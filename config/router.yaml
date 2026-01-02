@@ -1,0 +1,22 @@
+# LiteLLM proxy routing config (draft)
+model_list:
+  - model_name: openai/jerry-weak
+    litellm_params:
+      model: os.environ/JERRY_WEAK_MODEL
+      api_base: os.environ/JERRY_WEAK_API_BASE
+      api_key: os.environ/JERRY_WEAK_API_KEY
+  - model_name: openai/jerry-editor
+    litellm_params:
+      model: os.environ/JERRY_EDITOR_MODEL
+      api_base: os.environ/JERRY_EDITOR_API_BASE
+      api_key: os.environ/JERRY_EDITOR_API_KEY
+  - model_name: openai/jerry-architect
+    litellm_params:
+      model: os.environ/JERRY_ARCHITECT_MODEL
+      api_base: os.environ/JERRY_ARCHITECT_API_BASE
+      api_key: os.environ/JERRY_ARCHITECT_API_KEY
+  - model_name: openai/lil-jerry
+    litellm_params:
+      model: os.environ/LIL_JERRY_MODEL
+      api_base: os.environ/LIL_JERRY_API_BASE
+      api_key: os.environ/LIL_JERRY_API_KEY
