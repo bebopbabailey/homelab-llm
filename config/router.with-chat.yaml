@@ -1,4 +1,4 @@
-# LiteLLM proxy routing config (draft)
+# LiteLLM proxy routing config (with jerry-chat)
 model_list:
   - model_name: openai/jerry-weak
     litellm_params:

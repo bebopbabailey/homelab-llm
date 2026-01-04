@@ -12,3 +12,4 @@ wheels/
 # Local env overrides
 .env
 config/env.local
+.aider*
