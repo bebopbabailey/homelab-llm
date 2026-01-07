@@ -15,7 +15,7 @@ sudo systemctl restart open-webui
 ```
 
 ## LiteLLM Upstream
-Open WebUI uses OpenAI-compatible settings:
+Open WebUI uses OpenAI-compatible settings and plain model names from LiteLLM:
 - `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`
 - `OPENAI_API_KEY=dummy`
 

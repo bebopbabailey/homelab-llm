@@ -19,7 +19,7 @@ This document summarizes LiteLLM proxy capabilities we can rely on to avoid cust
 - Pre-call checks for context window enforcement (`enable_pre_call_checks`). citeturn0search1
 
 ## OpenAI-Compatible Endpoints
-- Use `openai/<model>` for OpenAI-compatible upstreams. citeturn0search2
+- Use `openai/<model>` in `litellm_params.model` for OpenAI-compatible upstreams. citeturn0search2
 
 ## Config Surface
 - `general_settings`, `router_settings`, `litellm_settings` are first-class config sections; Swagger exposes the full schema. citeturn0search0

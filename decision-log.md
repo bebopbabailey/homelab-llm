@@ -3,7 +3,7 @@
 ## 2026-01-03 — Gateway & Naming Decisions
 - Chose LiteLLM proxy mode for the gateway (no custom FastAPI forwarder in Phase 1).
 - Standardized OpenAI-compatible endpoints: `/v1/chat/completions` and `/v1/models`.
-- Adopted `openai/`-prefixed model names for compatibility, plus plain-name aliases (`jerry-*`) for clients that omit the prefix.
+- Adopted plain client-facing model names (`jerry-*`, `lil-jerry`) to keep `/v1/models` clean; LiteLLM still uses `openai/<upstream>` in `litellm_params.model` for provider routing.
 
 ## 2026-01-03 — Backend Topology & Aider Roles
 - MLX OpenAI servers run on the Studio at ports `8100`, `8101`, `8102`, `8103`; OpenVINO remains on the Mini at `9000`.

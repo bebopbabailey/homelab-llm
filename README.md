@@ -6,15 +6,11 @@ provides routing only and does not implement inference.
 ## Scope
 - Gateway only; no inference in this repo.
 - Declarative routing via `config/router.yaml` with env-var substitution.
-- Logical model names (canonical): `openai/jerry-weak`, `openai/jerry-editor`, `openai/jerry-architect`, `openai/lil-jerry`, `openai/jerry-chat`.
-
-## Model Naming Standard
-- Canonical client-facing names MUST use the `openai/` prefix (e.g., `openai/jerry-architect`).
-- Plain-name aliases (`jerry-*`) are temporary compatibility shims and will be removed once all clients are updated.
+- Logical model names: `jerry-weak`, `jerry-editor`, `jerry-architect`, `jerry-chat`, `jerry-test`, `lil-jerry`.
 
 ## Backends (External Services)
-- MLX OpenAI servers on the Studio: `jerry-chat` on `8100`, `jerry-editor` on `8101`, `jerry-architect` on `8102`, `jerry-weak` on `8103`.
-- OpenVINO LLM server on the Mini (external to this repo), mapped as `openai/lil-jerry`.
+- MLX OpenAI servers on the Studio: `jerry-chat` on `8100`, `jerry-editor` on `8101`, `jerry-architect` on `8102`, `jerry-weak` on `8103`, test model on `8109`.
+- OpenVINO LLM server on the Mini (external to this repo), mapped as `lil-jerry`.
 
 ## Configuration
 - `config/router.yaml` maps logical model names to upstream endpoints.
@@ -35,11 +31,15 @@ provides routing only and does not implement inference.
 ## Studio MLX Helpers
 - `scripts/run-mlx-studio.sh` starts the three coding models on ports `8103`, `8101`, `8102`.
 - `scripts/stop-mlx-studio.sh` stops the MLX servers by port.
+- `scripts/stop-mlx-studio-all.sh` stops MLX servers on ports `8100-8109` and boots out launchd.
+- `scripts/stop-mlx-ports.sh` (Mini or Studio) stops ports `8100-8109` and boots out launchd.
 - `scripts/run-mlx-gptoss-architect.sh` starts GPT-OSS 120B on port `8100` as `jerry-chat`.
+- `scripts/run-test-model.sh` (Mini) downloads + runs a Hugging Face model on port `8109`, updates LiteLLM, and restarts `litellm-orch`.
+- `scripts/start-mlx-jerry-chat.sh` restarts the Studio launchd service for `jerry-chat` (port `8100`).
 
 ## Verify
-- `GET /v1/models` returns `openai/jerry-*` and `openai/lil-jerry`.
-- `POST /v1/chat/completions` with `"model": "openai/jerry-weak"` returns a valid response.
+- `GET /v1/models` returns `jerry-*` and `lil-jerry`.
+- `POST /v1/chat/completions` with `"model": "jerry-weak"` returns a valid response.
 - `GET /health` returns LiteLLM health results for configured deployments.
 
 ## Health Check Script
@@ -52,6 +52,7 @@ provides routing only and does not implement inference.
 - Known issues and workarounds are tracked in `docs/known-issues.md`.
 - Security and exposure notes are in `docs/security.md`.
 - Open WebUI setup (non-docker) for the Mini is documented in `docs/openwebui.md`.
+- TinyAgents integration notes (planned) live in `docs/tinyagents-integration.md`.
 
 ## Auth (Planned)
 - API key enforcement will be enabled later when non-local access is needed.

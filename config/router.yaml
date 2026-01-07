@@ -1,50 +1,33 @@
 # LiteLLM proxy routing config (draft)
 model_list:
-  - model_name: openai/jerry-weak
-    litellm_params:
-      model: os.environ/JERRY_WEAK_MODEL
-      api_base: os.environ/JERRY_WEAK_API_BASE
-      api_key: os.environ/JERRY_WEAK_API_KEY
   - model_name: jerry-weak
     litellm_params:
       model: os.environ/JERRY_WEAK_MODEL
       api_base: os.environ/JERRY_WEAK_API_BASE
       api_key: os.environ/JERRY_WEAK_API_KEY
-  - model_name: openai/jerry-editor
-    litellm_params:
-      model: os.environ/JERRY_EDITOR_MODEL
-      api_base: os.environ/JERRY_EDITOR_API_BASE
-      api_key: os.environ/JERRY_EDITOR_API_KEY
   - model_name: jerry-editor
     litellm_params:
       model: os.environ/JERRY_EDITOR_MODEL
       api_base: os.environ/JERRY_EDITOR_API_BASE
       api_key: os.environ/JERRY_EDITOR_API_KEY
-  - model_name: openai/jerry-architect
-    litellm_params:
-      model: os.environ/JERRY_ARCHITECT_MODEL
-      api_base: os.environ/JERRY_ARCHITECT_API_BASE
-      api_key: os.environ/JERRY_ARCHITECT_API_KEY
   - model_name: jerry-architect
     litellm_params:
       model: os.environ/JERRY_ARCHITECT_MODEL
       api_base: os.environ/JERRY_ARCHITECT_API_BASE
       api_key: os.environ/JERRY_ARCHITECT_API_KEY
-  - model_name: openai/jerry-chat
-    litellm_params:
-      model: os.environ/JERRY_CHAT_MODEL
-      api_base: os.environ/JERRY_CHAT_API_BASE
-      api_key: os.environ/JERRY_CHAT_API_KEY
   - model_name: jerry-chat
     litellm_params:
       model: os.environ/JERRY_CHAT_MODEL
       api_base: os.environ/JERRY_CHAT_API_BASE
       api_key: os.environ/JERRY_CHAT_API_KEY
-  - model_name: openai/lil-jerry
+  - model_name: jerry-test
     litellm_params:
-      model: os.environ/LIL_JERRY_MODEL
-      api_base: os.environ/LIL_JERRY_API_BASE
-      api_key: os.environ/LIL_JERRY_API_KEY
+      model: os.environ/JERRY_TEST_MODEL
+      api_base: os.environ/JERRY_TEST_API_BASE
+      api_key: os.environ/JERRY_TEST_API_KEY
+    model_info:
+      max_input_tokens: 32768
+      max_output_tokens: 4096
   - model_name: lil-jerry
     litellm_params:
       model: os.environ/LIL_JERRY_MODEL
