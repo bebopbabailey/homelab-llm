@@ -1,0 +1,16 @@
+[Unit]
+Description=Open WebUI (system, LiteLLM upstream)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/open-webui
+EnvironmentFile=/etc/open-webui/env
+ExecStart=/home/christopherbailey/open-webui/.venv/bin/open-webui serve --host 0.0.0.0 --port 3000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

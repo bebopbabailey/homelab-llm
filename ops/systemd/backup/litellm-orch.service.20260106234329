@@ -1,0 +1,17 @@
+[Unit]
+Description=LiteLLM Proxy (litellm-orch)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/litellm-orch
+EnvironmentFile=/home/christopherbailey/litellm-orch/config/env.local
+Environment=LITELLM_LOG=INFO
+ExecStart=/home/christopherbailey/.local/bin/uv run litellm --config /home/christopherbailey/litellm-orch/config/router.yaml --host 0.0.0.0 --port 4000
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

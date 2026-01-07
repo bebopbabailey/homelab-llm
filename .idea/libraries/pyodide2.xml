@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="pyodide2">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/services/open-webui/.venv/lib64/python3.11/site-packages/open_webui/frontend/pyodide/libopenblas-0.3.26.zip!/" />
+      <root url="jar://$PROJECT_DIR$/services/open-webui/.venv/lib64/python3.11/site-packages/open_webui/frontend/pyodide/libopenssl-1.1.1w.zip!/" />
+      <root url="jar://$PROJECT_DIR$/services/open-webui/.venv/lib64/python3.11/site-packages/open_webui/frontend/pyodide/python_stdlib.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
