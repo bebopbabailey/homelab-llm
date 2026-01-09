@@ -23,4 +23,11 @@ check_http() {
 
 check_port 4000
 check_port 3000
+check_http http://127.0.0.1:4000/v1/models
 check_http http://127.0.0.1:9000/health
+check_http http://127.0.0.1:4020/v1/models
+check_http http://192.168.1.72:8100/v1/models
+check_http http://192.168.1.72:8101/v1/models
+check_http http://192.168.1.72:8102/v1/models
+check_http http://192.168.1.72:8103/v1/models
+check_http http://192.168.1.72:8109/v1/models

@@ -1,0 +1,519 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+import shutil
+from contextlib import contextmanager
+from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None
+
+
+DEFAULT_REGISTRY = "/Users/thestudio/models/hf/hub/registry.json"
+DEFAULT_HF_HOME = "/Users/thestudio/models/hf"
+PORT_RANGE = range(8100, 8110)
+
+
+def _is_local_host():
+    host = socket.gethostname().split(".")[0].lower()
+    return host in {"studio", "thestudio"}
+
+
+def _maybe_forward_to_studio(args):
+    if args.local:
+        return
+    if _is_local_host():
+        return
+    studio_host = os.environ.get("STUDIO_HOST", "studio")
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    cmd = ["ssh", studio_host, studio_cmd, "--local"] + sys.argv[1:]
+    raise SystemExit(subprocess.call(cmd))
+
+
+def _registry_path():
+    return Path(os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY))
+
+
+def _hf_home():
+    return Path(os.environ.get("HF_HOME", DEFAULT_HF_HOME))
+
+
+@contextmanager
+def _registry_lock(path: Path):
+    lock_path = path.with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("w") as lock_handle:
+        if fcntl:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        yield
+        if fcntl:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _load_registry(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(json.dumps({"version": 1, "models": {}}, indent=2))
+    with _registry_lock(path):
+        data = json.loads(path.read_text() or "{}")
+    data.setdefault("version", 1)
+    data.setdefault("models", {})
+    return data
+
+
+def _write_registry(path: Path, data):
+    tmp = path.with_suffix(".tmp")
+    payload = json.dumps(data, indent=2)
+    with _registry_lock(path):
+        tmp.write_text(payload)
+        tmp.replace(path)
+
+
+def _slugify(text: str):
+    text = text.lower().replace("/", "-")
+    text = re.sub(r"[^a-z0-9-_]+", "-", text).strip("-")
+    return text
+
+
+def _repo_from_dir(name: str):
+    if not name.startswith("models--"):
+        return None
+    parts = name.replace("models--", "", 1).split("--", 1)
+    if len(parts) != 2:
+        return None
+    return f"{parts[0]}/{parts[1]}"
+
+
+def _latest_snapshot(model_dir: Path):
+    snapshots = model_dir / "snapshots"
+    if not snapshots.exists():
+        return None
+    candidates = list(snapshots.iterdir())
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _guess_format(repo_id: str):
+    return "gguf" if "gguf" in repo_id.lower() else "mlx"
+
+
+def _find_entry(data, model_ref: str):
+    models = data.get("models", {})
+    if model_ref in models:
+        return model_ref, models[model_ref]
+    for slug, entry in models.items():
+        if entry.get("repo_id") == model_ref:
+            return slug, entry
+    return None, None
+
+
+def _port_listening(port: int):
+    try:
+        result = subprocess.run(
+            ["lsof", "-tiTCP:%d" % port, "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        raise SystemExit("lsof is required on the Studio to detect ports.")
+    pids = [line for line in result.stdout.splitlines() if line.strip()]
+    return pids
+
+
+def _ps_snapshot():
+    try:
+        result = subprocess.run(
+            ["ps", "-ax", "-o", "pid=,ppid=,command="],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        raise SystemExit("ps is required on the Studio to inspect processes.")
+    rows = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid, ppid, cmd = parts
+        rows.append((int(pid), int(ppid), cmd))
+    return rows
+
+
+def _mlx_pids_for_port(port: int):
+    port_token = re.compile(rf"--port(?:=|\s+){port}\b")
+    pids = []
+    for pid, _ppid, cmd in _ps_snapshot():
+        if "mlx-openai-server" not in cmd:
+            continue
+        if port_token.search(cmd):
+            pids.append(pid)
+    return pids
+
+
+def _include_children(pids):
+    snapshot = _ps_snapshot()
+    by_ppid = {}
+    for pid, ppid, cmd in snapshot:
+        by_ppid.setdefault(ppid, []).append((pid, cmd))
+    expanded = set(pids)
+    queue = list(pids)
+    while queue:
+        current = queue.pop()
+        for child_pid, _cmd in by_ppid.get(current, []):
+            if child_pid not in expanded:
+                expanded.add(child_pid)
+                queue.append(child_pid)
+    return sorted(expanded)
+
+
+def _kill_pids(pids, timeout: int = 10):
+    if not pids:
+        return
+    for pid in pids:
+        subprocess.run(["kill", str(pid)], check=False)
+    deadline = time.time() + timeout
+    remaining = set(pids)
+    while remaining and time.time() < deadline:
+        live = set(pid for pid, _ppid, _cmd in _ps_snapshot())
+        remaining = remaining.intersection(live)
+        if remaining:
+            time.sleep(0.5)
+    if remaining:
+        for pid in remaining:
+            subprocess.run(["kill", "-9", str(pid)], check=False)
+
+
+def _stop_mlx_for_port(port: int):
+    pids = _mlx_pids_for_port(port)
+    if not pids:
+        return
+    tree = _include_children(pids)
+    _kill_pids(tree)
+
+
+def _launchd_loaded(label: str):
+    if sys.platform != "darwin":
+        return False
+    result = subprocess.run(
+        ["launchctl", "print", f"system/{label}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _maybe_stop_launchd(label: str):
+    if not _launchd_loaded(label):
+        return
+    if os.geteuid() != 0:
+        print(f"launchd job {label} is loaded; stop it with:")
+        print(f"sudo launchctl bootout system/{label}")
+        return
+    subprocess.run(["launchctl", "bootout", f"system/{label}"], check=False)
+
+
+def _prompt_yes_no(message: str):
+    reply = input(f"{message} [y/N]: ").strip().lower()
+    return reply in {"y", "yes"}
+
+
+def _model_on_port(data, port: int):
+    for slug, entry in data["models"].items():
+        if entry.get("port") == port:
+            return slug, entry
+    return None, None
+
+
+def _wait_for_port(port: int, timeout: int = 60):
+    start = time.time()
+    while time.time() - start < timeout:
+        if _port_listening(port):
+            return True
+        time.sleep(1)
+    return False
+
+
+def cmd_init(_args):
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    models = data["models"]
+
+    hub = _hf_home() / "hub"
+    if not hub.exists():
+        raise SystemExit(f"HF hub directory not found: {hub}")
+
+    added = 0
+    for model_dir in hub.iterdir():
+        repo_id = _repo_from_dir(model_dir.name)
+        if not repo_id:
+            continue
+        slug = _slugify(repo_id)
+        if slug in models:
+            continue
+        snapshot = _latest_snapshot(model_dir)
+        if not snapshot:
+            continue
+        models[slug] = {
+            "repo_id": repo_id,
+            "model_id": repo_id,
+            "cache_path": str(snapshot),
+            "format": _guess_format(repo_id),
+            "port": None,
+        }
+        added += 1
+
+    _write_registry(registry_path, data)
+    print(f"registry initialized: {registry_path} (added {added})")
+
+
+def cmd_list(_args):
+    data = _load_registry(_registry_path())
+    for slug, entry in sorted(data["models"].items()):
+        port = entry.get("port")
+        repo_id = entry.get("repo_id")
+        print(f"{slug}\t{repo_id}\t{port if port else '-'}")
+
+
+def cmd_status(_args):
+    data = _load_registry(_registry_path())
+    port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
+    for port in PORT_RANGE:
+        pids = _port_listening(port)
+        proc_pids = _mlx_pids_for_port(port)
+        slug = port_map.get(port)
+        status = "listening" if pids else ("starting" if proc_pids else "idle")
+        pid_str = ",".join(pids if pids else [str(pid) for pid in proc_pids]) if (pids or proc_pids) else "-"
+        model_str = slug if slug else "-"
+        print(f"{port}\t{status}\t{pid_str}\t{model_str}")
+
+
+def _download_and_register(data, model_ref: str):
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:
+        raise SystemExit("huggingface_hub is required for downloads. Install it first.") from exc
+
+    cache_dir = _hf_home()
+    repo_id = model_ref
+    snapshot = snapshot_download(repo_id, cache_dir=str(cache_dir))
+    slug = _slugify(repo_id)
+    data["models"][slug] = {
+        "repo_id": repo_id,
+        "model_id": repo_id,
+        "cache_path": str(snapshot),
+        "format": _guess_format(repo_id),
+        "port": None,
+    }
+    return slug, data["models"][slug]
+
+
+def _launch_server(entry, port: int):
+    model_path = entry["cache_path"]
+    cmd = os.environ.get("MLX_LAUNCH_CMD")
+    if cmd:
+        argv = cmd.split()
+    elif shutil.which("mlx-openai-server"):
+        argv = ["mlx-openai-server", "launch"]
+    elif shutil.which("uv"):
+        argv = ["uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
+    elif Path("/opt/homebrew/bin/uv").exists():
+        argv = ["/opt/homebrew/bin/uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
+    else:
+        raise SystemExit("mlx-openai-server not found; set MLX_LAUNCH_CMD or install it.")
+
+    argv += [
+        "--model-path",
+        model_path,
+        "--model-type",
+        "lm",
+        "--trust-remote-code",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        str(port),
+    ]
+
+    chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
+    if chat_template:
+        argv += ["--chat-template-file", chat_template]
+
+    log_dir = os.environ.get("MLX_LOG_DIR", "/tmp")
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
+    log_file = Path(log_dir) / f"mlx-{port}.log"
+    with log_file.open("a") as handle:
+        subprocess.Popen(argv, stdout=handle, stderr=handle)
+
+
+def cmd_load(args):
+    port = int(args.port)
+    if port not in PORT_RANGE:
+        raise SystemExit("port must be between 8100 and 8109")
+
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    launchd_label = os.environ.get("MLX_LAUNCHD_LABEL", "com.bebop.mlx-launch")
+    if not args.ignore_launchd and _launchd_loaded(launchd_label):
+        if _prompt_yes_no(f"launchd job {launchd_label} is loaded. Stop it before loading?"):
+            _maybe_stop_launchd(launchd_label)
+        else:
+            raise SystemExit("load cancelled")
+
+    running_pids = _mlx_pids_for_port(port)
+    if (running_pids or _port_listening(port)) and not args.force:
+        slug, _entry = _model_on_port(data, port)
+        model_name = slug if slug else "unknown"
+        if not _prompt_yes_no(f"model {model_name} already in port {port}. Unload model?"):
+            raise SystemExit("load cancelled")
+        cmd_unload(argparse.Namespace(port=str(port)))
+
+    slug, entry = _find_entry(data, args.model)
+    if not entry:
+        slug, entry = _download_and_register(data, args.model)
+
+    if entry.get("port") and entry.get("port") != port:
+        raise SystemExit(f"model already assigned to port {entry['port']}; unload first")
+
+    _launch_server(entry, port)
+    if not _wait_for_port(port):
+        raise SystemExit(f"model failed to start on port {port}")
+
+    entry["port"] = port
+    _write_registry(registry_path, data)
+    print(f"loaded {slug} on {port}")
+
+
+def cmd_unload(args):
+    port = int(args.port)
+    if port not in PORT_RANGE:
+        raise SystemExit("port must be between 8100 and 8109")
+
+    _stop_mlx_for_port(port)
+
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    for entry in data["models"].values():
+        if entry.get("port") == port:
+            entry["port"] = None
+    _write_registry(registry_path, data)
+    print(f"unloaded port {port}")
+
+
+def cmd_unload_all(_args):
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    running = []
+    for port in PORT_RANGE:
+        if _port_listening(port) or _mlx_pids_for_port(port):
+            slug, _entry = _model_on_port(data, port)
+            model_name = slug if slug else "unknown"
+            running.append((port, model_name))
+    if running:
+        print("Currently running models:")
+        for port, model_name in running:
+            print(f"- {model_name} on {port}")
+    else:
+        print("No running models detected.")
+        return
+    if not _prompt_yes_no("Unload all models?"):
+        print("unload-all cancelled")
+        return
+    for port in PORT_RANGE:
+        _stop_mlx_for_port(port)
+        for entry in data["models"].values():
+            if entry.get("port") == port:
+                entry["port"] = None
+    _write_registry(registry_path, data)
+    print("unloaded all ports")
+
+
+def cmd_reconcile(_args):
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    changed = 0
+    for entry in data["models"].values():
+        port = entry.get("port")
+        if not port:
+            continue
+        if not _port_listening(int(port)):
+            entry["port"] = None
+            changed += 1
+    _write_registry(registry_path, data)
+    print(f"reconciled registry (cleared {changed} stale ports)")
+
+
+def cmd_verify(_args):
+    expected = [
+        "--tool-call-parser qwen3_moe",
+        "--reasoning-parser qwen3_moe",
+        "--trust-remote-code",
+        "--chat-template-file /Users/thestudio/models/hf/hub/models--mlx-community--Qwen3-235B-A22B-Instruct-2507-6bit/snapshots/6dd2ef235d39fb976237fd9243184741d8407a55/chat_template.jinja",
+    ]
+    missing = []
+    for pid, _ppid, cmd in _ps_snapshot():
+        if "mlx-openai-server" not in cmd or "--port 8100" not in cmd:
+            continue
+        for token in expected:
+            if token not in cmd:
+                missing.append(token)
+        if missing:
+            raise SystemExit("mlxctl verify failed: missing flags:\n  - " + "\n  - ".join(sorted(set(missing))))
+        print("mlxctl verify ok: required flags present")
+        return
+    raise SystemExit("mlxctl verify failed: no mlx-openai-server process found on port 8100")
+
+
+def main():
+    parser = argparse.ArgumentParser(prog="mlxctl")
+    parser.add_argument("--local", action="store_true", help="run locally on Studio")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("init")
+    sub.add_parser("list")
+    sub.add_parser("status")
+
+    load = sub.add_parser("load")
+    load.add_argument("model")
+    load.add_argument("port")
+    load.add_argument("--force", action="store_true")
+    load.add_argument("--ignore-launchd", action="store_true")
+
+    unload = sub.add_parser("unload")
+    unload.add_argument("port")
+
+    sub.add_parser("unload-all")
+    sub.add_parser("reconcile")
+    sub.add_parser("verify")
+
+    args = parser.parse_args()
+    _maybe_forward_to_studio(args)
+
+    commands = {
+        "init": cmd_init,
+        "list": cmd_list,
+        "status": cmd_status,
+        "load": cmd_load,
+        "unload": cmd_unload,
+        "unload-all": cmd_unload_all,
+        "reconcile": cmd_reconcile,
+        "verify": cmd_verify,
+    }
+    commands[args.command](args)
+
+
+if __name__ == "__main__":
+    main()

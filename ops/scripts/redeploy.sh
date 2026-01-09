@@ -26,7 +26,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HEALTHCHECK="$REPO_ROOT/ops/scripts/healthcheck.sh"
 
 # Services we know how to manage.
-KNOWN_SERVICES=("litellm-orch" "open-webui" "ov-server")
+KNOWN_SERVICES=("litellm-orch" "open-webui" "ov-server" "optillm-proxy")
 
 log() { printf "\n[%s] %s\n" "$(date +'%F %T')" "$*"; }
 die() { printf "\nERROR: %s\n" "$*" >&2; exit 1; }

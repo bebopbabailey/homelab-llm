@@ -1,0 +1,16 @@
+[Unit]
+Description=OptiLLM Proxy (optillm-proxy)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/optillm-proxy
+EnvironmentFile=/etc/optillm-proxy/env
+ExecStart=/home/christopherbailey/.local/bin/uv run optillm --host 127.0.0.1 --port 4020 --base-url http://127.0.0.1:4000/v1 --approach auto --model jerry-architect
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

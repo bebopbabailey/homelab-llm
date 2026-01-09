@@ -5,7 +5,6 @@
 - Use `uv` only; no system Python mutations.
 - Do not touch existing services (Ollama, OpenVINO, MLX).
 - Keep LiteLLM as the single gateway.
-- No MCP until explicitly planned.
 - Ports are immutable without a migration phase.
 
 ## Should
@@ -22,5 +21,4 @@
 - Change/reuse existing ports.
 - Expose new LAN-facing services by default.
 - Bypass LiteLLM gateway.
-- Introduce MCP.
 - Store secrets in repo or prompts.
