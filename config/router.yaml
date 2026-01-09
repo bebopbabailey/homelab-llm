@@ -1,38 +1,59 @@
 # LiteLLM proxy routing config (draft)
 model_list:
-  - model_name: jerry-weak
+  - model_name: jerry-xl
     litellm_params:
-      model: os.environ/JERRY_WEAK_MODEL
-      api_base: os.environ/JERRY_WEAK_API_BASE
-      api_key: os.environ/JERRY_WEAK_API_KEY
-  - model_name: jerry-editor
+      model: os.environ/JERRY_XL_MODEL
+      api_base: os.environ/JERRY_XL_API_BASE
+      api_key: os.environ/JERRY_XL_API_KEY
+  - model_name: jerry-l
     litellm_params:
-      model: os.environ/JERRY_EDITOR_MODEL
-      api_base: os.environ/JERRY_EDITOR_API_BASE
-      api_key: os.environ/JERRY_EDITOR_API_KEY
-  - model_name: jerry-architect
+      model: os.environ/JERRY_L_MODEL
+      api_base: os.environ/JERRY_L_API_BASE
+      api_key: os.environ/JERRY_L_API_KEY
+  - model_name: jerry-m
     litellm_params:
-      model: os.environ/JERRY_ARCHITECT_MODEL
-      api_base: os.environ/JERRY_ARCHITECT_API_BASE
-      api_key: os.environ/JERRY_ARCHITECT_API_KEY
-  - model_name: jerry-chat
+      model: os.environ/JERRY_M_MODEL
+      api_base: os.environ/JERRY_M_API_BASE
+      api_key: os.environ/JERRY_M_API_KEY
+  - model_name: jerry-s
     litellm_params:
-      model: os.environ/JERRY_CHAT_MODEL
-      api_base: os.environ/JERRY_CHAT_API_BASE
-      api_key: os.environ/JERRY_CHAT_API_KEY
-  - model_name: jerry-test
+      model: os.environ/JERRY_S_MODEL
+      api_base: os.environ/JERRY_S_API_BASE
+      api_key: os.environ/JERRY_S_API_KEY
+  - model_name: bench-xl
     litellm_params:
-      model: os.environ/JERRY_TEST_MODEL
-      api_base: os.environ/JERRY_TEST_API_BASE
-      api_key: os.environ/JERRY_TEST_API_KEY
+      model: os.environ/BENCH_XL_MODEL
+      api_base: os.environ/BENCH_XL_API_BASE
+      api_key: os.environ/BENCH_XL_API_KEY
     model_info:
+      # what clients should assume for budgeting:
       max_input_tokens: 32768
       max_output_tokens: 4096
-  - model_name: lil-jerry
+  - model_name: bench-l
     litellm_params:
-      model: os.environ/LIL_JERRY_MODEL
-      api_base: os.environ/LIL_JERRY_API_BASE
-      api_key: os.environ/LIL_JERRY_API_KEY
+      model: os.environ/BENCH_L_MODEL
+      api_base: os.environ/BENCH_L_API_BASE
+      api_key: os.environ/BENCH_L_API_KEY
+  - model_name: bench-m
+    litellm_params:
+      model: os.environ/BENCH_M_MODEL
+      api_base: os.environ/BENCH_M_API_BASE
+      api_key: os.environ/BENCH_M_API_KEY
+  - model_name: bench-s
+    litellm_params:
+      model: os.environ/BENCH_S_MODEL
+      api_base: os.environ/BENCH_S_API_BASE
+      api_key: os.environ/BENCH_S_API_KEY
+  - model_name: utility-a
+    litellm_params:
+      model: os.environ/UTILITY_A_MODEL
+      api_base: os.environ/UTILITY_A_API_BASE
+      api_key: os.environ/UTILITY_A_API_KEY
+  - model_name: utility-b
+    litellm_params:
+      model: os.environ/UTILITY_B_MODEL
+      api_base: os.environ/UTILITY_B_API_BASE
+      api_key: os.environ/UTILITY_B_API_KEY
 
 router_settings:
   allowed_fails: 2
