@@ -459,7 +459,7 @@ def cmd_reconcile(_args):
 def cmd_verify(_args):
     expected = [
         "--tool-call-parser qwen3_moe",
-        "--reasoning-parser qwen3_moe",
+        "--reasoning-parser qwen3",
         "--trust-remote-code",
         "--chat-template-file /Users/thestudio/models/hf/hub/models--mlx-community--Qwen3-235B-A22B-Instruct-2507-6bit/snapshots/6dd2ef235d39fb976237fd9243184741d8407a55/chat_template.jinja",
     ]

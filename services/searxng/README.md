@@ -1,4 +1,4 @@
-# SearXNG (planned)
+# SearXNG
 
 ## Overview
 SearXNG is a privacy-focused metasearch engine. It is planned as a **local
@@ -12,30 +12,42 @@ Docs: `https://docs.searxng.org/admin/installation.html`
 - Bind to localhost unless explicitly approved for LAN exposure.
 - Use `uv` for Python dependency management.
 
-## Install (manual, no Docker)
-The upstream project provides install scripts and step-by-step setup. For a
-manual install that aligns with `uv`:
+## Install (no Docker, repo-based)
+SearXNG runs from `services/searxng/app` and is managed via systemd.
 
-1) Create a dedicated user (recommended by upstream) and a system directory
-   (example: `/opt/searxng`).
-2) Clone the repo and create a virtual environment:
+1) Clone upstream into the service directory:
 
 ```bash
-git clone https://github.com/searxng/searxng.git /opt/searxng
-cd /opt/searxng
-uv venv .venv
-uv pip install -r requirements.txt
+git clone https://github.com/searxng/searxng.git services/searxng/app
 ```
 
-3) Create `/etc/searxng/settings.yml` based on the upstream template and set
-   `server.secret_key`. The upstream template lives in:
-   `utils/templates/etc/searxng/settings.yml`.
+2) Bootstrap dependencies + settings:
+
+```bash
+./services/searxng/scripts/bootstrap.sh
+```
+
+This will:
+- create `services/searxng/app/.venv`
+- install `requirements.txt` + `requirements-server.txt`
+- write `/etc/searxng/settings.yml` from `services/searxng/settings.yml.example`
+- write `/etc/searxng/env` from `services/searxng/searxng.env.example`
 
 ## Configuration (essentials)
 Key settings in `/etc/searxng/settings.yml`:
 - `server.secret_key` (required)
 - `server.bind_address` (default `127.0.0.1`)
 - `server.port` (default `8888`)
+- `search.formats` (include `json` for API use)
+- `search.safe_search` (0/1/2)
+- `search.autocomplete` (optional)
+- `server.limiter` (local-only rate limiting)
+
+Useful knobs for future tuning:
+- `server.base_url` (stable links in results)
+- `search.languages` or `search.language`
+- `engines` (disable unused engines to speed up results)
+- `outgoing.request_timeout` (reduce slow engine hangs)
 
 SearXNG reads its config from `SEARXNG_SETTINGS_PATH`. Example:
 
@@ -43,15 +55,26 @@ SearXNG reads its config from `SEARXNG_SETTINGS_PATH`. Example:
 export SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
 ```
 
-## Run (local)
-For a local dev run, the upstream `manage` script supports `webapp.run` and
-uses Granian/WSGI for development. For production, follow the upstream uWSGI or
-Granian guides.
+## Run (systemd)
+Install the unit and start:
+
+```bash
+sudo cp /home/christopherbailey/homelab-llm/ops/systemd/searxng.service /etc/systemd/system/searxng.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now searxng.service
+```
 
 ## Usage
 Once running on localhost:
 - Web UI: `http://127.0.0.1:8888`
 - JSON search endpoint: `http://127.0.0.1:8888/search?q=<query>&format=json`
+
+## LiteLLM Integration
+LiteLLM exposes SearXNG via `/v1/search/<tool_name>` once configured in
+`services/litellm-orch/config/router.yaml`.
+Set these in `services/litellm-orch/config/env.local`:
+- `SEARXNG_API_BASE=http://127.0.0.1:8888`
+- `SEARXNG_API_KEY=` (optional)
 
 ## References
 - Installation: `https://docs.searxng.org/admin/installation.html`

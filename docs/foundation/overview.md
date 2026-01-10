@@ -15,12 +15,16 @@ while allowing backend models to evolve independently.
 3) Tooling (planned)
    - MCP servers provide tool access (search, ops, repo actions).
    - TinyAgents connects to MCP servers; LiteLLM remains the LLM gateway.
+   - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
    - OptiLLM runs localhost-only behind LiteLLM to apply inference-time strategies.
    - LiteLLM sends prefixed model names (e.g., `moa-jerry-architect`) to avoid loops.
 5) Specialist Backends (current)
-   - OpenVINO LLM server on the Mac Mini (`lil-jerry`).
+   - OpenVINO LLM server on the Mac Mini (`benny-*`).
    - MLX OpenAI servers on the Mac Studio (`jerry-*`).
+6) Search (planned → current)
+   - SearXNG runs locally on the Mini and is exposed via LiteLLM `/v1/search`.
+   - `web.fetch` is the next step after search for clean content extraction.
 
 ## Data Flow (current)
 1) Client sends an OpenAI-compatible request to LiteLLM.

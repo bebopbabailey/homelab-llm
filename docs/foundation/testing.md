@@ -44,6 +44,11 @@ Check for MLX aliases:
 curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^(jerry|bench|utility)-'
 ```
 
+Check for OpenVINO aliases:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^benny-'
+```
+
 ## OptiLLM (Mini)
 ```bash
 curl -fsS http://127.0.0.1:4020/v1/models | jq .
@@ -57,6 +62,28 @@ curl -fsS http://127.0.0.1:9000/health | jq .
 ## SearXNG (Mini, once installed)
 ```bash
 curl -fsS "http://127.0.0.1:8888/search?q=ping&format=json" | jq .
+```
+
+## LiteLLM Search Proxy (Mini)
+```bash
+curl -fsS http://127.0.0.1:4000/v1/search/searxng-search \
+  -H "Authorization: Bearer dummy" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"openvino llm","max_results":3}' | jq .
+```
+
+## MCP web.fetch (Mini, stdio)
+```bash
+cd /home/christopherbailey/homelab-llm/services/web-fetch
+uv venv .venv
+uv pip install -e .
+.venv/bin/python3 scripts/demo_client.py --url https://example.com --print-clean-text
+```
+
+## MCP search.web (Mini, stdio)
+```bash
+cd /home/christopherbailey/homelab-llm/services/web-fetch
+.venv/bin/python3 scripts/demo_client.py --tool search.web --query "openvino llm" --max-results 3
 ```
 
 ## TinyAgents (Mini, once wired)

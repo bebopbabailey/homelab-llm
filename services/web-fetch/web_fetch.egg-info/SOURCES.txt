@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+web_fetch_mcp.py
+web_fetch.egg-info/PKG-INFO
+web_fetch.egg-info/SOURCES.txt
+web_fetch.egg-info/dependency_links.txt
+web_fetch.egg-info/entry_points.txt
+web_fetch.egg-info/requires.txt
+web_fetch.egg-info/top_level.txt

@@ -1,0 +1,129 @@
+# Benny Model Onboarding (OpenVINO)
+
+Purpose: consistent, repeatable steps to add small/medium OpenVINO models for the
+Mini and register them under the Benny naming scheme.
+
+## Prereqs
+- `hf` CLI installed and logged in if needed (Llama 3.2 requires license access).
+- Conversion env exists: `uv venv .venv-convert` and
+  `uv pip install --python .venv-convert "optimum[openvino]" sentencepiece tiktoken`.
+- Source models live in `~/models`.
+- Converted outputs and registry live in `~/models/converted_models`.
+
+## Recommended Benny Names
+- benny-classify-s / benny-classify-m
+- benny-clean-s / benny-clean-m
+- benny-tool-s / benny-tool-m
+- benny-summarize-s / benny-summarize-m
+- benny-extract-s / benny-extract-m
+- benny-rewrite-s / benny-rewrite-m
+- benny-route-s / benny-route-m
+
+## Recommended Mapping (current)
+| benny name | HF repo | weight format |
+| --- | --- | --- |
+| benny-route-s | Qwen/Qwen2.5-0.5B-Instruct | int8 |
+| benny-route-m | Qwen/Qwen2.5-1.5B-Instruct | fp16 (shared with benny-tool-s) |
+| benny-classify-s | ibm-granite/granite-3.0-2b-instruct | int8 |
+| benny-classify-m | Qwen/Qwen2.5-3B-Instruct | fp16 |
+| benny-clean-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | fp16 |
+| benny-clean-m | microsoft/Phi-4-mini-instruct | fp16 |
+| benny-tool-s | Qwen/Qwen2.5-1.5B-Instruct | fp16 |
+| benny-tool-m | Qwen/Qwen2.5-3B-Instruct | fp16 (shared with benny-classify-m) |
+| benny-summarize-s | meta-llama/Llama-3.2-1B-Instruct | fp16 |
+| benny-summarize-m | microsoft/Phi-3.5-mini-instruct | fp16 |
+| benny-extract-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | fp16 (shared with benny-clean-s) |
+| benny-extract-m | microsoft/Phi-3.5-mini-instruct | fp16 (shared with benny-summarize-m) |
+| benny-rewrite-s | google/gemma-2-2b-it | fp16 |
+| benny-rewrite-m | meta-llama/Llama-3.2-3B-Instruct | fp16 |
+
+## Download (examples)
+Use `hf download` to place repos under `~/models/<RepoName>`:
+
+```bash
+hf download Qwen/Qwen2.5-1.5B-Instruct --local-dir ~/models/Qwen2.5-1.5B-Instruct
+hf download Qwen/Qwen2.5-3B-Instruct --local-dir ~/models/Qwen2.5-3B-Instruct
+hf download HuggingFaceTB/SmolLM2-1.7B-Instruct --local-dir ~/models/SmolLM2-1.7B-Instruct
+hf download microsoft/Phi-3.5-mini-instruct --local-dir ~/models/Phi-3.5-mini-instruct
+hf download meta-llama/Llama-3.2-1B-Instruct --local-dir ~/models/Llama-3.2-1B-Instruct
+hf download meta-llama/Llama-3.2-3B-Instruct --local-dir ~/models/Llama-3.2-3B-Instruct
+hf download Qwen/Qwen2.5-0.5B-Instruct --local-dir ~/models/Qwen2.5-0.5B-Instruct
+hf download ibm-granite/granite-3.0-2b-instruct --local-dir ~/models/granite-3.0-2b-instruct
+hf download google/gemma-2-2b-it --local-dir ~/models/gemma-2-2b-it
+```
+
+If a model is gated, run:
+```bash
+hf auth login
+```
+
+## Convert + Register
+Run the converter from the repo:
+
+```bash
+cd ~/homelab-llm/services/ov-llm-server
+./scripts/ov-convert-model
+```
+
+If you have it on PATH:
+```bash
+ov-convert-model
+```
+
+Optional flags:
+```bash
+./scripts/ov-convert-model --weight-format int8
+./scripts/ov-convert-model --task text-generation-with-past
+```
+
+Download + convert in one step:
+```bash
+ov-convert-model --model Qwen/Qwen2.5-1.5B-Instruct --weight-format int8
+```
+
+## Phi Compatibility Patch (automatic)
+Phi-3.5 and Phi-4 models require two small compatibility symbols that are not
+present in released Transformers. The converter now runs
+`services/ov-llm-server/scripts/patch-transformers-compat.sh` automatically.
+If you rebuild `.venv-convert`, this patch will re-apply on the next conversion.
+
+When prompted for a custom name, enter the Benny name (e.g. `benny-tool-s`).
+The converter writes:
+- OpenVINO IR to `~/models/converted_models/<name>/task-text-generation-with-past__wf-fp16`
+- `conversion.json` in that folder
+- Registry entry in `~/models/converted_models/registry.json`
+
+## Offload Originals to HP
+The converter offloads originals to the HP by default and removes local copies.
+If offload fails, it falls back to keeping the copy under `~/models/og_models`.
+
+Defaults:
+- Host: `hp`
+- Destination: `/root/models/og_models`
+
+Override if needed:
+```bash
+export OV_MODEL_OG_REMOTE=hp
+export OV_MODEL_OG_REMOTE_DIR=/root/models/og_models
+```
+
+## Quick Verify
+```bash
+jq '.models | keys' ~/models/converted_models/registry.json
+```
+
+## LiteLLM Wiring
+Once converted, add the Benny entries to LiteLLM:
+- Router: `services/litellm-orch/config/router.yaml`
+- Env vars: `services/litellm-orch/config/env.local` (copy from `env.example`)
+
+Each `BENNY_*_MODEL` should be `openai/<benny-name>` and all `BENNY_*_API_BASE`
+should point to `http://127.0.0.1:9000/v1`.
+
+Lean note: some Benny aliases intentionally point to the same OpenVINO model
+name to avoid duplicate backends. See `services/litellm-orch/config/env.local`
+for the current alias mapping.
+
+## Notes
+- Conversion always uses `--trust-remote-code` (required by some model families).
+- Keep names stable; the registry key is the model name LiteLLM will reference.

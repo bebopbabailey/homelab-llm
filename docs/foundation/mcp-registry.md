@@ -12,18 +12,21 @@ intended to be the single source of truth for tool endpoints and transports.
   "version": 1,
   "servers": [
     {
-      "name": "searxng-search",
-      "purpose": "web search",
-      "transport": "http",
-      "endpoint": "http://127.0.0.1:8888",
-      "health": "http://127.0.0.1:8888/health",
+      "name": "web-fetch",
+      "purpose": "fetch + clean HTML",
+      "transport": "stdio",
+      "command": "/home/christopherbailey/homelab-llm/services/web-fetch/web_fetch_mcp.py",
+      "args": [],
       "env": [
-        "SEARXNG_SETTINGS_PATH"
+        "LITELLM_SEARCH_API_BASE",
+        "LITELLM_SEARCH_API_KEY",
+        "WEB_FETCH_USER_AGENT"
       ],
       "tools": [
-        "search.web"
+        "search.web",
+        "web.fetch"
       ],
-      "notes": "Local-only; behind firewall"
+      "notes": "Returns cleaned text plus optional raw HTML."
     }
   ]
 }
@@ -34,6 +37,8 @@ intended to be the single source of truth for tool endpoints and transports.
 - `endpoint`: URL for HTTP/SSE servers; command for stdio servers can be stored
   in `command` and `args`.
 - `tools`: human-readable tool identifiers exposed by the server.
+- Consider a future `python.run` tool only with strict sandboxing and
+  confirmation prompts for untrusted code.
 
 ## stdio Example
 ```json
@@ -47,3 +52,23 @@ intended to be the single source of truth for tool endpoints and transports.
 }
 ```
 
+## Tool Schema Example: `web.fetch`
+```json
+{
+  "name": "web.fetch",
+  "description": "Fetch a URL and return cleaned, model-ready content.",
+  "input": {
+    "url": "https://example.com/article",
+    "include_raw_html": false
+  },
+  "output": {
+    "final_url": "https://example.com/article",
+    "title": "Example Article",
+    "byline": "Author Name",
+    "published_at": "2025-01-01T00:00:00Z",
+    "lang": "en",
+    "clean_text": "Extracted text...",
+    "raw_html": "<html>...</html>"
+  }
+}
+```

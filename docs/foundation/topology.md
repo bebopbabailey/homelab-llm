@@ -23,6 +23,10 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
 
+## MCP Tools (stdio, no ports)
+- `web.fetch` — stdio MCP tool on the Mini (no network port).
+- `search.web` — exposed via LiteLLM `/v1/search`, backed by SearXNG.
+
 ## Exposure and Secrets
 - LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000, Ollama 11434,
   MLX 8100-8103/8109, Home Assistant 8123.

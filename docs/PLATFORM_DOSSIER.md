@@ -32,6 +32,8 @@
 - MLX: scripts under `/home/christopherbailey/litellm-orch/scripts`, launchd plist `/Library/LaunchDaemons/com.bebop.mlx-launch.plist`, runtime `/opt/mlx-launch`.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
+- MCP tools: stdio tools (no ports) managed by TinyAgents; `web.fetch` is the
+  first planned tool.
 
 ## Exposure and secrets (short)
 - LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000, Ollama 11434, MLX 8100-8103/8109, Home Assistant 8123.

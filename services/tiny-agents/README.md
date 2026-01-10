@@ -35,6 +35,16 @@ python tinytoolcallingagent.py servers/weather/weather.py
 python tinycodeagent.py servers/weather/weather.py
 ```
 
+## MCP smoke (local tools)
+Use the web-fetch MCP server to validate `search.web` and `web.fetch`:
+
+```bash
+cd /home/christopherbailey/homelab-llm/services/web-fetch
+uv venv .venv
+uv pip install -e .
+.venv/bin/python3 /home/christopherbailey/homelab-llm/services/tiny-agents/scripts/mcp_smoke.py --tool search.web
+```
+
 ## References
 - Upstream README: `https://github.com/albertvillanova/tinyagents`
 - MCP overview: `https://modelcontextprotocol.io/`

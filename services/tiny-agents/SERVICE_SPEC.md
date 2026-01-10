@@ -17,6 +17,7 @@ clients directly.
 ## Configuration (planned)
 - `LITELLM_API_BASE=http://127.0.0.1:4000/v1` (if/when TinyAgents is adapted)
 - `HUGGINGFACEHUB_API_TOKEN` (only if HF InferenceClient is used)
+- `MCP_REGISTRY_PATH=/etc/homelab-llm/mcp-registry.json` (planned)
 
 ## Constraints
 - MCP usage is allowed but should be planned and documented before enabling.

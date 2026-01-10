@@ -12,7 +12,9 @@ and constraints so new work stays compatible with the existing platform.
 - `mcp-tools.md` — MCP tool usage and adoption guidance.
 - `mcp-101.md` — analogy and system fit for MCP + tools.
 - `mcp-registry.md` — MCP registry template and schema.
+- `tool-contracts.md` — tool input/output contracts (living doc).
 - `mlx-registry.md` — MLX registry and controller overview.
+- `benny-model-onboarding.md` — OpenVINO model onboarding + Benny naming.
 - `testing.md` — verification steps and smoke tests.
 
 ## Sources of Truth
@@ -20,10 +22,15 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/foundation/topology.md` — authoritative port map for this repo.
 - `docs/foundation/constraints-and-decisions.md` — immutable constraints.
 - `docs/INTEGRATIONS.md` — LiteLLM routing + Open WebUI/OpenVINO/OptiLLM linkage.
+- `docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
+- `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
 - `services/*/SERVICE_SPEC.md` — per-service runtime contract and env locations.
 - `services/litellm-orch/ARCHITECTURE.md` and `services/ov-llm-server/ARCHITECTURE.md`
   — layered architecture framing.
 - `services/*/SERVICE_SPEC.md` — per-service contract details.
+- `docs/foundation/tool-contracts.md` — tool interfaces and expectations.
+- Tool contracts should include both OpenAPI (HTTP transport) and MCP tool
+  schemas (tool-level interface) where applicable.
 
 ## Agent Expectations (global)
 - Update `TASKS.md` and service `AGENTS.md` before implementing new features.
