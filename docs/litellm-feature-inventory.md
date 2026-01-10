@@ -20,6 +20,7 @@ This document summarizes LiteLLM proxy capabilities we can rely on to avoid cust
 
 ## OpenAI-Compatible Endpoints
 - Use `openai/<model>` in `litellm_params.model` for OpenAI-compatible upstreams. citeturn0search2
+- `/v1/search` is supported via `search_tools` config entries (e.g., SearXNG).
 
 ## Config Surface
 - `general_settings`, `router_settings`, `litellm_settings` are first-class config sections; Swagger exposes the full schema. citeturn0search0

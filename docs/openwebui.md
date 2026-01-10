@@ -21,6 +21,21 @@ Open WebUI uses OpenAI-compatible settings and plain model names from LiteLLM:
 
 These environment variables are `PersistentConfig` in Open WebUI, so the app stores them after first start. citeturn0search0
 
+## Web Search (SearXNG via LiteLLM)
+LiteLLM exposes `/v1/search/<tool_name>` once `search_tools` are configured.
+Use `searxng-search` as the tool name.
+
+Example request:
+```bash
+curl -X POST "http://127.0.0.1:4000/v1/search/searxng-search" \
+  -H "Authorization: Bearer dummy" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"openvino llm server","max_results":5}'
+```
+
+If Open WebUI offers a web search tool setting, point it to the LiteLLM base
+URL and use `/v1/search/searxng-search` as the endpoint.
+
 ## Install Notes
 - The Open WebUI docs recommend Python 3.11 and describe `uv` / `pip`-based installs for non-Docker setups. citeturn1search1
 

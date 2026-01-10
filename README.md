@@ -6,11 +6,11 @@ provides routing only and does not implement inference.
 ## Scope
 - Gateway only; no inference in this repo.
 - Declarative routing via `config/router.yaml` with env-var substitution.
-- Logical model names: `jerry-weak`, `jerry-editor`, `jerry-architect`, `jerry-chat`, `jerry-test`, `lil-jerry`.
+- Logical model names: `jerry-*`, `bench-*`, `utility-*`, `benny-*`.
 
 ## Backends (External Services)
-- MLX OpenAI servers on the Studio: `jerry-chat` on `8100`, `jerry-editor` on `8101`, `jerry-architect` on `8102`, `jerry-weak` on `8103`, test model on `8109`.
-- OpenVINO LLM server on the Mini (external to this repo), mapped as `lil-jerry`.
+- MLX OpenAI servers on the Studio: `jerry-*`, `bench-*`, `utility-*` (ports `8100-8109`).
+- OpenVINO LLM server on the Mini (external to this repo), mapped as `benny-*` (port `9000`).
 
 ## Configuration
 - `config/router.yaml` maps logical model names to upstream endpoints.
@@ -38,8 +38,8 @@ provides routing only and does not implement inference.
 - `scripts/start-mlx-jerry-chat.sh` restarts the Studio launchd service for `jerry-chat` (port `8100`).
 
 ## Verify
-- `GET /v1/models` returns `jerry-*` and `lil-jerry`.
-- `POST /v1/chat/completions` with `"model": "jerry-weak"` returns a valid response.
+- `GET /v1/models` returns `jerry-*`, `bench-*`, `utility-*`, and `benny-*`.
+- `POST /v1/chat/completions` with `"model": "jerry-s"` returns a valid response.
 - `GET /health` returns LiteLLM health results for configured deployments.
 
 ## Health Check Script
