@@ -9,6 +9,7 @@ utility services behind a single LiteLLM gateway.
 - System constraints and decisions: `docs/foundation/constraints-and-decisions.md`
 - Platform dossier (authoritative): `docs/PLATFORM_DOSSIER.md`
 - Integration details: `docs/INTEGRATIONS.md`
+- Experiment journal: `docs/journal/index.md`
 - Active delivery plan: `TASKS.md`
 
 ## How to Read This Repo
@@ -18,7 +19,7 @@ utility services behind a single LiteLLM gateway.
 - Treat `TASKS.md` as the active plan and update it before and after changes.
 
 ## Service Conventions
-- Each service should include `SERVICE_SPEC.md`, `ARCHITECTURE.md`, and `AGENTS.md`.
+- Target convention: each service should include `SERVICE_SPEC.md`, `ARCHITECTURE.md`, and `AGENTS.md`.
 - Runtime configs and secrets live outside the repo; see `docs/foundation/topology.md`.
 - Use `uv` for Python services; avoid system Python changes.
 
@@ -27,6 +28,7 @@ Stable services:
 - LiteLLM gateway — `services/litellm-orch`
 - OpenVINO LLM server — `services/ov-llm-server`
 - OptiLLM proxy — `services/optillm-proxy`
+- SearXNG — `services/searxng`
 - Open WebUI — documented in `docs/PLATFORM_DOSSIER.md`
 - MLX OpenAI servers — documented in `docs/PLATFORM_DOSSIER.md`
 - Ollama — documented in `docs/PLATFORM_DOSSIER.md`
@@ -34,7 +36,6 @@ Stable services:
 
 Planned services (endpoints):
 - TinyAgents (planned client/orchestrator behind LiteLLM)
-- SearXNG (planned search endpoint)
 - OptiLLM (planned expansion of optimization endpoints)
 
 ## Ops Scripts (core)

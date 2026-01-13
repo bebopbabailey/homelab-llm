@@ -1,0 +1,19 @@
+{
+  "count": 14,
+  "prompts": {
+    "benny-classify-m": 2,
+    "benny-classify-s": 2,
+    "benny-clean-m": 3,
+    "benny-clean-s": 3,
+    "benny-extract-m": 2,
+    "benny-extract-s": 2,
+    "benny-rewrite-m": 2,
+    "benny-rewrite-s": 2,
+    "benny-route-m": 2,
+    "benny-route-s": 2,
+    "benny-summarize-m": 2,
+    "benny-summarize-s": 2,
+    "benny-tool-m": 2,
+    "benny-tool-s": 2
+  }
+}

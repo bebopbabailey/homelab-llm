@@ -47,7 +47,7 @@ Minimum required:
 ## Authentication
 
 ### OptiLLM proxy auth
-- Controlled via `--optillm-api-key` or `OPTILLM_API_KEY`
+-- Controlled via `--optillm-api-key` (do not set `OPTILLM_API_KEY` env)
 - LiteLLM must include:
 ```
 Authorization: Bearer <OPTILLM_API_KEY>
@@ -56,6 +56,9 @@ Authorization: Bearer <OPTILLM_API_KEY>
 ### Upstream auth
 - Provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
 - Used only for OptiLLM → LiteLLM calls
+
+Important: setting `OPTILLM_API_KEY` in the environment triggers OptiLLM's
+local inference mode. Use the flag instead.
 
 ---
 
@@ -69,7 +72,7 @@ Authorization: Bearer <OPTILLM_API_KEY>
 
 Example:
 ```
-moa-jerry-chat
+moa-jerry-xl
 ```
 
 OptiLLM strips the prefix before upstream calls.
@@ -89,7 +92,6 @@ Breaking this rule can cause infinite routing loops.
 
 Expected external configuration (env file, not committed):
 
-- `OPTILLM_API_KEY` (proxy auth)
 - `OPENAI_API_KEY` (used by OptiLLM when calling LiteLLM)
 Example env file path (systemd): `/etc/optillm-proxy/env`.
 
@@ -97,8 +99,9 @@ Runtime flags (systemd `ExecStart` should pass explicitly):
 - `--host 127.0.0.1`
 - `--port 4020`
 - `--base-url http://127.0.0.1:4000/v1`
-- `--approach auto`
-- `--model <base_model>` (example: `jerry-chat`)
+- `--approach proxy`
+- `--model <base_model>` (example: `jerry-xl`)
+- `--optillm-api-key <key>` (proxy auth)
 
 Exact variable names depend on pinned OptiLLM version.
 
@@ -138,6 +141,18 @@ HTTP 200 + valid JSON indicates healthy.
 - Intended for deep reasoning and planning
 - Not for low-latency chat
 
+## Technique selection (model prefixes)
+OptiLLM chooses strategies based on the model prefix:
+- `moa-<base>`: Mixture-of-Agents (strong reasoning, higher latency)
+- `bon-<base>`: best-of-n sampling (faster than MoA, moderate gains)
+- `plansearch-<base>`: planning/search (slower, good for multi-step tasks)
+- `self_consistency-<base>`: consistency voting (slower, robust)
+
+Example:
+```
+OPTILLM_JERRY_XL_MODEL=openai/bon-jerry-xl
+```
+
 ---
 
 ## Versioning
@@ -153,6 +168,18 @@ No Docker installs are allowed in this repo.
 cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 uv venv .venv
 uv pip install optillm==0.3.12
+```
+
+## Proxy provider config
+OptiLLM proxy plugin loads providers from:
+`/home/christopherbailey/.optillm/proxy_config.yaml`.
+
+This must point to LiteLLM only:
+```yaml
+providers:
+  - name: litellm
+    base_url: http://127.0.0.1:4000/v1
+    api_key: dummy
 ```
 
 ---

@@ -18,12 +18,12 @@ while allowing backend models to evolve independently.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
    - OptiLLM runs localhost-only behind LiteLLM to apply inference-time strategies.
-   - LiteLLM sends prefixed model names (e.g., `moa-jerry-architect`) to avoid loops.
+   - LiteLLM sends prefixed model names (e.g., `moa-jerry-xl`) to avoid loops.
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (`benny-*`).
    - MLX OpenAI servers on the Mac Studio (`jerry-*`).
-6) Search (planned → current)
-   - SearXNG runs locally on the Mini and is exposed via LiteLLM `/v1/search`.
+6) Search (current)
+   - SearXNG runs locally on the Mini (127.0.0.1:8888) and is exposed via LiteLLM `/v1/search`.
    - `web.fetch` is the next step after search for clean content extraction.
 
 ## Data Flow (current)
@@ -36,6 +36,10 @@ while allowing backend models to evolve independently.
 - Ports are treated as immutable without a migration plan.
 - No new inference backends or LAN-exposed services without explicit approval.
 - Use `uv` for Python dependency management; avoid system Python changes.
+
+## MCP Status (current)
+- `web.fetch` and `search.web` are implemented as stdio MCP tools.
+- MCP registry and systemd wiring are MVP work items.
 
 ## Repo Layout (high-level)
 - `docs/` — platform-wide architecture, constraints, topology.

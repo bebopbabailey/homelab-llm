@@ -1,7 +1,7 @@
 # SearXNG
 
 ## Overview
-SearXNG is a privacy-focused metasearch engine. It is planned as a **local
+SearXNG is a privacy-focused metasearch engine. It is implemented as a **local
 search endpoint** for tools/agents and must not be LAN-exposed without approval.
 
 Upstream project: `https://github.com/searxng/searxng`

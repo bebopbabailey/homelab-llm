@@ -1,19 +1,15 @@
-# MCP Tools (Planned)
+# MCP Tools (Implemented Locally)
 
 ## Purpose
 MCP servers expose tools that agents can call. In this platform:
 - **LLM calls** go through LiteLLM only.
 - **Tool calls** go through MCP servers.
 
-TinyAgents is the default MCP client that discovers and calls tools.
+TinyAgents is the default MCP client for the MVP.
 
-## Recommended Timing
-Adopt MCP once these are stable:
-- LiteLLM routing and model registry are reliable.
-- Tool endpoints (e.g., SearXNG, repos, ops scripts) are defined.
-- Basic health checks and logging are in place.
-
-Start with one or two tools, validate the workflow, then scale.
+## Current Status
+- MCP stdio tools are implemented (`web.fetch`, `search.web`) and run locally on the Mini.
+- MCP registry and systemd wiring are MVP work items.
 
 ## How LLMs Use MCP
 LLMs do not talk to MCP servers directly.
@@ -21,7 +17,7 @@ An agent runtime (e.g., TinyAgents) interprets the model output, selects tools,
 and calls MCP servers, then feeds results back to the LLM via the same
 conversation.
 
-## MCP Server Inventory (planned)
+## MCP Server Inventory (pending registry)
 Maintain a simple registry of MCP servers with:
 - Name and purpose
 - Transport (stdio vs HTTP/SSE)
@@ -39,11 +35,11 @@ Maintain a simple registry of MCP servers with:
 - `transcript.clean`: wraps `benny-clean-m` with a fixed system prompt and
   returns only cleaned text (no commentary).
 
-## Web Search + Fetch (planned)
+## Web Search + Fetch (implemented)
 Search is only the first step. A durable pipeline also needs a fetch/clean
 stage that returns readable text for models and schemas.
 
-### `web.fetch` (planned)
+### `web.fetch` (implemented)
 Purpose: fetch a URL and return a cleaned, model-ready payload.
 
 Recommended output fields:

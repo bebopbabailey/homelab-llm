@@ -16,6 +16,8 @@ and constraints so new work stays compatible with the existing platform.
 - `mlx-registry.md` — MLX registry and controller overview.
 - `benny-model-onboarding.md` — OpenVINO model onboarding + Benny naming.
 - `testing.md` — verification steps and smoke tests.
+- `onnx-evaluation.md` — non-LLM ONNX evaluation plan for routing/summarization.
+- `docs/journal/index.md` — experiment journal index.
 
 ## Sources of Truth
 - `docs/PLATFORM_DOSSIER.md` — current topology, ports, inventory, exposure.
@@ -24,6 +26,8 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/INTEGRATIONS.md` — LiteLLM routing + Open WebUI/OpenVINO/OptiLLM linkage.
 - `docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
 - `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
+- `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
+- `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
 - `services/*/SERVICE_SPEC.md` — per-service runtime contract and env locations.
 - `services/litellm-orch/ARCHITECTURE.md` and `services/ov-llm-server/ARCHITECTURE.md`
   — layered architecture framing.
@@ -45,7 +49,8 @@ and constraints so new work stays compatible with the existing platform.
 - Keep a single source of truth (env vars + one registry file).
 - Avoid duplicate or conflicting configuration sources.
 
-## MCP Adoption Checklist (planned)
+## MCP Adoption Checklist (MVP)
+- Status: MCP tools implemented; registry/systemd wiring pending.
 - Define the MCP server (stdio vs HTTP/SSE) and where it runs.
 - Document tool contracts and versions.
 - Add server to the MCP tool registry and include health checks.

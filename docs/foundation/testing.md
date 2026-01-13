@@ -51,7 +51,23 @@ curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^benny-'
 
 ## OptiLLM (Mini)
 ```bash
-curl -fsS http://127.0.0.1:4020/v1/models | jq .
+curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
+```
+
+Verify OptiLLM via LiteLLM alias:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"optillm-jerry-xl","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  | jq .
+```
+
+Verify OptiLLM (jerry-l):
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"optillm-jerry-l","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  | jq .
 ```
 
 ## OpenVINO (Mini)
@@ -89,3 +105,27 @@ cd /home/christopherbailey/homelab-llm/services/web-fetch
 ## TinyAgents (Mini, once wired)
 Run the agent with a known MCP tool and confirm tool output is reflected in the
 response.
+
+## MCP registry + TinyAgents env (MVP)
+```bash
+sudo cp /home/christopherbailey/homelab-llm/ops/templates/mcp-registry.json /etc/homelab-llm/mcp-registry.json
+sudo cp /home/christopherbailey/homelab-llm/ops/templates/tiny-agents.env /etc/homelab-llm/tiny-agents.env
+```
+
+## OpenVINO model control (ovctl)
+```bash
+/home/christopherbailey/homelab-llm/ops/scripts/ovctl list
+/home/christopherbailey/homelab-llm/ops/scripts/ovctl profiles
+/home/christopherbailey/homelab-llm/ops/scripts/ovctl warm-profile benny-only-expanded
+/home/christopherbailey/homelab-llm/ops/scripts/ovctl status
+```
+
+## LiteLLM prompt sync (Benny)
+```bash
+/home/christopherbailey/homelab-llm/ops/scripts/sync-benny-prompts
+```
+
+## ONNX evaluation (route + summarize)
+```bash
+ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/onnx_eval.py
+```

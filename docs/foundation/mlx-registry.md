@@ -16,11 +16,19 @@ LiteLLM reloads. This uses a registry file plus a single controller command.
       "model_id": "mlx-community/Qwen3-235B-A22B-Instruct-2507-6bit",
       "cache_path": "/Users/thestudio/models/hf/hub/models--.../snapshots/<sha>",
       "format": "mlx",
-      "port": 8100
+      "port": 8100,
+      "chat_template": "/path/to/chat_template.jinja",
+      "tool_call_parser": "qwen3_moe",
+      "reasoning_parser": "qwen3"
     }
   }
 }
 ```
+
+Optional fields:
+- `chat_template`: passed as `--chat-template-file` if present.
+- `tool_call_parser`: passed as `--tool-call-parser` if present.
+- `reasoning_parser`: passed as `--reasoning-parser` if present.
 
 ## Controller (`mlxctl`)
 `mlxctl` is the single command to manage MLX models. It runs locally on the
@@ -52,3 +60,21 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
 - One port, one model. Ports are immutable.
 - LiteLLM aliases are fixed; port swaps must keep the alias semantics consistent.
 - The Studio boot model is defined in `/opt/mlx-launch/bin/start.sh` (port 8100).
+
+## Harmony-format models (gpt-oss)
+Some MLX models (e.g., gpt-oss) output Harmony tags unless a template/parser
+is set. For these, set in the registry entry:
+- `chat_template` to the model’s Harmony template file
+- `tool_call_parser: harmony`
+- `reasoning_parser: harmony`
+
+This ensures OpenAI-compatible responses without raw `<|channel|>` tags.
+
+## Planned Jerry Slot Mapping
+Register these intents in the MLX registry (Studio):
+- `jerry-xl` → `mlx-community/Qwen3-235B-A22B-Instruct-2507-6bit` (port 8100)
+- `jerry-l` → `halley-ai/gpt-oss-120b-MLX-6bit-gs64` (port 8101)
+- `jerry-m` → `mlx-community/DeepSeek-R1-Distill-Llama-70B-8bit` (port 8102)
+- `jerry-s` → `mlx-community/Qwen2.5-Coder-32B-Instruct-8bit` (port 8103)
+
+Bench/utility slots (ports 8104-8109) skew smaller and can be assigned later.

@@ -62,7 +62,7 @@ There are **two separate authentication concerns**.
 
 ### 1) OptiLLM proxy authentication
 - Protects access *to OptiLLM itself*
-- Configured via `--optillm-api-key` or `OPTILLM_API_KEY`
+- **Use `--optillm-api-key`** (recommended)
 - Requests must include:
 ```
 Authorization: Bearer <OPTILLM_API_KEY>
@@ -73,7 +73,23 @@ Authorization: Bearer <OPTILLM_API_KEY>
 - Usually provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
 - This is unrelated to `OPTILLM_API_KEY`
 
-Do not mix these two concepts.
+Important: setting `OPTILLM_API_KEY` in the environment triggers OptiLLM's
+**local inference mode**. Do not set it when using a remote upstream (LiteLLM).
+Use the `--optillm-api-key` flag instead.
+
+## Proxy provider config (required)
+OptiLLM's proxy plugin reads its provider list from:
+```
+~/.optillm/proxy_config.yaml
+```
+
+For this homelab, it must point **only** to LiteLLM:
+```yaml
+providers:
+  - name: litellm
+    base_url: http://127.0.0.1:4000/v1
+    api_key: dummy
+```
 
 ---
 
@@ -92,18 +108,18 @@ Run manually (for quick verification):
 
 ```bash
 OPENAI_API_KEY="<litellm-proxy-or-upstream-key>" \
-OPTILLM_API_KEY="<optillm-proxy-key>" \
 uv run optillm \
   --host 127.0.0.1 \
   --port 4020 \
   --base-url http://127.0.0.1:4000/v1 \
-  --approach auto \
-  --model jerry-chat
+  --approach proxy \
+  --model jerry-xl \
+  --optillm-api-key "<optillm-proxy-key>"
 ```
 
 Notes:
 - `OPENAI_API_KEY` is used by OptiLLM when calling the LiteLLM upstream.
-- `OPTILLM_API_KEY` protects the OptiLLM proxy itself.
+- `--optillm-api-key` protects the OptiLLM proxy itself.
 - `--base-url` must point at the LiteLLM gateway.
 
 ## Loop-avoidance rule (critical)
@@ -122,15 +138,27 @@ LiteLLM must never route the base model back to OptiLLM.
 
 Expose **one clean alias** to clients:
 ```
-plan-architect
+optillm-jerry-xl
 ```
 
 Behind the scenes:
-- LiteLLM maps `plan-architect` → OptiLLM
-- LiteLLM sends `model = moa-<BIG_THINKER_BASE_MODEL>` to OptiLLM
-- OptiLLM applies Mixture-of-Agents and calls upstream with `<BIG_THINKER_BASE_MODEL>`
+- LiteLLM maps `optillm-jerry-xl` → OptiLLM
+- LiteLLM sends `model = openai/moa-jerry-xl` (or other OptiLLM prefixed model)
+- OptiLLM applies the chosen strategy and calls upstream with `jerry-xl`
 
 This yields higher-quality plans with minimal system complexity.
+
+## Technique selection (model prefixes)
+OptiLLM chooses strategies based on the model prefix:
+- `moa-<base>`: Mixture-of-Agents (strong reasoning, higher latency)
+- `bon-<base>`: best-of-n sampling (faster than MoA, moderate gains)
+- `plansearch-<base>`: planning/search (slower, good for multi-step tasks)
+- `self_consistency-<base>`: consistency voting (slower, robust)
+
+Example:
+```
+OPTILLM_JERRY_XL_MODEL=openai/bon-jerry-xl
+```
 
 ---
 

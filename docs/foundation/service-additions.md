@@ -56,4 +56,4 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
 - LiteLLM routing: `services/litellm-orch/config/router.yaml`.
 - LiteLLM env: `services/litellm-orch/config/env.local` (local only).
 - Open WebUI env: `/etc/open-webui/env`.
-- OpenVINO env: `/home/christopherbailey/.config/ov-llm-server/ov-server.env`.
+- OpenVINO env: `/etc/homelab-llm/ov-server.env`.

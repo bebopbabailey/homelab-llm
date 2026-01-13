@@ -97,6 +97,7 @@ without changing clients.
   - Add Home Assistant control via HA MCP Server after `transcript.clean`.
   - Add `mlx.load` / `mlx.unload` after HA control is stable.
   - Add these tools to the MCP registry and update `docs/foundation/mcp-registry.md`.
+  - Copy `ops/templates/mcp-registry.json` to `/etc/homelab-llm/mcp-registry.json`.
   - Add MCP server health checks in `ops/scripts/healthcheck.sh`.
   - Near-term: add `transcript.clean` as a tool that injects the fixed prompt and
     calls `benny-clean-m` via LiteLLM to return only cleaned text.
@@ -104,7 +105,9 @@ without changing clients.
 10) **Agent routing (TinyAgents)**
    - Adapt TinyAgents to call LiteLLM (`http://127.0.0.1:4000/v1`).
    - Add a TinyAgents env file (model selection + tool server endpoints).
+   - Copy `ops/templates/tiny-agents.env` to `/etc/homelab-llm/tiny-agents.env`.
    - Add a minimal runner script that chooses agent type + tool set.
+   - Add `ovctl` to manage OpenVINO warm-up profiles (`ops/scripts/ovctl`).
    - Start with a single tool list (`search.web`) and expand after stability.
 
 11) **Home-control readiness**
@@ -121,6 +124,7 @@ without changing clients.
    - Version tool schemas to prevent breaking changes.
    - Add smoke tests for tool availability.
    - Plan a `python.run` MCP tool (sandboxed code execution) for future workflows.
+   - Maintain Benny prompts in `docs/prompts/benny` and sync via `ops/scripts/sync-benny-prompts`.
 
 14) **Vector DB planning (Studio)**
    - Standardize on Qdrant (service on Studio), persist indexes on SSD.

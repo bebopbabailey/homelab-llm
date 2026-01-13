@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+DB_URL = "postgresql://litellm:blue3232@127.0.0.1:5432/litellm"
+PROMPT_DIR = Path("/home/christopherbailey/homelab-llm/docs/prompts/benny")
+INDEX_PATH = Path("/home/christopherbailey/homelab-llm/docs/prompts/benny/index.json")
+
+
+def q(val: str) -> str:
+    return "'" + str(val).replace("'", "''") + "'"
+
+
+def _latest_versions():
+    sql = (
+        "SELECT prompt_id, MAX(version) "
+        "FROM \"LiteLLM_PromptTable\" "
+        "WHERE prompt_id LIKE 'benny-%' "
+        "GROUP BY prompt_id ORDER BY prompt_id;"
+    )
+    output = subprocess.check_output(["psql", DB_URL, "-t", "-c", sql]).decode("utf-8")
+    versions = {}
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        prompt_id, version = [part.strip() for part in line.split("|")]
+        versions[prompt_id] = int(version)
+    return versions
+
+
+def main():
+    if not PROMPT_DIR.exists():
+        raise SystemExit(f"prompt dir not found: {PROMPT_DIR}")
+
+    prompt_files = sorted(PROMPT_DIR.glob("*.prompt.md"))
+    if not prompt_files:
+        raise SystemExit(f"no prompt files found in {PROMPT_DIR}")
+
+    prompt_ids = [p.stem.replace(".prompt", "") for p in prompt_files]
+    versions = _latest_versions()
+    filtered = {pid: versions.get(pid, 0) for pid in sorted(prompt_ids)}
+    index = {"count": len(filtered), "prompts": filtered}
+    INDEX_PATH.write_text(json.dumps(index, indent=2, sort_keys=True))
+    print(f"Wrote {INDEX_PATH}.")
+
+
+if __name__ == "__main__":
+    main()

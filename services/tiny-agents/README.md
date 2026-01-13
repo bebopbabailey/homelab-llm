@@ -1,14 +1,14 @@
-# TinyAgents (planned)
+# TinyAgents (MVP orchestration)
 
 ## Overview
 TinyAgents is a minimalist agent implementation that uses LLMs plus MCP tools.
 Upstream project: `https://github.com/albertvillanova/tinyagents`.
 
-In this homelab, TinyAgents is planned as a **client/orchestrator** that calls
+In this homelab, TinyAgents is used as a **client/orchestrator MVP** that calls
 LiteLLM only. It must not call backends directly.
 
 ## Status and Constraints
-- MCP is allowed, but should be planned and documented before enabling.
+- MCP tools are implemented locally; TinyAgents is the MVP client.
 - No new LAN-exposed services without approval.
 - Use `uv` for Python dependency management.
 
@@ -21,11 +21,13 @@ uv venv .venv
 uv pip install "tinyagents @ git+https://github.com/albertvillanova/tinyagents.git@<PINNED_COMMIT>"
 ```
 
-## Configuration
+## Configuration (MVP)
 - TinyAgents uses Hugging Face InferenceClient upstream by default.
 - If using HF, set `HUGGINGFACEHUB_API_TOKEN` (or the token your HF client reads).
 - For homelab integration, adapt TinyAgents to call LiteLLM instead of Hugging Face.
   LiteLLM base URL: `http://127.0.0.1:4000/v1`.
+- MCP registry (runtime): `MCP_REGISTRY_PATH=/etc/homelab-llm/mcp-registry.json`.
+- Template env: `ops/templates/tiny-agents.env`.
 
 ## Usage (upstream examples)
 Upstream scripts (from the repo):

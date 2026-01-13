@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "name": "web-fetch",
+      "purpose": "fetch + clean HTML",
+      "transport": "stdio",
+      "command": "/home/christopherbailey/homelab-llm/services/web-fetch/web_fetch_mcp.py",
+      "args": [],
+      "env": [
+        "LITELLM_SEARCH_API_BASE",
+        "LITELLM_SEARCH_API_KEY",
+        "WEB_FETCH_USER_AGENT"
+      ],
+      "tools": [
+        "search.web",
+        "web.fetch"
+      ],
+      "notes": "Returns cleaned text plus optional raw HTML."
+    }
+  ]
+}

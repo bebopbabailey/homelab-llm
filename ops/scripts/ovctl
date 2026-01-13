@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+DEFAULT_REGISTRY = os.path.expanduser("~/models/converted_models/registry.json")
+DEFAULT_PROFILE_DIR = Path("/home/christopherbailey/homelab-llm/ops/ov-profiles")
+DEFAULT_SERVER_URL = "http://127.0.0.1:9000"
+WARM_SCRIPT = Path("/home/christopherbailey/homelab-llm/services/ov-llm-server/scripts/ov-warm-models")
+
+
+def _registry_path():
+    return Path(os.environ.get("OV_REGISTRY_PATH", DEFAULT_REGISTRY))
+
+
+def _load_registry(path: Path):
+    if not path.exists():
+        raise FileNotFoundError(f"registry not found: {path}")
+    return json.loads(path.read_text() or "{}")
+
+
+def _print_json(data):
+    print(json.dumps(data, indent=2, sort_keys=True))
+
+
+def _http_get_json(url: str):
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"HTTP {exc.code} from {url}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Failed to reach {url}: {exc}") from exc
+
+
+def cmd_list(_args):
+    registry = _load_registry(_registry_path())
+    models = registry.get("models", {})
+    rows = []
+    for name, meta in sorted(models.items()):
+        rows.append(
+            {
+                "name": name,
+                "path": meta.get("path"),
+                "task": meta.get("task"),
+                "weight_format": meta.get("weight_format"),
+            }
+        )
+    _print_json({"count": len(rows), "models": rows})
+
+
+def cmd_status(args):
+    url = args.server_url.rstrip("/") + "/v1/models"
+    data = _http_get_json(url)
+    _print_json(data)
+
+
+def _load_profile(path: Path):
+    if not path.exists():
+        raise FileNotFoundError(f"profile not found: {path}")
+    models = []
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        models.append(stripped)
+    return models
+
+
+def _run_warm(models, server_url):
+    if not WARM_SCRIPT.exists():
+        raise FileNotFoundError(f"warm script not found: {WARM_SCRIPT}")
+    env = os.environ.copy()
+    env["OV_SERVER_URL"] = server_url
+    cmd = [str(WARM_SCRIPT)] + list(models)
+    return subprocess.call(cmd, env=env)
+
+
+def cmd_warm(args):
+    if args.all:
+        models = []
+    else:
+        models = args.models
+    if not args.all and not models:
+        raise SystemExit("Provide one or more model names, or use --all.")
+    exit_code = _run_warm(models, args.server_url)
+    raise SystemExit(exit_code)
+
+
+def cmd_profiles(args):
+    if not args.profile_dir.exists():
+        raise SystemExit(f"profile dir not found: {args.profile_dir}")
+    profiles = sorted(p.name for p in args.profile_dir.glob("*.txt"))
+    _print_json({"count": len(profiles), "profiles": profiles})
+
+
+def cmd_warm_profile(args):
+    profile_path = args.profile_dir / f"{args.profile}.txt"
+    models = _load_profile(profile_path)
+    if not models:
+        raise SystemExit(f"profile {args.profile} is empty")
+    exit_code = _run_warm(models, args.server_url)
+    raise SystemExit(exit_code)
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="OpenVINO model controller (ovctl)")
+    parser.add_argument(
+        "--server-url",
+        default=DEFAULT_SERVER_URL,
+        help="OpenVINO server base URL (default: http://127.0.0.1:9000)",
+    )
+    parser.add_argument(
+        "--profile-dir",
+        type=Path,
+        default=DEFAULT_PROFILE_DIR,
+        help="Directory containing profile .txt files",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("list", help="List models in the OpenVINO registry")
+    sub.add_parser("status", help="Show /v1/models output from the server")
+
+    warm = sub.add_parser("warm", help="Warm one or more models (or all)")
+    warm.add_argument("models", nargs="*", help="Model names to warm")
+    warm.add_argument("--all", action="store_true", help="Warm all registry models")
+
+    sub.add_parser("profiles", help="List available warm profiles")
+    warm_profile = sub.add_parser("warm-profile", help="Warm a named profile")
+    warm_profile.add_argument("profile", help="Profile name (without .txt)")
+
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.command == "list":
+        cmd_list(args)
+    elif args.command == "status":
+        cmd_status(args)
+    elif args.command == "warm":
+        cmd_warm(args)
+    elif args.command == "profiles":
+        cmd_profiles(args)
+    elif args.command == "warm-profile":
+        cmd_warm_profile(args)
+    else:
+        raise SystemExit(f"Unknown command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()

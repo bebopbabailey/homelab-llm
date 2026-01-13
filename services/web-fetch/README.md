@@ -5,7 +5,8 @@ Fetch a URL and return cleaned, model-ready text for downstream use in search,
 summarization, or schema extraction.
 
 ## Status
-Planned (stdio MCP tool). Uses `trafilatura` with `readability-lxml` fallback.
+Implemented (stdio MCP tool). Uses `trafilatura` with `readability-lxml` fallback.
+Runs locally via an MCP client; not a systemd service yet.
 
 ## Tools exposed
 - `search.web` (via LiteLLM `/v1/search`)

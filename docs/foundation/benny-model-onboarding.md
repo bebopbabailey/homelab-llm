@@ -26,16 +26,34 @@ Mini and register them under the Benny naming scheme.
 | benny-route-m | Qwen/Qwen2.5-1.5B-Instruct | fp16 (shared with benny-tool-s) |
 | benny-classify-s | ibm-granite/granite-3.0-2b-instruct | int8 |
 | benny-classify-m | Qwen/Qwen2.5-3B-Instruct | fp16 |
-| benny-clean-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | fp16 |
-| benny-clean-m | microsoft/Phi-4-mini-instruct | fp16 |
+| benny-clean-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | int8 |
+| benny-clean-m | microsoft/Phi-4-mini-instruct | int8 |
 | benny-tool-s | Qwen/Qwen2.5-1.5B-Instruct | fp16 |
 | benny-tool-m | Qwen/Qwen2.5-3B-Instruct | fp16 (shared with benny-classify-m) |
 | benny-summarize-s | meta-llama/Llama-3.2-1B-Instruct | fp16 |
 | benny-summarize-m | microsoft/Phi-3.5-mini-instruct | fp16 |
-| benny-extract-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | fp16 (shared with benny-clean-s) |
+| benny-extract-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | fp16 |
 | benny-extract-m | microsoft/Phi-3.5-mini-instruct | fp16 (shared with benny-summarize-m) |
 | benny-rewrite-s | google/gemma-2-2b-it | fp16 |
 | benny-rewrite-m | meta-llama/Llama-3.2-3B-Instruct | fp16 |
+
+## Recommended Benny generation presets (Mini, OpenVINO)
+Starting defaults tuned for the Mini (Intel iGPU) and OpenVINO. They favor
+determinism for routing/classification, low variance for clean/extract, and
+modest creativity for rewrite. LiteLLM uses `drop_params: true`, so any
+unsupported parameters are ignored.
+
+| purpose | models | temperature | top_p | top_k | repetition_penalty | max_tokens |
+| --- | --- | --- | --- | --- | --- | --- |
+| route/classify | benny-route-*, benny-classify-* | 0.01 | 1 | 1 | 1.0 | 128 |
+| clean (s) | benny-clean-s | 0.01 | 1 | 1 | 1.05 | 512 |
+| clean (m) | benny-clean-m | 0.01 | 1 | 1 | 1.05 | 512 |
+| extract (s) | benny-extract-s | 0.01 | 1 | 1 | 1.05 | 1024 |
+| extract (m) | benny-extract-m | 0.01 | 1 | 1 | 1.05 | 2048 |
+| tool use | benny-tool-* | 0.1 | 0.9 | 40 | 1.05 | 512 |
+| summarize (s) | benny-summarize-s | 0.2 | 0.9 | 40 | 1.1 | 512 |
+| summarize (m) | benny-summarize-m | 0.2 | 0.9 | 40 | 1.1 | 1024 |
+| rewrite | benny-rewrite-* | 0.5 | 0.9 | 50 | 1.05 | 1024 |
 
 ## Download (examples)
 Use `hf download` to place repos under `~/models/<RepoName>`:
@@ -124,6 +142,21 @@ Lean note: some Benny aliases intentionally point to the same OpenVINO model
 name to avoid duplicate backends. See `services/litellm-orch/config/env.local`
 for the current alias mapping.
 
+## Prompt templates (LiteLLM prompt manager)
+- Prompt files live under `docs/prompts/benny/*.prompt.md`.
+- Each file maps to a LiteLLM prompt ID with the same name (e.g., `benny-clean-m`).
+- Prompts are stored in the LiteLLM DB (`LiteLLM_PromptTable`); new edits should
+  be re-imported to bump the version.
+- Prompt index (latest versions): `docs/prompts/benny/index.json`.
+- Sync script: `ops/scripts/sync-benny-prompts` (updates index only).
+- LiteLLM injects these prompts automatically per model via
+  `services/litellm-orch/config/prompt_injector.py` and
+  `services/litellm-orch/config/router.yaml` callbacks, so clients do **not**
+  need to pass `prompt_id`.
+
 ## Notes
 - Conversion always uses `--trust-remote-code` (required by some model families).
 - Keep names stable; the registry key is the model name LiteLLM will reference.
+- OpenVINO currently errors if `temperature` is exactly `0` while sampling is enabled,
+  so router defaults use `0.01` for deterministic-ish tasks.
+- Golden test set for cleaning: `docs/foundation/golden-set-cleaning.md`.

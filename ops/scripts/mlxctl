@@ -348,6 +348,14 @@ def _launch_server(entry, port: int):
         str(port),
     ]
 
+    tool_call_parser = entry.get("tool_call_parser") or os.environ.get("MLX_TOOL_CALL_PARSER")
+    if tool_call_parser:
+        argv += ["--tool-call-parser", tool_call_parser]
+
+    reasoning_parser = entry.get("reasoning_parser") or os.environ.get("MLX_REASONING_PARSER")
+    if reasoning_parser:
+        argv += ["--reasoning-parser", reasoning_parser]
+
     chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
     if chat_template:
         argv += ["--chat-template-file", chat_template]

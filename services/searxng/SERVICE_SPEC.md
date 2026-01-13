@@ -9,6 +9,7 @@ without explicit approval.
 - **Dependency manager**: `uv` only
 - **Process model**: long-running web app (WSGI)
 - **App dir**: `services/searxng/app`
+- **Systemd unit**: `/etc/systemd/system/searxng.service`
 
 ## Network
 - **Bind address**: 127.0.0.1 (default)

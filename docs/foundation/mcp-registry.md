@@ -5,6 +5,8 @@ intended to be the single source of truth for tool endpoints and transports.
 
 ## Recommended Location
 - `/etc/homelab-llm/mcp-registry.json` (runtime, not in repo)
+- Status: not created yet; MVP will write this file.
+- Template: `ops/templates/mcp-registry.json`.
 
 ## JSON Schema (v1)
 ```json

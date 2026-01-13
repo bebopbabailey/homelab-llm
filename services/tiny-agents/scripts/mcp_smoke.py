@@ -3,6 +3,7 @@
 
 import argparse
 import asyncio
+import os
 import sys
 
 from mcp import ClientSession, StdioServerParameters
@@ -25,6 +26,7 @@ async def main() -> None:
     server_params = StdioServerParameters(
         command=sys.executable,
         args=["-m", "web_fetch_mcp"],
+        env=os.environ.copy(),
     )
 
     async with stdio_client(server_params) as (read, write):
