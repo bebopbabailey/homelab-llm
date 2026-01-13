@@ -5,7 +5,7 @@
 - Runtime config: `config/router.yaml` and `config/env.example` (copy to `config/env.local` for real values).
 - External services: OpenVINO on `localhost:9000`; MLX OpenAI servers on the Studio at ports `8100`, `8101`, `8102`.
 - Source code: currently minimal (`main.py` placeholder); gateway logic will live in this repo.
-- Scripts/tests: `scripts/`, `docs/`, and `logs/` are available; add runbooks and tests as phases progress.
+- Scripts/tests: `scripts/`, `docs/`, `logs/`, and `callbacks/` are available; add runbooks and tests as phases progress.
 
 ## Build, Test, and Development Commands
 There is no build or test pipeline yet. Use `uv` for all dependency management.

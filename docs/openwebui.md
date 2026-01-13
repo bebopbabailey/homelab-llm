@@ -3,7 +3,7 @@
 Open WebUI provides a local chat UI that talks to LiteLLM via OpenAI-compatible APIs. citeturn1search1
 
 ## Install Location (Mini)
-- App dir: `/home/christopherbailey/open-webui`
+- App dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist)
 - Data dir: `/home/christopherbailey/.open-webui`
 - Env file: `/etc/open-webui/env`
 - Systemd unit: `/etc/systemd/system/open-webui.service`

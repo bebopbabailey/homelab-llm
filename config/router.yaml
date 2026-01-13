@@ -54,76 +54,156 @@ model_list:
       model: os.environ/UTILITY_B_MODEL
       api_base: os.environ/UTILITY_B_API_BASE
       api_key: os.environ/UTILITY_B_API_KEY
+  - model_name: optillm-jerry-xl
+    litellm_params:
+      model: os.environ/OPTILLM_JERRY_XL_MODEL
+      api_base: os.environ/OPTILLM_JERRY_XL_API_BASE
+      api_key: os.environ/OPTILLM_JERRY_XL_API_KEY
+  - model_name: optillm-jerry-l
+    litellm_params:
+      model: os.environ/OPTILLM_JERRY_L_MODEL
+      api_base: os.environ/OPTILLM_JERRY_L_API_BASE
+      api_key: os.environ/OPTILLM_JERRY_L_API_KEY
   - model_name: benny-classify-s
     litellm_params:
       model: os.environ/BENNY_CLASSIFY_S_MODEL
       api_base: os.environ/BENNY_CLASSIFY_S_API_BASE
       api_key: os.environ/BENNY_CLASSIFY_S_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.0
+      max_tokens: 128
   - model_name: benny-classify-m
     litellm_params:
       model: os.environ/BENNY_CLASSIFY_M_MODEL
       api_base: os.environ/BENNY_CLASSIFY_M_API_BASE
       api_key: os.environ/BENNY_CLASSIFY_M_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.0
+      max_tokens: 128
   - model_name: benny-clean-s
     litellm_params:
       model: os.environ/BENNY_CLEAN_S_MODEL
       api_base: os.environ/BENNY_CLEAN_S_API_BASE
       api_key: os.environ/BENNY_CLEAN_S_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.05
+      max_tokens: 512
   - model_name: benny-clean-m
     litellm_params:
       model: os.environ/BENNY_CLEAN_M_MODEL
       api_base: os.environ/BENNY_CLEAN_M_API_BASE
       api_key: os.environ/BENNY_CLEAN_M_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.05
+      max_tokens: 512
   - model_name: benny-tool-s
     litellm_params:
       model: os.environ/BENNY_TOOL_S_MODEL
       api_base: os.environ/BENNY_TOOL_S_API_BASE
       api_key: os.environ/BENNY_TOOL_S_API_KEY
+      temperature: 0.1
+      top_p: 0.9
+      top_k: 40
+      repetition_penalty: 1.05
+      max_tokens: 512
   - model_name: benny-tool-m
     litellm_params:
       model: os.environ/BENNY_TOOL_M_MODEL
       api_base: os.environ/BENNY_TOOL_M_API_BASE
       api_key: os.environ/BENNY_TOOL_M_API_KEY
+      temperature: 0.1
+      top_p: 0.9
+      top_k: 40
+      repetition_penalty: 1.05
+      max_tokens: 512
   - model_name: benny-summarize-s
     litellm_params:
       model: os.environ/BENNY_SUMMARIZE_S_MODEL
       api_base: os.environ/BENNY_SUMMARIZE_S_API_BASE
       api_key: os.environ/BENNY_SUMMARIZE_S_API_KEY
+      temperature: 0.2
+      top_p: 0.9
+      top_k: 40
+      repetition_penalty: 1.1
+      max_tokens: 512
   - model_name: benny-summarize-m
     litellm_params:
       model: os.environ/BENNY_SUMMARIZE_M_MODEL
       api_base: os.environ/BENNY_SUMMARIZE_M_API_BASE
       api_key: os.environ/BENNY_SUMMARIZE_M_API_KEY
+      temperature: 0.2
+      top_p: 0.9
+      top_k: 40
+      repetition_penalty: 1.1
+      max_tokens: 1024
   - model_name: benny-extract-s
     litellm_params:
       model: os.environ/BENNY_EXTRACT_S_MODEL
       api_base: os.environ/BENNY_EXTRACT_S_API_BASE
       api_key: os.environ/BENNY_EXTRACT_S_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.05
+      max_tokens: 1024
   - model_name: benny-extract-m
     litellm_params:
       model: os.environ/BENNY_EXTRACT_M_MODEL
       api_base: os.environ/BENNY_EXTRACT_M_API_BASE
       api_key: os.environ/BENNY_EXTRACT_M_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.05
+      max_tokens: 2048
   - model_name: benny-rewrite-s
     litellm_params:
       model: os.environ/BENNY_REWRITE_S_MODEL
       api_base: os.environ/BENNY_REWRITE_S_API_BASE
       api_key: os.environ/BENNY_REWRITE_S_API_KEY
+      temperature: 0.5
+      top_p: 0.9
+      top_k: 50
+      repetition_penalty: 1.05
+      max_tokens: 1024
   - model_name: benny-rewrite-m
     litellm_params:
       model: os.environ/BENNY_REWRITE_M_MODEL
       api_base: os.environ/BENNY_REWRITE_M_API_BASE
       api_key: os.environ/BENNY_REWRITE_M_API_KEY
+      temperature: 0.5
+      top_p: 0.9
+      top_k: 50
+      repetition_penalty: 1.05
+      max_tokens: 1024
   - model_name: benny-route-s
     litellm_params:
       model: os.environ/BENNY_ROUTE_S_MODEL
       api_base: os.environ/BENNY_ROUTE_S_API_BASE
       api_key: os.environ/BENNY_ROUTE_S_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.0
+      max_tokens: 128
   - model_name: benny-route-m
     litellm_params:
       model: os.environ/BENNY_ROUTE_M_MODEL
       api_base: os.environ/BENNY_ROUTE_M_API_BASE
       api_key: os.environ/BENNY_ROUTE_M_API_KEY
+      temperature: 0.01
+      top_p: 1
+      top_k: 1
+      repetition_penalty: 1.0
+      max_tokens: 128
 
 search_tools:
   - search_tool_name: searxng-search
@@ -146,3 +226,6 @@ router_settings:
 
 litellm_settings:
   json_logs: true
+  drop_params: true
+  callbacks:
+    - prompt_injector.prompt_injector_instance

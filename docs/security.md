@@ -6,7 +6,7 @@
 - **Fallback access:** SSH into machines via Tailscale if the Mini is unreachable.
 
 ## Backend Services
-- **OpenVINO (Mini):** `localhost:9000` only (not exposed on LAN/Tailscale).
+- **OpenVINO (Mini):** binds `0.0.0.0:9000` for maintenance, but callers use `127.0.0.1:9000`.
 - **MLX (Studio):** LAN-only ports `8100–8109`; accessible via Tailscale as needed.
 
 ## Tailscale Notes
