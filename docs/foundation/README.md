@@ -18,6 +18,7 @@ and constraints so new work stays compatible with the existing platform.
 - `testing.md` — verification steps and smoke tests.
 - `onnx-evaluation.md` — non-LLM ONNX evaluation plan for routing/summarization.
 - `git-submodules.md` — how to work with submodules in this repo.
+- `git-submodules-intellij.md` — IntelliJ workflow for submodules.
 - `docs/journal/index.md` — experiment journal index.
 
 ## Sources of Truth

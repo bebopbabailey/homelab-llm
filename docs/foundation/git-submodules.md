@@ -67,6 +67,8 @@ cd /home/christopherbailey/homelab-llm
 git push
 ```
 
+Replace `layer-gateway/litellm-orch` with the submodule you are working in.
+
 ## Common pitfalls
 - **Forgetting to update the monorepo pointer** after committing inside a submodule.
 - **Pulling the monorepo** without running `git submodule update` (submodules stay stale).
@@ -83,5 +85,7 @@ If you see a leading `-` or `+`, the submodule pointer is out of sync.
 
 ## Where we use submodules
 - `layer-gateway/litellm-orch`
+- `layer-gateway/optillm-proxy`
 - `layer-inference/ov-llm-server`
-
+- `layer-tools/mcp-tools`
+- `layer-tools/searxng`
