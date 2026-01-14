@@ -63,7 +63,7 @@ without changing clients.
    - On Mini: `mlxctl` forwards arguments over SSH to the Studio controller.
 
 5) **[x] LiteLLM pre-registration**
-   - Add the fixed aliases above to `services/litellm-orch/config/router.yaml`
+   - Add the fixed aliases above to `layer-gateway/litellm-orch/config/router.yaml`
      and `config/env.example` with stable ports.
    - Ensure LiteLLM never needs a reload for model swaps as long as ports remain
      stable and managed by the MLX controller.
@@ -175,8 +175,8 @@ without changing clients.
 
 22) **[x] OpenVINO Benny aliases (Mini)**
   - Add `benny-*` models to LiteLLM router config.
-  - Add `BENNY_*` env vars to `services/litellm-orch/config/env.example`.
-  - Add `BENNY_*` env vars to `services/litellm-orch/config/env.local`.
+  - Add `BENNY_*` env vars to `layer-gateway/litellm-orch/config/env.example`.
+  - Add `BENNY_*` env vars to `layer-gateway/litellm-orch/config/env.local`.
   - Document Benny onboarding and mapping in `docs/foundation/benny-model-onboarding.md`.
 
 ## Constraints

@@ -17,7 +17,7 @@ intended to be the single source of truth for tool endpoints and transports.
       "name": "web-fetch",
       "purpose": "fetch + clean HTML",
       "transport": "stdio",
-      "command": "/home/christopherbailey/homelab-llm/services/web-fetch/web_fetch_mcp.py",
+      "command": "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch/web_fetch_mcp.py",
       "args": [],
       "env": [
         "LITELLM_SEARCH_API_BASE",

@@ -86,7 +86,7 @@ hf auth login
 Run the converter from the repo:
 
 ```bash
-cd ~/homelab-llm/services/ov-llm-server
+cd ~/homelab-llm/layer-inference/ov-llm-server
 ./scripts/ov-convert-model
 ```
 
@@ -109,7 +109,7 @@ ov-convert-model --model Qwen/Qwen2.5-1.5B-Instruct --weight-format int8
 ## Phi Compatibility Patch (automatic)
 Phi-3.5 and Phi-4 models require two small compatibility symbols that are not
 present in released Transformers. The converter now runs
-`services/ov-llm-server/scripts/patch-transformers-compat.sh` automatically.
+`layer-inference/ov-llm-server/scripts/patch-transformers-compat.sh` automatically.
 If you rebuild `.venv-convert`, this patch will re-apply on the next conversion.
 
 When prompted for a custom name, enter the Benny name (e.g. `benny-tool-s`).
@@ -139,14 +139,14 @@ jq '.models | keys' ~/models/converted_models/registry.json
 
 ## LiteLLM Wiring
 Once converted, add the Benny entries to LiteLLM:
-- Router: `services/litellm-orch/config/router.yaml`
-- Env vars: `services/litellm-orch/config/env.local` (copy from `env.example`)
+- Router: `layer-gateway/litellm-orch/config/router.yaml`
+- Env vars: `layer-gateway/litellm-orch/config/env.local` (copy from `env.example`)
 
 Each `BENNY_*_MODEL` should be `openai/<benny-name>` and all `BENNY_*_API_BASE`
 should point to `http://127.0.0.1:9000/v1`.
 
 Lean note: some Benny aliases intentionally point to the same OpenVINO model
-name to avoid duplicate backends. See `services/litellm-orch/config/env.local`
+name to avoid duplicate backends. See `layer-gateway/litellm-orch/config/env.local`
 for the current alias mapping.
 
 ## Prompt templates (LiteLLM prompt manager)
@@ -157,8 +157,8 @@ for the current alias mapping.
 - Prompt index (latest versions): `docs/prompts/benny/index.json`.
 - Sync script: `ops/scripts/sync-benny-prompts` (updates index only).
 - LiteLLM injects these prompts automatically per model via
-  `services/litellm-orch/config/prompt_injector.py` and
-  `services/litellm-orch/config/router.yaml` callbacks, so clients do **not**
+  `layer-gateway/litellm-orch/config/prompt_injector.py` and
+  `layer-gateway/litellm-orch/config/router.yaml` callbacks, so clients do **not**
   need to pass `prompt_id`.
 
 ## Notes

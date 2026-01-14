@@ -1,8 +1,11 @@
-services/searxng/app/
-services/searxng/.venv/
 __pycache__/
 *.pyc
-services/litellm-orch/config/env.local
 .aider.chat.history.md
 .venv/
 .venv-*/
+.idea/
+*.egg-info/
+layer-tools/searxng/app/
+layer-tools/searxng/.venv/
+layer-gateway/litellm-orch/config/env.local
+layer-interface/open-webui/.webui_secret_key

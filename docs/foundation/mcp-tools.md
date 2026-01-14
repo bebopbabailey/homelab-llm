@@ -62,4 +62,4 @@ Provide trimmed, relevant HTML or clean text to improve extraction fidelity.
 
 ### MCP server note
 `web.fetch` and `search.web` are implemented as a stdio MCP tool server under
-`services/web-fetch` and are launched by the agent runtime.
+`layer-tools/mcp-tools/web-fetch` and are launched by the agent runtime.

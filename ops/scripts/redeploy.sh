@@ -43,13 +43,25 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
+service_dir() {
+  local svc="$1"
+  case "$svc" in
+    litellm-orch) echo "$REPO_ROOT/layer-gateway/litellm-orch" ;;
+    optillm-proxy) echo "$REPO_ROOT/layer-gateway/optillm-proxy" ;;
+    open-webui) echo "$REPO_ROOT/layer-interface/open-webui" ;;
+    ov-server) echo "$REPO_ROOT/layer-inference/ov-llm-server" ;;
+    *) echo "$REPO_ROOT/$svc" ;;
+  esac
+}
+
 maybe_uv_sync() {
   # We only sync if:
   #  - service dir exists
   #  - has pyproject.toml
   #  - and has a uv lock (uv.lock) or requirements lock (we treat uv.lock as best)
   local svc="$1"
-  local svc_dir="$REPO_ROOT/services/$svc"
+  local svc_dir
+  svc_dir="$(service_dir "$svc")"
   [[ -d "$svc_dir" ]] || return 0
 
   if [[ -f "$svc_dir/pyproject.toml" ]]; then

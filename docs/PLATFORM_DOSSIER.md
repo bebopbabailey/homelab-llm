@@ -15,18 +15,18 @@
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `/proc/net/fib_trie` |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `curl http://127.0.0.1:3000/health` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
-| OptiLLM proxy | Mini | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `services/optillm-proxy/SERVICE_SPEC.md`, local install |
+| OptiLLM proxy | Mini | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-proxy/SERVICE_SPEC.md`, local install |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
-| MLX (jerry-xl) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (jerry-l) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (jerry-m) | Studio | 8102 | 0.0.0.0 | http://192.168.1.72:8102/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (jerry-s) | Studio | 8103 | 0.0.0.0 | http://192.168.1.72:8103/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (bench-xl) | Studio | 8104 | 0.0.0.0 | http://192.168.1.72:8104/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (bench-l) | Studio | 8105 | 0.0.0.0 | http://192.168.1.72:8105/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (bench-m) | Studio | 8106 | 0.0.0.0 | http://192.168.1.72:8106/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (bench-s) | Studio | 8107 | 0.0.0.0 | http://192.168.1.72:8107/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (utility-a) | Studio | 8108 | 0.0.0.0 | http://192.168.1.72:8108/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
-| MLX (utility-b) | Studio | 8109 | 0.0.0.0 | http://192.168.1.72:8109/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
+| MLX (jerry-xl) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (jerry-l) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (jerry-m) | Studio | 8102 | 0.0.0.0 | http://192.168.1.72:8102/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (jerry-s) | Studio | 8103 | 0.0.0.0 | http://192.168.1.72:8103/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (bench-xl) | Studio | 8104 | 0.0.0.0 | http://192.168.1.72:8104/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (bench-l) | Studio | 8105 | 0.0.0.0 | http://192.168.1.72:8105/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (bench-m) | Studio | 8106 | 0.0.0.0 | http://192.168.1.72:8106/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (bench-s) | Studio | 8107 | 0.0.0.0 | http://192.168.1.72:8107/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (utility-a) | Studio | 8108 | 0.0.0.0 | http://192.168.1.72:8108/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
+| MLX (utility-b) | Studio | 8109 | 0.0.0.0 | http://192.168.1.72:8109/v1 | /v1/models | `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local`, owner confirmation |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
 | Home Assistant | DietPi | 8123 | 0.0.0.0 (assumed) | http://192.168.1.70:8123 | not documented | `/home/christopherbailey/.ssh/config`, owner confirmation |
@@ -35,9 +35,9 @@
 - Do not change or reuse ports without an explicit port-migration phase.
 
 ## Service inventory (concise)
-- LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `services/litellm-orch/config/router.yaml`.
+- LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `layer-gateway/litellm-orch/config/router.yaml`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
-  Working dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
+  Working dir: `/home/christopherbailey/homelab-llm/layer-interface/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
 - OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env`.
   Runtime uses int8 for `benny-clean-*` via LiteLLM; fp16 variants remain in the registry.
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.

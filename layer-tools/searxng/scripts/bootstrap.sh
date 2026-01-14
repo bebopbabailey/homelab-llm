@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-APP_DIR="${REPO_ROOT}/services/searxng/app"
-SETTINGS_SRC="${REPO_ROOT}/services/searxng/settings.yml.example"
+APP_DIR="${REPO_ROOT}/layer-tools/searxng/app"
+SETTINGS_SRC="${REPO_ROOT}/layer-tools/searxng/settings.yml.example"
 SETTINGS_DIR="/etc/searxng"
 SETTINGS_DST="${SETTINGS_DIR}/settings.yml"
 ENV_DST="${SETTINGS_DIR}/env"
@@ -29,7 +29,7 @@ PY
 fi
 
 if [[ ! -f "${ENV_DST}" ]]; then
-  sudo cp "${REPO_ROOT}/services/searxng/searxng.env.example" "${ENV_DST}"
+  sudo cp "${REPO_ROOT}/layer-tools/searxng/searxng.env.example" "${ENV_DST}"
 fi
 
 echo "SearXNG bootstrap complete."

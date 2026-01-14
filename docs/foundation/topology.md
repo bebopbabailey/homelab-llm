@@ -44,7 +44,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - Local-only: OptiLLM 4020 (must not be LAN-exposed), SearXNG 8888.
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
-  - LiteLLM: `services/litellm-orch/config/env.local`
+  - LiteLLM: `layer-gateway/litellm-orch/config/env.local`
   - Open WebUI: `/etc/open-webui/env`
   - OpenVINO: `/etc/homelab-llm/ov-server.env`
   - SearXNG: `/etc/searxng/env`

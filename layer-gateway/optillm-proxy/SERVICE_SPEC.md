@@ -165,7 +165,7 @@ Upgrades must be deliberate and validated.
 No Docker installs are allowed in this repo.
 
 ```bash
-cd /home/christopherbailey/homelab-llm/services/optillm-proxy
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 uv venv .venv
 uv pip install optillm==0.3.12
 ```

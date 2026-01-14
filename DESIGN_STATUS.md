@@ -10,19 +10,19 @@ restructuring the repo. It is intentionally short and will be refined later.
   (README, SERVICE_SPEC, ARCHITECTURE, AGENTS, TASKS, RUNBOOK, plus `docs/`).
 - Root-level docs focus on **system architecture and integration**, not service internals.
 - Use a **layered directory tree** with technical names (Option C: Interface, Gateway,
-  Inference, Tools, Data). We will move files later using IntelliJ.
+  Inference, Tools, Data). Services have been moved into layers via IntelliJ.
 - **System monitoring** should live at the **Gateway layer** (LiteLLM is the source
   of monitoring signals and health data).
-- **Registries** are service-owned (model/backend bookkeeping), while monitoring is a
-  separate mechanism.
-- Monitoring uses **SQLite-first** with a Postgres-ready schema (see
-  `docs/foundation/monitoring-db-schema.md`).
+- **System documentation DB** is the single source of truth (SQLite-first with a
+  Postgres migration path). Model registries live here as first-class entities.
+- **Monitoring** is derived from views over this DB, not a separate truth source.
+- Schema: `docs/foundation/system-docs-db-schema.md`.
 
 ## Layer definitions (working)
 - **Interface**: human-facing UI/clients (Open WebUI, Shortcuts endpoints)
 - **Gateway**: request routing, auth, observability (LiteLLM + system monitoring)
 - **Inference**: model backends and cognition (OpenVINO, MLX, AFM)
-- **Tools**: action/execution (MCP tools, web fetch, HA control)
+- **Tools**: action/execution (MCP tools, web fetch, HA control, SearXNG search)
 - **Data**: user memory, summaries, logs as data products (not ops telemetry)
 
 ## Proposed root layout (target)
@@ -33,10 +33,13 @@ homelab-llm/
 
   layer-gateway/
     litellm-orch/
-    system-monitor/           # planned
+    system-monitor/           # placeholder service
+    optillm-proxy/            # optimization proxy behind LiteLLM
+    tiny-agents/              # orchestration client
 
   layer-inference/
     ov-llm-server/
+    orin-llm-server/          # future inference host
     mlx-backends/             # docs/config only if needed
     afm/                      # planned
 
@@ -45,11 +48,13 @@ homelab-llm/
       web-fetch/
       search-web/             # if split later
       home-assistant/         # planned
+    searxng/                  # search service (via LiteLLM /v1/search)
 
   layer-data/
+    vector-db/                # RAG storage (if used here)
     memory/                   # user/context memory (RAG-able)
     summaries/                # derived summaries
-    registries/               # index of service-owned registries
+    registries/               # index or exports from the system documentation DB
 
   platform/
     ARCHITECTURE.md
@@ -67,10 +72,8 @@ homelab-llm/
   - LiteLLM is the single entry point for requests.
   - Health, errors, latency, and model routing are visible there.
   - Monitoring is ops telemetry, not user memory.
-  - Monitoring storage is SQLite-first with migration path to Postgres.
+  - Monitoring views are derived from the system documentation DB.
 
 ## Open questions to resolve
-- Should `system-monitor` be its own service under `layer-gateway/`, or a
-  gateway-adjacent tool/module documented within LiteLLM?
 - Which registries should be centralized vs strictly service-local?
 - Should `layer-data/registries/` be an index only (links), or store live files?

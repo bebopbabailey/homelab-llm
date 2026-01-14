@@ -122,7 +122,7 @@ curl -fsS http://127.0.0.1:4000/v1/search/searxng-search \
 
 ## MCP web.fetch (Mini, stdio)
 ```bash
-cd /home/christopherbailey/homelab-llm/services/web-fetch
+cd /home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch
 uv venv .venv
 uv pip install -e .
 .venv/bin/python3 scripts/demo_client.py --url https://example.com --print-clean-text
@@ -130,7 +130,7 @@ uv pip install -e .
 
 ## MCP search.web (Mini, stdio)
 ```bash
-cd /home/christopherbailey/homelab-llm/services/web-fetch
+cd /home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch
 .venv/bin/python3 scripts/demo_client.py --tool search.web --query "openvino llm" --max-results 3
 ```
 

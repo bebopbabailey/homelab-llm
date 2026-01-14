@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=christopherbailey
-WorkingDirectory=/home/christopherbailey/homelab-llm/services/searxng/app
+WorkingDirectory=/home/christopherbailey/homelab-llm/layer-tools/searxng/app
 EnvironmentFile=/etc/searxng/env
-ExecStart=/home/christopherbailey/homelab-llm/services/searxng/app/.venv/bin/granian searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8888
+ExecStart=/home/christopherbailey/homelab-llm/layer-tools/searxng/app/.venv/bin/granian searx.webapp:app --interface wsgi --host 127.0.0.1 --port 8888
 Restart=always
 RestartSec=2
 LimitNOFILE=65536

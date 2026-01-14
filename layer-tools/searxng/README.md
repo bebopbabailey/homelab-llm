@@ -13,25 +13,25 @@ Docs: `https://docs.searxng.org/admin/installation.html`
 - Use `uv` for Python dependency management.
 
 ## Install (no Docker, repo-based)
-SearXNG runs from `services/searxng/app` and is managed via systemd.
+SearXNG runs from `layer-tools/searxng/app` and is managed via systemd.
 
 1) Clone upstream into the service directory:
 
 ```bash
-git clone https://github.com/searxng/searxng.git services/searxng/app
+git clone https://github.com/searxng/searxng.git layer-tools/searxng/app
 ```
 
 2) Bootstrap dependencies + settings:
 
 ```bash
-./services/searxng/scripts/bootstrap.sh
+./layer-tools/searxng/scripts/bootstrap.sh
 ```
 
 This will:
-- create `services/searxng/app/.venv`
+- create `layer-tools/searxng/app/.venv`
 - install `requirements.txt` + `requirements-server.txt`
-- write `/etc/searxng/settings.yml` from `services/searxng/settings.yml.example`
-- write `/etc/searxng/env` from `services/searxng/searxng.env.example`
+- write `/etc/searxng/settings.yml` from `layer-tools/searxng/settings.yml.example`
+- write `/etc/searxng/env` from `layer-tools/searxng/searxng.env.example`
 
 ## Configuration (essentials)
 Key settings in `/etc/searxng/settings.yml`:
@@ -71,8 +71,8 @@ Once running on localhost:
 
 ## LiteLLM Integration
 LiteLLM exposes SearXNG via `/v1/search/<tool_name>` once configured in
-`services/litellm-orch/config/router.yaml`.
-Set these in `services/litellm-orch/config/env.local`:
+`layer-gateway/litellm-orch/config/router.yaml`.
+Set these in `layer-gateway/litellm-orch/config/env.local`:
 - `SEARXNG_API_BASE=http://127.0.0.1:8888`
 - `SEARXNG_API_KEY=` (optional)
 

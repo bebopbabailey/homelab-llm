@@ -1,2 +1,0 @@
-[console_scripts]
-web-fetch-mcp = web_fetch_mcp:main

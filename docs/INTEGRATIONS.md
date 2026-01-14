@@ -1,8 +1,8 @@
 # INTEGRATIONS
 
 ## LiteLLM routing
-- Config: `services/litellm-orch/config/router.yaml` + `services/litellm-orch/config/env.local`.
-- Router settings: retries and cooldowns in `services/litellm-orch/config/router.yaml`.
+- Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
+- Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
 - Upstreams: MLX `http://192.168.1.72:<port>/v1`, OpenVINO `http://localhost:9000/v1`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: `jerry-{xl,l,m,s}`, `bench-{xl,l,m,s}`, `utility-{a,b}`, `benny-*`.
@@ -25,7 +25,7 @@
 ## Web fetch + clean (implemented, MCP stdio)
 - Purpose: fetch a URL and return clean, model-ready text for summarization,
   RAG, or schema extraction.
-- Implemented as MCP stdio tool (`services/web-fetch`) exposing `web.fetch`
+- Implemented as MCP stdio tool (`layer-tools/mcp-tools/web-fetch`) exposing `web.fetch`
   and `search.web` (LiteLLM `/v1/search` backend). Invoked by an MCP client;
   not running as a systemd service yet.
 - Recommended `web.fetch` stack: `httpx` + `trafilatura` (primary extraction)
@@ -40,7 +40,7 @@
 - Ops: `/home/christopherbailey/homelab-llm/ops/scripts/ovctl` controls model warm-up profiles.
 - LiteLLM routes `benny-*` via `BENNY_*_API_BASE` and `BENNY_*_MODEL`.
   Current defaults use int8 for `benny-clean-s` and `benny-clean-m` via
-  `benny-clean-*-int8` model IDs in `services/litellm-orch/config/env.local`.
+  `benny-clean-*-int8` model IDs in `layer-gateway/litellm-orch/config/env.local`.
   int4 exists in the registry but is GPU-unstable on this iGPU stack.
   Runtime device is currently `OV_DEVICE=GPU` (see `/etc/homelab-llm/ov-server.env`);
   evaluating `AUTO` and `MULTI:GPU,CPU` for multi-request throughput.

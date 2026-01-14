@@ -4,7 +4,7 @@ This script calls the `web.fetch` MCP tool over stdio and prints the result.
 
 ## Run
 ```bash
-cd /home/christopherbailey/homelab-llm/services/web-fetch
+cd /home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch
 uv venv .venv
 uv pip install -e .
 .venv/bin/python3 scripts/demo_client.py

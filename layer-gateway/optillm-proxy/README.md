@@ -99,7 +99,7 @@ This repo does not allow Docker installs. Use `uv` to install a pinned OptiLLM
 version and run it as a local service.
 
 ```bash
-cd /home/christopherbailey/homelab-llm/services/optillm-proxy
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 uv venv .venv
 uv pip install optillm==0.3.12
 ```

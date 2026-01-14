@@ -8,7 +8,7 @@ without explicit approval.
 - **Language**: Python 3.x (upstream supports 3.10+)
 - **Dependency manager**: `uv` only
 - **Process model**: long-running web app (WSGI)
-- **App dir**: `services/searxng/app`
+- **App dir**: `layer-tools/searxng/app`
 - **Systemd unit**: `/etc/systemd/system/searxng.service`
 
 ## Network
@@ -29,7 +29,7 @@ without explicit approval.
 
 ## LiteLLM Integration
 - Add a `search_tools` entry for SearXNG in
-  `services/litellm-orch/config/router.yaml`.
+  `layer-gateway/litellm-orch/config/router.yaml`.
 - Use `/v1/search/<tool_name>` for clients to query via LiteLLM.
 - Tool name: `searxng-search`.
 

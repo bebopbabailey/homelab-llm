@@ -27,24 +27,24 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
 - Ensure LiteLLM remains the LLM gateway; tools are separate.
 
 ## Add a New Backend (LiteLLM-routed)
-1) Create service directory under `services/<name>`.
+1) Create service directory under the appropriate `layer-*/<name>` folder.
 2) Provide a service contract:
-   - `services/<name>/SERVICE_SPEC.md` (host, endpoints, env, health).
-   - `services/<name>/ARCHITECTURE.md` (role in the mesh).
+   - `layer-*/<name>/SERVICE_SPEC.md` (host, endpoints, env, health).
+   - `layer-*/<name>/ARCHITECTURE.md` (role in the mesh).
 3) Ensure the backend exposes:
    - `POST /v1/chat/completions`
    - `GET /v1/models`
    - `GET /health`
 4) Add routing in LiteLLM:
-   - Update `services/litellm-orch/config/router.yaml`.
-   - Add env vars to `services/litellm-orch/config/env.local` (not committed).
+   - Update `layer-gateway/litellm-orch/config/router.yaml`.
+   - Add env vars to `layer-gateway/litellm-orch/config/env.local` (not committed).
    - Use plain logical model names (`jerry-*` style).
 5) Update topology docs:
    - `docs/foundation/topology.md`
    - `docs/PLATFORM_DOSSIER.md`
 6) Validate with health checks:
    - `ops/scripts/healthcheck.sh` (extend if needed).
-   - `services/litellm-orch/scripts/health-check.sh` for LiteLLM.
+   - `layer-gateway/litellm-orch/scripts/health-check.sh` for LiteLLM.
 
 ## Add a New Client/Orchestrator (TinyAgents)
 1) Client must call LiteLLM only (`http://192.168.1.71:4000/v1`).
@@ -53,7 +53,7 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
 3) Document the client contract in `docs/` and its service folder.
 
 ## Config Sources of Truth
-- LiteLLM routing: `services/litellm-orch/config/router.yaml`.
-- LiteLLM env: `services/litellm-orch/config/env.local` (local only).
+- LiteLLM routing: `layer-gateway/litellm-orch/config/router.yaml`.
+- LiteLLM env: `layer-gateway/litellm-orch/config/env.local` (local only).
 - Open WebUI env: `/etc/open-webui/env`.
 - OpenVINO env: `/etc/homelab-llm/ov-server.env`.

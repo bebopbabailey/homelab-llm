@@ -27,18 +27,18 @@ utility services behind a single LiteLLM gateway.
 
 ## Service Index
 Stable services:
-- LiteLLM gateway — `services/litellm-orch`
-- OpenVINO LLM server — `services/ov-llm-server`
-- OptiLLM proxy — `services/optillm-proxy`
-- SearXNG — `services/searxng`
+- LiteLLM gateway — `layer-gateway/litellm-orch`
+- OpenVINO LLM server — `layer-inference/ov-llm-server`
+- OptiLLM proxy — `layer-gateway/optillm-proxy`
+- TinyAgents — `layer-gateway/tiny-agents`
+- SearXNG — `layer-tools/searxng`
 - Open WebUI — documented in `docs/PLATFORM_DOSSIER.md`
 - MLX OpenAI servers — documented in `docs/PLATFORM_DOSSIER.md`
 - Ollama — documented in `docs/PLATFORM_DOSSIER.md`
 - Home Assistant — documented in `docs/PLATFORM_DOSSIER.md`
 
 Planned services (endpoints):
-- TinyAgents (planned client/orchestrator behind LiteLLM)
-- OptiLLM (planned expansion of optimization endpoints)
+- System monitor (planned, gateway layer)
 - AFM (planned OpenAI-compatible API on the Studio, routed via LiteLLM)
 
 ## Ops Scripts (core)

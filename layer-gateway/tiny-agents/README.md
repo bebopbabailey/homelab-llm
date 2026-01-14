@@ -16,7 +16,7 @@ LiteLLM only. It must not call backends directly.
 TinyAgents is a small repo with a `pyproject.toml`. Install from a pinned commit:
 
 ```bash
-cd /home/christopherbailey/homelab-llm/services/tiny-agents
+cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
 uv venv .venv
 uv pip install "tinyagents @ git+https://github.com/albertvillanova/tinyagents.git@<PINNED_COMMIT>"
 ```
@@ -41,10 +41,10 @@ python tinycodeagent.py servers/weather/weather.py
 Use the web-fetch MCP server to validate `search.web` and `web.fetch`:
 
 ```bash
-cd /home/christopherbailey/homelab-llm/services/web-fetch
+cd /home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch
 uv venv .venv
 uv pip install -e .
-.venv/bin/python3 /home/christopherbailey/homelab-llm/services/tiny-agents/scripts/mcp_smoke.py --tool search.web
+.venv/bin/python3 /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents/scripts/mcp_smoke.py --tool search.web
 ```
 
 ## References

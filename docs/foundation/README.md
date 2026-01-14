@@ -29,10 +29,10 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
 - `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
 - `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
-- `services/*/SERVICE_SPEC.md` — per-service runtime contract and env locations.
-- `services/litellm-orch/ARCHITECTURE.md` and `services/ov-llm-server/ARCHITECTURE.md`
+- `layer-*/<service>/SERVICE_SPEC.md` — per-service runtime contract and env locations.
+- `layer-gateway/litellm-orch/ARCHITECTURE.md` and `layer-inference/ov-llm-server/ARCHITECTURE.md`
   — layered architecture framing.
-- `services/*/SERVICE_SPEC.md` — per-service contract details.
+- `layer-*/<service>/SERVICE_SPEC.md` — per-service contract details.
 - `docs/foundation/tool-contracts.md` — tool interfaces and expectations.
 - Tool contracts should include both OpenAPI (HTTP transport) and MCP tool
   schemas (tool-level interface) where applicable.
