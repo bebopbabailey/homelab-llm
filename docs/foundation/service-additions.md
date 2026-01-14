@@ -15,9 +15,9 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
 - `SERVICE_SPEC.md` present with run/health/env details.
 - `ARCHITECTURE.md` updated with role in the mesh.
 - `AGENTS.md` created with service-scoped guidance.
-- `ops/scripts/healthcheck.sh` updated if new endpoints exist.
-- `ops/scripts/restart-all.sh` updated if new systemd service added.
-- Systemd unit added under `ops/systemd/` when applicable.
+- `platform/ops/scripts/healthcheck.sh` updated if new endpoints exist.
+- `platform/ops/scripts/restart-all.sh` updated if new systemd service added.
+- Systemd unit added under `platform/ops/systemd/` when applicable.
 - `docs/foundation/topology.md` and `docs/PLATFORM_DOSSIER.md` updated.
 
 ## MCP Tool Checklist (when applicable)
@@ -43,7 +43,7 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
    - `docs/foundation/topology.md`
    - `docs/PLATFORM_DOSSIER.md`
 6) Validate with health checks:
-   - `ops/scripts/healthcheck.sh` (extend if needed).
+   - `platform/ops/scripts/healthcheck.sh` (extend if needed).
    - `layer-gateway/litellm-orch/scripts/health-check.sh` for LiteLLM.
 
 ## Add a New Client/Orchestrator (TinyAgents)

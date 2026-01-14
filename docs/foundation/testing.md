@@ -94,8 +94,8 @@ sudo systemctl restart ov-server.service
 ## Non-LLM pilot tests (Mini)
 Run and capture timing + quality notes:
 ```bash
-ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/onnx_eval.py
-ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/clean_punct_onnx.py
+platform/ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/platform/ops/scripts/onnx_eval.py
+platform/ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/platform/ops/scripts/clean_punct_onnx.py
 ```
 
 ## STT/TTS/Vision evaluation (planned)
@@ -140,24 +140,24 @@ response.
 
 ## MCP registry + TinyAgents env (MVP)
 ```bash
-sudo cp /home/christopherbailey/homelab-llm/ops/templates/mcp-registry.json /etc/homelab-llm/mcp-registry.json
-sudo cp /home/christopherbailey/homelab-llm/ops/templates/tiny-agents.env /etc/homelab-llm/tiny-agents.env
+sudo cp /home/christopherbailey/homelab-llm/platform/ops/templates/mcp-registry.json /etc/homelab-llm/mcp-registry.json
+sudo cp /home/christopherbailey/homelab-llm/platform/ops/templates/tiny-agents.env /etc/homelab-llm/tiny-agents.env
 ```
 
 ## OpenVINO model control (ovctl)
 ```bash
-/home/christopherbailey/homelab-llm/ops/scripts/ovctl list
-/home/christopherbailey/homelab-llm/ops/scripts/ovctl profiles
-/home/christopherbailey/homelab-llm/ops/scripts/ovctl warm-profile benny-only-expanded
-/home/christopherbailey/homelab-llm/ops/scripts/ovctl status
+/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl list
+/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl profiles
+/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl warm-profile benny-only-expanded
+/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl status
 ```
 
 ## LiteLLM prompt sync (Benny)
 ```bash
-/home/christopherbailey/homelab-llm/ops/scripts/sync-benny-prompts
+/home/christopherbailey/homelab-llm/platform/ops/scripts/sync-benny-prompts
 ```
 
 ## ONNX evaluation (route + summarize)
 ```bash
-ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/onnx_eval.py
+platform/ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/platform/ops/scripts/onnx_eval.py
 ```

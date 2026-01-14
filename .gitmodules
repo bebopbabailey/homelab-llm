@@ -1,6 +1,6 @@
 [submodule "layer-gateway/litellm-orch"]
 	path = layer-gateway/litellm-orch
-	url = https://github.com/bebopbabailey/orchestration.git
+	url = git@github.com:bebopbabailey/litellm-orch.git
 [submodule "layer-inference/ov-llm-server"]
 	path = layer-inference/ov-llm-server
-	url = https://github.com/bebopbabailey/ov-llm-server.git
+	url = git@github.com:bebopbabailey/ov-llm-server.git

@@ -9,7 +9,7 @@
 
 ## Conflicts found
 - OpenVINO binds 0.0.0.0 for maintenance access; internal callers use localhost.
-- MLX ports 8100-8109 are reserved and managed via `ops/scripts/mlxctl`.
+- MLX ports 8100-8109 are reserved and managed via `platform/ops/scripts/mlxctl`.
 
 ## Notes
 - Open WebUI systemd unit uses `/home/christopherbailey/homelab-llm/layer-interface/open-webui`.

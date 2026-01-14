@@ -42,9 +42,9 @@ Planned services (endpoints):
 - AFM (planned OpenAI-compatible API on the Studio, routed via LiteLLM)
 
 ## Ops Scripts (core)
-- `ops/scripts/healthcheck.sh`
-- `ops/scripts/restart-all.sh`
-- `ops/scripts/redeploy.sh`
+- `platform/ops/scripts/healthcheck.sh`
+- `platform/ops/scripts/restart-all.sh`
+- `platform/ops/scripts/redeploy.sh`
 
 ## Documentation Hygiene
 - Keep service docs, topology, and integrations in sync with changes.

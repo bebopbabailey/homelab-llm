@@ -46,7 +46,7 @@ while allowing backend models to evolve independently.
 
 ## Repo Layout (high-level)
 - `docs/` — platform-wide architecture, constraints, topology.
-- `ops/` — operational scripts and systemd backup units.
+- `platform/ops/` — operational scripts and systemd backup units.
 - `layer-*/` — per-service code and contracts by layer.
 
 ## Glossary (short)

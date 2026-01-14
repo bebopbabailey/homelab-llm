@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 SERVICES=(litellm-orch open-webui ov-server optillm-proxy searxng)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HEALTHCHECK="$REPO_ROOT/ops/scripts/healthcheck.sh"
+HEALTHCHECK="$REPO_ROOT/platform/ops/scripts/healthcheck.sh"
 
 log() { printf "\n[%s] %s\n" "$(date +'%F %T')" "$*"; }
 

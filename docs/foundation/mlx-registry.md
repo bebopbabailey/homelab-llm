@@ -44,9 +44,9 @@ Supported commands:
 - `reconcile` — clear registry entries for ports that are no longer listening.
 
 ## Install
-Place `ops/scripts/mlxctl` on both hosts and ensure it is on PATH:
+Place `platform/ops/scripts/mlxctl` on both hosts and ensure it is on PATH:
 ```bash
-ln -s /home/christopherbailey/homelab-llm/ops/scripts/mlxctl /usr/local/bin/mlxctl
+ln -s /home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl /usr/local/bin/mlxctl
 ```
 
 On the Studio, the script assumes:

@@ -37,7 +37,7 @@
 - Systemd unit: `/etc/systemd/system/ov-server.service` (binds `0.0.0.0` for maintenance).
 - Env: `/etc/homelab-llm/ov-server.env` (runtime).
 - Endpoints: `/health`, `/v1/models`, `/v1/chat/completions`.
-- Ops: `/home/christopherbailey/homelab-llm/ops/scripts/ovctl` controls model warm-up profiles.
+- Ops: `/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl` controls model warm-up profiles.
 - LiteLLM routes `benny-*` via `BENNY_*_API_BASE` and `BENNY_*_MODEL`.
   Current defaults use int8 for `benny-clean-s` and `benny-clean-m` via
   `benny-clean-*-int8` model IDs in `layer-gateway/litellm-orch/config/env.local`.
@@ -92,7 +92,7 @@ OPTILLM_JERRY_XL_MODEL=openai/bon-jerry-xl
 ## MCP tools (implemented locally)
 - MCP servers provide tool access; TinyAgents is the MCP client (MVP).
 - MCP registry lives at `/etc/homelab-llm/mcp-registry.json` (pending creation).
-- Template: `ops/templates/mcp-registry.json`.
+- Template: `platform/ops/templates/mcp-registry.json`.
 - Keep tool calls separate from LiteLLM model calls.
 - Plan a sandboxed `python.run` tool for future workflows; avoid unsandboxed
   execution by default.

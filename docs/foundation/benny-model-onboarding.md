@@ -155,7 +155,7 @@ for the current alias mapping.
 - Prompts are stored in the LiteLLM DB (`LiteLLM_PromptTable`); new edits should
   be re-imported to bump the version.
 - Prompt index (latest versions): `docs/prompts/benny/index.json`.
-- Sync script: `ops/scripts/sync-benny-prompts` (updates index only).
+- Sync script: `platform/ops/scripts/sync-benny-prompts` (updates index only).
 - LiteLLM injects these prompts automatically per model via
   `layer-gateway/litellm-orch/config/prompt_injector.py` and
   `layer-gateway/litellm-orch/config/router.yaml` callbacks, so clients do **not**

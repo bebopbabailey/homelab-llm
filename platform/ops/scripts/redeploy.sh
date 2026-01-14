@@ -13,9 +13,9 @@ set -Eeuo pipefail
 #  - runs a health check
 #
 # Usage:
-#   ./ops/scripts/redeploy.sh all
-#   ./ops/scripts/redeploy.sh litellm-orch
-#   ./ops/scripts/redeploy.sh open-webui ov-server
+#   ./platform/ops/scripts/redeploy.sh all
+#   ./platform/ops/scripts/redeploy.sh litellm-orch
+#   ./platform/ops/scripts/redeploy.sh open-webui ov-server
 #
 # Notes:
 #  - requires passwordless sudo for systemctl (recommended) OR you'll be prompted
@@ -23,7 +23,7 @@ set -Eeuo pipefail
 # -----------------------------------------------------------------------------
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HEALTHCHECK="$REPO_ROOT/ops/scripts/healthcheck.sh"
+HEALTHCHECK="$REPO_ROOT/platform/ops/scripts/healthcheck.sh"
 
 # Services we know how to manage.
 KNOWN_SERVICES=("litellm-orch" "open-webui" "ov-server" "optillm-proxy")

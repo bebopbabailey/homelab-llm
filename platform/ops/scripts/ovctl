@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 DEFAULT_REGISTRY = os.path.expanduser("~/models/converted_models/registry.json")
-DEFAULT_PROFILE_DIR = Path("/home/christopherbailey/homelab-llm/ops/ov-profiles")
+DEFAULT_PROFILE_DIR = Path("/home/christopherbailey/homelab-llm/platform/ops/ov-profiles")
 DEFAULT_SERVER_URL = "http://127.0.0.1:9000"
 WARM_SCRIPT = Path("/home/christopherbailey/homelab-llm/layer-inference/ov-llm-server/scripts/ov-warm-models")
 

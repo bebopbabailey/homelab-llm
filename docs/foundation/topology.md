@@ -32,7 +32,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
 
 ### MLX port management
-- Ports 8100-8109 are reserved on the Studio and managed via `ops/scripts/mlxctl`.
+- Ports 8100-8109 are reserved on the Studio and managed via `platform/ops/scripts/mlxctl`.
 
 ## MCP Tools (stdio, no ports)
 - `web.fetch` — stdio MCP tool on the Mini (no network port).

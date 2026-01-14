@@ -59,7 +59,7 @@ export SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
 Install the unit and start:
 
 ```bash
-sudo cp /home/christopherbailey/homelab-llm/ops/systemd/searxng.service /etc/systemd/system/searxng.service
+sudo cp /home/christopherbailey/homelab-llm/platform/ops/systemd/searxng.service /etc/systemd/system/searxng.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now searxng.service
 ```

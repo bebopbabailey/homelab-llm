@@ -13,13 +13,13 @@ Golden sets:
 - `docs/foundation/golden-set-summarize.md`
 
 ## Execution
-Use `ops/scripts/onnx_eval.py` (creates per-role outputs and timing).
+Use `platform/ops/scripts/onnx_eval.py` (creates per-role outputs and timing).
 
 Env:
 ```bash
-uv venv ops/.venv-onnx
-uv pip install --python ops/.venv-onnx "optimum[onnxruntime]" transformers onnxruntime sentencepiece huggingface_hub numpy
-ops/.venv-onnx/bin/python ops/scripts/onnx_eval.py
+uv venv platform/ops/.venv-onnx
+uv pip install --python platform/ops/.venv-onnx "optimum[onnxruntime]" transformers onnxruntime sentencepiece huggingface_hub numpy
+platform/ops/.venv-onnx/bin/python platform/ops/scripts/onnx_eval.py
 ```
 
 ## Models (first pass)
@@ -31,7 +31,7 @@ ops/.venv-onnx/bin/python ops/scripts/onnx_eval.py
 - Keyword/entity extraction: lightweight NER or token classification (ONNX).
 
 ## Cleaner pilot (punctuation + casing)
-Script: `ops/scripts/clean_punct_onnx.py`
+Script: `platform/ops/scripts/clean_punct_onnx.py`
 Model: `punctuators` (`pcs_en`)
 
 Notes:

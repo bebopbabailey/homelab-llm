@@ -32,8 +32,8 @@ Use `uv` only. Do not use Docker.
 When adding this service to the system:
 - Add a LiteLLM route that points to `http://127.0.0.1:4020/v1`.
 - Ensure LiteLLM sends prefixed model names to OptiLLM (avoid loops).
-- Update `ops/scripts/healthcheck.sh` and `ops/scripts/restart-all.sh`.
-- Add a systemd unit in `ops/systemd/` and an env file outside the repo.
+- Update `platform/ops/scripts/healthcheck.sh` and `platform/ops/scripts/restart-all.sh`.
+- Add a systemd unit in `platform/ops/systemd/` and an env file outside the repo.
 
 ## Systemd Expectations (planned)
 - Prefer a system-level unit: `/etc/systemd/system/optillm-proxy.service`.

@@ -1,6 +1,6 @@
 # Design Status (Working Notes)
 
-Date: 2026-01-13
+Date: 2026-01-14
 
 This document captures the current design direction so we stay organized while
 restructuring the repo. It is intentionally short and will be refined later.
@@ -17,6 +17,7 @@ restructuring the repo. It is intentionally short and will be refined later.
   Postgres migration path). Model registries live here as first-class entities.
 - **Monitoring** is derived from views over this DB, not a separate truth source.
 - Schema: `docs/foundation/system-docs-db-schema.md`.
+- No plan to move `/docs` out of repo root; it remains the system-level doc hub.
 
 ## Layer definitions (working)
 - **Interface**: human-facing UI/clients (Open WebUI, Shortcuts endpoints)
@@ -25,7 +26,7 @@ restructuring the repo. It is intentionally short and will be refined later.
 - **Tools**: action/execution (MCP tools, web fetch, HA control, SearXNG search)
 - **Data**: user memory, summaries, logs as data products (not ops telemetry)
 
-## Proposed root layout (target)
+## Current layout (as of today)
 ```text
 homelab-llm/
   layer-interface/
@@ -40,32 +41,29 @@ homelab-llm/
   layer-inference/
     ov-llm-server/
     orin-llm-server/          # future inference host
-    mlx-backends/             # docs/config only if needed
-    afm/                      # planned
 
   layer-tools/
     mcp-tools/
       web-fetch/
-      search-web/             # if split later
-      home-assistant/         # planned
     searxng/                  # search service (via LiteLLM /v1/search)
 
   layer-data/
     vector-db/                # RAG storage (if used here)
-    memory/                   # user/context memory (RAG-able)
-    summaries/                # derived summaries
-    registries/               # index or exports from the system documentation DB
+
+  docs/                       # system-level docs (stay at root)
 
   platform/
-    ARCHITECTURE.md
-    PLATFORM_DOSSIER.md
-    INTEGRATIONS.md
-    constraints-and-decisions.md
-    topology.md
-    journal/
-    ops/
-    TASKS.md
+    ops/                      # moved from /ops
 ```
+
+## Runtime reality (Mini)
+- systemd units installed/enabled: LiteLLM, Open WebUI, OpenVINO LLM, SearXNG, OptiLLM.
+- All five are now running with venvs recreated under the layer paths.
+- SearXNG still runs on localhost:8888 (not exposed on LAN).
+
+## Runtime reality (Studio)
+- LaunchDaemon: `com.bebop.mlx-launch` is enabled and running at boot.
+- `com.deploy.mlx.server.plist.disabled` exists and remains disabled by design.
 
 ## Monitoring placement (decision)
 - **System monitoring is part of the Gateway layer** because:
@@ -73,6 +71,15 @@ homelab-llm/
   - Health, errors, latency, and model routing are visible there.
   - Monitoring is ops telemetry, not user memory.
   - Monitoring views are derived from the system documentation DB.
+
+
+## Documentation + Registry Integration (current stance)
+- System documentation DB is the single source of truth (SQLite-first, migrate to Postgres).
+- Registries live as DB tables/views, not scattered flat files long-term.
+- Monitoring is derived from DB views (no separate monitoring truth source).
+- Registries are minimal + actionable, with pointers to richer service docs.
+- Models are first-class entities with richer metadata; may link to a model-focused DB later.
+- System monitor is a gateway-layer service (not embedded inside LiteLLM).
 
 ## Open questions to resolve
 - Which registries should be centralized vs strictly service-local?

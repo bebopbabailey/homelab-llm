@@ -27,7 +27,7 @@ uv pip install "tinyagents @ git+https://github.com/albertvillanova/tinyagents.g
 - For homelab integration, adapt TinyAgents to call LiteLLM instead of Hugging Face.
   LiteLLM base URL: `http://127.0.0.1:4000/v1`.
 - MCP registry (runtime): `MCP_REGISTRY_PATH=/etc/homelab-llm/mcp-registry.json`.
-- Template env: `ops/templates/tiny-agents.env`.
+- Template env: `platform/ops/templates/tiny-agents.env`.
 
 ## Usage (upstream examples)
 Upstream scripts (from the repo):
