@@ -1,7 +1,7 @@
 # Studio launchd update (requires sudo on Studio)
 
 Status: legacy notes for a GPT-OSS launchd setup on port 8100. Current MLX
-port management is handled via `ops/scripts/mlxctl` and the registry. Use this
+port management is handled via `platform/ops/scripts/mlxctl` and the registry. Use this
 only if you intentionally revert to a single fixed launchd model on 8100.
 
 Goal: run `jerry-chat` (GPT-OSS) at boot on port `8100` via `com.bebop.mlx-launch`.

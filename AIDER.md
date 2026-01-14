@@ -53,7 +53,7 @@ If you load a heavy reasoning model on port 8100, you can switch your main model
 - Confirm LiteLLM can reach each backend using the URLs in your env file.
 
 ## Launch Checklist
-1. Start MLX servers on the Studio (preferred: `ops/scripts/mlxctl`).
+1. Start MLX servers on the Studio (preferred: `platform/ops/scripts/mlxctl`).
 2. Set the LiteLLM env vars in `config/env.local` and export them (or load via systemd).
 3. Start the LiteLLM proxy on the Mini (default port `4000`).
 4. From a client, verify `GET /v1/models` shows `jerry-*`, `bench-*`, `utility-*`, and `benny-*`.
