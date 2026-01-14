@@ -29,7 +29,7 @@ provides routing only and does not implement inference.
  - Optional alias: `scripts/run-dev-chat.sh` (same config; kept for convenience)
 
 ## Studio MLX Control
-- Use `ops/scripts/mlxctl` (registry-aware, stable aliases for ports 8100-8109).
+- Use `platform/ops/scripts/mlxctl` (registry-aware, stable aliases for ports 8100-8109).
 - Legacy MLX helper scripts were removed to reduce drift.
 
 ## Verify
