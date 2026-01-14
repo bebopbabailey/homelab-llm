@@ -75,6 +75,38 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 curl -fsS http://127.0.0.1:9000/health | jq .
 ```
 
+## OpenVINO device mode evaluation (Mini)
+Test latency and throughput with the same 1500-char input:
+```bash
+# GPU only (current)
+sudo sed -i 's/^OV_DEVICE=.*/OV_DEVICE=GPU/' /etc/homelab-llm/ov-server.env
+sudo systemctl restart ov-server.service
+
+# AUTO
+sudo sed -i 's/^OV_DEVICE=.*/OV_DEVICE=AUTO/' /etc/homelab-llm/ov-server.env
+sudo systemctl restart ov-server.service
+
+# MULTI CPU+GPU
+sudo sed -i 's/^OV_DEVICE=.*/OV_DEVICE=MULTI:GPU,CPU/' /etc/homelab-llm/ov-server.env
+sudo systemctl restart ov-server.service
+```
+
+## Non-LLM pilot tests (Mini)
+Run and capture timing + quality notes:
+```bash
+ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/onnx_eval.py
+ops/.venv-onnx/bin/python /home/christopherbailey/homelab-llm/ops/scripts/clean_punct_onnx.py
+```
+
+## STT/TTS/Vision evaluation (planned)
+Track candidate models, ports, and benchmarks in `docs/journal/`.
+
+## AFM (Studio, planned)
+Once the AFM OpenAI-compatible API is running:
+```bash
+curl -fsS http://192.168.1.72:9999/v1/models | jq .
+```
+
 ## SearXNG (Mini, once installed)
 ```bash
 curl -fsS "http://127.0.0.1:8888/search?q=ping&format=json" | jq .

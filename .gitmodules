@@ -1,0 +1,6 @@
+[submodule "services/litellm-orch"]
+	path = services/litellm-orch
+	url = https://github.com/bebopbabailey/orchestration.git
+[submodule "services/ov-llm-server"]
+	path = services/ov-llm-server
+	url = https://github.com/bebopbabailey/ov-llm-server.git

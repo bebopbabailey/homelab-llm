@@ -22,6 +22,9 @@ while allowing backend models to evolve independently.
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (`benny-*`).
    - MLX OpenAI servers on the Mac Studio (`jerry-*`).
+   - AFM OpenAI-compatible API on the Studio (planned).
+   - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.
+   - Non-LLM model evaluation (planned): routing/classification, summarization, cleaning.
 6) Search (current)
    - SearXNG runs locally on the Mini (127.0.0.1:8888) and is exposed via LiteLLM `/v1/search`.
    - `web.fetch` is the next step after search for clean content extraction.

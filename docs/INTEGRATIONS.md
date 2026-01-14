@@ -3,7 +3,8 @@
 ## LiteLLM routing
 - Config: `services/litellm-orch/config/router.yaml` + `services/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `services/litellm-orch/config/router.yaml`.
-- Upstreams: MLX `http://192.168.1.72:<port>/v1`, OpenVINO `http://localhost:9000/v1`.
+- Upstreams: MLX `http://192.168.1.72:<port>/v1`, OpenVINO `http://localhost:9000/v1`,
+  AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: `jerry-{xl,l,m,s}`, `bench-{xl,l,m,s}`, `utility-{a,b}`, `benny-*`.
   Upstream model IDs use `openai/<upstream>`.
 - Logs: JSON logs enabled (`litellm_settings.json_logs: true`).
@@ -38,10 +39,17 @@
 - Endpoints: `/health`, `/v1/models`, `/v1/chat/completions`.
 - Ops: `/home/christopherbailey/homelab-llm/ops/scripts/ovctl` controls model warm-up profiles.
 - LiteLLM routes `benny-*` via `BENNY_*_API_BASE` and `BENNY_*_MODEL`.
+  Current defaults use int8 for `benny-clean-s` and `benny-clean-m` via
+  `benny-clean-*-int8` model IDs in `services/litellm-orch/config/env.local`.
+  int4 exists in the registry but is GPU-unstable on this iGPU stack.
+  Runtime device is currently `OV_DEVICE=GPU` (see `/etc/homelab-llm/ov-server.env`);
+  evaluating `AUTO` and `MULTI:GPU,CPU` for multi-request throughput.
+  Pending: evaluate int8 for `benny-extract-*`, `benny-summarize-*`, `benny-tool-*`
+  and decide whether to switch their routing defaults.
 - Alias map (shared backends for lean footprint):
   - `benny-route-m` → `benny-tool-s`
   - `benny-tool-m` → `benny-classify-m`
-  - `benny-extract-s` → `benny-clean-s`
+  - `benny-extract-s` → `benny-clean-s` (fp16 registry entry)
   - `benny-extract-m` → `benny-summarize-m`
 
 ## OptiLLM optimization proxy
@@ -73,6 +81,13 @@ OPTILLM_JERRY_XL_MODEL=openai/bon-jerry-xl
 - Add `TINYAGENTS_API_BASE` and `TINYAGENTS_MODEL` to env.
 - Add a `model_list` entry in `config/router.yaml`.
 - Update `PLATFORM_DOSSIER.md` before new LAN exposure.
+
+## AFM backend (planned, Studio)
+- AFM runs an OpenAI-compatible API on the Studio (target: `http://192.168.1.72:9999/v1`).
+- Wire AFM as a LiteLLM backend once:
+  - base URL is confirmed,
+  - model ID(s) are known from `GET /v1/models`,
+  - auth requirements (if any) are defined.
 
 ## MCP tools (implemented locally)
 - MCP servers provide tool access; TinyAgents is the MCP client (MVP).

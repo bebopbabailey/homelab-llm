@@ -26,8 +26,8 @@ Mini and register them under the Benny naming scheme.
 | benny-route-m | Qwen/Qwen2.5-1.5B-Instruct | fp16 (shared with benny-tool-s) |
 | benny-classify-s | ibm-granite/granite-3.0-2b-instruct | int8 |
 | benny-classify-m | Qwen/Qwen2.5-3B-Instruct | fp16 |
-| benny-clean-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | int8 |
-| benny-clean-m | microsoft/Phi-4-mini-instruct | int8 |
+| benny-clean-s | HuggingFaceTB/SmolLM2-1.7B-Instruct | int8 (active), fp16 available |
+| benny-clean-m | microsoft/Phi-4-mini-instruct | int8 (active), fp16 available |
 | benny-tool-s | Qwen/Qwen2.5-1.5B-Instruct | fp16 |
 | benny-tool-m | Qwen/Qwen2.5-3B-Instruct | fp16 (shared with benny-classify-m) |
 | benny-summarize-s | meta-llama/Llama-3.2-1B-Instruct | fp16 |
@@ -36,6 +36,13 @@ Mini and register them under the Benny naming scheme.
 | benny-extract-m | microsoft/Phi-3.5-mini-instruct | fp16 (shared with benny-summarize-m) |
 | benny-rewrite-s | google/gemma-2-2b-it | fp16 |
 | benny-rewrite-m | meta-llama/Llama-3.2-3B-Instruct | fp16 |
+
+Notes:
+- int4 conversions exist for `benny-clean-s` and `benny-clean-m`, but GPU int4 is unstable
+  on this iGPU stack (kernel compile failures). CPU-only int4 is possible but lower fidelity.
+- LiteLLM currently routes `benny-clean-s` and `benny-clean-m` to `benny-clean-*-int8`.
+- Pending evaluation: int8 viability for `benny-extract-*`, `benny-summarize-*`, and
+  `benny-tool-*` (latency + quality vs fp16).
 
 ## Recommended Benny generation presets (Mini, OpenVINO)
 Starting defaults tuned for the Mini (Intel iGPU) and OpenVINO. They favor
@@ -107,7 +114,7 @@ If you rebuild `.venv-convert`, this patch will re-apply on the next conversion.
 
 When prompted for a custom name, enter the Benny name (e.g. `benny-tool-s`).
 The converter writes:
-- OpenVINO IR to `~/models/converted_models/<name>/task-text-generation-with-past__wf-fp16`
+- OpenVINO IR to `~/models/converted_models/<name>/task-text-generation-with-past__wf-<format>`
 - `conversion.json` in that folder
 - Registry entry in `~/models/converted_models/registry.json`
 

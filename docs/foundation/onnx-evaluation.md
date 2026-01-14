@@ -1,7 +1,7 @@
 # ONNX Evaluation (Non-LLM Benchmarks)
 
 Purpose: identify faster, smaller models for Benny roles that do not require full
-LLM generation (routing/classification and summarization).
+LLM generation (routing/classification, summarization, cleaning, and extraction).
 
 ## Step 1 — Route/Classify + Summarize
 Evaluate:
@@ -25,6 +25,10 @@ ops/.venv-onnx/bin/python ops/scripts/onnx_eval.py
 ## Models (first pass)
 - Embeddings: `onnx-models/all-MiniLM-L6-v2-onnx`
 - Summarization: `sshleifer/distilbart-cnn-12-6` (export to ONNX at runtime)
+
+## Next candidates (non-LLM)
+- Cleaning/extraction: fast punctuation/casing + rule pass (ONNX + rules).
+- Keyword/entity extraction: lightweight NER or token classification (ONNX).
 
 ## Cleaner pilot (punctuation + casing)
 Script: `ops/scripts/clean_punct_onnx.py`

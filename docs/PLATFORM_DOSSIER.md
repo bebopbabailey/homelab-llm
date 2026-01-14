@@ -5,6 +5,8 @@
   OptiLLM :4020 (localhost-only), SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX OpenAI servers :8100-:8109 (jerry/bench/utility slots)
 - HP DietPi: Home Assistant :8123
+## Topology (planned)
+- Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.
 
 ## Ports and endpoints (authoritative)
 
@@ -25,6 +27,7 @@
 | MLX (bench-s) | Studio | 8107 | 0.0.0.0 | http://192.168.1.72:8107/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
 | MLX (utility-a) | Studio | 8108 | 0.0.0.0 | http://192.168.1.72:8108/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
 | MLX (utility-b) | Studio | 8109 | 0.0.0.0 | http://192.168.1.72:8109/v1 | /v1/models | `/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local`, owner confirmation |
+| AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
 | Home Assistant | DietPi | 8123 | 0.0.0.0 (assumed) | http://192.168.1.70:8123 | not documented | `/home/christopherbailey/.ssh/config`, owner confirmation |
 
@@ -35,19 +38,24 @@
 - LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `services/litellm-orch/config/router.yaml`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
   Working dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
-- OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env` (currently fp32; revisit after testing).
+- OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env`.
+  Runtime uses int8 for `benny-clean-*` via LiteLLM; fp16 variants remain in the registry.
+  int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
+  Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for Benny).
+  Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
 - OptiLLM: systemd unit `/etc/systemd/system/optillm-proxy.service`, env `/etc/optillm-proxy/env`, localhost-only proxy.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
-- MLX: scripts under `/home/christopherbailey/homelab-llm/services/litellm-orch/scripts`, launchd plist `/Library/LaunchDaemons/com.bebop.mlx-launch.plist`, runtime `/opt/mlx-launch`.
-  Ports 8100-8109 are reserved and managed via `ops/scripts/mlxctl` on the Studio.
+- MLX: ports 8100-8109 are reserved and managed via `ops/scripts/mlxctl` on the Studio.
+  Launchd plist `/Library/LaunchDaemons/com.bebop.mlx-launch.plist`, runtime `/opt/mlx-launch`.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
   `search.web` are implemented, registry/systemd still pending.
+- AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
 
 ## Exposure and secrets (short)
 - LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000 (maintenance), Ollama 11434,
-  MLX 8100-8109, Home Assistant 8123.
+  MLX 8100-8109, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: OptiLLM 4020, SearXNG 8888.
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`.

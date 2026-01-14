@@ -75,13 +75,43 @@ without changing clients.
    - Verify Open WebUI can call LiteLLM search (Open WebUI only targets LiteLLM).
    - Document Open WebUI search wiring in `docs/foundation`.
 
-7) **OptiLLM wiring (move earlier)**
+7) **AFM backend (Studio)**
+   - Start AFM OpenAI-compatible API on the Studio (target: `:9999`).
+   - Confirm `/v1/models` output and auth requirements (if any).
+   - Add AFM base URL + model IDs to LiteLLM env and router config.
+   - Document AFM in `docs/PLATFORM_DOSSIER.md`, `docs/foundation/topology.md`,
+     and `docs/INTEGRATIONS.md`.
+
+8) **OpenVINO strengths evaluation (Mini)**
+   - Benchmark `benny-clean-*` with `OV_DEVICE=GPU`, `AUTO`, `MULTI:GPU,CPU`.
+   - Capture single-request latency and concurrent throughput (2–4 requests).
+   - Decide whether this host’s strengths are STT/vision/async throughput vs LLM.
+   - Document results in `docs/journal/` and update `docs/PLATFORM_DOSSIER.md`.
+
+9) **OpenVINO LLM follow-up (Mini)**
+   - Evaluate int8 for `benny-extract-*`, `benny-summarize-*`, `benny-tool-*`.
+   - Record quality + latency vs fp16; decide default routing per alias.
+   - Assess int4 utility for LLMs on this iGPU stack (CPU-only vs GPU stability).
+   - Decide whether IPEX-LLM is warranted to unlock GPU int4 paths.
+
+10) **Non-LLM model evaluation (Mini)**
+   - Validate ONNX route/classify + summarize baselines.
+   - Evaluate non-LLM cleaning/extraction (punctuation/casing + rule pass).
+   - Identify token-classification/NER options for extract/tool tasks.
+   - Capture speed/quality notes in the journal.
+
+11) **STT/TTS/Vision evaluation plan**
+   - Select candidate models and formats (OpenVINO/ONNX).
+   - Define minimal test set + metrics (latency, RTF, accuracy).
+   - Run pilots and record results in `docs/journal/`.
+
+12) **[x] OptiLLM wiring (move earlier)**
    - Point OptiLLM at one or more fixed aliases (e.g., `jerry-xl`) and ensure
      prefix-based loop avoidance (`moa-jerry-xl` into OptiLLM; `jerry-xl` upstream).
    - Add health checks and document the OptiLLM integration in `docs/foundation`
      and `docs/INTEGRATIONS.md`.
 
-8) **Orchestration hub setup (Mini)**
+13) **Orchestration hub setup (Mini)**
    - Document the Mini as the orchestration host in core docs.
    - Reserve/track MCP server endpoints (stdio vs HTTP/SSE).
    - Define a stable tool naming convention (e.g., `search.web`, `repo.scan`).
@@ -89,7 +119,7 @@ without changing clients.
    - Start with local stdio MCP servers to avoid port sprawl.
    - Add an HTTP/SSE MCP server only when remote access is required.
 
-9) **MCP MVP (Mini)**
+14) **MCP MVP (Mini)**
   - Run a single MCP server on the Mini (stdio or HTTP/SSE).
   - Start with `search.web` only (LiteLLM `/v1/search` → SearXNG).
   - Add `web.fetch` (clean HTML → text) as a stdio MCP tool after search is stable.
@@ -102,7 +132,7 @@ without changing clients.
   - Near-term: add `transcript.clean` as a tool that injects the fixed prompt and
     calls `benny-clean-m` via LiteLLM to return only cleaned text.
 
-10) **Agent routing (TinyAgents)**
+15) **Agent routing (TinyAgents)**
    - Adapt TinyAgents to call LiteLLM (`http://127.0.0.1:4000/v1`).
    - Add a TinyAgents env file (model selection + tool server endpoints).
    - Copy `ops/templates/tiny-agents.env` to `/etc/homelab-llm/tiny-agents.env`.
@@ -110,40 +140,40 @@ without changing clients.
    - Add `ovctl` to manage OpenVINO warm-up profiles (`ops/scripts/ovctl`).
    - Start with a single tool list (`search.web`) and expand after stability.
 
-11) **Home-control readiness**
+16) **Home-control readiness**
    - Add a permissions layer (safe vs confirmation-required tools).
    - Log tool calls with inputs, outputs, and request IDs.
    - Add a dry-run mode for home-control tools.
 
-12) **Voice readiness (STT/TTS)**
+17) **Voice readiness (STT/TTS)**
    - Route STT text through TinyAgents (no direct tool access).
    - Route responses through TTS (same agent runtime, no bypass).
 
-13) **Tool standardization**
+18) **Tool standardization**
    - Document each MCP tool contract (inputs/outputs, failure modes).
    - Version tool schemas to prevent breaking changes.
    - Add smoke tests for tool availability.
    - Plan a `python.run` MCP tool (sandboxed code execution) for future workflows.
    - Maintain Benny prompts in `docs/prompts/benny` and sync via `ops/scripts/sync-benny-prompts`.
 
-14) **Vector DB planning (Studio)**
+19) **Vector DB planning (Studio)**
    - Standardize on Qdrant (service on Studio), persist indexes on SSD.
    - Set explicit CPU/RAM limits (service flags or launchd) to avoid inference contention.
    - Add a simple tuning knob for max RAM/index cache size.
    - Add a controller command to adjust limits at runtime (or via config + restart).
    - Document expected resource usage and how to scale.
 
-15) **Reliability and ops**
+20) **Reliability and ops**
    - Add health checks for LiteLLM + MCP servers + TinyAgents runtime.
    - Add a reconcile step on boot to verify MCP availability.
    - Studio launchd should run `mlxctl reconcile` after default model startup.
    - Consolidate env files in a single location (e.g., `/etc/homelab-llm/`).
 
-16) **Observability**
+21) **Observability**
    - Log agent runs with request id, model, tool calls, latency, and errors.
    - Prefer JSON logs for future ingestion.
 
-17) **[x] OpenVINO Benny aliases (Mini)**
+22) **[x] OpenVINO Benny aliases (Mini)**
   - Add `benny-*` models to LiteLLM router config.
   - Add `BENNY_*` env vars to `services/litellm-orch/config/env.example`.
   - Add `BENNY_*` env vars to `services/litellm-orch/config/env.local`.

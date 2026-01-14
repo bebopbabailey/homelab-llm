@@ -11,6 +11,8 @@ utility services behind a single LiteLLM gateway.
 - Integration details: `docs/INTEGRATIONS.md`
 - Experiment journal: `docs/journal/index.md`
 - Active delivery plan: `TASKS.md`
+- Submodule workflow: `docs/foundation/git-submodules.md`
+- System architecture: `docs/ARCHITECTURE.md`
 
 ## How to Read This Repo
 - Read `docs/foundation/README.md` first; it points to the canonical sources of truth.
@@ -37,6 +39,7 @@ Stable services:
 Planned services (endpoints):
 - TinyAgents (planned client/orchestrator behind LiteLLM)
 - OptiLLM (planned expansion of optimization endpoints)
+- AFM (planned OpenAI-compatible API on the Studio, routed via LiteLLM)
 
 ## Ops Scripts (core)
 - `ops/scripts/healthcheck.sh`

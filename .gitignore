@@ -1,2 +1,8 @@
 services/searxng/app/
 services/searxng/.venv/
+__pycache__/
+*.pyc
+services/litellm-orch/config/env.local
+.aider.chat.history.md
+.venv/
+.venv-*/

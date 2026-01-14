@@ -3,6 +3,7 @@
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, OpenVINO, OptiLLM, SearXNG, Ollama.
 - Mac Studio: MLX OpenAI servers.
+- Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 
 ## Ports and Endpoints (authoritative)
@@ -26,6 +27,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | MLX (bench-s) | Studio | 8107 | http://192.168.1.72:8107/v1 | /v1/models |
 | MLX (utility-a) | Studio | 8108 | http://192.168.1.72:8108/v1 | /v1/models |
 | MLX (utility-b) | Studio | 8109 | http://192.168.1.72:8109/v1 | /v1/models |
+| AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
 
@@ -38,7 +40,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 
 ## Exposure and Secrets
 - LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000 (maintenance), Ollama 11434,
-  MLX 8100-8109, Home Assistant 8123.
+  MLX 8100-8109, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: OptiLLM 4020 (must not be LAN-exposed), SearXNG 8888.
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
