@@ -4,3 +4,12 @@
 [submodule "layer-inference/ov-llm-server"]
 	path = layer-inference/ov-llm-server
 	url = git@github.com:bebopbabailey/ov-llm-server.git
+[submodule "layer-gateway/optillm-proxy"]
+	path = layer-gateway/optillm-proxy
+	url = git@github.com:bebopbabailey/optillm-proxy.git
+[submodule "layer-tools/mcp-tools"]
+	path = layer-tools/mcp-tools
+	url = git@github.com:bebopbabailey/mcp-tools.git
+[submodule "layer-tools/searxng"]
+	path = layer-tools/searxng
+	url = git@github.com:bebopbabailey/searxng.git
