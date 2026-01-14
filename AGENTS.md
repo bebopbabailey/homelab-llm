@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - Root docs: `README.md`, `ARCHITECTURE.md`, `SERVICE_SPEC.md`, `DEV_CONTRACT.md`, `TASKS.md`, `AIDER.md`, `AGENT_PREFERENCES.md`.
 - Runtime config: `config/router.yaml` and `config/env.example` (copy to `config/env.local` for real values).
-- External services: OpenVINO on `localhost:9000`; MLX OpenAI servers on the Studio at ports `8100`, `8101`, `8102`.
+- External services: OpenVINO on `localhost:9000`; MLX OpenAI servers on the Studio at ports `8100-8109`.
 - Source code: currently minimal (`main.py` placeholder); gateway logic will live in this repo.
 - Scripts/tests: `scripts/`, `docs/`, `logs/`, and `callbacks/` are available; add runbooks and tests as phases progress.
 
@@ -16,8 +16,8 @@ When the LiteLLM proxy entrypoint is added, document the exact command here.
 ## Coding Style & Naming Conventions
 - Python only (3.12). Keep code minimal and configuration-driven.
 - Use `snake_case` for Python modules/functions and descriptive, explicit names for config keys.
-- Routing model names are plain (`jerry-*`, `lil-jerry`) while upstream `litellm_params.model` values remain `openai/<upstream>`.
-- Plain-name aliases (`jerry-*`) are temporary compatibility shims; plan to remove once all clients use canonical names.
+- Routing model names are plain (`jerry-*`, `bench-*`, `utility-*`, `benny-*`) while upstream
+  `litellm_params.model` values remain `openai/<upstream>`.
 - Prefer small, reversible changes; avoid hardcoding IPs/ports in Python—use env vars + `config/router.yaml`.
 
 ## Testing Guidelines
@@ -37,6 +37,6 @@ When the LiteLLM proxy entrypoint is added, document the exact command here.
 
 ## Security & Configuration Tips
 - **DO NOT** touch existing services (OLLAMA on `11434`, OpenVINO on `9000`).
-- MLX OpenAI servers run on the Studio at ports `8100`, `8101`, `8102` (external to this repo).
+- MLX OpenAI servers run on the Studio at ports `8100-8109` (external to this repo).
 - Keep secrets and hostnames in `config/env.local` (git-ignored).
 - The gateway is routing-only; inference must remain external.

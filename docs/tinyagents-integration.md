@@ -11,7 +11,7 @@ backend MLX/OpenVINO endpoints directly.
 
 ## Model Names
 TinyAgents should call the **plain** logical model names exposed by LiteLLM:
-`jerry-chat`, `jerry-architect`, `jerry-editor`, `jerry-weak`, `jerry-test`, `lil-jerry`.
+`jerry-{xl,l,m,s}`, `bench-{xl,l,m,s}`, `utility-{a,b}`, `benny-*`.
 
 ## Responsibility Split
 - **TinyAgents**: model selection, task decomposition, tool orchestration, task‑level retries.
@@ -23,4 +23,3 @@ link to LiteLLM request IDs when possible.
 
 ## Auth (Future)
 When API keys are enabled, TinyAgents will send the LiteLLM proxy key as a bearer token. 
-

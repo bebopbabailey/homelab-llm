@@ -15,8 +15,8 @@ Goal: Start a single OpenAI-compatible gateway on the Mini that routes to upstre
   - [ ] If proxy extras conflict, wrap LiteLLM routing via a minimal FastAPI forwarder (no business logic beyond mapping + proxying)
 - [x] Create `config/env.example`
 - [x] Create `config/router.yaml` containing:
-  - [x] logical model names (`jerry-weak`, `jerry-editor`, `jerry-architect`, `jerry-chat`, `jerry-test`, `lil-jerry`)
-  - [x] upstream base URLs (env-var substituted; MLX ports 8100/8101/8102/8103/8109, OpenVINO on localhost:9000)
+  - [x] logical model names (`jerry-*`, `bench-*`, `utility-*`, `benny-*`)
+  - [x] upstream base URLs (env-var substituted; MLX ports 8100-8109, OpenVINO on localhost:9000)
   - [x] upstream “model id” mapping if needed
 - [x] Document minimal runbook in `README.md`
 - [x] Create `scripts/run-dev.sh` to run locally in foreground
@@ -29,8 +29,9 @@ Goal: Aider on any device points at the Mini gateway and uses 3 roles.
 
 - [x] Create Aider usage doc (no installation here; clients install Aider separately)
 - [x] Define the Aider model role mapping:
-  - [x] weak model → `jerry-weak`
-  - [x] editor model → `jerry-editor`
+  - [x] weak model → `jerry-s`
+  - [x] editor model → `jerry-m`
+  - [x] main model → `jerry-l`
   - [x] architect uses Aider's architect mode (edit format), not a separate model
 - [x] Validate end-to-end from a non-mini machine over LAN and over Tailscale
 
@@ -45,6 +46,7 @@ Goal: Make routing resilient but still boring.
   - [x] clear error response if upstream down (LiteLLM default + retry/cooldown configured)
   - [ ] optional fallback mapping (config-driven; defer until standard model lineup)
 - [x] Add request logging (JSON): model name, upstream, latency, status, error
+- [ ] Add AFM backend (Studio) once API base URL + model IDs are confirmed
 
 ## Phase 4 — Service Hardening (Boot + Security)
 Goal: Make it long-running and safe.
@@ -56,7 +58,7 @@ Goal: Make it long-running and safe.
 - [x] remove duplicate `openai/` aliases from LiteLLM model list
 - [ ] decide log destination for ingestion pipeline (keep stdout/journald for now; switch to file if/when needed)
   - [ ] defer until ingestion pipeline is defined (current: stdout/journald)
-- [x] Studio launchd: run `jerry-chat` (GPT-OSS) at boot on port 8100
+- [x] Studio launchd: run the default port 8100 model at boot (current: `jerry-xl`)
 
 ## Phase 5 — Orchestrator Hooks (tinyagents-ready)
 Goal: Keep gateway tool-agnostic but orchestration-friendly.

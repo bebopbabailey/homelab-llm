@@ -17,9 +17,9 @@ Create `.aider.conf.yml` in your project or home directory:
 openai-api-base: http://<mini-host>:4000
 openai-api-key: dummy
 
-model: jerry-architect
-editor-model: jerry-editor
-weak-model: jerry-weak
+model: jerry-l
+editor-model: jerry-m
+weak-model: jerry-s
 ```
 
 Notes:
@@ -31,10 +31,10 @@ If you prefer shorthand:
 
 ```yaml
 alias:
-  - "arch:jerry-architect"
-  - "edit:jerry-editor"
-  - "weak:jerry-weak"
-model: arch
+  - "main:jerry-l"
+  - "edit:jerry-m"
+  - "weak:jerry-s"
+model: main
 editor-model: edit
 weak-model: weak
 ```
@@ -43,11 +43,9 @@ weak-model: weak
 - Start Aider normally, then use `/architect` to enable architect mode.
 - Use `/model` or update `.aider.conf.yml` to switch models if needed.
 
-## Optional: switch to `jerry-chat` for planning
-If you load the standalone GPT-OSS model on the Studio, you can switch your main model
-for planning sessions:
-- `/model jerry-chat`
-Note: `jerry-chat` is now included in the default LiteLLM config.
+## Optional: switch to `jerry-xl` for planning
+If you load a heavy reasoning model on port 8100, you can switch your main model:
+- `/model jerry-xl`
 
 ## Troubleshooting
 - If Aider says a model is unknown, ensure the model name matches a
@@ -55,10 +53,8 @@ Note: `jerry-chat` is now included in the default LiteLLM config.
 - Confirm LiteLLM can reach each backend using the URLs in your env file.
 
 ## Launch Checklist
-1. Start three `mlx-openai-server` instances on distinct ports (for example: `8103`, `8101`, `8102`).
-   - Studio helper: `scripts/run-mlx-studio.sh`
-   - Stop helper: `scripts/stop-mlx-studio.sh`
+1. Start MLX servers on the Studio (preferred: `ops/scripts/mlxctl`).
 2. Set the LiteLLM env vars in `config/env.local` and export them (or load via systemd).
 3. Start the LiteLLM proxy on the Mini (default port `4000`).
-4. From a client, verify `GET /v1/models` shows `jerry-*` and `lil-jerry`.
+4. From a client, verify `GET /v1/models` shows `jerry-*`, `bench-*`, `utility-*`, and `benny-*`.
 5. Launch Aider and run `/architect` to ensure both main and editor models route correctly.

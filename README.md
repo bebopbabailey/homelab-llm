@@ -28,14 +28,9 @@ provides routing only and does not implement inference.
  - Helper script (Mini): `scripts/run-dev.sh`
  - Optional alias: `scripts/run-dev-chat.sh` (same config; kept for convenience)
 
-## Studio MLX Helpers
-- `scripts/run-mlx-studio.sh` starts the three coding models on ports `8103`, `8101`, `8102`.
-- `scripts/stop-mlx-studio.sh` stops the MLX servers by port.
-- `scripts/stop-mlx-studio-all.sh` stops MLX servers on ports `8100-8109` and boots out launchd.
-- `scripts/stop-mlx-ports.sh` (Mini or Studio) stops ports `8100-8109` and boots out launchd.
-- `scripts/run-mlx-gptoss-architect.sh` starts GPT-OSS 120B on port `8100` as `jerry-chat`.
-- `scripts/run-test-model.sh` (Mini) downloads + runs a Hugging Face model on port `8109`, updates LiteLLM, and restarts `litellm-orch`.
-- `scripts/start-mlx-jerry-chat.sh` restarts the Studio launchd service for `jerry-chat` (port `8100`).
+## Studio MLX Control
+- Use `ops/scripts/mlxctl` (registry-aware, stable aliases for ports 8100-8109).
+- Legacy MLX helper scripts were removed to reduce drift.
 
 ## Verify
 - `GET /v1/models` returns `jerry-*`, `bench-*`, `utility-*`, and `benny-*`.
