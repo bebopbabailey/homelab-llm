@@ -7,26 +7,33 @@ architecture belongs inside each service directory.
 Provide a single OpenAI-compatible gateway while allowing multiple specialist
 backends (local and remote) to evolve independently.
 
-## Layer 1 — Gateway (Front Door)
+## Layer 1 — Interface
+- **Services**: Open WebUI, client entry points
+- **Role**: Human-facing access and interaction
+
+## Layer 2 — Gateway
 - **Service**: LiteLLM proxy
 - **Role**: Single OpenAI-compatible API for all clients
 - **Why**: Central routing point that hides backend complexity
 - **Where**: Runs on the Mini for now
-
-## Layer 2 — Orchestration (Planned)
-- **Service**: TinyAgents (planned)
-- **Role**: Choose specialist models, coordinate tool calls
-- **Pattern**: Router–Coordinator
-
-## Layer 3 — Specialist Backends
+ - **Monitoring**: system-monitor (planned) lives here
+## Layer 3 — Inference
 - **Local specialist**: OpenVINO GenAI server on the Mini (benny-*)
 - **Remote specialists**: MLX OpenAI servers on the Studio (jerry/bench/utility)
 - **Optimization proxy**: OptiLLM behind LiteLLM (localhost-only)
 
-## Layer 4 — Model Registry & Conversion
-- **MLX registry** (Studio): `mlxctl` manages fixed ports 8100–8109
-- **OpenVINO registry** (Mini): `~/models/converted_models/registry.json`
-- **Conversion**: `ov-convert-model` → OpenVINO IR + registry entries
+## Layer 4 — Tools
+- **Services**: MCP tools, web-fetch, search services (SearXNG)
+- **Role**: Execute actions and retrieval
+
+## Layer 5 — Data
+- **Registry & conversion**: model registries and conversion metadata
+- **System docs DB**: SQLite-first, Postgres-ready
+
+## Orchestration (Planned, cross-layer)
+- **Service**: TinyAgents (planned)
+- **Role**: Choose specialist models, coordinate tool calls
+- **Pattern**: Router–Coordinator
 
 ## Data Flow (Typical)
 1) Client sends request to LiteLLM.
