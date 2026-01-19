@@ -11,3 +11,5 @@ layer-tools/searxng/app/
 layer-tools/searxng/.venv/
 layer-gateway/litellm-orch/config/env.local
 layer-interface/open-webui/.webui_secret_key
+# Runtime logs
+logs/
