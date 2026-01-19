@@ -18,10 +18,11 @@ while allowing backend models to evolve independently.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
    - OptiLLM runs localhost-only behind LiteLLM to apply inference-time strategies.
-   - LiteLLM sends prefixed model names (e.g., `moa-jerry-xl`) to avoid loops.
+   - LiteLLM sends prefixed model names (e.g., `moa-<base-model>`) to avoid loops.
+   - OptiLLM local inference runs on the Studio (ports 4040–4042) for MPS/FP16.
 5) Specialist Backends (current)
-   - OpenVINO LLM server on the Mac Mini (`benny-*`).
-   - MLX OpenAI servers on the Mac Studio (`jerry-*`).
+   - OpenVINO LLM server on the Mac Mini (`ov-*`).
+   - MLX OpenAI servers on the Mac Studio (`mlx-*`).
    - AFM OpenAI-compatible API on the Studio (planned).
    - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.
    - Non-LLM model evaluation (planned): routing/classification, summarization, cleaning.
@@ -51,7 +52,9 @@ while allowing backend models to evolve independently.
 
 ## Glossary (short)
 - LiteLLM gateway: single OpenAI-compatible front door for all clients.
-- MLX servers: remote OpenAI-compatible backends on the Studio (ports 8100-8109).
+- MLX servers: remote OpenAI-compatible backends on the Studio (team ports 8100-8119; experimental 8120-8139).
+- MLX registry maps canonical `model_id` to `source_path`/`cache_path` for inference.
 - OpenVINO server: local lightweight backend on the Mini (port 9000).
 - OptiLLM proxy: localhost-only optimization proxy behind LiteLLM (port 4020).
+- OptiLLM local: Studio MPS/FP16 inference tier (ports 4040–4042, HF cache at `/Users/thestudio/models/hf/hub`).
 - TinyAgents: planned orchestration client that calls LiteLLM only.

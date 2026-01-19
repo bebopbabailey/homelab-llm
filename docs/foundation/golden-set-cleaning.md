@@ -1,4 +1,4 @@
-# Golden Set — Cleaning (Benny)
+# Golden Set — Cleaning (OpenVINO)
 
 ## Transcripts
 1. hey um i i i can send the draft tonight if you want i just need fifteen minutes

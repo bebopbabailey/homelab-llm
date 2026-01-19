@@ -3,6 +3,8 @@ __pycache__/
 .aider.chat.history.md
 .venv/
 .venv-*/
+**/.venv/
+**/.venv*/
 .idea/
 *.egg-info/
 layer-tools/searxng/app/

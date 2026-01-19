@@ -160,7 +160,7 @@ Format:
   "additionalProperties": false,
   "properties": {
     "model": { "type": "string", "minLength": 1 },
-    "port": { "type": "integer", "minimum": 8100, "maximum": 8109 }
+    "port": { "type": "integer", "minimum": 8100, "maximum": 8139 }
   }
 }
 ```
@@ -199,7 +199,7 @@ Format:
   "required": ["port"],
   "additionalProperties": false,
   "properties": {
-    "port": { "type": "integer", "minimum": 8100, "maximum": 8109 }
+    "port": { "type": "integer", "minimum": 8100, "maximum": 8139 }
   }
 }
 ```

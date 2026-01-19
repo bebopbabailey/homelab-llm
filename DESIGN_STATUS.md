@@ -80,7 +80,29 @@ homelab-llm/
 - Registries are minimal + actionable, with pointers to richer service docs.
 - Models are first-class entities with richer metadata; may link to a model-focused DB later.
 - System monitor is a gateway-layer service (not embedded inside LiteLLM).
+- Gateway v0: the only live registry is `handles.jsonl` (routing handles). Endpoint and policy registries are deferred.
+  - Planned models table should include size-on-disk / memory footprint for ordering and capacity planning.
+  - MLX registry uses `model_id` → `source_path` / `cache_path` for durable artifact resolution.
 
 ## Open questions to resolve
 - Which registries should be centralized vs strictly service-local?
 - Should `layer-data/registries/` be an index only (links), or store live files?
+
+
+## Layer Documentation Philosophy
+- Layer docs should not be uniform beyond a minimal floor.
+- **Required per layer:** `README.md` (mission/scope) and `CONSTRAINTS.md` (non‑negotiables).
+- Everything else is **layer‑specific**, based on responsibility and failure modes:
+  - Gateway: contracts, routing rules, auth, escalation boundaries.
+  - Inference: runtime configs, device constraints, model loading, perf notes.
+  - Tools: safety boundaries, external call policies, rate limits.
+  - Interface: UI config, upstream expectations.
+  - Data: lifecycle, retention, schema evolution.
+
+
+## Sandbox Permissions (Draft)
+- Defined in `SANDBOX_PERMISSIONS.md` and mirrored in each layer CONSTRAINTS.md.
+- Root agent: read-only across repo; can run diagnostics only.
+- Layer agents: read/write within their layer; can restart services in that layer only.
+- Service agents: full control within their service; must respect global constraints.
+- CONSTRAINTS.md will be folded into AGENTS.md later; keep CONSTRAINTS in layer docs for now.

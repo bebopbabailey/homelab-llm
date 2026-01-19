@@ -32,7 +32,7 @@ Maintain a simple registry of MCP servers with:
   and confirmation for untrusted execution.
 
 ## Near-term Tool Candidate
-- `transcript.clean`: wraps `benny-clean-m` with a fixed system prompt and
+- `transcript.clean`: wraps an `ov-*` alias (TBD) with a fixed system prompt and
   returns only cleaned text (no commentary).
 
 ## Web Search + Fetch (implemented)

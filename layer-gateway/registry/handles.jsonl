@@ -1,0 +1,13 @@
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-qwen2-5-3b-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-qwen2-5-3b-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-qwen2-5-1-5b-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-qwen2-5-1-5b-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-phi-4-mini-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-phi-4-mini-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-phi-3-5-mini-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-phi-3-5-mini-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-llama-3-2-3b-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-llama-3-2-3b-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-mistral-7b-instruct-v0-3-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-mistral-7b-instruct-v0-3-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-qwen2-5-1-5b-instruct-int4","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-qwen2-5-1-5b-instruct-int4"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-qwen2-5-coder-1-5b-instruct-fp16","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-qwen2-5-coder-1-5b-instruct-fp16"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-qwen2-5-coder-1-5b-instruct-int4","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-qwen2-5-coder-1-5b-instruct-int4"}}
+{"endpoint_ref":"ep_ov_llm_server_9000","handle":"ov-mistral-7b-instruct-v0-3-int4","invoke":"openai-chat","kind":"model","managed_by":"systemd","selector":{"model":"ov-mistral-7b-instruct-v0-3-int4"}}
+{"handle":"mlx-gpt-oss-120b-mxfp4-q4","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8100","selector":{"model":"mlx-gpt-oss-120b-mxfp4-q4"}}
+{"handle":"mlx-gemma-3-27b-it-qat-4bit","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8101","selector":{"model":"mlx-gemma-3-27b-it-qat-4bit"}}
+{"handle":"mlx-gpt-oss-20b-mxfp4-q4","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8102","selector":{"model":"mlx-gpt-oss-20b-mxfp4-q4"}}

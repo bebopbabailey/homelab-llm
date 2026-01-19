@@ -56,7 +56,7 @@ Model capability toggles (per model preset):
 - Web Search, File Upload, Code Interpreter, Image Generation, etc. citeturn2search0
 
 For this homelab:
-- Point base models to LiteLLM logical names (`jerry-*`, `bench-*`, `benny-*`).
+- Point base models to LiteLLM logical names (`mlx-*`, `ov-*`, `opt-*`).
 - Keep fallbacks conservative; prefer explicit routing in LiteLLM.
 
 ### C) Tools / Functions

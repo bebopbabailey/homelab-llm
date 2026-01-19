@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -12,6 +13,11 @@ DEFAULT_REGISTRY = os.path.expanduser("~/models/converted_models/registry.json")
 DEFAULT_PROFILE_DIR = Path("/home/christopherbailey/homelab-llm/platform/ops/ov-profiles")
 DEFAULT_SERVER_URL = "http://127.0.0.1:9000"
 WARM_SCRIPT = Path("/home/christopherbailey/homelab-llm/layer-inference/ov-llm-server/scripts/ov-warm-models")
+CONVERT_SCRIPT = Path("/home/christopherbailey/homelab-llm/layer-inference/ov-llm-server/scripts/ov-convert-model")
+DEFAULT_OUT_ROOT = Path("/home/christopherbailey/models/converted_models")
+DEFAULT_OG_ROOT = Path("/mnt/seagate/og_models")
+
+ENSEMBLES = {}
 
 
 def _registry_path():
@@ -38,6 +44,99 @@ def _http_get_json(url: str):
         raise RuntimeError(f"Failed to reach {url}: {exc}") from exc
 
 
+def _slugify(text: str):
+    return (
+        text.lower()
+        .replace("/", "-")
+        .replace("_", "-")
+        .replace(".", "-")
+    )
+
+
+def _infer_weight_format(name: str):
+    if "int4" in name:
+        return "int4"
+    if "int8" in name:
+        return "int8"
+    if "fp16" in name:
+        return "fp16"
+    return "fp16"
+
+
+def _ensure_registry_entry(name: str, path: Path, task: str, weight_format: str):
+    reg_path = _registry_path()
+    if not reg_path.exists():
+        reg_path.parent.mkdir(parents=True, exist_ok=True)
+        reg_path.write_text(json.dumps({"version": 1, "models": {}}, indent=2))
+    data = json.loads(reg_path.read_text() or "{}")
+    data.setdefault("version", 1)
+    models = data.setdefault("models", {})
+    models[name] = {
+        "path": str(path),
+        "task": task,
+        "weight_format": weight_format,
+    }
+    reg_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+def _download_openvino_ir(repo: str, name: str, task: str):
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:
+        raise SystemExit("huggingface_hub is required for downloads. Install it first.") from exc
+
+    out_root = Path(os.environ.get("OV_MODEL_OUT", DEFAULT_OUT_ROOT))
+    out_root.mkdir(parents=True, exist_ok=True)
+    dest = out_root / name
+    if dest.exists():
+        return dest
+    snapshot = snapshot_download(repo_id=repo, repo_type="model")
+    shutil.copytree(snapshot, dest, symlinks=False)
+    weight_format = _infer_weight_format(name)
+    _ensure_registry_entry(
+        name,
+        dest / f"task-text-generation-with-past__wf-{weight_format}",
+        task,
+        weight_format,
+    )
+    return dest
+
+
+def cmd_ensure(args):
+    repo = args.repo
+    name = args.name or _slugify(repo.split("/", 1)[1])
+    weight_format = args.weight_format or _infer_weight_format(name)
+    task = args.task
+
+    if repo.startswith("OpenVINO/"):
+        _download_openvino_ir(repo, name, task)
+        print(f"downloaded OV IR: {name}")
+        return
+
+    if not CONVERT_SCRIPT.exists():
+        raise SystemExit(f"convert script not found: {CONVERT_SCRIPT}")
+    env = os.environ.copy()
+    env["OV_MODEL_OG"] = str(DEFAULT_OG_ROOT)
+    env["OV_MODEL_OUT"] = str(DEFAULT_OUT_ROOT)
+    env["OV_MODEL_OG_REMOTE"] = ""
+    cmd = [
+        str(CONVERT_SCRIPT),
+        "--model",
+        repo,
+        "--weight-format",
+        weight_format,
+        "--task",
+        task,
+    ]
+    proc = subprocess.run(
+        cmd,
+        input=(name + "\n").encode("utf-8"),
+        env=env,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise SystemExit(f"conversion failed for {repo}")
+    print(f"converted: {name}")
 def cmd_list(_args):
     registry = _load_registry(_registry_path())
     models = registry.get("models", {})
@@ -108,6 +207,14 @@ def cmd_warm_profile(args):
     raise SystemExit(exit_code)
 
 
+def cmd_ensemble(args):
+    models = ENSEMBLES.get(args.name)
+    if not models:
+        raise SystemExit(f"unknown ensemble: {args.name}")
+    exit_code = _run_warm(models, args.server_url)
+    raise SystemExit(exit_code)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description="OpenVINO model controller (ovctl)")
     parser.add_argument(
@@ -133,6 +240,13 @@ def build_parser():
     sub.add_parser("profiles", help="List available warm profiles")
     warm_profile = sub.add_parser("warm-profile", help="Warm a named profile")
     warm_profile.add_argument("profile", help="Profile name (without .txt)")
+    ensemble = sub.add_parser("ensemble", help="Warm an OptiLLM OV ensemble")
+    ensemble.add_argument("name", help=f"Ensemble name ({', '.join(sorted(ENSEMBLES))})")
+    ensure = sub.add_parser("ensure", help="Download/convert and register a model")
+    ensure.add_argument("repo", help="Hugging Face repo id")
+    ensure.add_argument("--name", help="Canonical model id (ov-...)")
+    ensure.add_argument("--weight-format", choices=["fp16", "int8", "int4"])
+    ensure.add_argument("--task", default="text-generation-with-past")
 
     return parser
 
@@ -150,6 +264,10 @@ def main():
         cmd_profiles(args)
     elif args.command == "warm-profile":
         cmd_warm_profile(args)
+    elif args.command == "ensure":
+        cmd_ensure(args)
+    elif args.command == "ensemble":
+        cmd_ensemble(args)
     else:
         raise SystemExit(f"Unknown command: {args.command}")
 

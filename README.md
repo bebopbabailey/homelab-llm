@@ -1,7 +1,10 @@
 # homelab-llm
 
 Monorepo for a home LLM platform connecting multiple small models, tools, and
-utility services behind a single LiteLLM gateway.
+utility services behind a single LiteLLM gateway. The goal is to create a very capable personal 
+AI assistant platform for personal use, but to learn implementation of agent pipelines, tool use, etc. 
+The variety of hardware in the lab allows testing various use cases, minimum hardware requirements by 
+use-case. Hopes of branching into enterprise-land later.
 
 ## Start Here
 - Architecture overview: `docs/foundation/README.md`
@@ -19,17 +22,26 @@ utility services behind a single LiteLLM gateway.
 - Use `docs/PLATFORM_DOSSIER.md` for the latest topology and exposure details.
 - Check `docs/INTEGRATIONS.md` before wiring new services into LiteLLM.
 - Treat `TASKS.md` as the active plan and update it before and after changes.
+- See `/next-projects`for documentation of software development plans, upcoming features.
 
 ## Service Conventions
 - Target convention: each service should include `SERVICE_SPEC.md`, `ARCHITECTURE.md`, and `AGENTS.md`.
 - Runtime configs and secrets live outside the repo; see `docs/foundation/topology.md`.
 - Use `uv` for Python services; avoid system Python changes.
+- Naming: registry keys use `snake_case`; registry values use `kebab-case` where applicable.
+- Showroom/backroom rule: only models present on the Mini or Studio are exposed as
+  LiteLLM handles; Seagate storage is backroom-only.
+- OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
+  `layer-gateway/optillm-proxy/README.md`.
+- Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` and pins
+  `transformers<5` for router compatibility.
 
 ## Service Index
 Stable services:
 - LiteLLM gateway — `layer-gateway/litellm-orch`
 - OpenVINO LLM server — `layer-inference/ov-llm-server`
 - OptiLLM proxy — `layer-gateway/optillm-proxy`
+- OptiLLM local (Studio) — `layer-gateway/optillm-local`
 - TinyAgents — `layer-gateway/tiny-agents`
 - SearXNG — `layer-tools/searxng`
 - Open WebUI — documented in `docs/PLATFORM_DOSSIER.md`

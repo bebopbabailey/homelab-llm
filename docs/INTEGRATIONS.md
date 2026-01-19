@@ -5,11 +5,21 @@
 - Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
 - Upstreams: MLX `http://192.168.1.72:<port>/v1`, OpenVINO `http://localhost:9000/v1`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
-- Model naming: `jerry-{xl,l,m,s}`, `bench-{xl,l,m,s}`, `utility-{a,b}`, `benny-*`.
-  Upstream model IDs use `openai/<upstream>`.
+- Model naming: canonical model IDs with prefixes `mlx-*`, `ov-*`, `opt-*`.
+  Handles for models must match the canonical model ID (dash-only, no vendor prefixes).
+  Exception: OptiLLM uses technique prefixes (e.g., `moa-`, `bon-`) in the
+  **selector** sent to OptiLLM; handles stay `opt-*`.
+- For OpenAI-compatible upstreams, keep model aliases as handles and set the backend `litellm_params.model` to `openai/<base-model>`.
 - Logs: JSON logs enabled (`litellm_settings.json_logs: true`).
 - Auth: proxy key planned via `LITELLM_PROXY_KEY`.
- - MLX alias set (fixed ports): `jerry-xl/l/m/s`, `bench-xl/l/m/s`, `utility-a/b`.
+- MLX alias set (fixed ports): `mlx-*` (ports `8100-8119` team); `8120-8139` reserved for experimental tests.
+- MLX registry is the canonical link from `model_id` to inference source:
+  `model_id` → `registry.json` → `source_path` / `cache_path`.
+- Context defaults: `router.yaml` uses MLX registry fields:
+  `context_length` → `max_input_tokens`, `max_output_tokens` (currently 65k).
+  These defaults are persisted in the Studio registry and synced via `mlxctl sync-gateway`.
+- **Showroom vs backroom:** only models present on the Mini or Studio are exposed
+  as LiteLLM handles. Seagate storage is **backroom only** and never receives handles.
 
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
@@ -38,32 +48,42 @@
 - Env: `/etc/homelab-llm/ov-server.env` (runtime).
 - Endpoints: `/health`, `/v1/models`, `/v1/chat/completions`.
 - Ops: `/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl` controls model warm-up profiles.
-- LiteLLM routes `benny-*` via `BENNY_*_API_BASE` and `BENNY_*_MODEL`.
-  Current defaults use int8 for `benny-clean-s` and `benny-clean-m` via
-  `benny-clean-*-int8` model IDs in `layer-gateway/litellm-orch/config/env.local`.
-  int4 exists in the registry but is GPU-unstable on this iGPU stack.
+- LiteLLM routes `ov-*` via `OV_*_API_BASE` and `OV_*_MODEL`.
+  Current aliases map directly to base OpenVINO model IDs:
+  `ov-qwen2-5-3b-instruct-fp16`, `ov-qwen2-5-1-5b-instruct-fp16`, `ov-phi-4-mini-instruct-fp16`,
+  `ov-phi-3-5-mini-instruct-fp16`, `ov-llama-3-2-3b-instruct-fp16`, `ov-mistral-7b-instruct-v0-3-fp16`.
   Runtime device is currently `OV_DEVICE=GPU` (see `/etc/homelab-llm/ov-server.env`);
   evaluating `AUTO` and `MULTI:GPU,CPU` for multi-request throughput.
-  Pending: evaluate int8 for `benny-extract-*`, `benny-summarize-*`, `benny-tool-*`
-  and decide whether to switch their routing defaults.
-- Alias map (shared backends for lean footprint):
-  - `benny-route-m` → `benny-tool-s`
-  - `benny-tool-m` → `benny-classify-m`
-  - `benny-extract-s` → `benny-clean-s` (fp16 registry entry)
-  - `benny-extract-m` → `benny-summarize-m`
+  The previous `ov-*` role aliases are deprecated.
 
 ## OptiLLM optimization proxy
 - Local-only proxy: `http://127.0.0.1:4020/v1`.
-- LiteLLM routes:
-  - `optillm-jerry-xl` → OptiLLM (`OPTILLM_JERRY_XL_API_BASE`, `OPTILLM_JERRY_XL_MODEL=openai/moa-jerry-xl`, `OPTILLM_JERRY_XL_API_KEY`)
-  - `optillm-jerry-l` → OptiLLM (`OPTILLM_JERRY_L_API_BASE`, `OPTILLM_JERRY_L_MODEL=openai/moa-jerry-l`, `OPTILLM_JERRY_L_API_KEY`)
-- Loop-avoidance: LiteLLM sends prefixed model names (e.g., `moa-jerry-xl`); OptiLLM strips prefix upstream.
+- LiteLLM routes OptiLLM selectors via `OPTILLM_<HANDLE>_*` env vars.
+- Current OptiLLM handles: _none (direct routing via MLX handles)_.
+- Loop-avoidance: LiteLLM sends prefixed model names (e.g., `router-<base-model>`);
+  OptiLLM strips the prefix upstream.
+- Current wiring: **all MLX handles route to OptiLLM**, and OptiLLM calls LiteLLM with
+  `router-mlx-*` model names that are mapped directly to MLX ports.
+  These `router-mlx-*` entries are internal (not in `handles.jsonl`) but will appear
+  in LiteLLM `/v1/models`.
+- Toggle: `mlxctl sync-gateway --no-route-via-optillm` disables this mode.
+  Default is enabled via `MLX_ROUTE_VIA_OPTILLM=1`.
 - Auth: LiteLLM must send `Authorization: Bearer <OPTILLM_API_KEY>` (configured
   via `--optillm-api-key`, not env, to avoid local inference mode).
 - OptiLLM runs with `--approach proxy` to allow per-request technique selection
   via model name prefixes.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
+
+## OptiLLM local inference (Studio)
+- Separate local inference instances (PyTorch/MPS) run on the Studio:
+  - `4040` → `opt-router-high`
+  - `4041` → `opt-router-balanced`
+  - `4042` → `opt-router-fast`
+- These are distinct from the Mini proxy and use single-model local inference.
+- Local instances are currently disabled by default until setup is finalized.
+- Standard HF cache on Studio: `/Users/thestudio/models/hf/hub`.
+- Pin `transformers<5` for router compatibility.
 
 ### Technique selection (model prefixes)
 Change the model prefix in LiteLLM env to pick techniques:
@@ -74,7 +94,7 @@ Change the model prefix in LiteLLM env to pick techniques:
 
 Example:
 ```
-OPTILLM_JERRY_XL_MODEL=openai/bon-jerry-xl
+OPTILLM_OPT_ROUTER_EXAMPLE_MODEL=openai/router-<base-model>
 ```
 
 ## Tiny Agents hook (plan)

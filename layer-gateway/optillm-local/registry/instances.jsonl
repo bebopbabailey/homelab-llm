@@ -1,0 +1,2 @@
+{"handle":"opt-router-high","port":4040,"model_id":"qwen2-5-72b-instruct","host":"studio"}
+{"handle":"opt-router-balanced","port":4041,"model_id":"qwen2-57b-a14b-instruct","host":"studio"}

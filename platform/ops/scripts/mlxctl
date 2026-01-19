@@ -3,13 +3,16 @@ import argparse
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
 import time
 import shutil
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 
 try:
     import fcntl
@@ -19,7 +22,23 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
 
 DEFAULT_REGISTRY = "/Users/thestudio/models/hf/hub/registry.json"
 DEFAULT_HF_HOME = "/Users/thestudio/models/hf"
-PORT_RANGE = range(8100, 8110)
+DEFAULT_OFFLOAD_SCRIPT = "/home/christopherbailey/homelab-llm/logs/mlx_offload.sh"
+DEFAULT_CONVERT_CMD = "python3 -m mlx_lm.convert --hf-path {src} --mlx-path {dest}"
+DEFAULT_GATEWAY_ROOT = "/home/christopherbailey/homelab-llm"
+DEFAULT_GATEWAY_HOST = "mini"
+DEFAULT_GATEWAY_MLXCTL = "/home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl"
+DEFAULT_HANDLES_PATH = "/home/christopherbailey/homelab-llm/layer-gateway/registry/handles.jsonl"
+DEFAULT_ENSEMBLES_DOC = "/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy/ENSEMBLES.md"
+DEFAULT_MLX_HOST = "192.168.1.72"
+DEFAULT_ROUTE_VIA_OPTILLM = True
+
+TEAM_RANGE = range(8100, 8120)
+EXPERIMENTAL_RANGE = range(8120, 8140)
+PORT_RANGE = range(8100, 8140)
+
+PORT_MAP = {}
+
+ENSEMBLES = {}
 
 
 def _is_local_host():
@@ -29,6 +48,12 @@ def _is_local_host():
 
 def _maybe_forward_to_studio(args):
     if args.local:
+        return
+    if getattr(args, "command", None) == "offload-og":
+        return
+    if getattr(args, "command", None) == "sync-gateway":
+        return
+    if getattr(args, "command", None) == "assign-team":
         return
     if _is_local_host():
         return
@@ -67,6 +92,37 @@ def _load_registry(path: Path):
     data.setdefault("version", 1)
     data.setdefault("models", {})
     return data
+
+
+def _port_for_model(model_id: str, data):
+    entry = data.get("models", {}).get(model_id)
+    if entry and entry.get("port"):
+        return int(entry["port"])
+    for slug, row in data.get("models", {}).items():
+        if row.get("model_id") == model_id and row.get("port"):
+            return int(row["port"])
+    return PORT_MAP.get(model_id)
+
+
+def _load_ensembles_doc(path: Path):
+    if not path.exists():
+        return {}
+    handle = None
+    ensembles = {}
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        match = re.match(r"- \*\*(opt-[^*]+)\*\*", line)
+        if match:
+            handle = match.group(1)
+            ensembles.setdefault(handle, [])
+            continue
+        if not handle:
+            continue
+        if line.startswith("- Base:") or line.startswith("- Bases:"):
+            models = re.findall(r"`([^`]+)`", line)
+            if models:
+                ensembles[handle].extend(models)
+    return ensembles
 
 
 def _write_registry(path: Path, data):
@@ -114,6 +170,20 @@ def _find_entry(data, model_ref: str):
         if entry.get("repo_id") == model_ref:
             return slug, entry
     return None, None
+
+
+def _is_preconverted(repo_id: str, override: Optional[str] = None):
+    if override == "yes":
+        return True
+    if override == "no":
+        return False
+    org, _sep, _name = repo_id.partition("/")
+    orgs = os.environ.get("MLX_PRECONVERTED_ORGS", "mlx-community,mlx,ml-explore").split(",")
+    orgs = {o.strip().lower() for o in orgs if o.strip()}
+    hints = os.environ.get("MLX_PRECONVERTED_HINTS", "mlx").split(",")
+    hints = {h.strip().lower() for h in hints if h.strip()}
+    repo_lower = repo_id.lower()
+    return org.lower() in orgs or any(hint in repo_lower for hint in hints)
 
 
 def _port_listening(port: int):
@@ -248,6 +318,17 @@ def _wait_for_port(port: int, timeout: int = 60):
     return False
 
 
+def _available_port(data, preferred_range):
+    assigned = {entry.get("port") for entry in data.get("models", {}).values() if entry.get("port")}
+    for port in preferred_range:
+        if port in assigned:
+            continue
+        if _port_listening(port) or _mlx_pids_for_port(port):
+            continue
+        return port
+    return None
+
+
 def cmd_init(_args):
     registry_path = _registry_path()
     data = _load_registry(registry_path)
@@ -270,7 +351,7 @@ def cmd_init(_args):
             continue
         models[slug] = {
             "repo_id": repo_id,
-            "model_id": repo_id,
+            "model_id": slug,
             "cache_path": str(snapshot),
             "format": _guess_format(repo_id),
             "port": None,
@@ -291,6 +372,20 @@ def cmd_list(_args):
 
 def cmd_status(_args):
     data = _load_registry(_registry_path())
+    env_flag = os.environ.get("MLX_ROUTE_VIA_OPTILLM")
+    route_via_optillm = DEFAULT_ROUTE_VIA_OPTILLM
+    if env_flag is not None:
+        route_via_optillm = env_flag.strip().lower() not in {"0", "false", "no"}
+    print(f"route_via_optillm\t{'on' if route_via_optillm else 'off'}")
+    if route_via_optillm:
+        gateway_host = os.environ.get("GATEWAY_HOST", DEFAULT_GATEWAY_HOST)
+        cmd = ["ssh", gateway_host, "curl -sS -m 3 http://127.0.0.1:4020/v1/models >/dev/null && echo ok || echo down"]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            status = result.stdout.strip() or "unknown"
+        except Exception:
+            status = "unknown"
+        print(f"optillm_proxy\t{status}")
     port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
     for port in PORT_RANGE:
         pids = _port_listening(port)
@@ -314,12 +409,66 @@ def _download_and_register(data, model_ref: str):
     slug = _slugify(repo_id)
     data["models"][slug] = {
         "repo_id": repo_id,
-        "model_id": repo_id,
+        "model_id": slug,
         "cache_path": str(snapshot),
         "format": _guess_format(repo_id),
         "port": None,
     }
     return slug, data["models"][slug]
+
+
+def _run_convert(repo_id: str, src_path: Path, dest_path: Path):
+    cmd_tmpl = os.environ.get("MLX_CONVERT_CMD", DEFAULT_CONVERT_CMD)
+    cmd = cmd_tmpl.format(repo=repo_id, src=src_path, dest=dest_path)
+    argv = shlex.split(cmd)
+    if not argv:
+        raise SystemExit("MLX_CONVERT_CMD is empty")
+    dest_path.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(argv, check=False)
+    if result.returncode != 0:
+        raise SystemExit(f"conversion failed (exit {result.returncode})")
+
+
+def _ensure_model(data, model_ref: str, name: Optional[str], convert_mode: str, preconverted: Optional[str]):
+    slug, entry = _find_entry(data, model_ref)
+    if entry:
+        return slug, entry, False
+
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:
+        raise SystemExit("huggingface_hub is required for downloads. Install it first.") from exc
+
+    cache_dir = _hf_home()
+    repo_id = model_ref
+    snapshot = snapshot_download(repo_id, cache_dir=str(cache_dir))
+    slug = name or _slugify(repo_id)
+
+    preconverted = _is_preconverted(repo_id, preconverted)
+    do_convert = convert_mode == "force" or (convert_mode == "auto" and not preconverted)
+    if convert_mode == "skip":
+        do_convert = False
+
+    repo_root = Path(snapshot).parent.parent
+    entry = {
+        "repo_id": repo_id,
+        "model_id": slug,
+        "cache_path": str(snapshot),
+        "format": _guess_format(repo_id),
+        "port": None,
+    }
+
+    if do_convert:
+        hub = _hf_home() / "hub"
+        dest = hub / f"converted--{slug}"
+        if not dest.exists() or not any(dest.iterdir()):
+            _run_convert(repo_id, Path(snapshot), dest)
+        entry["og_path"] = str(repo_root)
+        entry["cache_path"] = str(dest)
+        entry["format"] = "mlx"
+
+    data["models"][slug] = entry
+    return slug, entry, do_convert
 
 
 def _launch_server(entry, port: int):
@@ -368,9 +517,16 @@ def _launch_server(entry, port: int):
 
 
 def cmd_load(args):
+    if args.port == "auto":
+        registry_path = _registry_path()
+        data = _load_registry(registry_path)
+        port = _available_port(data, EXPERIMENTAL_RANGE)
+        if port is None:
+            raise SystemExit("no free ports available in experimental range (8120-8139)")
+        args.port = str(port)
     port = int(args.port)
     if port not in PORT_RANGE:
-        raise SystemExit("port must be between 8100 and 8109")
+        raise SystemExit("port must be between 8100 and 8139")
 
     registry_path = _registry_path()
     data = _load_registry(registry_path)
@@ -390,8 +546,9 @@ def cmd_load(args):
         cmd_unload(argparse.Namespace(port=str(port)))
 
     slug, entry = _find_entry(data, args.model)
+    converted = False
     if not entry:
-        slug, entry = _download_and_register(data, args.model)
+        slug, entry, converted = _ensure_model(data, args.model, args.name, args.convert, args.preconverted)
 
     if entry.get("port") and entry.get("port") != port:
         raise SystemExit(f"model already assigned to port {entry['port']}; unload first")
@@ -402,13 +559,17 @@ def cmd_load(args):
 
     entry["port"] = port
     _write_registry(registry_path, data)
+    if converted and args.offload_og:
+        cmd_offload_og(argparse.Namespace(dry_run=False))
+    if args.sync:
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
     print(f"loaded {slug} on {port}")
 
 
 def cmd_unload(args):
     port = int(args.port)
     if port not in PORT_RANGE:
-        raise SystemExit("port must be between 8100 and 8109")
+        raise SystemExit("port must be between 8100 and 8139")
 
     _stop_mlx_for_port(port)
 
@@ -485,6 +646,577 @@ def cmd_verify(_args):
     raise SystemExit("mlxctl verify failed: no mlx-openai-server process found on port 8100")
 
 
+def cmd_ensemble(args):
+    doc_path = Path(os.environ.get("OPTILLM_ENSEMBLES_DOC", DEFAULT_ENSEMBLES_DOC))
+    ensembles = _load_ensembles_doc(doc_path)
+    if not ensembles:
+        ensembles = ENSEMBLES
+    models = ensembles.get(args.name)
+    if not models:
+        raise SystemExit(f"unknown ensemble: {args.name}")
+    mlx_models = [m for m in models if m.startswith("mlx-")]
+    if not mlx_models:
+        raise SystemExit(f"ensemble {args.name} has no mlx models; use ovctl for ov-* ensembles")
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    for model in mlx_models:
+        port = _port_for_model(model, data)
+        if port is None:
+            raise SystemExit(f"no port mapping for {model} (run mlxctl assign-team or load {model} manually)")
+        cmd_load(
+            argparse.Namespace(
+                model=model,
+                port=str(port),
+                force=args.force,
+                ignore_launchd=args.ignore_launchd,
+                convert="auto",
+                name=None,
+                offload_og=False,
+                preconverted="auto",
+                sync=False,
+            )
+        )
+
+
+def cmd_ensure(args):
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    slug, entry, converted = _ensure_model(data, args.repo, args.name, args.convert, args.preconverted)
+    _write_registry(registry_path, data)
+    if converted and args.offload_og:
+        cmd_offload_og(argparse.Namespace(dry_run=False))
+    if args.load:
+        cmd_load(
+            argparse.Namespace(
+                model=slug,
+                port=args.port,
+                force=False,
+                ignore_launchd=False,
+                convert="skip",
+                name=None,
+                offload_og=False,
+                preconverted="auto",
+                sync=args.sync,
+            )
+        )
+    elif args.sync:
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
+
+
+def _fetch_registry_from_studio(studio_ssh: str, registry_path: str):
+    script = f"""
+import json
+from pathlib import Path
+path = Path({registry_path!r})
+if not path.exists():
+    raise SystemExit(1)
+print(path.read_text())
+"""
+    result = subprocess.run(
+        ["ssh", studio_ssh, "python3", "-"],
+        input=script.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit("failed to read MLX registry from studio")
+    return json.loads(result.stdout.decode("utf-8") or "{}")
+
+
+def _fetch_registry_sizes(studio_ssh: str, registry_path: str):
+    script = f"""
+import json
+import os
+from pathlib import Path
+
+path = Path({registry_path!r})
+if not path.exists():
+    raise SystemExit(1)
+data = json.loads(path.read_text() or "{{}}")
+models = data.get("models", {{}})
+
+def repo_root(cache_path: str):
+    p = Path(cache_path)
+    if p.name.startswith("models--") or p.name.startswith("converted--"):
+        return p
+    for parent in p.parents:
+        name = parent.name
+        if name.startswith("models--") or name.startswith("converted--"):
+            return parent
+    return p
+
+def dir_size(root: Path):
+    total = 0
+    for base, _dirs, files in os.walk(root, followlinks=False):
+        for fname in files:
+            fpath = os.path.join(base, fname)
+            if os.path.islink(fpath):
+                continue
+            try:
+                total += os.path.getsize(fpath)
+            except OSError:
+                continue
+    return total
+
+rows = []
+for slug, entry in models.items():
+    cache_path = entry.get("cache_path")
+    if not cache_path:
+        continue
+    root = repo_root(cache_path)
+    if not root.exists():
+        continue
+    rows.append({{
+        "slug": slug,
+        "model_id": entry.get("model_id") or slug,
+        "cache_path": str(cache_path),
+        "root": str(root),
+        "size_bytes": dir_size(root),
+        "port": entry.get("port"),
+    }})
+print(json.dumps(rows))
+"""
+    result = subprocess.run(
+        ["ssh", studio_ssh, "python3", "-"],
+        input=script.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit("failed to read MLX registry sizes from studio")
+    return json.loads(result.stdout.decode("utf-8") or "[]")
+
+
+def _optillm_models_from_handles(path: Path):
+    if not path.exists():
+        raise SystemExit(f"handles.jsonl not found: {path}")
+    models = set()
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        handle = obj.get("handle", "")
+        if not handle.startswith("opt-"):
+            continue
+        selector = obj.get("selector") or {}
+        model = selector.get("model")
+        if not model:
+            continue
+        for match in re.findall(r"mlx-[a-z0-9-]+", str(model)):
+            models.add(match)
+    return models
+
+
+def _apply_port_map(assignments, studio_ssh: str, sync: bool):
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    for handle, port in assignments:
+        cmd = [
+            "ssh",
+            studio_ssh,
+            studio_cmd,
+            "--local",
+            "load",
+            handle,
+            str(port),
+            "--force",
+            "--ignore-launchd",
+            "--no-sync",
+        ]
+        subprocess.run(cmd, check=False)
+    if sync:
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
+
+
+def cmd_assign_team(args):
+    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    handles_path = Path(os.environ.get("HANDLES_PATH", DEFAULT_HANDLES_PATH))
+    registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
+
+    # ensure registry includes all cached models
+    subprocess.run(["ssh", studio_ssh, os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl"), "--local", "init"], check=False)
+
+    optillm_models = _optillm_models_from_handles(handles_path)
+    rows = _fetch_registry_sizes(studio_ssh, registry_path)
+    if not rows:
+        raise SystemExit("no MLX models found in registry")
+
+    by_handle = {row["model_id"]: row for row in rows}
+    opt_rows = [row for handle, row in by_handle.items() if handle in optillm_models]
+    other_rows = [row for handle, row in by_handle.items() if handle not in optillm_models]
+
+    opt_rows.sort(key=lambda r: (-r["size_bytes"], r["model_id"]))
+    other_rows.sort(key=lambda r: (-r["size_bytes"], r["model_id"]))
+
+    opt_ports = list(range(8100, 8110))
+    other_ports = list(range(8110, 8120))
+
+    if len(opt_rows) > len(opt_ports):
+        raise SystemExit("too many optillm models for 8100-8109")
+    if len(other_rows) > len(other_ports):
+        raise SystemExit("too many non-optillm models for 8110-8119")
+
+    assignments = []
+    for row, port in zip(opt_rows, opt_ports):
+        assignments.append((row["model_id"], port))
+    for row, port in zip(other_rows, other_ports):
+        assignments.append((row["model_id"], port))
+
+    if args.dry_run:
+        print(json.dumps({"count": len(assignments), "assignments": assignments}, indent=2))
+        return
+
+    _apply_port_map(assignments, studio_ssh, sync=args.sync)
+
+
+def _env_key(handle: str, suffix: str):
+    key = handle.upper().replace("-", "_")
+    return f"MLX_{key}_{suffix}"
+
+
+def _build_mlx_entries(models, host: str):
+    items = []
+    for slug, entry in models.items():
+        port = entry.get("port")
+        if not port:
+            continue
+        handle = entry.get("model_id") or slug
+        items.append(
+            {
+                "handle": handle,
+                "port": int(port),
+                "request_params": entry.get("request_params", {}),
+                "context_length": entry.get("context_length"),
+                "max_output_tokens": entry.get("max_output_tokens"),
+            }
+        )
+    return sorted(items, key=lambda i: i["port"])
+
+
+
+def _yaml_scalar(value):
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value)
+    raise SystemExit(f"unsupported request_param type: {type(value)}")
+
+
+def _update_router_yaml(path: Path, mlx_entries, route_via_optillm: bool):
+    if not path.exists():
+        raise SystemExit(f"router.yaml not found: {path}")
+    lines = path.read_text().splitlines()
+    begin = "# BEGIN MLXCTL AUTO"
+    end = "# END MLXCTL AUTO"
+
+    # Remove existing MLX entries (legacy or previous sync)
+    new_lines = []
+    skip = False
+    skip_block = False
+    for line in lines:
+        if line.strip() == begin:
+            skip = True
+            continue
+        if line.strip() == end:
+            skip = False
+            continue
+        if skip:
+            continue
+        if line.startswith("- model_name: "):
+            if line.startswith("- model_name: mlx-") or line.startswith("- model_name: router-mlx-"):
+                skip_block = True
+                continue
+            skip_block = False
+        if skip_block:
+            continue
+        new_lines.append(line)
+
+    block = [begin]
+    for item in mlx_entries:
+        handle = item["handle"]
+        env_base = _env_key(handle, "API_BASE")
+        env_model = _env_key(handle, "MODEL")
+        env_key = _env_key(handle, "API_KEY")
+        ctx = item.get("context_length") or 65536
+        max_output = item.get("max_output_tokens")
+        if not max_output:
+            max_output = min(32768, max(1024, int(ctx) // 2))
+        block += [
+            f"- model_name: {handle}",
+            "  litellm_params:",
+            f"    model: os.environ/{env_model}",
+            f"    api_base: os.environ/{env_base}",
+            f"    api_key: os.environ/{env_key}",
+            f"    max_tokens: {max_output}",
+        ]
+        request_params = item.get("request_params") or {}
+        if request_params:
+            for key in sorted(request_params.keys()):
+                block.append(f"    {key}: {_yaml_scalar(request_params[key])}")
+        block += [
+            "  model_info:",
+            f"    max_input_tokens: {int(ctx)}",
+            f"    max_output_tokens: {int(max_output)}",
+        ]
+        if route_via_optillm:
+            router_handle = f"router-{handle}"
+            router_env_base = _env_key(router_handle, "API_BASE")
+            router_env_model = _env_key(router_handle, "MODEL")
+            router_env_key = _env_key(router_handle, "API_KEY")
+            block += [
+                f"- model_name: {router_handle}",
+                "  litellm_params:",
+                f"    model: os.environ/{router_env_model}",
+                f"    api_base: os.environ/{router_env_base}",
+                f"    api_key: os.environ/{router_env_key}",
+                f"    max_tokens: {max_output}",
+                "  model_info:",
+                f"    max_input_tokens: {int(ctx)}",
+                f"    max_output_tokens: {int(max_output)}",
+            ]
+    block.append(end)
+
+    inserted = False
+    output = []
+    for line in new_lines:
+        output.append(line)
+        if line.strip() == "model_list:" and not inserted:
+            output.extend(block)
+            inserted = True
+    if not inserted:
+        output = block + new_lines
+    path.write_text("\n".join(output) + "\n")
+
+
+def _update_env_local(path: Path, mlx_entries, host: str, route_via_optillm: bool):
+    if not path.exists():
+        raise SystemExit(f"env.local not found: {path}")
+    begin = "# BEGIN MLXCTL AUTO"
+    end = "# END MLXCTL AUTO"
+    lines = path.read_text().splitlines()
+    output = []
+    skip = False
+    for line in lines:
+        if line.strip() == begin:
+            skip = True
+            continue
+        if line.strip() == end:
+            skip = False
+            continue
+        if skip:
+            continue
+        if line.startswith("JERRY_") or line.startswith("BENCH_") or line.startswith("MLX_") or line.startswith("ROUTER_"):
+            continue
+        output.append(line)
+
+    block = [begin, "# MLX OpenAI server base URLs (auto-generated)"]
+    for item in mlx_entries:
+        handle = item["handle"]
+        port = item["port"]
+        if route_via_optillm:
+            block.append(f"{_env_key(handle, 'API_BASE')}=http://127.0.0.1:4020/v1")
+        else:
+            block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
+    block.append("")
+    block.append("# Upstream model IDs (prefix with \"openai/\" for OpenAI-compatible backends)")
+    for item in mlx_entries:
+        handle = item["handle"]
+        if route_via_optillm:
+            block.append(f"{_env_key(handle, 'MODEL')}=openai/router-{handle}")
+        else:
+            block.append(f"{_env_key(handle, 'MODEL')}=openai/{handle}")
+    block.append("")
+    block.append("# API keys (set to \"dummy\" if the backend does not enforce auth)")
+    for item in mlx_entries:
+        handle = item["handle"]
+        block.append(f"{_env_key(handle, 'API_KEY')}=dummy")
+    if route_via_optillm:
+        block.append("")
+        block.append("# OptiLLM → MLX (internal router targets)")
+        for item in mlx_entries:
+            handle = item["handle"]
+            port = item["port"]
+            router_handle = f"router-{handle}"
+            block.append(f"{_env_key(router_handle, 'API_BASE')}=http://{host}:{port}/v1")
+            block.append(f"{_env_key(router_handle, 'MODEL')}=openai/{handle}")
+            block.append(f"{_env_key(router_handle, 'API_KEY')}=dummy")
+    block.append(end)
+
+    output.append("")
+    output.extend(block)
+    path.write_text("\n".join(output).rstrip() + "\n")
+
+
+def _update_handles(path: Path, mlx_entries):
+    if not path.exists():
+        raise SystemExit(f"handles.jsonl not found: {path}")
+    rows = []
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            rows.append(line)
+            continue
+        handle = obj.get("handle", "")
+        endpoint = obj.get("endpoint_ref", "")
+        if handle.startswith("mlx-") or endpoint.startswith("ep_mlx_slot_"):
+            continue
+        rows.append(obj)
+
+    for item in mlx_entries:
+        handle = item["handle"]
+        port = item["port"]
+        rows.append(
+            {
+                "handle": handle,
+                "kind": "model",
+                "invoke": "openai-chat",
+                "managed_by": "launchd",
+                "endpoint_ref": f"ep_mlx_slot_{port}",
+                "selector": {"model": handle},
+            }
+        )
+
+    with path.open("w") as handle_out:
+        for row in rows:
+            if isinstance(row, str):
+                handle_out.write(row + "\n")
+            else:
+                handle_out.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+
+def cmd_sync_gateway(args):
+    gateway_root = Path(os.environ.get("GATEWAY_ROOT", DEFAULT_GATEWAY_ROOT))
+    router_path = gateway_root / "layer-gateway/litellm-orch/config/router.yaml"
+    env_path = gateway_root / "layer-gateway/litellm-orch/config/env.local"
+    handles_path = gateway_root / "layer-gateway/registry/handles.jsonl"
+
+    if not router_path.exists():
+        gateway_host = os.environ.get("GATEWAY_HOST", DEFAULT_GATEWAY_HOST)
+        gateway_mlxctl = os.environ.get("GATEWAY_MLXCTL", DEFAULT_GATEWAY_MLXCTL)
+        remote_cmd = [gateway_mlxctl, "--local", "sync-gateway"]
+        if args.dry_run:
+            remote_cmd.append("--dry-run")
+        if args.route_via_optillm is True:
+            remote_cmd.append("--route-via-optillm")
+        elif args.route_via_optillm is False:
+            remote_cmd.append("--no-route-via-optillm")
+        subprocess.run(["ssh", gateway_host] + remote_cmd, check=False)
+        return
+
+    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
+    registry = _fetch_registry_from_studio(studio_ssh, registry_path)
+    mlx_entries = _build_mlx_entries(registry.get("models", {}), os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
+    route_via_optillm = args.route_via_optillm
+    if route_via_optillm is None:
+        env_flag = os.environ.get("MLX_ROUTE_VIA_OPTILLM")
+        if env_flag is None:
+            route_via_optillm = DEFAULT_ROUTE_VIA_OPTILLM
+        else:
+            route_via_optillm = env_flag.strip().lower() not in {"0", "false", "no"}
+
+    if args.dry_run:
+        print(json.dumps({"count": len(mlx_entries), "entries": mlx_entries}, indent=2))
+        return
+
+    _update_router_yaml(router_path, mlx_entries, route_via_optillm)
+    _update_env_local(env_path, mlx_entries, os.environ.get("MLX_HOST", DEFAULT_MLX_HOST), route_via_optillm)
+    _update_handles(handles_path, mlx_entries)
+
+
+def _collect_offload_candidates(studio_ssh: str):
+    script = """
+import json
+from pathlib import Path
+
+hub = Path("/Users/thestudio/models/hf/hub")
+reg = hub / "registry.json"
+if not reg.exists():
+    raise SystemExit(0)
+data = json.loads(reg.read_text() or "{}")
+models = data.get("models", {})
+for entry in models.values():
+    og_path = entry.get("og_path")
+    cache_path = entry.get("cache_path")
+    if not og_path or not cache_path:
+        continue
+    if og_path == cache_path:
+        continue
+    try:
+        og_path = Path(og_path)
+        rel = og_path.relative_to(hub)
+    except Exception:
+        continue
+    print(str(rel))
+"""
+    result = subprocess.run(
+        ["ssh", studio_ssh, "python3", "-"],
+        input=script.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit("failed to build offload list from studio registry")
+    lines = [line.strip() for line in result.stdout.decode("utf-8").splitlines() if line.strip()]
+    return lines
+
+
+def cmd_offload_og(args):
+    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    offload_script = Path(os.environ.get("MLX_OFFLOAD_SCRIPT", DEFAULT_OFFLOAD_SCRIPT))
+
+    candidates = _collect_offload_candidates(studio_ssh)
+    if not candidates:
+        print("no offload candidates found")
+        return
+    if args.dry_run:
+        print("\n".join(candidates))
+        return
+
+    with tempfile.NamedTemporaryFile("w", delete=False) as handle:
+        for line in candidates:
+            handle.write(line + "\n")
+        list_path = handle.name
+
+    if offload_script.exists():
+        env = os.environ.copy()
+        env["MLX_OFFLOAD_ALLOW"] = "1"
+        env["MLX_OFFLOAD_LIST"] = list_path
+        env.setdefault("STUDIO_SSH", studio_ssh)
+        subprocess.run([str(offload_script)], env=env, check=False)
+        return
+
+    offload_host = os.environ.get("MLX_OFFLOAD_HOST", "mini")
+    if not offload_host:
+        raise SystemExit(f"offload script not found locally and MLX_OFFLOAD_HOST not set: {offload_script}")
+
+    remote_list = f"/tmp/mlx_offload_{os.getpid()}.txt"
+    subprocess.run(
+        ["ssh", offload_host, f"cat > {remote_list}"],
+        input=Path(list_path).read_bytes(),
+        check=False,
+    )
+    env_parts = [
+        "MLX_OFFLOAD_ALLOW=1",
+        f"MLX_OFFLOAD_LIST={remote_list}",
+        f"STUDIO_SSH={studio_ssh}",
+    ]
+    subprocess.run(
+        ["ssh", offload_host, " ".join(env_parts + [str(offload_script)])],
+        check=False,
+    )
+    subprocess.run(["ssh", offload_host, "rm", "-f", remote_list], check=False)
+
+
 def main():
     parser = argparse.ArgumentParser(prog="mlxctl")
     parser.add_argument("--local", action="store_true", help="run locally on Studio")
@@ -496,9 +1228,21 @@ def main():
 
     load = sub.add_parser("load")
     load.add_argument("model")
-    load.add_argument("port")
+    load.add_argument("port", help="Port number (8100-8139) or 'auto' for 8120+")
     load.add_argument("--force", action="store_true")
     load.add_argument("--ignore-launchd", action="store_true")
+    load.add_argument("--convert", choices=["auto", "force", "skip"], default="auto")
+    load.add_argument("--name", help="Canonical model id override")
+    load.add_argument("--no-offload-og", dest="offload_og", action="store_false")
+    load.set_defaults(offload_og=True)
+    load.add_argument(
+        "--preconverted",
+        choices=["yes", "no", "auto"],
+        default="auto",
+        help="Override pre-converted detection (yes|no|auto)",
+    )
+    load.add_argument("--no-sync", dest="sync", action="store_false")
+    load.set_defaults(sync=True)
 
     unload = sub.add_parser("unload")
     unload.add_argument("port")
@@ -506,6 +1250,37 @@ def main():
     sub.add_parser("unload-all")
     sub.add_parser("reconcile")
     sub.add_parser("verify")
+    ensemble = sub.add_parser("ensemble")
+    ensemble.add_argument("name", help=f"Ensemble name ({', '.join(sorted(ENSEMBLES))})")
+    ensemble.add_argument("--force", action="store_true")
+    ensemble.add_argument("--ignore-launchd", action="store_true")
+    ensure = sub.add_parser("ensure")
+    ensure.add_argument("repo")
+    ensure.add_argument("--name", help="Canonical model id override")
+    ensure.add_argument("--convert", choices=["auto", "force", "skip"], default="auto")
+    ensure.add_argument("--no-offload-og", dest="offload_og", action="store_false")
+    ensure.set_defaults(offload_og=True)
+    ensure.add_argument(
+        "--preconverted",
+        choices=["yes", "no", "auto"],
+        default="auto",
+        help="Override pre-converted detection (yes|no|auto)",
+    )
+    ensure.add_argument("--load", action="store_true", help="Load the model after ensuring it")
+    ensure.add_argument("--port", default="auto", help="Port number (8100-8139) or 'auto' for 8120+")
+    ensure.add_argument("--no-sync", dest="sync", action="store_false")
+    ensure.set_defaults(sync=True)
+    offload = sub.add_parser("offload-og", help="Offload OG base weights that are not used for inference")
+    offload.add_argument("--dry-run", action="store_true")
+    sync = sub.add_parser("sync-gateway", help="Sync MLX registry to gateway router/env/handles")
+    sync.add_argument("--route-via-optillm", dest="route_via_optillm", action="store_true")
+    sync.add_argument("--no-route-via-optillm", dest="route_via_optillm", action="store_false")
+    sync.set_defaults(route_via_optillm=None)
+    sync.add_argument("--dry-run", action="store_true")
+    assign = sub.add_parser("assign-team", help="Assign MLX models to team ports by size (OptiLLM first)")
+    assign.add_argument("--dry-run", action="store_true")
+    assign.add_argument("--no-sync", dest="sync", action="store_false")
+    assign.set_defaults(sync=True)
 
     args = parser.parse_args()
     _maybe_forward_to_studio(args)
@@ -519,6 +1294,11 @@ def main():
         "unload-all": cmd_unload_all,
         "reconcile": cmd_reconcile,
         "verify": cmd_verify,
+        "ensemble": cmd_ensemble,
+        "ensure": lambda args: cmd_ensure(args),
+        "offload-og": cmd_offload_og,
+        "sync-gateway": cmd_sync_gateway,
+        "assign-team": cmd_assign_team,
     }
     commands[args.command](args)
 

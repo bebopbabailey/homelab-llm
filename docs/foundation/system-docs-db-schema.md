@@ -41,7 +41,7 @@ CREATE TABLE endpoints (
 ### models (first-class)
 ```sql
 CREATE TABLE models (
-  model_id TEXT PRIMARY KEY,      -- stable ID (e.g., "benny-clean-m-int8")
+  model_id TEXT PRIMARY KEY,      -- stable ID (e.g., "ov-phi4-mini")
   family TEXT,                    -- e.g., "phi", "qwen", "llama"
   size TEXT,                      -- e.g., "1.7B", "3B"
   format TEXT,                    -- ov-ir | onnx | mlx | gguf

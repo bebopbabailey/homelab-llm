@@ -14,7 +14,7 @@ and constraints so new work stays compatible with the existing platform.
 - `mcp-registry.md` — MCP registry template and schema.
 - `tool-contracts.md` — tool input/output contracts (living doc).
 - `mlx-registry.md` — MLX registry and controller overview.
-- `benny-model-onboarding.md` — OpenVINO model onboarding + Benny naming.
+- `ov-model-onboarding.md` — OpenVINO model onboarding + ov-* naming.
 - `testing.md` — verification steps and smoke tests.
 - `onnx-evaluation.md` — non-LLM ONNX evaluation plan for routing/summarization.
 - `git-submodules.md` — how to work with submodules in this repo.
@@ -28,7 +28,7 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/INTEGRATIONS.md` — LiteLLM routing + Open WebUI/OpenVINO/OptiLLM linkage.
 - `docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
 - `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
-- `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
+- `docs/foundation/opt-techniques.md` — OptiLLM technique prefixes + use cases.
 - `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
 - `layer-*/<service>/SERVICE_SPEC.md` — per-service runtime contract and env locations.
 - `layer-gateway/litellm-orch/ARCHITECTURE.md` and `layer-inference/ov-llm-server/ARCHITECTURE.md`
@@ -49,6 +49,7 @@ and constraints so new work stays compatible with the existing platform.
 - State test expectations explicitly, even if no tests exist.
 - When unsure, ask before adding new test frameworks.
 - Keep a single source of truth (env vars + one registry file).
+- MLX registry is canonical for `model_id` → `source_path`/`cache_path`.
 - Avoid duplicate or conflicting configuration sources.
 
 ## MCP Adoption Checklist (MVP)

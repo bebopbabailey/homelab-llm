@@ -1,6 +1,6 @@
 # ONNX Evaluation (Non-LLM Benchmarks)
 
-Purpose: identify faster, smaller models for Benny roles that do not require full
+Purpose: identify faster, smaller models for OpenVINO roles that do not require full
 LLM generation (routing/classification, summarization, cleaning, and extraction).
 
 ## Step 1 — Route/Classify + Summarize

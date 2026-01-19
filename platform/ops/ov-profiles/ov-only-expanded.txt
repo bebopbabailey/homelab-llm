@@ -1,0 +1,6 @@
+ov-qwen2-5-3b-instruct-fp16
+ov-qwen2-5-1-5b-instruct-fp16
+ov-phi-4-mini-instruct-fp16
+ov-phi-3-5-mini-instruct-fp16
+ov-llama-3-2-3b-instruct-fp16
+ov-mistral-7b-instruct-v0-3-fp16

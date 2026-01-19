@@ -1,0 +1,2 @@
+ov-qwen2-5-1-5b-instruct-fp16
+ov-phi-4-mini-instruct-fp16

@@ -32,6 +32,16 @@ mlxctl reconcile
 After reboot or launchd restart, confirm port 8100 is serving Qwen3-235B:
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
+
+Load a test model into the experimental range (8120+):
+```bash
+mlxctl load mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4 auto
+```
+
+After any MLX port change:
+```bash
+mlxctl sync-gateway
+```
 ```
 
 ## LiteLLM Aliases (Mini)
@@ -41,12 +51,12 @@ curl -fsS http://127.0.0.1:4000/v1/models | jq .
 
 Check for MLX aliases:
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^(jerry|bench|utility)-'
+curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^(mlx|ov|opt)-'
 ```
 
 Check for OpenVINO aliases:
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^benny-'
+curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^ov-'
 ```
 
 ## OptiLLM (Mini)
@@ -54,19 +64,24 @@ curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^benny-'
 curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
 ```
 
-Verify OptiLLM via LiteLLM alias:
+## OptiLLM local (Studio)
+```bash
+curl -fsS http://192.168.1.72:4041/v1/models -H "Authorization: Bearer dummy" | jq .
+```
+
+Verify OptiLLM via LiteLLM alias (when handles are registered):
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"optillm-jerry-xl","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  -d '{"model":"opt-router-<base-model>","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
   | jq .
 ```
 
-Verify OptiLLM (jerry-l):
+Verify direct MLX handles (when models are registered):
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"optillm-jerry-l","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  -d '{"model":"mlx-<base-model>","messages":[{"role":"user","content":"ping"}],"max_tokens":128}' \
   | jq .
 ```
 
@@ -148,13 +163,8 @@ sudo cp /home/christopherbailey/homelab-llm/platform/ops/templates/tiny-agents.e
 ```bash
 /home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl list
 /home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl profiles
-/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl warm-profile benny-only-expanded
+/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl warm-profile ov-only-expanded
 /home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl status
-```
-
-## LiteLLM prompt sync (Benny)
-```bash
-/home/christopherbailey/homelab-llm/platform/ops/scripts/sync-benny-prompts
 ```
 
 ## ONNX evaluation (route + summarize)

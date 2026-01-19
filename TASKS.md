@@ -21,17 +21,16 @@ without changing clients.
      - `version: 1`
      - `models: { "<slug>": { repo_id, model_id, cache_path, format, port } }`
      - `port` represents current active port; one port per model; no duplicates allowed.
-   - Confirm fixed LiteLLM model aliases for ports 8100-8109:
-     - 8100 = `jerry-xl`
-     - 8101 = `jerry-l`
-     - 8102 = `jerry-m`
-     - 8103 = `jerry-s`
-     - 8104 = `bench-xl`
-     - 8105 = `bench-l`
-     - 8106 = `bench-m`
-     - 8107 = `bench-s`
-     - 8108 = `utility-a`
-     - 8109 = `utility-b`
+   - Confirm fixed LiteLLM model aliases for ports 8100-8107:
+     - 8100 = `mlx-qwen3-235b-a22b-instruct-2507-6bit`
+     - 8101 = `mlx-gpt-oss-120b-6bit-gs64`
+     - 8102 = `mlx-deepseek-r1-distill-llama-70b-8bit`
+     - 8103 = `mlx-qwen2-5-coder-32b-instruct-8bit`
+     - 8104 = `mlx-qwen2-5-coder-7b-instruct-8bit`
+     - 8105 = `mlx-llama-3-1-8b-instruct-4bit`
+     - 8106 = `mlx-gpt-oss-120b-4bit`
+     - 8107 = `mlx-home-llama-3-2-3b-w8a8-rk3588`
+   - Reserve 8108-8109 for manual test loads (not registered).
    - Create the MCP registry template and choose runtime location (`/etc/homelab-llm/mcp-registry.json`).
 
 2) **[x] Registry bootstrap (Studio)**
@@ -83,13 +82,13 @@ without changing clients.
      and `docs/INTEGRATIONS.md`.
 
 8) **OpenVINO strengths evaluation (Mini)**
-   - Benchmark `benny-clean-*` with `OV_DEVICE=GPU`, `AUTO`, `MULTI:GPU,CPU`.
+   - Benchmark `ov-*` aliases with `OV_DEVICE=GPU`, `AUTO`, `MULTI:GPU,CPU`.
    - Capture single-request latency and concurrent throughput (2–4 requests).
    - Decide whether this host’s strengths are STT/vision/async throughput vs LLM.
    - Document results in `docs/journal/` and update `docs/PLATFORM_DOSSIER.md`.
 
 9) **OpenVINO LLM follow-up (Mini)**
-   - Evaluate int8 for `benny-extract-*`, `benny-summarize-*`, `benny-tool-*`.
+   - Evaluate int8 for current `ov-*` base models (e.g., qwen2.5/phi/llama/mistral).
    - Record quality + latency vs fp16; decide default routing per alias.
    - Assess int4 utility for LLMs on this iGPU stack (CPU-only vs GPU stability).
    - Decide whether IPEX-LLM is warranted to unlock GPU int4 paths.
@@ -106,8 +105,8 @@ without changing clients.
    - Run pilots and record results in `docs/journal/`.
 
 12) **[x] OptiLLM wiring (move earlier)**
-   - Point OptiLLM at one or more fixed aliases (e.g., `jerry-xl`) and ensure
-     prefix-based loop avoidance (`moa-jerry-xl` into OptiLLM; `jerry-xl` upstream).
+   - Point OptiLLM at one or more fixed aliases (e.g., `opt-moa-jerry-xl`) and ensure
+     prefix-based loop avoidance (`moa-jerry-xl` into OptiLLM; base model upstream).
    - Add health checks and document the OptiLLM integration in `docs/foundation`
      and `docs/INTEGRATIONS.md`.
 
@@ -130,7 +129,7 @@ without changing clients.
   - Copy `platform/ops/templates/mcp-registry.json` to `/etc/homelab-llm/mcp-registry.json`.
   - Add MCP server health checks in `platform/ops/scripts/healthcheck.sh`.
   - Near-term: add `transcript.clean` as a tool that injects the fixed prompt and
-    calls `benny-clean-m` via LiteLLM to return only cleaned text.
+    calls an `ov-*` alias via LiteLLM to return only cleaned text.
 
 15) **Agent routing (TinyAgents)**
    - Adapt TinyAgents to call LiteLLM (`http://127.0.0.1:4000/v1`).
@@ -154,11 +153,16 @@ without changing clients.
    - Version tool schemas to prevent breaking changes.
    - Add smoke tests for tool availability.
    - Plan a `python.run` MCP tool (sandboxed code execution) for future workflows.
-   - Maintain Benny prompts in `docs/prompts/benny` and sync via `platform/ops/scripts/sync-benny-prompts`.
+   - Maintain OpenVINO prompts in `docs/prompts/ov` and sync via `platform/ops/scripts/sync-ov-prompts`.
 
 19) **Vector DB planning (Studio)**
    - Standardize on Qdrant (service on Studio), persist indexes on SSD.
    - Set explicit CPU/RAM limits (service flags or launchd) to avoid inference contention.
+
+## Nice-to-haves
+- Add a QoS launcher/toggle for MLX inference so we can bias P-cores vs E-cores
+  (e.g., user-initiated for low-latency, background for efficiency).
+- Document QoS expectations and a minimal benchmark script for before/after measurements.
    - Add a simple tuning knob for max RAM/index cache size.
    - Add a controller command to adjust limits at runtime (or via config + restart).
    - Document expected resource usage and how to scale.
@@ -173,11 +177,11 @@ without changing clients.
    - Log agent runs with request id, model, tool calls, latency, and errors.
    - Prefer JSON logs for future ingestion.
 
-22) **[x] OpenVINO Benny aliases (Mini)**
-  - Add `benny-*` models to LiteLLM router config.
+22) **[x] OpenVINO OpenVINO aliases (Mini)**
+  - Add `ov-*` models to LiteLLM router config.
   - Add `BENNY_*` env vars to `layer-gateway/litellm-orch/config/env.example`.
   - Add `BENNY_*` env vars to `layer-gateway/litellm-orch/config/env.local`.
-  - Document Benny onboarding and mapping in `docs/foundation/benny-model-onboarding.md`.
+  - Document OpenVINO onboarding and mapping in `docs/foundation/ov-model-onboarding.md`.
 
 ## Constraints
 - One port, one model (no shared ports).
