@@ -84,6 +84,11 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
   (current ports: `8100`, `8101`, `8102`).
 - Offload happens only when `og_path` is set and `og_path != cache_path`.
   This prevents removing artifacts that are used for inference.
+- `mlxctl list` now shows `context_length` and `max_output_tokens`.
+- `mlxctl load` / `mlxctl ensure` set defaults if missing:
+  - `context_length`: inferred from `config.json` when available, else 131072
+  - `max_output_tokens`: defaults to 64000
+- `mlxctl ensemble` is deprecated (use `load`/`assign-team`).
 
 ## Conversion + offload defaults
 - `mlxctl load` and `mlxctl ensure` use `--convert auto` by default:

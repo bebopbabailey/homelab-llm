@@ -4,6 +4,8 @@
 - [2026-01-19 — MLX default ensemble boot config](2026-01-19-mlx-default-ensemble-boot.md)
 - [2026-01-19 — OptiLLM routing for MLX handles](2026-01-19-optillm-mlx-routing.md)
 - [2026-01-19 — OptiLLM routing toggle (mlxctl)](2026-01-19-optillm-routing-toggle.md)
+- [2026-01-19 — OptiLLM web_search uses SearXNG](2026-01-19-optillm-searxng-integration.md)
+- [2026-01-19 — mlxctl command updates](2026-01-19-mlxctl-updates.md)
 - [2026-01-19 — OptiLLM default ensemble refresh](2026-01-19-optillm-default-ensemble-update.md)
 
 - [2026-01-15 — Registries, Entity IDs, and JSONL Plan](2026-01-15-registries-and-ids.md)
