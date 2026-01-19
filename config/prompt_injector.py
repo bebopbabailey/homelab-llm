@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from litellm.integrations.custom_logger import CustomLogger
 
-_PROMPT_ROOT = Path(__file__).resolve().parents[3] / "docs" / "prompts" / "benny"
+_PROMPT_ROOT = Path(__file__).resolve().parents[3] / "docs" / "prompts" / "ov"
 _PROMPT_CACHE: Dict[str, str] = {}
 
 
@@ -48,7 +48,7 @@ def _load_prompt(model: str) -> Optional[str]:
 class PromptInjector(CustomLogger):
     def _apply_prompt(self, data: dict) -> dict:
         model = data.get("model")
-        if not isinstance(model, str) or not model.startswith("benny-"):
+        if not isinstance(model, str) or not model.startswith("ov-"):
             return data
 
         prompt_text = _load_prompt(model)
@@ -61,14 +61,14 @@ class PromptInjector(CustomLogger):
 
         metadata_key = "litellm_metadata"
         metadata = data.get(metadata_key)
-        if isinstance(metadata, dict) and metadata.get("benny_prompt_injected") == model:
+        if isinstance(metadata, dict) and metadata.get("ov_prompt_injected") == model:
             return data
 
         data["messages"] = [{"role": "system", "content": prompt_text}, *messages]
         if metadata is None:
             metadata = {}
         if isinstance(metadata, dict):
-            metadata = {**metadata, "benny_prompt_injected": model}
+            metadata = {**metadata, "ov_prompt_injected": model}
             data[metadata_key] = metadata
         return data
 

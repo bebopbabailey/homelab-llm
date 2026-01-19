@@ -24,14 +24,13 @@ the Mini, MLX on the Studio, AFM planned).
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
-- **MLX OpenAI servers** on the Studio: ports **8100-8109** (OpenAI-compatible `/v1/*`)
+- **MLX OpenAI servers** on the Studio: ports **8100-8119** (team) and **8120-8139** (experimental)
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
 
 ## Default Logical Models
-- `jerry-{xl,l,m,s}` → MLX ports `8100-8103`
-- `bench-{xl,l,m,s}` → MLX ports `8104-8107`
-- `utility-{a,b}` → MLX ports `8108-8109`
-- `benny-*` → OpenVINO on `localhost:9000`
+- `mlx-*` → MLX ports `8100-8119` (team), `8120-8139` (experimental)
+- `ov-*` → OpenVINO on `localhost:9000`
+- `opt-*` → OptiLLM on `localhost:4020`
 
 ## Logging (Planned)
 - Request logging: JSONL via LiteLLM (`json_logs: true`) for ingestion (model, upstream, latency, status, error).

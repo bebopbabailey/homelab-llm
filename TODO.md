@@ -4,7 +4,8 @@ Status: legacy notes for a GPT-OSS launchd setup on port 8100. Current MLX
 port management is handled via `platform/ops/scripts/mlxctl` and the registry. Use this
 only if you intentionally revert to a single fixed launchd model on 8100.
 
-Goal: run `jerry-chat` (GPT-OSS) at boot on port `8100` via `com.bebop.mlx-launch`.
+Goal: run the default MLX boot ensemble at ports `8111` and `8113`
+via `com.bebop.mlx-launch`.
 
 ## Edit `/opt/mlx-launch/bin/start.sh`
 Replace the model line so it launches GPT-OSS:
@@ -182,7 +183,7 @@ This strips Harmony `<|channel|>` tokens before display.
 
 1) Open WebUI → Workspace → Functions → Import.
 2) Import the Harmony2Think Filter from the Open WebUI community.
-3) Workspace → Models → edit `jerry-chat` → Filters → enable Harmony2Think.
+3) Workspace → Models → edit the 8100 model → Filters → enable Harmony2Think.
 4) Save, then refresh models or restart Open WebUI.
 
 ## Alternative fix: MLX server Harmony parsers (backend-side)

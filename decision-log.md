@@ -1,9 +1,9 @@
 # Decision Log
 
 ## 2026-01-13 — Naming Expansion + Backend Slots
-- Expanded logical model names to `jerry-*`, `bench-*`, `utility-*`, `benny-*`.
-- MLX ports standardized to `8100-8109`; OpenVINO remains on `9000`.
-- `lil-jerry` retired in favor of `benny-*` aliases for OpenVINO.
+- Expanded logical model names to `mlx-*`, `ov-*`, `opt-*`.
+- MLX ports standardized to `8100-8139` (team 8100-8119, experimental 8120-8139); OpenVINO remains on `9000`.
+- `lil-jerry` retired in favor of `ov-*` aliases for OpenVINO.
 
 ## 2026-01-03 — Gateway & Naming Decisions
 - Chose LiteLLM proxy mode for the gateway (no custom FastAPI forwarder in Phase 1).
@@ -11,7 +11,7 @@
 - Adopted plain client-facing model names (superseded; see 2026-01-13 update).
 
 ## 2026-01-03 — Backend Topology & Aider Roles
-- MLX OpenAI servers run on the Studio at ports `8100-8109`; OpenVINO remains on the Mini at `9000`.
+- MLX OpenAI servers run on the Studio at ports `8100-8139`; OpenVINO remains on the Mini at `9000`.
 - Aider uses three roles: main, editor, weak (model names updated in `AIDER.md`).
 
 ## 2026-01-03 — MLX Chat Template Issue

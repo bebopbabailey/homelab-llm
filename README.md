@@ -6,17 +6,18 @@ provides routing only and does not implement inference.
 ## Scope
 - Gateway only; no inference in this repo.
 - Declarative routing via `config/router.yaml` with env-var substitution.
-- Logical model names: `jerry-*`, `bench-*`, `utility-*`, `benny-*`.
+- Logical model names use base model names (kebab-case). MLX models are prefixed with `mlx-` and OpenVINO models with `ov-`.
 
 ## Backends (External Services)
-- MLX OpenAI servers on the Studio: `jerry-*`, `bench-*`, `utility-*` (ports `8100-8109`).
-- OpenVINO LLM server on the Mini (external to this repo), mapped as `benny-*` (port `9000`).
+- MLX OpenAI servers on the Studio: `mlx-*` (ports `8100-8119` team; `8120-8139` experimental).
+- OpenVINO LLM server on the Mini (external to this repo), mapped as `ov-*` (port `9000`).
 
 ## Configuration
 - `config/router.yaml` maps logical model names to upstream endpoints.
 - `config/env.example` provides the env var template for base URLs and model IDs.
 - Copy `config/env.example` to `config/env.local` (git-ignored) and set real IPs/model IDs.
 - For long-running service use, load env vars explicitly (e.g., systemd `EnvironmentFile=config/env.local`).
+- For OpenAI-compatible upstreams, keep the handle as the alias and set `litellm_params.model` to `openai/<base-model>`.
 
 ## Aider
 - See `AIDER.md` for a 3-model setup (main/editor/weak) via the LiteLLM proxy.
@@ -29,12 +30,13 @@ provides routing only and does not implement inference.
  - Optional alias: `scripts/run-dev-chat.sh` (same config; kept for convenience)
 
 ## Studio MLX Control
-- Use `platform/ops/scripts/mlxctl` (registry-aware, stable aliases for ports 8100-8109).
+- Use `platform/ops/scripts/mlxctl` (registry-aware, stable aliases for ports 8100-8139).
+- After MLX port changes, run `mlxctl sync-gateway` to refresh router/env/handles.
 - Legacy MLX helper scripts were removed to reduce drift.
 
 ## Verify
-- `GET /v1/models` returns `jerry-*`, `bench-*`, `utility-*`, and `benny-*`.
-- `POST /v1/chat/completions` with `"model": "jerry-s"` returns a valid response.
+- `GET /v1/models` returns `mlx-*`, `ov-*`, and `opt-*` handles from the router config.
+- `POST /v1/chat/completions` with a known `mlx-*` or `ov-*` model returns a valid response.
 - `GET /health` returns LiteLLM health results for configured deployments.
 
 ## Health Check Script

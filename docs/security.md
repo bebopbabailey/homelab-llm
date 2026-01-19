@@ -7,7 +7,7 @@
 
 ## Backend Services
 - **OpenVINO (Mini):** binds `0.0.0.0:9000` for maintenance, but callers use `127.0.0.1:9000`.
-- **MLX (Studio):** LAN-only ports `8100–8109`; accessible via Tailscale as needed.
+- **MLX (Studio):** LAN-only ports `8100–8139`; accessible via Tailscale as needed.
 
 ## Tailscale Notes
 - All machines are members of the same tailnet.

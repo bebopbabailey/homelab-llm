@@ -23,7 +23,7 @@ service) and serves as one specialist node.
 ## Layer 3 — Specialist Backends (Current)
 - **Local specialist (machine)**:
     - OpenVINO GenAI server on the Mac Mini (external service, not in this repo)
-    - Exposed to the gateway as `benny-*`
+    - Exposed to the gateway as `ov-*`
     - Lightweight models for classification, tool calls, quick instruction following
     - Optimized for low-resource, always-on use
 - **Remote specialist (big box)**:
@@ -35,7 +35,7 @@ service) and serves as one specialist node.
 1. Client sends an OpenAI-compatible request to LiteLLM.
 2. LiteLLM routes based on the requested logical model name.
 3. LiteLLM forwards to the chosen backend:
-    - Local OpenVINO server (external service on this Mini, mapped as `benny-*`), or
+    - Local OpenVINO server (external service on this Mini, mapped as `ov-*`), or
     - Remote heavy-inference machine (MLX OpenAI servers on the Studio).
 4. LiteLLM returns the upstream response to the client.
 
@@ -47,8 +47,8 @@ service) and serves as one specialist node.
 5. Optional: OptiLLM or teacher/student refinement loops run between steps 2–4.
 
 ## Naming Conventions
-- `jerry-*`, `bench-*`, `utility-*` logical models target MLX servers on the Studio.
-- `benny-*` targets the local OpenVINO backend on the Mini.
+- `mlx-*` logical models target MLX servers on the Studio.
+- `ov-*` targets the local OpenVINO backend on the Mini.
 
 ## TinyAgents Integration (Planned)
 - TinyAgents will be an orchestration client that sends OpenAI-compatible requests to LiteLLM.
