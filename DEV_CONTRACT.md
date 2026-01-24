@@ -26,18 +26,17 @@
 
 ## 4. Required Behavior
 * Provide a single “front door” OpenAI-compatible endpoint for clients (Aider, tinyagents later).
-* Route by logical model name (e.g., `mlx-*`, `ov-*`, `opt-*`) to upstream backends.
+* Route by logical model name (e.g., `mlx-*`, `ov-*`) to upstream backends.
 * Expose LiteLLM health endpoints (`/health`, `/health/readiness`, `/health/liveliness`) for scalable monitoring.
-* Client-facing model names use handles (`mlx-*`, `ov-*`, `opt-*`);
+* Client-facing model names use handles (`mlx-*`, `ov-*`);
   provider routing stays in `litellm_params.model` with `openai/<base-model>` for OpenAI-compatible backends.
 * Initial mapping (config-driven, no hardcoded URLs):
   - `mlx-*` → MLX `8100-8119` (team), `8120-8139` (experimental)
   - `ov-*` → OpenVINO `localhost:9000`
-  - `opt-*` → OptiLLM `localhost:4020`
 * Keep routing config declarative (YAML + env vars). No hardcoded IPs/ports in Python.
 
 ## 5. Definition of Done (for Phase 1)
 The system is operational when:
 1. A developer can run `uv run ...` and start the gateway on port **4000**.
-2. `GET /v1/models` returns the configured logical model names (`mlx-*`, `ov-*`, `opt-*`).
+2. `GET /v1/models` returns the configured logical model names (`mlx-*`, `ov-*`).
 3. `POST /v1/chat/completions` with `"model": "mlx-qwen2-5-coder-32b-instruct-8bit"` forwards to the MLX `8103` backend and returns a valid OpenAI response.

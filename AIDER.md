@@ -56,5 +56,5 @@ If you load a heavy reasoning model on port 8100, you can switch your main model
 1. Start MLX servers on the Studio (preferred: `platform/ops/scripts/mlxctl`).
 2. Set the LiteLLM env vars in `config/env.local` and export them (or load via systemd).
 3. Start the LiteLLM proxy on the Mini (default port `4000`).
-4. From a client, verify `GET /v1/models` shows `mlx-*`, `ov-*`, and `opt-*`.
+4. From a client, verify `GET /v1/models` shows `mlx-*` and `ov-*`.
 5. Launch Aider and run `/architect` to ensure both main and editor models route correctly.

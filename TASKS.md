@@ -15,7 +15,7 @@ Goal: Start a single OpenAI-compatible gateway on the Mini that routes to upstre
   - [ ] If proxy extras conflict, wrap LiteLLM routing via a minimal FastAPI forwarder (no business logic beyond mapping + proxying)
 - [x] Create `config/env.example`
 - [x] Create `config/router.yaml` containing:
-  - [x] logical model names (`mlx-*`, `ov-*`, `opt-*`)
+  - [x] logical model names (`mlx-*`, `ov-*`)
   - [x] upstream base URLs (env-var substituted; MLX ports 8100-8119 team, 8120-8139 experimental; OpenVINO on localhost:9000)
   - [x] upstream “model id” mapping if needed
 - [x] Document minimal runbook in `README.md`
@@ -72,3 +72,4 @@ Goal: Keep gateway tool-agnostic but orchestration-friendly.
 - [ ] Add a helper script to detect or extract MLX chat templates and launch MLX servers with `--chat-template-file` automatically (durable model swaps).
 - [ ] Fork `mlx-openai-server` and apply a permanent BatchEncoding→input_ids fix; point `/opt/mlx-launch` to the fork.
 - [ ] Add tag/capability metadata for health output (compact JSON enrichment).
+- [ ] Add a lightweight routing rule to force short/low‑complexity prompts (e.g., transcript cleaning) to `none` to avoid heavy OptiLLM techniques.

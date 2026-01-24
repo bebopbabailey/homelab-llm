@@ -21,6 +21,7 @@ the Mini, MLX on the Studio, AFM planned).
 - Environment variables supply upstream base URLs and runtime options.
 - Example envs live in `config/env.example`.
 - For long-running service use, load env vars explicitly (e.g., systemd `EnvironmentFile=config/env.local`).
+- Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
@@ -30,11 +31,15 @@ the Mini, MLX on the Studio, AFM planned).
 ## Default Logical Models
 - `mlx-*` → MLX ports `8100-8119` (team), `8120-8139` (experimental)
 - `ov-*` → OpenVINO on `localhost:9000`
-- `opt-*` → OptiLLM on `localhost:4020`
+- `mlx-*` may be routed through OptiLLM on `localhost:4020`
 
 ## Logging (Planned)
 - Request logging: JSONL via LiteLLM (`json_logs: true`) for ingestion (model, upstream, latency, status, error).
 - Log destination: stdout/journald for now; switch to file output when ingestion pipeline is ready.
+
+## Guardrails
+- `promptopt-max-guardrail` post-call guardrail implements fan-out → reducer → cleanup for `p-opt-max`.
+- Guardrail code: `config/promptopt_guardrail.py`.
 
 ## Service Management (Planned)
 - User systemd service with explicit port binding

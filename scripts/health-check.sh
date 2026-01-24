@@ -3,11 +3,17 @@ set -euo pipefail
 
 # Health checks for upstream backends.
 # Usage: scripts/health-check.sh
+# Default: readiness check (fast, no deep backend probes).
+# Set VERBOSE=1 to hit /health (deep checks).
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 VERBOSE="${VERBOSE:-0}"
 
-raw="$(curl -fsS "${BASE_URL}/health")"
+if [[ "${VERBOSE:-0}" == "1" ]]; then
+  raw="$(curl -fsS "${BASE_URL}/health")"
+else
+  raw="$(curl -fsS "${BASE_URL}/health/readiness")"
+fi
 
 if [[ "${VERBOSE}" == "1" ]]; then
   python3 - <<'PY' "$raw"

@@ -6,11 +6,12 @@ provides routing only and does not implement inference.
 ## Scope
 - Gateway only; no inference in this repo.
 - Declarative routing via `config/router.yaml` with env-var substitution.
-- Logical model names use base model names (kebab-case). MLX models are prefixed with `mlx-` and OpenVINO models with `ov-`.
+- Logical model names use base model names (kebab-case). MLX models are prefixed with `mlx-`.
 
 ## Backends (External Services)
 - MLX OpenAI servers on the Studio: `mlx-*` (ports `8100-8119` team; `8120-8139` experimental).
-- OpenVINO LLM server on the Mini (external to this repo), mapped as `ov-*` (port `9000`).
+- OpenVINO LLM server on the Mini (external to this repo) is not wired into LiteLLM
+  right now.
 
 ## Configuration
 - `config/router.yaml` maps logical model names to upstream endpoints.
@@ -35,9 +36,10 @@ provides routing only and does not implement inference.
 - Legacy MLX helper scripts were removed to reduce drift.
 
 ## Verify
-- `GET /v1/models` returns `mlx-*`, `ov-*`, and `opt-*` handles from the router config.
-- `POST /v1/chat/completions` with a known `mlx-*` or `ov-*` model returns a valid response.
-- `GET /health` returns LiteLLM health results for configured deployments.
+- `GET /v1/models` returns `mlx-*` handles from the router config.
+- `POST /v1/chat/completions` with a known `mlx-*` model returns a valid response.
+- `GET /health/readiness` is the default health signal (fast, no deep probes).
+- `GET /health` is a deep probe and can show unhealthy when backends are offline.
 
 ## Health Check Script
 - `scripts/health-check.sh` outputs compact, pretty-printed JSON from LiteLLM `/health`.

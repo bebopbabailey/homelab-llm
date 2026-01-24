@@ -48,6 +48,7 @@ service) and serves as one specialist node.
 
 ## Naming Conventions
 - `mlx-*` logical models target MLX servers on the Studio.
+- Canonical format: `mlx-<family>-<params>-<quant>-<variant>` in that order.
 - `ov-*` targets the local OpenVINO backend on the Mini.
 
 ## TinyAgents Integration (Planned)

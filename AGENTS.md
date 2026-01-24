@@ -16,7 +16,7 @@ When the LiteLLM proxy entrypoint is added, document the exact command here.
 ## Coding Style & Naming Conventions
 - Python only (3.12). Keep code minimal and configuration-driven.
 - Use `snake_case` for Python modules/functions and descriptive, explicit names for config keys.
-- Routing model names use handles (`mlx-*`, `ov-*`, `opt-*`) while upstream
+- Routing model names use handles (`mlx-*`) while upstream
   `litellm_params.model` values use `openai/<base-model>` for OpenAI-compatible backends.
 - Prefer small, reversible changes; avoid hardcoding IPs/ports in Python—use env vars + `config/router.yaml`.
 

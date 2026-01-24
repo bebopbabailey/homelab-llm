@@ -9,33 +9,15 @@ model_list:
   model_info:
     max_input_tokens: 131072
     max_output_tokens: 65536
-- model_name: router-mlx-gpt-oss-120b-mxfp4-q4
+- model_name: mlx-qwen3-next-80b-mxfp4-a3b-instruct
   litellm_params:
-    model: os.environ/MLX_ROUTER_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_ROUTER_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_ROUTER_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
-    max_tokens: 65536
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
+    max_tokens: 32768
   model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
-- model_name: mlx-gemma-3-27b-it-qat-4bit
-  litellm_params:
-    model: os.environ/MLX_MLX_GEMMA_3_27B_IT_QAT_4BIT_MODEL
-    api_base: os.environ/MLX_MLX_GEMMA_3_27B_IT_QAT_4BIT_API_BASE
-    api_key: os.environ/MLX_MLX_GEMMA_3_27B_IT_QAT_4BIT_API_KEY
-    max_tokens: 65536
-  model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
-- model_name: router-mlx-gemma-3-27b-it-qat-4bit
-  litellm_params:
-    model: os.environ/MLX_ROUTER_MLX_GEMMA_3_27B_IT_QAT_4BIT_MODEL
-    api_base: os.environ/MLX_ROUTER_MLX_GEMMA_3_27B_IT_QAT_4BIT_API_BASE
-    api_key: os.environ/MLX_ROUTER_MLX_GEMMA_3_27B_IT_QAT_4BIT_API_KEY
-    max_tokens: 65536
-  model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
+    max_input_tokens: 65536
+    max_output_tokens: 32768
 - model_name: mlx-gpt-oss-20b-mxfp4-q4
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
@@ -45,66 +27,147 @@ model_list:
   model_info:
     max_input_tokens: 131072
     max_output_tokens: 65536
-- model_name: router-mlx-gpt-oss-20b-mxfp4-q4
-  litellm_params:
-    model: os.environ/MLX_ROUTER_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_ROUTER_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_ROUTER_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 65536
-  model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
 # END MLXCTL AUTO
-- model_name: ov-qwen2-5-3b-instruct-fp16
+- model_name: char-transcript
   litellm_params:
-    model: os.environ/OV_QWEN25_MODEL
-    api_base: os.environ/OV_QWEN25_API_BASE
-    api_key: os.environ/OV_QWEN25_API_KEY
-- model_name: ov-qwen2-5-1-5b-instruct-fp16
+    model: openai/mlx-gpt-oss-20b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-transcript
   litellm_params:
-    model: os.environ/OV_QWEN25_15B_MODEL
-    api_base: os.environ/OV_QWEN25_15B_API_BASE
-    api_key: os.environ/OV_QWEN25_15B_API_KEY
-- model_name: ov-phi-4-mini-instruct-fp16
+    model: openai/mlx-gpt-oss-20b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-transcript-md
   litellm_params:
-    model: os.environ/OV_PHI4_MINI_MODEL
-    api_base: os.environ/OV_PHI4_MINI_API_BASE
-    api_key: os.environ/OV_PHI4_MINI_API_KEY
-- model_name: ov-phi-3-5-mini-instruct-fp16
+    model: openai/mlx-gpt-oss-20b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: char-casual
   litellm_params:
-    model: os.environ/OV_PHI35_MINI_MODEL
-    api_base: os.environ/OV_PHI35_MINI_API_BASE
-    api_key: os.environ/OV_PHI35_MINI_API_KEY
-- model_name: ov-llama-3-2-3b-instruct-fp16
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: char-duck
   litellm_params:
-    model: os.environ/OV_LLAMA32_3B_MODEL
-    api_base: os.environ/OV_LLAMA32_3B_API_BASE
-    api_key: os.environ/OV_LLAMA32_3B_API_KEY
-- model_name: ov-mistral-7b-instruct-v0-3-fp16
+    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: char-careful
   litellm_params:
-    model: os.environ/OV_MISTRAL7B_MODEL
-    api_base: os.environ/OV_MISTRAL7B_API_BASE
-    api_key: os.environ/OV_MISTRAL7B_API_KEY
-- model_name: ov-qwen2-5-1-5b-instruct-int4
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: char-brainstorm
   litellm_params:
-    model: os.environ/OV_QWEN25_15B_INT4_MODEL
-    api_base: os.environ/OV_QWEN25_15B_INT4_API_BASE
-    api_key: os.environ/OV_QWEN25_15B_INT4_API_KEY
-- model_name: ov-qwen2-5-coder-1-5b-instruct-fp16
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-opt-fast
   litellm_params:
-    model: os.environ/OV_QWEN25_CODER_15B_FP16_MODEL
-    api_base: os.environ/OV_QWEN25_CODER_15B_FP16_API_BASE
-    api_key: os.environ/OV_QWEN25_CODER_15B_FP16_API_KEY
-- model_name: ov-qwen2-5-coder-1-5b-instruct-int4
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-opt-balanced
   litellm_params:
-    model: os.environ/OV_QWEN25_CODER_15B_INT4_MODEL
-    api_base: os.environ/OV_QWEN25_CODER_15B_INT4_API_BASE
-    api_key: os.environ/OV_QWEN25_CODER_15B_INT4_API_KEY
-- model_name: ov-mistral-7b-instruct-v0-3-int4
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-opt-max
   litellm_params:
-    model: os.environ/OV_MISTRAL7B_INT4_MODEL
-    api_base: os.environ/OV_MISTRAL7B_INT4_API_BASE
-    api_key: os.environ/OV_MISTRAL7B_INT4_API_KEY
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: char-jsonclerk
+  litellm_params:
+    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-fast
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-safe
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-deep
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-chat
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-fast-super
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-safe-super
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-deep-super
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-plan
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-care
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-seek
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-make
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-spark
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-plan-max
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-care-max
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-seek-max
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-make-max
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-spark-max
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -124,4 +187,13 @@ router_settings:
     ServiceUnavailableError: 1
 litellm_settings:
   json_logs: true
-  drop_params: true
+  drop_params: false
+  callbacks:
+  - prompt_injector.prompt_injector_instance
+  - persona_router.persona_router_instance
+guardrails:
+  - guardrail_name: promptopt-max-guardrail
+    litellm_params:
+      guardrail: promptopt_guardrail.PromptOptMaxGuardrail
+      mode: "post_call"
+      default_on: true

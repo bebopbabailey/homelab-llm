@@ -11,7 +11,7 @@ backend MLX/OpenVINO endpoints directly.
 
 ## Model Names
 TinyAgents should call the **plain** logical model names exposed by LiteLLM:
-`mlx-*`, `ov-*`, `opt-*`.
+`mlx-*`, `ov-*`.
 
 ## Responsibility Split
 - **TinyAgents**: model selection, task decomposition, tool orchestration, task‑level retries.
