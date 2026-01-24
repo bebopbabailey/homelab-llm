@@ -1,5 +1,7 @@
 # 2026-01-19 — OptiLLM routing for MLX handles
 
+**Status:** Deprecated. Routing MLX handles through OptiLLM is no longer used.
+
 ## Summary
 All MLX handles now route through OptiLLM with intelligent routing enabled.
 

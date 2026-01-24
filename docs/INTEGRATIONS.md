@@ -3,15 +3,19 @@
 ## LiteLLM routing
 - Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
-- Upstreams: MLX `http://192.168.1.72:<port>/v1`, OpenVINO `http://localhost:9000/v1`,
+- Upstreams: MLX `http://192.168.1.72:<port>/v1`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
-- Model naming: canonical model IDs with prefixes `mlx-*`, `ov-*`, `opt-*`.
-  Handles for models must match the canonical model ID (dash-only, no vendor prefixes).
-  Exception: OptiLLM uses technique prefixes (e.g., `moa-`, `bon-`) in the
-  **selector** sent to OptiLLM; handles stay `opt-*`.
+- Model naming: canonical model IDs with prefix `mlx-`.
+  Format: `mlx-<family>-<params>-<quant>-<variant>` in that order (dash-only,
+  no vendor/org prefixes). Handles must match the canonical model ID.
+  OptiLLM techniques are selected per-request via `optillm_approach` rather than
+  exploding model handles.
 - For OpenAI-compatible upstreams, keep model aliases as handles and set the backend `litellm_params.model` to `openai/<base-model>`.
 - Logs: JSON logs enabled (`litellm_settings.json_logs: true`).
+- OptiLLM request fields are passed through by setting `litellm_settings.drop_params: false`
+  (only relevant when calling OptiLLM directly).
 - Auth: proxy key planned via `LITELLM_PROXY_KEY`.
+- Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
 - MLX alias set (fixed ports): `mlx-*` (ports `8100-8119` team); `8120-8139` reserved for experimental tests.
 - MLX registry is the canonical link from `model_id` to inference source:
   `model_id` → `registry.json` → `source_path` / `cache_path`.
@@ -20,6 +24,32 @@
   These defaults are persisted in the Studio registry and synced via `mlxctl sync-gateway`.
 - **Showroom vs backroom:** only models present on the Mini or Studio are exposed
   as LiteLLM handles. Seagate storage is **backroom only** and never receives handles.
+- Health policy: use `/health/readiness` as the default health signal. `/health` is
+  a deep probe that can report unhealthy when backends are intentionally offline.
+- Personas: `char-*` model aliases are rewritten server‑side via LiteLLM callbacks.
+- Presets: `p-*` model aliases provide fast/safe/deep/chat defaults with OptiLLM chaining.
+  See `layer-gateway/litellm-orch/docs/personas.md`.
+
+### Param support probe (LiteLLM + MLX backends)
+Run this on the **Mini** to verify which optional params are accepted or ignored:
+```bash
+curl -sS --max-time 10 http://127.0.0.1:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "mlx-gpt-oss-20b-mxfp4-q4",
+    "messages": [{"role": "user", "content": "ping"}],
+    "max_tokens": 16,
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "presence_penalty": 0.4,
+    "frequency_penalty": 0.2
+  }'
+```
+Expected: either a normal response (params accepted/ignored) or a 4xx validation error
+if a param is rejected by the backend.
+
+**Probe note (Jan 19, 2026):** running the above from this repo shell timed out
+(`http://127.0.0.1:4000/health` did not respond). Re-run on the Mini host.
 
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
@@ -31,6 +61,7 @@
 - LiteLLM proxy: `http://127.0.0.1:4000/v1/search/searxng-search`
 - Env: `SEARXNG_API_BASE=http://127.0.0.1:8888`
 - Tool name: `searxng-search`
+- OptiLLM `web_search` plugin also uses SearXNG when `SEARXNG_API_BASE` is set in `/etc/optillm-proxy/env`.
 
 ## Web fetch + clean (implemented, MCP stdio)
 - Purpose: fetch a URL and return clean, model-ready text for summarization,
@@ -43,35 +74,20 @@
 - Schematron note: it ignores prompts and uses only schema + input. Provide
   trimmed HTML or clean text for best extraction.
 
-## OpenVINO backend
+## OpenVINO backend (not wired in LiteLLM)
 - Systemd unit: `/etc/systemd/system/ov-server.service` (binds `0.0.0.0` for maintenance).
 - Env: `/etc/homelab-llm/ov-server.env` (runtime).
 - Endpoints: `/health`, `/v1/models`, `/v1/chat/completions`.
 - Ops: `/home/christopherbailey/homelab-llm/platform/ops/scripts/ovctl` controls model warm-up profiles.
-- LiteLLM routes `ov-*` via `OV_*_API_BASE` and `OV_*_MODEL`.
-  Current aliases map directly to base OpenVINO model IDs:
-  `ov-qwen2-5-3b-instruct-fp16`, `ov-qwen2-5-1-5b-instruct-fp16`, `ov-phi-4-mini-instruct-fp16`,
-  `ov-phi-3-5-mini-instruct-fp16`, `ov-llama-3-2-3b-instruct-fp16`, `ov-mistral-7b-instruct-v0-3-fp16`.
-  Runtime device is currently `OV_DEVICE=GPU` (see `/etc/homelab-llm/ov-server.env`);
-  evaluating `AUTO` and `MULTI:GPU,CPU` for multi-request throughput.
-  The previous `ov-*` role aliases are deprecated.
+- Status: available as a standalone backend; no LiteLLM handles are currently registered.
 
 ## OptiLLM optimization proxy
 - Local-only proxy: `http://127.0.0.1:4020/v1`.
-- LiteLLM routes OptiLLM selectors via `OPTILLM_<HANDLE>_*` env vars.
-- Current OptiLLM handles: _none (direct routing via MLX handles)_.
-- Loop-avoidance: LiteLLM sends prefixed model names (e.g., `router-<base-model>`);
-  OptiLLM strips the prefix upstream.
-- Current wiring: **all MLX handles route to OptiLLM**, and OptiLLM calls LiteLLM with
-  `router-mlx-*` model names that are mapped directly to MLX ports.
-  These `router-mlx-*` entries are internal (not in `handles.jsonl`) but will appear
-  in LiteLLM `/v1/models`.
-- Toggle: `mlxctl sync-gateway --no-route-via-optillm` disables this mode.
-  Default is enabled via `MLX_ROUTE_VIA_OPTILLM=1`.
-- Auth: LiteLLM must send `Authorization: Bearer <OPTILLM_API_KEY>` (configured
-  via `--optillm-api-key`, not env, to avoid local inference mode).
-- OptiLLM runs with `--approach proxy` to allow per-request technique selection
-  via model name prefixes.
+- **Current (ergonomic) usage:** call OptiLLM directly and set `optillm_approach`
+  as a top-level JSON field. This works from Open WebUI (custom params), curl,
+  iOS Shortcuts, and any OpenAI-compatible client.
+- **Deprecated:** routing all MLX handles through OptiLLM and maintaining
+  `router-mlx-*` loop-avoidance entries in LiteLLM.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
 
@@ -85,16 +101,16 @@
 - Standard HF cache on Studio: `/Users/thestudio/models/hf/hub`.
 - Pin `transformers<5` for router compatibility.
 
-### Technique selection (model prefixes)
-Change the model prefix in LiteLLM env to pick techniques:
-- `moa-<base>`: Mixture-of-Agents (strong reasoning, higher latency)
-- `bon-<base>`: best-of-n sampling (faster than MoA, moderate gains)
-- `plansearch-<base>`: planning/search (slower, good for multi-step tasks)
-- `self_consistency-<base>`: consistency voting (slower, robust)
+### Technique selection (request body)
+Set `optillm_approach` in the request body:
+- `moa`: Mixture-of-Agents (strong reasoning, higher latency)
+- `bon`: best-of-n sampling (faster than MoA, moderate gains)
+- `plansearch`: planning/search (slower, good for multi-step tasks)
+- `self_consistency`: consistency voting (slower, robust)
 
 Example:
-```
-OPTILLM_OPT_ROUTER_EXAMPLE_MODEL=openai/router-<base-model>
+```json
+{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
 ```
 
 ## Tiny Agents hook (plan)

@@ -69,11 +69,12 @@ curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq 
 curl -fsS http://192.168.1.72:4041/v1/models -H "Authorization: Bearer dummy" | jq .
 ```
 
-Verify OptiLLM via LiteLLM alias (when handles are registered):
+Verify OptiLLM directly (Mini):
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://127.0.0.1:4020/v1/chat/completions \
+  -H "Authorization: Bearer dummy" \
   -H "Content-Type: application/json" \
-  -d '{"model":"opt-router-<base-model>","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  -d '{"model":"mlx-<base-model>","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' \
   | jq .
 ```
 

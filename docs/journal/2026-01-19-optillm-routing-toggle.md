@@ -1,5 +1,7 @@
 # 2026-01-19 — OptiLLM routing toggle (mlxctl)
 
+**Status:** Deprecated. Routing MLX handles through OptiLLM is no longer used.
+
 ## Summary
 Added a simple on/off switch to route MLX handles through OptiLLM without
 changing user-facing handles.

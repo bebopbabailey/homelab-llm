@@ -1,0 +1,311 @@
+{
+  "timestamp": 1768884016.6834185,
+  "models": {
+    "mlx-gpt-oss-120b-mxfp4-q4": {
+      "temperature": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_p": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_k": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "min_p": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "presence_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "frequency_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "repetition_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "max_tokens": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "max_completion_tokens": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "stop": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "seed": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "logprobs": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_logprobs": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "logit_bias": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "n": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "user": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "metadata": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "response_format_json": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "response_format_schema": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "tools": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      }
+    },
+    "mlx-gemma-3-27b-it-qat-4bit": {
+      "temperature": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "top_p": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "top_k": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "min_p": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "presence_penalty": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "frequency_penalty": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "repetition_penalty": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "max_tokens": {
+        "status": 200,
+        "text": "Pong!",
+        "tool_calls": null
+      },
+      "max_completion_tokens": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "stop": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "seed": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "logprobs": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "top_logprobs": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "logit_bias": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "n": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "user": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "metadata": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "response_format_json": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      },
+      "response_format_schema": {
+        "status": 200,
+        "text": "{",
+        "tool_calls": null
+      },
+      "tools": {
+        "status": 200,
+        "text": "Pong",
+        "tool_calls": null
+      }
+    },
+    "mlx-gpt-oss-20b-mxfp4-q4": {
+      "temperature": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_p": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_k": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "min_p": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "presence_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "frequency_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "repetition_penalty": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "max_tokens": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "max_completion_tokens": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "stop": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "seed": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "logprobs": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "top_logprobs": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "logit_bias": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "n": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "user": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "metadata": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "response_format_json": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "response_format_schema": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      },
+      "tools": {
+        "status": 200,
+        "text": "",
+        "tool_calls": null
+      }
+    }
+  }
+}

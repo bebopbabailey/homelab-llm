@@ -6,7 +6,7 @@ large defaults for context and output tokens.
 
 ## Boot ensemble (Studio)
 - `mlx-gpt-oss-120b-mxfp4-q4` → port `8100`
-- `mlx-gemma-3-27b-it-qat-4bit` → port `8101`
+- `mlx-qwen3-next-80b-a3b-instruct-mxfp4` → port `8101`
 - `mlx-gpt-oss-20b-mxfp4-q4` → port `8102`
 
 ## Defaults

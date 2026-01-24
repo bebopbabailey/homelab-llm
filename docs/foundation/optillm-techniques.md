@@ -1,9 +1,9 @@
 # OptiLLM Techniques Cheatsheet
 
-This is a practical guide to OptiLLM technique prefixes and when to use them.
-Use these prefixes in LiteLLM env vars, e.g.:
-```
-OPTILLM_OPT_ROUTER_EXAMPLE_MODEL=openai/router-<base-model>
+This is a practical guide to OptiLLM technique values and when to use them.
+Set the approach per request via `optillm_approach`, e.g.:
+```json
+{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon"}
 ```
 
 Local inference note (Studio):
@@ -11,7 +11,7 @@ Local inference note (Studio):
 - Router compatibility: pin `transformers<5`
 
 ## Strategy overview (techniques vs plugins)
-- Techniques (prefix-based) change how a model is queried (e.g., `moa-<base>`).
+- Techniques (request-based) change how a model is queried (e.g., `moa`).
 - Plugins (pipeline-based) add request/response transforms (e.g., `readurls`, `memory`).
 - Plugins can be chained with `&` (sequential) or `|` (parallel) when supported.
 - Current enabled plugins are documented in `layer-gateway/optillm-proxy/docs/FEATURES.md`.
@@ -27,42 +27,42 @@ Local inference note (Studio):
 - As full MoA peers for deep reasoning (adds noise/latency).
 - In plansearch/self-consistency loops for complex tasks.
 
-## moa-<base> (Mixture-of-Agents)
+## moa (Mixture-of-Agents)
 - Best for: hard reasoning, ambiguous prompts, multi-step planning.
 - Why: runs multiple candidate answers and merges/selects the best.
 - Examples:
   - “Design a scalable deployment plan for X with constraints Y.”
   - “Evaluate tradeoffs between two architectures and pick one.”
 
-## bon-<base> (Best-of-N)
+## bon (Best-of-N)
 - Best for: quick quality boost with moderate latency.
 - Why: samples multiple completions and picks the best.
 - Examples:
   - “Draft a clean response email.”
   - “Summarize a long thread into bullet points.”
 
-## plansearch-<base>
+## plansearch
 - Best for: structured workflows and planning-heavy tasks.
 - Why: generates a plan, validates/refines it, then answers.
 - Examples:
   - “Give me a step-by-step rollout plan for a new service.”
   - “Create a recording session checklist.”
 
-## self_consistency-<base>
+## self_consistency
 - Best for: correctness-sensitive reasoning.
 - Why: samples multiple reasoning chains and selects the most consistent.
 - Examples:
   - “Explain why A implies B with constraints.”
   - “Solve a logic puzzle or routing constraint.”
 
-## rto-<base> (Round-Trip Optimization)
+## rto (Round-Trip Optimization)
 - Best for: rewrite/polish tasks.
 - Why: drafts, critiques, and revises a response.
 - Examples:
   - “Rewrite this transcript for clarity.”
   - “Improve documentation readability.”
 
-## deepthink-<base> / coc-<base>
+## deepthink / coc
 - Best for: deliberate, deeper reasoning.
 - Why: encourages more explicit internal reasoning steps.
 - Examples:
@@ -87,6 +87,6 @@ The initial evaluation matrix lives in the OptiLLM service directory:
 
 ## Naming conventions (system-wide)
 - Registry values are kebab-case only (letters, digits, dashes).
-- OptiLLM handles use `opt-<tier>-<intent>` or `opt-<intent>-<tier>`.
-- Technique prefix remains part of the OptiLLM selector (e.g., `moa-<base>`),
-  so `handle` does not need to include the technique.
+- OptiLLM handles use `opt-<tier>-<intent>` or `opt-<intent>-<tier>` when needed.
+- Technique selection is per-request via `optillm_approach`, so handles do not
+  need to encode the technique.

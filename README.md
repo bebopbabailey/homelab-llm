@@ -31,6 +31,13 @@ use-case. Hopes of branching into enterprise-land later.
 - Naming: registry keys use `snake_case`; registry values use `kebab-case` where applicable.
 - Showroom/backroom rule: only models present on the Mini or Studio are exposed as
   LiteLLM handles; Seagate storage is backroom-only.
+- OpenVINO backend is offline for now; OV health checks are suppressed (1s timeout, no background checks).
+- OptiLLM router targets suppress background health checks to avoid false negatives when downstream MLX is cold.
+- OptiLLM techniques are selected per-request via `optillm_approach` (no alias explosion).
+- Health policy: use LiteLLM `/health/readiness` as the default health signal; `/health`
+  is a deep probe that can flag offline backends.
+- Personas: `char-*` model aliases are rewritten server‑side (LiteLLM callback).
+- Presets: `p-*` model aliases provide fast/safe/deep/chat defaults with OptiLLM chaining.
 - OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
   `layer-gateway/optillm-proxy/README.md`.
 - Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` and pins

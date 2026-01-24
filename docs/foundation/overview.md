@@ -17,8 +17,8 @@ while allowing backend models to evolve independently.
    - TinyAgents connects to MCP servers; LiteLLM remains the LLM gateway.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
-   - OptiLLM runs localhost-only behind LiteLLM to apply inference-time strategies.
-   - LiteLLM sends prefixed model names (e.g., `moa-<base-model>`) to avoid loops.
+   - OptiLLM runs localhost-only and is called directly when a technique is needed.
+   - Clients include `optillm_approach` in the request body.
    - OptiLLM local inference runs on the Studio (ports 4040–4042) for MPS/FP16.
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (`ov-*`).
@@ -55,6 +55,6 @@ while allowing backend models to evolve independently.
 - MLX servers: remote OpenAI-compatible backends on the Studio (team ports 8100-8119; experimental 8120-8139).
 - MLX registry maps canonical `model_id` to `source_path`/`cache_path` for inference.
 - OpenVINO server: local lightweight backend on the Mini (port 9000).
-- OptiLLM proxy: localhost-only optimization proxy behind LiteLLM (port 4020).
+- OptiLLM proxy: localhost-only optimization proxy called directly (port 4020).
 - OptiLLM local: Studio MPS/FP16 inference tier (ports 4040–4042, HF cache at `/Users/thestudio/models/hf/hub`).
 - TinyAgents: planned orchestration client that calls LiteLLM only.

@@ -38,7 +38,8 @@ Optimization proxies (e.g., OptiLLM) must sit behind LiteLLM and bind to localho
 4) Add routing in LiteLLM:
    - Update `layer-gateway/litellm-orch/config/router.yaml`.
    - Add env vars to `layer-gateway/litellm-orch/config/env.local` (not committed).
-   - Use plain logical model names (`mlx-*`, `ov-*`, `opt-*`).
+   - Use plain logical model names (`mlx-*`, `ov-*`).
+   - OptiLLM techniques are selected per-request via `optillm_approach`.
 5) Update topology docs:
    - `docs/foundation/topology.md`
    - `docs/PLATFORM_DOSSIER.md`

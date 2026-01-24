@@ -1,0 +1,185 @@
+{
+  "timestamp": 1768879883.6985567,
+  "models": {
+    "mlx-gpt-oss-120b-mxfp4-q4": {
+      "temperature": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "top_p": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "presence_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "frequency_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "stop": {
+        "status": [
+          200
+        ],
+        "contains_STOP": false
+      },
+      "n": {
+        "status": [
+          200
+        ],
+        "choices": 1
+      },
+      "logprobs": {
+        "status": [
+          200
+        ],
+        "has_logprobs": false
+      },
+      "seed": {
+        "status": [
+          200,
+          200
+        ],
+        "deterministic": true
+      },
+      "max_completion_tokens": {
+        "status": [
+          200
+        ]
+      }
+    },
+    "mlx-gemma-3-27b-it-qat-4bit": {
+      "temperature": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": true
+      },
+      "top_p": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": true
+      },
+      "presence_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "frequency_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "stop": {
+        "status": [
+          200
+        ],
+        "contains_STOP": true
+      },
+      "n": {
+        "status": [
+          200
+        ],
+        "choices": 1
+      },
+      "logprobs": {
+        "status": [
+          200
+        ],
+        "has_logprobs": false
+      },
+      "seed": {
+        "status": [
+          200,
+          200
+        ],
+        "deterministic": true
+      },
+      "max_completion_tokens": {
+        "status": [
+          200
+        ]
+      }
+    },
+    "mlx-gpt-oss-20b-mxfp4-q4": {
+      "temperature": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "top_p": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "presence_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "frequency_penalty": {
+        "status": [
+          200,
+          200
+        ],
+        "effect_detected": false
+      },
+      "stop": {
+        "status": [
+          200
+        ],
+        "contains_STOP": false
+      },
+      "n": {
+        "status": [
+          200
+        ],
+        "choices": 1
+      },
+      "logprobs": {
+        "status": [
+          200
+        ],
+        "has_logprobs": false
+      },
+      "seed": {
+        "status": [
+          200,
+          200
+        ],
+        "deterministic": true
+      },
+      "max_completion_tokens": {
+        "status": [
+          200
+        ]
+      }
+    }
+  }
+}

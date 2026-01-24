@@ -1,5 +1,8 @@
 # Journal Index
 
+- [2026-01-20 — OptiLLM approach selection via request body](2026-01-20-optillm-approach-selection.md)
+- [2026-01-20 — LiteLLM direct MLX routing + handle pruning](2026-01-20-lite-mlx-direct-routing.md)
+- [2026-01-20 — OptiLLM fork + pin](2026-01-20-optillm-fork-and-pin.md)
 - [2026-01-19 — MLX model reset (pre-download)](2026-01-19-mlx-model-reset.md)
 - [2026-01-19 — MLX default ensemble boot config](2026-01-19-mlx-default-ensemble-boot.md)
 - [2026-01-19 — OptiLLM routing for MLX handles](2026-01-19-optillm-mlx-routing.md)
@@ -7,6 +10,8 @@
 - [2026-01-19 — OptiLLM web_search uses SearXNG](2026-01-19-optillm-searxng-integration.md)
 - [2026-01-19 — mlxctl command updates](2026-01-19-mlxctl-updates.md)
 - [2026-01-19 — OptiLLM default ensemble refresh](2026-01-19-optillm-default-ensemble-update.md)
+- [2026-01-24 — Transcript personas finalized](2026-01-24-transcript-personas.md)
+- [2026-01-24 — Presets + SDLC mapping](2026-01-24-presets-sdlc-mapping.md)
 
 - [2026-01-15 — Registries, Entity IDs, and JSONL Plan](2026-01-15-registries-and-ids.md)
 - [2026-01-16 — Benny deprecation + ov-* alias alignment](2026-01-16-benny-deprecation.md)

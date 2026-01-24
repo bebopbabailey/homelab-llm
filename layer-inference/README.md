@@ -5,3 +5,6 @@ directly by clients; all requests come through LiteLLM.
 
 See root docs: `/home/christopherbailey/homelab-llm/SYSTEM_OVERVIEW.md`.
 Use `docs/` for deeper inference notes.
+
+Key references:
+- `docs/ENSEMBLE_PARAMETER_SUPPORT.md` (MLX ensemble parameter surface)

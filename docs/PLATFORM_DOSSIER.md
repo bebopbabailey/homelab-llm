@@ -22,7 +22,7 @@
 | OptiLLM local (balanced) | Studio | 4041 | 0.0.0.0 | http://192.168.1.72:4041/v1 | /v1/models | `layer-gateway/optillm-local/SERVICE_SPEC.md`, launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
-| MLX (mlx-gemma-3-27b-it-qat-4bit) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
+| MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
 | MLX (mlx-gpt-oss-20b-mxfp4-q4) | Studio | 8102 | 0.0.0.0 | http://192.168.1.72:8102/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |

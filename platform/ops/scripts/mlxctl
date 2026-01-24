@@ -30,7 +30,6 @@ DEFAULT_GATEWAY_MLXCTL = "/home/christopherbailey/homelab-llm/platform/ops/scrip
 DEFAULT_HANDLES_PATH = "/home/christopherbailey/homelab-llm/layer-gateway/registry/handles.jsonl"
 DEFAULT_ENSEMBLES_DOC = "/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy/ENSEMBLES.md"
 DEFAULT_MLX_HOST = "192.168.1.72"
-DEFAULT_ROUTE_VIA_OPTILLM = True
 DEFAULT_CONTEXT_LENGTH = 131072
 DEFAULT_MAX_OUTPUT_TOKENS = 64000
 
@@ -139,6 +138,60 @@ def _slugify(text: str):
     text = text.lower().replace("/", "-")
     text = re.sub(r"[^a-z0-9-_]+", "-", text).strip("-")
     return text
+
+
+def _is_quant_token(token: str) -> bool:
+    if token in {
+        "mxfp4",
+        "mxfp8",
+        "fp16",
+        "fp8",
+        "fp4",
+        "int4",
+        "int8",
+        "int16",
+        "bf16",
+    }:
+        return True
+    if re.match(r"^q\\d+$", token):
+        return True
+    if token.endswith("bit"):
+        return True
+    return False
+
+
+def _extract_param_token(tokens):
+    for idx, token in enumerate(tokens):
+        if token.endswith("b") and token[0].isdigit():
+            if idx > 0 and tokens[idx - 1].isdigit():
+                return idx - 1, idx, f"{tokens[idx - 1]}-{token}"
+            return idx, idx, token
+    return None
+
+
+def _canonical_model_id(repo_id: str):
+    _org, _sep, name = repo_id.partition("/")
+    base = _slugify(name)
+    if base.startswith("mlx-"):
+        base = base[len("mlx-"):]
+    base = base.replace("-mlx-", "-")
+    if base.endswith("-mlx"):
+        base = base[:-4]
+    tokens = [t for t in base.split("-") if t]
+    if not tokens:
+        return "mlx-unknown"
+
+    param_info = _extract_param_token(tokens)
+    if not param_info:
+        return f"mlx-{base}"
+
+    param_start, param_end, param_token = param_info
+    family_tokens = tokens[:param_start]
+    remainder = tokens[param_end + 1 :]
+    quant_tokens = [t for t in remainder if _is_quant_token(t)]
+    other_tokens = [t for t in remainder if t not in quant_tokens]
+    ordered = family_tokens + [param_token] + quant_tokens + other_tokens
+    return "mlx-" + "-".join(ordered)
 
 
 def _repo_from_dir(name: str):
@@ -345,7 +398,7 @@ def cmd_init(_args):
         repo_id = _repo_from_dir(model_dir.name)
         if not repo_id:
             continue
-        slug = _slugify(repo_id)
+        slug = _canonical_model_id(repo_id)
         if slug in models:
             continue
         snapshot = _latest_snapshot(model_dir)
@@ -376,20 +429,6 @@ def cmd_list(_args):
 
 def cmd_status(_args):
     data = _load_registry(_registry_path())
-    env_flag = os.environ.get("MLX_ROUTE_VIA_OPTILLM")
-    route_via_optillm = DEFAULT_ROUTE_VIA_OPTILLM
-    if env_flag is not None:
-        route_via_optillm = env_flag.strip().lower() not in {"0", "false", "no"}
-    print(f"route_via_optillm\t{'on' if route_via_optillm else 'off'}")
-    if route_via_optillm:
-        gateway_host = os.environ.get("GATEWAY_HOST", DEFAULT_GATEWAY_HOST)
-        cmd = ["ssh", gateway_host, "curl -sS -m 3 http://127.0.0.1:4020/v1/models >/dev/null && echo ok || echo down"]
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            status = result.stdout.strip() or "unknown"
-        except Exception:
-            status = "unknown"
-        print(f"optillm_proxy\t{status}")
     port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
     for port in PORT_RANGE:
         pids = _port_listening(port)
@@ -438,7 +477,7 @@ def _download_and_register(data, model_ref: str):
     cache_dir = _hf_home()
     repo_id = model_ref
     snapshot = snapshot_download(repo_id, cache_dir=str(cache_dir))
-    slug = _slugify(repo_id)
+    slug = _canonical_model_id(repo_id)
     data["models"][slug] = {
         "repo_id": repo_id,
         "model_id": slug,
@@ -474,7 +513,7 @@ def _ensure_model(data, model_ref: str, name: Optional[str], convert_mode: str, 
     cache_dir = _hf_home()
     repo_id = model_ref
     snapshot = snapshot_download(repo_id, cache_dir=str(cache_dir))
-    slug = name or _slugify(repo_id)
+    slug = name or _canonical_model_id(repo_id)
 
     preconverted = _is_preconverted(repo_id, preconverted)
     do_convert = convert_mode == "force" or (convert_mode == "auto" and not preconverted)
@@ -595,7 +634,7 @@ def cmd_load(args):
     if converted and args.offload_og:
         cmd_offload_og(argparse.Namespace(dry_run=False))
     if args.sync:
-        cmd_sync_gateway(argparse.Namespace(dry_run=False, route_via_optillm=None))
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
     print(f"loaded {slug} on {port}")
 
 
@@ -613,7 +652,7 @@ def cmd_unload(args):
             entry["port"] = None
     _write_registry(registry_path, data)
     if args.sync:
-        cmd_sync_gateway(argparse.Namespace(dry_run=False, route_via_optillm=None))
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
     print(f"unloaded port {port}")
 
 
@@ -643,7 +682,7 @@ def cmd_unload_all(args):
                 entry["port"] = None
     _write_registry(registry_path, data)
     if args.sync:
-        cmd_sync_gateway(argparse.Namespace(dry_run=False, route_via_optillm=None))
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
     print("unloaded all ports")
 
 
@@ -660,7 +699,6 @@ def cmd_reconcile(_args):
             changed += 1
     _write_registry(registry_path, data)
     print(f"reconciled registry (cleared {changed} stale ports)")
-    _verify_optillm_routing()
 
 
 def cmd_verify(_args):
@@ -673,7 +711,6 @@ def cmd_verify(_args):
             missing.append(f"{slug}: missing max_output_tokens")
     if missing:
         raise SystemExit("mlxctl verify failed:\n  - " + "\n  - ".join(missing))
-    _verify_optillm_routing()
     print("mlxctl verify ok: registry defaults and routing state are consistent")
 
 
@@ -704,7 +741,7 @@ def cmd_ensure(args):
             )
         )
     elif args.sync:
-        cmd_sync_gateway(argparse.Namespace(dry_run=False, route_via_optillm=None))
+        cmd_sync_gateway(argparse.Namespace(dry_run=False))
 
 
 def _fetch_registry_from_studio(studio_ssh: str, registry_path: str):
@@ -912,7 +949,7 @@ def _yaml_scalar(value):
     raise SystemExit(f"unsupported request_param type: {type(value)}")
 
 
-def _update_router_yaml(path: Path, mlx_entries, route_via_optillm: bool):
+def _update_router_yaml(path: Path, mlx_entries):
     if not path.exists():
         raise SystemExit(f"router.yaml not found: {path}")
     lines = path.read_text().splitlines()
@@ -933,7 +970,7 @@ def _update_router_yaml(path: Path, mlx_entries, route_via_optillm: bool):
         if skip:
             continue
         if line.startswith("- model_name: "):
-            if line.startswith("- model_name: mlx-") or line.startswith("- model_name: router-mlx-"):
+            if line.startswith("- model_name: mlx-"):
                 skip_block = True
                 continue
             skip_block = False
@@ -968,22 +1005,7 @@ def _update_router_yaml(path: Path, mlx_entries, route_via_optillm: bool):
             f"    max_input_tokens: {int(ctx)}",
             f"    max_output_tokens: {int(max_output)}",
         ]
-        if route_via_optillm:
-            router_handle = f"router-{handle}"
-            router_env_base = _env_key(router_handle, "API_BASE")
-            router_env_model = _env_key(router_handle, "MODEL")
-            router_env_key = _env_key(router_handle, "API_KEY")
-            block += [
-                f"- model_name: {router_handle}",
-                "  litellm_params:",
-                f"    model: os.environ/{router_env_model}",
-                f"    api_base: os.environ/{router_env_base}",
-                f"    api_key: os.environ/{router_env_key}",
-                f"    max_tokens: {max_output}",
-                "  model_info:",
-                f"    max_input_tokens: {int(ctx)}",
-                f"    max_output_tokens: {int(max_output)}",
-            ]
+        # OptiLLM routing via router-* handles is deprecated and removed.
     block.append(end)
 
     inserted = False
@@ -998,7 +1020,7 @@ def _update_router_yaml(path: Path, mlx_entries, route_via_optillm: bool):
     path.write_text("\n".join(output) + "\n")
 
 
-def _update_env_local(path: Path, mlx_entries, host: str, route_via_optillm: bool):
+def _update_env_local(path: Path, mlx_entries, host: str):
     if not path.exists():
         raise SystemExit(f"env.local not found: {path}")
     begin = "# BEGIN MLXCTL AUTO"
@@ -1023,33 +1045,18 @@ def _update_env_local(path: Path, mlx_entries, host: str, route_via_optillm: boo
     for item in mlx_entries:
         handle = item["handle"]
         port = item["port"]
-        if route_via_optillm:
-            block.append(f"{_env_key(handle, 'API_BASE')}=http://127.0.0.1:4020/v1")
-        else:
-            block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
+        block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
     block.append("")
     block.append("# Upstream model IDs (prefix with \"openai/\" for OpenAI-compatible backends)")
     for item in mlx_entries:
         handle = item["handle"]
-        if route_via_optillm:
-            block.append(f"{_env_key(handle, 'MODEL')}=openai/router-{handle}")
-        else:
-            block.append(f"{_env_key(handle, 'MODEL')}=openai/{handle}")
+        block.append(f"{_env_key(handle, 'MODEL')}=openai/{handle}")
     block.append("")
     block.append("# API keys (set to \"dummy\" if the backend does not enforce auth)")
     for item in mlx_entries:
         handle = item["handle"]
         block.append(f"{_env_key(handle, 'API_KEY')}=dummy")
-    if route_via_optillm:
-        block.append("")
-        block.append("# OptiLLM → MLX (internal router targets)")
-        for item in mlx_entries:
-            handle = item["handle"]
-            port = item["port"]
-            router_handle = f"router-{handle}"
-            block.append(f"{_env_key(router_handle, 'API_BASE')}=http://{host}:{port}/v1")
-            block.append(f"{_env_key(router_handle, 'MODEL')}=openai/{handle}")
-            block.append(f"{_env_key(router_handle, 'API_KEY')}=dummy")
+    # OptiLLM routing block removed (deprecated).
     block.append(end)
 
     output.append("")
@@ -1097,32 +1104,6 @@ def _update_handles(path: Path, mlx_entries):
                 handle_out.write(json.dumps(row, separators=(",", ":")) + "\n")
 
 
-def _verify_optillm_routing():
-    env_flag = os.environ.get("MLX_ROUTE_VIA_OPTILLM")
-    route_via_optillm = DEFAULT_ROUTE_VIA_OPTILLM
-    if env_flag is not None:
-        route_via_optillm = env_flag.strip().lower() not in {"0", "false", "no"}
-    if not route_via_optillm:
-        return
-    gateway_root = Path(os.environ.get("GATEWAY_ROOT", DEFAULT_GATEWAY_ROOT))
-    router_path = gateway_root / "layer-gateway/litellm-orch/config/router.yaml"
-    env_path = gateway_root / "layer-gateway/litellm-orch/config/env.local"
-    if not router_path.exists() or not env_path.exists():
-        raise SystemExit("mlxctl verify failed: gateway router/env not found")
-    router_text = router_path.read_text()
-    env_text = env_path.read_text()
-    data = _load_registry(_registry_path())
-    missing = []
-    for slug, entry in data["models"].items():
-        if not entry.get("port"):
-            continue
-        router_handle = f"router-{slug}"
-        if f"- model_name: {router_handle}" not in router_text:
-            missing.append(f"router.yaml missing {router_handle}")
-        if f"{_env_key(router_handle, 'API_BASE')}=" not in env_text:
-            missing.append(f"env.local missing {router_handle} API_BASE")
-    if missing:
-        raise SystemExit("mlxctl verify failed:\n  - " + "\n  - ".join(missing))
 
 
 def cmd_sync_gateway(args):
@@ -1137,10 +1118,6 @@ def cmd_sync_gateway(args):
         remote_cmd = [gateway_mlxctl, "--local", "sync-gateway"]
         if args.dry_run:
             remote_cmd.append("--dry-run")
-        if args.route_via_optillm is True:
-            remote_cmd.append("--route-via-optillm")
-        elif args.route_via_optillm is False:
-            remote_cmd.append("--no-route-via-optillm")
         subprocess.run(["ssh", gateway_host] + remote_cmd, check=False)
         return
 
@@ -1148,20 +1125,13 @@ def cmd_sync_gateway(args):
     registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
     registry = _fetch_registry_from_studio(studio_ssh, registry_path)
     mlx_entries = _build_mlx_entries(registry.get("models", {}), os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
-    route_via_optillm = args.route_via_optillm
-    if route_via_optillm is None:
-        env_flag = os.environ.get("MLX_ROUTE_VIA_OPTILLM")
-        if env_flag is None:
-            route_via_optillm = DEFAULT_ROUTE_VIA_OPTILLM
-        else:
-            route_via_optillm = env_flag.strip().lower() not in {"0", "false", "no"}
 
     if args.dry_run:
         print(json.dumps({"count": len(mlx_entries), "entries": mlx_entries}, indent=2))
         return
 
-    _update_router_yaml(router_path, mlx_entries, route_via_optillm)
-    _update_env_local(env_path, mlx_entries, os.environ.get("MLX_HOST", DEFAULT_MLX_HOST), route_via_optillm)
+    _update_router_yaml(router_path, mlx_entries)
+    _update_env_local(env_path, mlx_entries, os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
     _update_handles(handles_path, mlx_entries)
 
 
@@ -1250,21 +1220,41 @@ def cmd_offload_og(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="mlxctl")
+    parser = argparse.ArgumentParser(
+        prog="mlxctl",
+        description=(
+            "MLX model registry + port controller for the Studio. "
+            "Manages HF cache, registry.json, MLX servers, and LiteLLM sync."
+        ),
+        epilog=(
+            "Naming (default): model_id becomes 'mlx-<family>-<params>-<quant>-<variant>'.\n"
+            "Order matters: family → parameter count → quant → other identifiers (e.g., instruct).\n"
+            "Repo org is stripped; dash-only; use --name only for exceptions.\n\n"
+            "Common commands:\n"
+            "  mlxctl list\n"
+            "  mlxctl status\n"
+            "  mlxctl load <repo_id> 8101\n"
+            "  mlxctl unload 8101\n"
+            "  mlxctl sync-gateway\n\n"
+            "Ports:\n"
+            "  8100-8119 team, 8120-8139 experimental\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--local", action="store_true", help="run locally on Studio")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init")
-    sub.add_parser("list", help="List registered MLX models (model_id, repo_id, port)")
-    sub.add_parser("status", help="Show MLX port status and OptiLLM routing mode")
+    sub.add_parser("init", help="Scan HF cache and initialize registry entries")
+    sub.add_parser("list", help="List registered MLX models (model_id, repo_id, port, ctx, max_out)")
+    sub.add_parser("status", help="Show MLX port status and routing mode")
 
-    load = sub.add_parser("load", help="Download/register a model and launch it on a port")
-    load.add_argument("model")
+    load = sub.add_parser("load", help="Download/register a model and launch on a port")
+    load.add_argument("model", help="HF repo_id or existing registry model_id")
     load.add_argument("port", help="Port number (8100-8139) or 'auto' for 8120+")
     load.add_argument("--force", action="store_true", help="Force reload even if port/model is already assigned")
     load.add_argument("--ignore-launchd", action="store_true", help="Skip launchd stop prompt")
     load.add_argument("--convert", choices=["auto", "force", "skip"], default="auto")
-    load.add_argument("--name", help="Canonical model id override")
+    load.add_argument("--name", help="Canonical model id override (defaults to mlx-<repo-name>, no org prefix)")
     load.add_argument("--no-offload-og", dest="offload_og", action="store_false", help="Skip offloading OG weights after conversion")
     load.set_defaults(offload_og=True)
     load.add_argument(
@@ -1276,24 +1266,24 @@ def main():
     load.add_argument("--no-sync", dest="sync", action="store_false", help="Skip gateway sync after load")
     load.set_defaults(sync=True)
 
-    unload = sub.add_parser("unload")
-    unload.add_argument("port")
+    unload = sub.add_parser("unload", help="Stop server on a port and clear registry assignment")
+    unload.add_argument("port", help="Port number (8100-8139)")
     unload.add_argument("--no-sync", dest="sync", action="store_false", help="Skip gateway sync after unload")
     unload.set_defaults(sync=True)
 
-    unload_all = sub.add_parser("unload-all")
+    unload_all = sub.add_parser("unload-all", help="Stop all MLX servers and clear assignments")
     unload_all.add_argument("--no-sync", dest="sync", action="store_false", help="Skip gateway sync after unload-all")
     unload_all.set_defaults(sync=True)
-    sub.add_parser("reconcile")
-    sub.add_parser("verify")
+    sub.add_parser("reconcile", help="Clear registry entries for ports no longer listening")
+    sub.add_parser("verify", help="Validate registry vs gateway config")
     # Deprecated: ensemble (kept for backward compatibility)
     ensemble = sub.add_parser("ensemble", help="DEPRECATED: use load/assign-team instead")
     ensemble.add_argument("name", help="Deprecated")
     ensemble.add_argument("--force", action="store_true")
     ensemble.add_argument("--ignore-launchd", action="store_true")
-    ensure = sub.add_parser("ensure", help="Ensure model is present in registry (optionally load)")
-    ensure.add_argument("repo")
-    ensure.add_argument("--name", help="Canonical model id override")
+    ensure = sub.add_parser("ensure", help="Ensure model is in registry (optionally load)")
+    ensure.add_argument("repo", help="HF repo_id")
+    ensure.add_argument("--name", help="Canonical model id override (defaults to mlx-<repo-name>, no org prefix)")
     ensure.add_argument("--convert", choices=["auto", "force", "skip"], default="auto")
     ensure.add_argument("--no-offload-og", dest="offload_og", action="store_false")
     ensure.set_defaults(offload_og=True)
@@ -1307,14 +1297,11 @@ def main():
     ensure.add_argument("--port", default="auto", help="Port number (8100-8139) or 'auto' for 8120+")
     ensure.add_argument("--no-sync", dest="sync", action="store_false")
     ensure.set_defaults(sync=True)
-    offload = sub.add_parser("offload-og", help="Offload OG base weights that are not used for inference")
+    offload = sub.add_parser("offload-og", help="Offload OG base weights not used for inference")
     offload.add_argument("--dry-run", action="store_true")
-    sync = sub.add_parser("sync-gateway", help="Sync MLX registry to gateway router/env/handles")
-    sync.add_argument("--route-via-optillm", dest="route_via_optillm", action="store_true", help="Route MLX handles through OptiLLM (default)")
-    sync.add_argument("--no-route-via-optillm", dest="route_via_optillm", action="store_false", help="Route MLX handles directly to MLX ports")
-    sync.set_defaults(route_via_optillm=None)
+    sync = sub.add_parser("sync-gateway", help="Sync MLX registry to LiteLLM router/env/handles")
     sync.add_argument("--dry-run", action="store_true")
-    assign = sub.add_parser("assign-team", help="Assign MLX models to team ports by size (OptiLLM first)")
+    assign = sub.add_parser("assign-team", help="Assign MLX models to team ports by size")
     assign.add_argument("--dry-run", action="store_true")
     assign.add_argument("--no-sync", dest="sync", action="store_false")
     assign.set_defaults(sync=True)

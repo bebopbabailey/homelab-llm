@@ -13,3 +13,7 @@ layer-gateway/litellm-orch/config/env.local
 layer-interface/open-webui/.webui_secret_key
 # Runtime logs
 logs/
+SCRATCH_PAD.md
+homelab-llm-agent-snapshot.zip
+homelab-llm-agent-snapshot/
+CREDENTIALS.md

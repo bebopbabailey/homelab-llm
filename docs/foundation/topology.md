@@ -20,7 +20,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OptiLLM local (balanced) | Studio | 4041 | http://192.168.1.72:4041/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
-| MLX (mlx-gemma-3-27b-it-qat-4bit) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
+| MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
 | MLX (mlx-gpt-oss-20b-mxfp4-q4) | Studio | 8102 | http://192.168.1.72:8102/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |

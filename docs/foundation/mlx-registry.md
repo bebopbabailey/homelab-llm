@@ -49,7 +49,7 @@ Supported commands:
 - `reconcile` — clear registry entries for ports that are no longer listening.
 - `offload-og` — offload base-weight artifacts when they are not used for inference.
 - `sync-gateway` — sync MLX registry → LiteLLM router/env/handles.
-- `assign-team` — assign all current MLX models to team ports, prioritizing OptiLLM.
+- `assign-team` — assign all current MLX models to team ports.
 
 ## Install
 Place `platform/ops/scripts/mlxctl` on both hosts and ensure it is on PATH:
@@ -68,17 +68,16 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
 - One port, one model. Ports are immutable.
 - LiteLLM aliases are fixed; port swaps must keep the alias semantics consistent.
 - Only models present on the Studio are exposed via LiteLLM handles; Seagate is backroom storage only.
+- Naming: `mlxctl` defaults to canonical model IDs in the form
+  `mlx-<family>-<params>-<quant>-<variant>` (dash-only, no org prefix).
+  Order is fixed: family → parameter count → quant → other identifiers.
+  Use `--name` only for exceptions.
 - LiteLLM `router.yaml` uses MLX registry fields:
   `context_length` → `max_input_tokens` and `max_output_tokens` (currently 65k).
   Defaults persist in the Studio registry and are synced by `mlxctl sync-gateway`.
-- Current routing mode: MLX handles route through OptiLLM; OptiLLM calls
-  LiteLLM using `router-mlx-*` model names mapped directly to MLX ports.
-  These `router-mlx-*` entries are internal (not in `handles.jsonl`) but appear
-  in LiteLLM `/v1/models`.
-- Toggle routing via OptiLLM:
-  - `mlxctl sync-gateway --route-via-optillm` (on)
-  - `mlxctl sync-gateway --no-route-via-optillm` (off)
-  - Default is **on** in `mlxctl` (`MLX_ROUTE_VIA_OPTILLM=1` overrides).
+- Current routing mode: MLX handles route **directly** to MLX ports.
+- OptiLLM is used only when clients call `http://127.0.0.1:4020/v1` directly
+  and include `optillm_approach` in the request body.
 - Ports 8100–8119 are the team range; 8120–8139 are experimental.
 - The Studio boot ensemble is defined in `/opt/mlx-launch/bin/start.sh`
   (current ports: `8100`, `8101`, `8102`).
@@ -141,5 +140,4 @@ Current boot ensemble:
 - New downloads intended for testing should load into the lowest available
   experimental port (8120–8139). Use `mlxctl load <model> auto`.
 - Team models are promoted into 8100–8119 explicitly by choosing the port.
-  `mlxctl assign-team` orders by on-disk size and gives OptiLLM models priority
-  (ports 8100–8109) before non-OptiLLM models (ports 8110–8119).
+  `mlxctl assign-team` orders by on-disk size.
