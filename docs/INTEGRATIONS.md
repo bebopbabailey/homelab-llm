@@ -74,6 +74,18 @@ if a param is rejected by the backend.
 - Schematron note: it ignores prompts and uses only schema + input. Provide
   trimmed HTML or clean text for best extraction.
 
+## OpenCode (client)
+- Config: `~/.config/opencode/opencode.json` (MacBook).
+- Provider: LiteLLM OpenAI-compatible `baseURL=http://100.69.99.60:4000/v1`.
+- Models: use LiteLLM handles (e.g., `p-plan`, `p-seek`, `p-make`, `p-plan-max`).
+- Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
+- Web search uses MCP `web-fetch` (stdio) with `search.web` routed to
+  LiteLLM `/v1/search/searxng-search`.
+
+## LiteLLM extension points (summary)
+See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
+and where this repo uses callbacks vs guardrails.
+
 ## OpenVINO backend (not wired in LiteLLM)
 - Systemd unit: `/etc/systemd/system/ov-server.service` (binds `0.0.0.0` for maintenance).
 - Env: `/etc/homelab-llm/ov-server.env` (runtime).

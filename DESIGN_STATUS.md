@@ -12,7 +12,8 @@ clients (Open WebUI, OpenCode, Shortcuts) consume these presets.
   default params, and OptiLLM approach.
 - Preset tiers: fast / safe / deep / chat, with optional “super” variants for extra compute.
 - Keep client usage minimal: callers only choose a preset name.
-- Transcript personas are finalized in LiteLLM (`char-transcript`, `p-transcript`, `p-transcript-md`) with
+- Transcribe personas are finalized in LiteLLM (`char-transcribe`, `p-transcribe`, `p-transcribe-md`,
+  `p-transcribe-clarify`, `p-transcribe-vivid`) with
   server-side punctuation stripping and vivid-but-not-theatrical rules.
 - Transcript personas default to the medium MLX model (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`).
 

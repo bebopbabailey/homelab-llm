@@ -12,8 +12,9 @@ use-case. Hopes of branching into enterprise-land later.
 - System constraints and decisions: `docs/foundation/constraints-and-decisions.md`
 - Platform dossier (authoritative): `docs/PLATFORM_DOSSIER.md`
 - Integration details: `docs/INTEGRATIONS.md`
+- OpenCode setup: `docs/OPENCODE.md`
 - Experiment journal: `docs/journal/index.md`
-- Active delivery plan: `TASKS.md`
+- Active delivery plan: `NOW.md`
 - Submodule workflow: `docs/foundation/git-submodules.md`
 - System architecture: `docs/ARCHITECTURE.md`
 
@@ -21,7 +22,7 @@ use-case. Hopes of branching into enterprise-land later.
 - Read `docs/foundation/README.md` first; it points to the canonical sources of truth.
 - Use `docs/PLATFORM_DOSSIER.md` for the latest topology and exposure details.
 - Check `docs/INTEGRATIONS.md` before wiring new services into LiteLLM.
-- Treat `TASKS.md` as the active plan and update it before and after changes.
+- Treat `NOW.md` as the active plan and update it before and after changes.
 - See `/next-projects`for documentation of software development plans, upcoming features.
 
 ## Service Conventions
@@ -38,6 +39,7 @@ use-case. Hopes of branching into enterprise-land later.
   is a deep probe that can flag offline backends.
 - Personas: `char-*` model aliases are rewritten server‑side (LiteLLM callback).
 - Presets: `p-*` model aliases provide fast/safe/deep/chat defaults with OptiLLM chaining.
+- Transcribe presets: `p-transcribe`, `p-transcribe-vivid`, `p-transcribe-clarify` (server-side cleaning).
 - OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
   `layer-gateway/optillm-proxy/README.md`.
 - Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` and pins
@@ -67,7 +69,7 @@ Planned services (endpoints):
 
 ## Documentation Hygiene
 - Keep service docs, topology, and integrations in sync with changes.
-- Update `TASKS.md` before and after implementing new features.
+- Update `NOW.md` before and after implementing new features.
 
 
 ## Agent Expectations
