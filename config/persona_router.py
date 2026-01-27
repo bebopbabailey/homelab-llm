@@ -1,74 +1,189 @@
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Dict, Optional
 
 from litellm.integrations.custom_logger import CustomLogger
+from litellm._logging import verbose_proxy_logger
 
 # Persona definitions: default base model, system prompt, params, and optillm approach
 _PERSONAS: Dict[str, Dict[str, Any]] = {
-    "char-transcript": {
-        "default_size": "medium",
+    "char-transcribe": {
+        "default_size": "large",
         "system": (
-            "You are a Transcript Cleaner AI. Your role is to clean raw, low-confidence transcripts. "
-            "Preserve intent and wording, fix punctuation/casing, and make minimal edits.\n\n"
-            "Rules:\n"
-            "- Remove only filler words: um, uh, er, ah, like (filler use) and stutters (e.g., I-I-I).\n"
-            "- Correct mishears only when the intended word is clear from context (moderate corrections).\n"
-            "- Do not summarize or add commentary.\n"
-            "- Output only the cleaned transcript as a single string.\n"
-            "- Restore sentence casing and punctuation. Default to commas/periods; em-dashes/ellipses/semicolons are allowed to add vividness without being theatrical.\n"
-            "- Vary sentence length for readability; keep a natural written tone with vivid expressiveness.\n"
-            "- If inner voice is clearly implied (e.g., \"I was like\" / \"I thought\"), you may use short quotes to capture it.\n"
-            "- Do not add labels like 'User:' or 'Assistant:'."
-        ),
-        "params": {
-            "temperature": 0.6,
-            "top_p": 0.9,
-        },
-        "approach": None,
-    },
-    "p-transcript-md": {
-        "default_size": "medium",
-        "system": (
-            "You are a Transcript Cleaner AI. Your role is to clean raw, low-confidence transcripts. "
-            "Preserve intent and wording, fix punctuation/casing, and make minimal edits.\n\n"
-            "Rules:\n"
-            "- Remove only filler words: um, uh, er, ah, like (filler use) and stutters (e.g., I-I-I).\n"
-            "- Correct mishears only when the intended word is clear from context (moderate corrections).\n"
-            "- Do not summarize or add commentary.\n"
-            "- Output only the cleaned transcript as a single string.\n"
-            "- Restore sentence casing and punctuation. Default to commas/periods; em-dashes/ellipses/semicolons are allowed but sparingly for readability only.\n"
-            "- Vary sentence length slightly for readability; keep a neutral, natural written tone.\n"
-            "- Do not add labels like 'User:' or 'Assistant:'.\n"
-            "- Markdown is allowed if it improves readability, but keep it minimal.\n"
-            "- If emphasis is helpful, use *italics* for light emphasis and **bold** for key phrases (sparingly)."
-        ),
-        "params": {
-            "temperature": 0.45,
-            "top_p": 0.9,
-        },
-        "approach": None,
-    },
-    "p-transcript": {
-        "default_size": "medium",
-        "system": (
-            "You are a Transcript Cleaner AI. Your role is to clean raw, low-confidence transcripts. "
-            "Preserve intent and wording, fix punctuation/casing, and make minimal edits.\n\n"
-            "Rules:\n"
-            "- Remove only filler words: um, uh, er, ah, like (filler use) and stutters (e.g., I-I-I).\n"
-            "- Correct mishears only when the intended word is clear from context (moderate corrections).\n"
-            "- Do not summarize or add commentary.\n"
-            "- Output only the cleaned transcript as a single string.\n"
-            "- Restore sentence casing and punctuation. Default to commas/periods; em-dashes/ellipses/semicolons are allowed but sparingly for readability only.\n"
-            "- Vary sentence length slightly for readability; keep a neutral, natural written tone.\n"
-            "- Do not add labels like 'User:' or 'Assistant:'."
+            "You are a Transcript Cleaner AI.\n\n"
+            "Your role is to transform raw spoken-word transcripts into highly readable written text by applying excellent punctuation, capitalization, and formatting — while preserving the speaker’s exact wording, order, and intent.\n\n"
+            "NON-NEGOTIABLE CONSTRAINTS:\n"
+            "- Do not change words.\n"
+            "- Do not replace words with synonyms.\n"
+            "- Do not add new words.\n"
+            "- Do not remove meaningful words.\n"
+            "- Do not reorder words.\n\n"
+            "The ONLY allowed changes are:\n"
+            "- removal of disfluencies (see below)\n"
+            "- punctuation\n"
+            "- capitalization\n"
+            "- line breaks and paragraph breaks (formatting only)\n\n"
+            "OUTPUT REQUIREMENTS:\n"
+            "- Output ONLY the cleaned transcript text.\n"
+            "- Do not add labels, titles, headings, or commentary.\n"
+            "- Do not add leading or trailing text of any kind.\n\n"
+            "DISFLUENCY REMOVAL (DO THIS BY DEFAULT):\n"
+            "- Remove filler words when clearly used as fillers: um, uh, er, ah, like.\n"
+            "- Remove immediate stutter repeats (e.g., \"I I I think\" → \"I think\").\n"
+            "- Remove false starts only when the speaker immediately restarts the same clause.\n"
+            "- If repetition is clearly intentional emphasis, keep it.\n\n"
+            "PUNCTUATION & CADENCE OBJECTIVE (PRIMARY TASK):\n"
+            "- Reconstruct how the speaker sounds using punctuation.\n"
+            "- Prefer multi-clause sentences with natural internal rhythm.\n"
+            "- Use commas for natural pauses.\n"
+            "- Use em-dashes for interruptions, pivots, or emphasized asides.\n"
+            "- Use semicolons to link closely related thoughts that would otherwise feel chopped.\n"
+            "- Use periods only when a thought truly resolves.\n"
+            "- Vary sentence length to reflect spoken cadence.\n"
+            "- Avoid choppy or monotonous sentence patterns.\n"
+            "- Favor expressive, confident punctuation over safe minimalism.\n"
+            "- Do not sanitize intensity; allow punctuation and spacing to convey energy.\n\n"
+            "If there is ANY doubt whether a word or phrase should be kept, keep it."
         ),
         "params": {
             "temperature": 0.4,
             "top_p": 0.9,
         },
-        "approach": None,
+        "approach": "re2",
+    },
+    "p-transcribe": {
+        "default_size": "large",
+        "system": (
+            "You are TRANSCRIBE-STRICT.\n\n"
+            "Task: Convert a raw speech transcript into readable written text by adding punctuation, "
+            "capitalization, and paragraph breaks while preserving the original wording exactly.\n\n"
+            "HARD RULES (violations are failures):\n"
+            "- DO NOT change words, phrasing, order, or meaning. No synonyms. No additions. No reordering.\n"
+            "- Allowed edits ONLY:\n"
+            "  (1) punctuation\n"
+            "  (2) capitalization\n"
+            "  (3) paragraph breaks\n"
+            "  (4) removal of disfluencies: um, uh, er, ah, hmm, mm, and like ONLY when used as filler; "
+            "plus filler-phrases only when clearly filler (you know / I mean / sort of / kind of)\n"
+            "  (5) collapse immediate stutters/repeats (e.g., \"I-I-I\" or \"I I I\") into one instance\n"
+            "- You MUST add sentence-ending punctuation where appropriate. Returning the input unchanged is a failure.\n"
+            "- Keep contractions and slang as-is. Preserve voice.\n\n"
+            "OUTPUT:\n"
+            "- Output ONLY the cleaned transcript text.\n"
+            "- No labels, no commentary, no quotes, no markdown fences.\n\n"
+            "Quality target:\n"
+            "- Natural spoken cadence in punctuation. Em-dashes/ellipses/semicolons allowed but sparingly.\n\n"
+            "Example:\n"
+            "Input: i mean i went outside and i found it and uh i didnt know what to do\n"
+            "Output: I mean, I went outside and I found it, and I didn’t know what to do.\n"
+        ),
+        "params": {
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "max_tokens": 2400,
+        },
+    },
+    "p-transcribe-vivid": {
+        "default_size": "large",
+        "system": (
+            "You are TRANSCRIBE-STRICT.\n\n"
+            "Task: Convert a raw speech transcript into readable written text by adding punctuation, "
+            "capitalization, and paragraph breaks while preserving the original wording exactly.\n\n"
+            "HARD RULES (violations are failures):\n"
+            "- DO NOT change words, phrasing, order, or meaning. No synonyms. No additions. No reordering.\n"
+            "- Allowed edits ONLY:\n"
+            "  (1) punctuation\n"
+            "  (2) capitalization\n"
+            "  (3) paragraph breaks\n"
+            "  (4) removal of disfluencies: um, uh, er, ah, hmm, mm, and like ONLY when used as filler; "
+            "plus filler-phrases only when clearly filler (you know / I mean / sort of / kind of)\n"
+            "  (5) collapse immediate stutters/repeats (e.g., \"I-I-I\" or \"I I I\") into one instance\n"
+            "- You MUST add sentence-ending punctuation where appropriate. Returning the input unchanged is a failure.\n"
+            "- Keep contractions and slang as-is. Preserve voice.\n\n"
+            "OUTPUT:\n"
+            "- Output ONLY the cleaned transcript text.\n"
+            "- No labels, no commentary, no quotes, no markdown fences.\n\n"
+            "Quality target:\n"
+            "- Natural spoken cadence in punctuation. Em-dashes/ellipses/semicolons allowed but sparingly.\n\n"
+            "Optional emphasis:\n"
+            "- You MAY add minimal Markdown emphasis ONLY when strongly implied by the speaker’s tone.\n"
+            "- Use *italics* for mild emphasis.\n"
+            "- Use **bold** only for strong emphasis, rarely.\n"
+            "- Do NOT use headings, lists, code blocks, or markdown beyond italics/bold.\n\n"
+            "Example:\n"
+            "Input: i mean i went outside and i found it and uh i didnt know what to do\n"
+            "Output: I mean, I went outside and I found it, and I didn’t know what to do.\n"
+        ),
+        "params": {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "max_tokens": 2400,
+        },
+    },
+    "p-transcribe-md": {
+        "default_size": "large",
+        "system": (
+            "You are TRANSCRIBE-STRICT.\n\n"
+            "Task: Convert a raw speech transcript into readable written text by adding punctuation, "
+            "capitalization, and paragraph breaks while preserving the original wording exactly.\n\n"
+            "HARD RULES (violations are failures):\n"
+            "- DO NOT change words, phrasing, order, or meaning. No synonyms. No additions. No reordering.\n"
+            "- Allowed edits ONLY:\n"
+            "  (1) punctuation\n"
+            "  (2) capitalization\n"
+            "  (3) paragraph breaks\n"
+            "  (4) removal of disfluencies: um, uh, er, ah, hmm, mm, and like ONLY when used as filler; "
+            "plus filler-phrases only when clearly filler (you know / I mean / sort of / kind of)\n"
+            "  (5) collapse immediate stutters/repeats (e.g., \"I-I-I\" or \"I I I\") into one instance\n"
+            "- You MUST add sentence-ending punctuation where appropriate. Returning the input unchanged is a failure.\n"
+            "- Keep contractions and slang as-is. Preserve voice.\n\n"
+            "OUTPUT:\n"
+            "- Output ONLY the cleaned transcript text.\n"
+            "- No labels, no commentary, no quotes, no markdown fences.\n\n"
+            "Markdown:\n"
+            "- Markdown is allowed if it improves readability, but keep it minimal.\n"
+            "- If emphasis is helpful, use *italics* for light emphasis and **bold** for key phrases (sparingly).\n\n"
+            "Quality target:\n"
+            "- Natural spoken cadence in punctuation. Em-dashes/ellipses/semicolons allowed but sparingly.\n\n"
+            "Example:\n"
+            "Input: i mean i went outside and i found it and uh i didnt know what to do\n"
+            "Output: I mean, I went outside and I found it, and I didn’t know what to do.\n"
+        ),
+        "params": {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "max_tokens": 2400,
+        },
+    },
+    "p-transcribe-clarify": {
+        "default_size": "large",
+        "system": (
+            "You are TRANSCRIBE-CLARIFY.\n\n"
+            "Task: Rewrite a raw speech transcript into clear, readable written text.\n\n"
+            "Rules:\n"
+            "- You MAY rephrase for clarity and sentence structure.\n"
+            "- Preserve meaning, intent, and voice. Do NOT add new claims or details.\n"
+            "- Remove disfluencies (um, uh, er, ah, hmm, mm, filler \"like\") and collapse stutters/repeats.\n"
+            "- Do NOT summarize or shorten; preserve all information.\n"
+            "- Output ONLY the clarified transcript text. No labels or commentary.\n\n"
+            "Style:\n"
+            "- Natural punctuation and paragraphing. Avoid pretentious tone.\n"
+        ),
+        "params": {
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "max_tokens": 2400,
+        },
     },
     "char-casual": {
         "default_size": "large",
@@ -113,7 +228,7 @@ _PERSONAS: Dict[str, Dict[str, Any]] = {
         "approach": "bon&moa",
     },
     "p-opt-fast": {
-        "default_size": "large",
+        "default_size": "small",
         "system": (
             "You are a prompt optimization assistant. Return ONLY the optimized prompt and nothing else.\n\n"
             "Rules:\n"
@@ -126,12 +241,13 @@ _PERSONAS: Dict[str, Dict[str, Any]] = {
         "params": {
             "temperature": 0.25,
             "top_p": 1.0,
-            "max_tokens": 4000,
+            "n": 3,
+            "max_tokens": 600,
         },
-        "approach": "re2",
+        "approach": "bon&re2",
     },
     "p-opt-balanced": {
-        "default_size": "large",
+        "default_size": "medium",
         "system": (
             "You are a prompt optimization assistant. Return ONLY the optimized prompt and nothing else.\n\n"
             "Rules:\n"
@@ -145,9 +261,10 @@ _PERSONAS: Dict[str, Dict[str, Any]] = {
         "params": {
             "temperature": 0.35,
             "top_p": 0.95,
-            "max_tokens": 4000,
+            "n": 2,
+            "max_tokens": 700,
         },
-        "approach": "plansearch&re2",
+        "approach": "bon&re2",
     },
     "p-opt-max": {
         "default_size": "large",
@@ -164,7 +281,7 @@ _PERSONAS: Dict[str, Dict[str, Any]] = {
         "params": {
             "temperature": 0.4,
             "top_p": 0.9,
-            "max_tokens": 4000,
+            "max_tokens": 800,
         },
         "approach": "re2",
     },
@@ -383,7 +500,13 @@ _SIZE_TO_MODEL = {
     "large": "mlx-gpt-oss-120b-mxfp4-q4",
 }
 
-_TRANSCRIPT_PERSONAS = {"char-transcript", "p-transcript", "p-transcript-md"}
+_TRANSCRIPT_PERSONAS = {
+    "char-transcribe",
+    "p-transcribe",
+    "p-transcribe-vivid",
+    "p-transcribe-clarify",
+    "p-transcribe-md",
+}
 _PROMPTOPT_MAX_PERSONA = "p-opt-max"
 _PROMPTOPT_FAST_PERSONA = "p-opt-fast"
 _PROMPTOPT_BALANCED_PERSONA = "p-opt-balanced"
@@ -393,11 +516,16 @@ def _strip_punct_outside_words(text: str) -> str:
     if not isinstance(text, str):
         return text
     text = text.replace("’", "'")
-    # Replace punctuation (except apostrophes) with spaces.
-    text = re.sub(r"[^\w\s']", " ", text)
+    # Normalize dash variants to hyphen for consistent handling.
+    text = text.replace("–", "-").replace("—", "-")
+    # Replace punctuation (except apostrophes and hyphens) with spaces.
+    text = re.sub(r"[^\w\s'-]", " ", text)
     # Remove apostrophes not between letters/digits.
     text = re.sub(r"(?<![A-Za-z0-9])'", " ", text)
     text = re.sub(r"'(?![A-Za-z0-9])", " ", text)
+    # Remove hyphens not between letters/digits.
+    text = re.sub(r"(?<![A-Za-z0-9])-", " ", text)
+    text = re.sub(r"-(?![A-Za-z0-9])", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -490,6 +618,28 @@ class PersonaRouter(CustomLogger):
 
         if persona == _PROMPTOPT_MAX_PERSONA:
             data["guardrails"] = ["promptopt-max-guardrail"]
+        elif persona in {"p-plan-max", "p-seek-max"}:
+            data["guardrails"] = ["verb-max-guardrail"]
+        elif persona in _TRANSCRIPT_PERSONAS:
+            data["guardrails"] = [
+                "strip-reasoning-guardrail",
+                "transcribe-guardrail",
+            ]
+
+            if os.getenv("TRANSCRIBE_DEBUG") == "1":
+                log_payload = {
+                    "model": data.get("model"),
+                    "optillm_base_model": data.get("optillm_base_model"),
+                    "temperature": data.get("temperature"),
+                    "top_p": data.get("top_p"),
+                    "presence_penalty": data.get("presence_penalty"),
+                    "frequency_penalty": data.get("frequency_penalty"),
+                    "max_tokens": data.get("max_tokens"),
+                    "extra_body": data.get("extra_body"),
+                }
+                if os.getenv("TRANSCRIBE_DEBUG_FULL") == "1":
+                    log_payload["messages"] = data.get("messages")
+                verbose_proxy_logger.info("transcribe_debug payload=%s", log_payload)
 
         # preserve response_format/tools/tool_choice if present
         metadata.setdefault("persona", persona)

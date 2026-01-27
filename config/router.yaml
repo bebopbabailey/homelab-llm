@@ -28,19 +28,29 @@ model_list:
     max_input_tokens: 131072
     max_output_tokens: 65536
 # END MLXCTL AUTO
-- model_name: char-transcript
+- model_name: char-transcribe
   litellm_params:
     model: openai/mlx-gpt-oss-20b-mxfp4-q4
     api_base: http://127.0.0.1:4020/v1
     api_key: dummy
-- model_name: p-transcript
+- model_name: p-transcribe
   litellm_params:
-    model: openai/mlx-gpt-oss-20b-mxfp4-q4
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
     api_base: http://127.0.0.1:4020/v1
     api_key: dummy
-- model_name: p-transcript-md
+- model_name: p-transcribe-vivid
   litellm_params:
-    model: openai/mlx-gpt-oss-20b-mxfp4-q4
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-transcribe-clarify
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
+    api_base: http://127.0.0.1:4020/v1
+    api_key: dummy
+- model_name: p-transcribe-md
+  litellm_params:
+    model: openai/mlx-gpt-oss-120b-mxfp4-q4
     api_base: http://127.0.0.1:4020/v1
     api_key: dummy
 - model_name: char-casual
@@ -196,4 +206,19 @@ guardrails:
     litellm_params:
       guardrail: promptopt_guardrail.PromptOptMaxGuardrail
       mode: "post_call"
-      default_on: true
+      default_on: false
+  - guardrail_name: verb-max-guardrail
+    litellm_params:
+      guardrail: verb_max_guardrail.VerbMaxGuardrail
+      mode: "post_call"
+      default_on: false
+  - guardrail_name: strip-reasoning-guardrail
+    litellm_params:
+      guardrail: strip_reasoning_guardrail.StripReasoningGuardrail
+      mode: "post_call"
+      default_on: false
+  - guardrail_name: transcribe-guardrail
+    litellm_params:
+      guardrail: transcribe_guardrail.TranscribeGuardrail
+      mode: "post_call"
+      default_on: false

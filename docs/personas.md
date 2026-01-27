@@ -5,35 +5,34 @@ persona alias expands server‑side into:
 - base model (small/medium/large)
 - persona system prompt
 - default sampling params
-- OptiLLM approach (`extra_body.optillm_approach`)
+- OptiLLM approach (`extra_body.optillm_approach`) when applicable
 
 ## How it works
-- LiteLLM exposes persona aliases as `model` values (e.g., `char-transcript`).
+- LiteLLM exposes persona aliases as `model` values (e.g., `char-transcribe`).
 - A LiteLLM pre‑call hook rewrites the request:
   - sets `optillm_base_model` to the chosen base model (keeps `model` as the preset alias)
   - prepends persona system prompt to `messages`
   - injects default params when not provided by the client
   - adds `extra_body.optillm_approach` when applicable
-- A LiteLLM post‑call hook augments `p-opt-max`:
-  - fans out to extra approaches (leap + plansearch)
-  - reduces deterministically (single reducer call)
-  - runs a final re2 cleanup
-  - implemented as a guardrail: `config/promptopt_guardrail.py`
-  - reducer runs directly against the MLX OpenAI server (no OptiLLM approach)
+- `p-opt-*` use Best‑of‑N (`bon`) with explicit `n` values per preset.
+  - Guardrail fan‑out/reducer is disabled by default but remains available in
+    `config/promptopt_guardrail.py` if needed later.
 
 Implementation: `config/persona_router.py` via LiteLLM `callbacks`.
 
 ## Persona aliases
-- `char-transcript` → medium (mlx‑qwen3‑next‑80b‑mxfp4‑a3b‑instruct)
-- `p-transcript` → medium (same as char-transcript)
-- `p-transcript-md` → medium (Markdown allowed if it helps readability)
+- `char-transcribe` → large (mlx‑gpt‑oss‑120b‑mxfp4‑q4)
+- `p-transcribe` → large (strict verbatim + baseline punctuation)
+- `p-transcribe-vivid` → large (strict verbatim + minimal Markdown emphasis)
+- `p-transcribe-clarify` → large (light rewrite for clarity)
+- `p-transcribe-md` → large (strict verbatim + minimal Markdown emphasis)
 - `char-casual` → large
 - `char-duck` → medium
 - `char-careful` → large
 - `char-brainstorm` → large
 - `char-jsonclerk` → medium
-- `p-opt-fast` → large (prompt optimizer, fast)
-- `p-opt-balanced` → large (prompt optimizer, balanced)
+- `p-opt-fast` → small (prompt optimizer, fast)
+- `p-opt-balanced` → medium (prompt optimizer, balanced)
 - `p-opt-max` → large (prompt optimizer, max compute)
 
 ## Preset aliases (p-*)
@@ -50,14 +49,24 @@ All p-* presets default to the large model.
 - `p-seek` → re2&bon (exploration)
 - `p-make` → re2&bon (execution)
 - `p-spark` → bon (creative output)
-- `p-plan-max` → leap&re2&bon&moa (max compute)
+- `p-plan-max` → heavy‑small/light‑large guardrail (20B plansearch&re2 → 120B re2)
 - `p-care-max` → leap&re2&bon&moa (max compute)
-- `p-seek-max` → bon&moa (max compute)
+- `p-seek-max` → heavy‑small/light‑large guardrail (20B plansearch&re2 → 120B re2)
 - `p-make-max` → re2&bon&moa (max compute)
 - `p-spark-max` → bon&moa (max compute)
-- `p-opt-fast` → re2 (prompt optimizer, fast)
-- `p-opt-balanced` → plansearch&re2 (prompt optimizer, balanced)
-- `p-opt-max` → re2 + fan-out (leap/plansearch) + reducer + re2 cleanup (max compute)
+- `p-opt-fast` → bon&re2, `n=3`, `max_tokens=600`
+- `p-opt-balanced` → bon&re2, `n=4`, `max_tokens=1200`
+- `p-opt-max` → re2 + guardrail triad fan‑out (see below), `max_tokens=800`
+
+### p-opt-max triad fan‑out (guardrail)
+`p-opt-max` uses an explicit fan‑out reducer (single pass) with three upstream
+models, then a deterministic reducer on the 80B model, and optional cleanup:
+- 20B: `bon&re2`, `n=4–6` (dynamic)
+- 80B: `bon&re2`, `n=1–2` (dynamic)
+- 120B: `plansearch&re2`, `n=1`
+- Reducer: 80B, temp 0, output only the chosen prompt
+- Cleanup: optional `re2` if output drifts
+  - Guardrail logs `cleanup_triggered` and `cleanup_reason` for future tuning.
 
 ## Model size override
 Clients can override size using `metadata.size`:
@@ -67,27 +76,59 @@ Or pin a specific base model:
 - `metadata.base_model=mlx-gpt-oss-20b-mxfp4-q4` (or other known base model)
 
 ## Transcript preprocessing
-For `char-transcript`, `p-transcript`, and `p-transcript-md`, the pre‑call hook strips punctuation
-outside words (apostrophes inside words are preserved) before the system prompt
+For `char-transcribe`, `p-transcribe`, and `p-transcribe-vivid`, the pre‑call hook strips punctuation
+outside words. Apostrophes and hyphens inside words are preserved before the system prompt
 is applied. This keeps clients lightweight while matching the transcript spec.
 
 Transcript personas (locked):
-- Expressiveness: vivid, not dramatic (neutral written tone)
-- Pacing: varied/balanced sentence length
-- Emphasis: commas/periods default; em‑dashes/semicolons/ellipses allowed sparingly for readability only
+- Expressiveness: vivid and character‑forward (not theatrical)
+- Pacing: prefer multi‑clause sentences with natural pauses; avoid choppy splits
+- Emphasis: commas/periods default; em‑dashes/semicolons/ellipses encouraged when they improve rhythm or emphasis
 - Exclamations: rare
-- Word correction: moderate (only when intent is clearly implied)
+- Word correction: **none** (wording is preserved; only disfluencies may be removed)
 - Output: cleaned transcript only (no metadata, no summaries)
+- Reasoning content is stripped from transcript responses (guardrail).
+
+Transcript variants:
+- `p-transcribe-clarify`: light rewrite for clarity, preserve meaning
+- `p-transcribe-vivid`: expressive cadence + minimal Markdown emphasis
+- `p-transcribe-md`: minimal Markdown emphasis for readability
+
+## Known‑good transcript baseline (must not drift)
+Default `p-transcribe` settings:
+- temperature: **0.0**
+- top_p: **1.0**
+- presence_penalty: **0.0**
+- frequency_penalty: **0.0**
+- max_tokens: **2400**
+- **No OptiLLM approach** (single‑pass)
+
+Preprocess (server‑side):
+- Strip punctuation outside words
+- Preserve apostrophes/hyphens inside words
+- Normalize em/en dashes to `-` before the model
+
+Output:
+- Cleaned transcript text only
+- No labels/headings/markdown wrappers
+- Must start immediately with transcript content
+
+Tests:
+- `python -m unittest discover -s layer-gateway/litellm-orch/tests -p \"test_transcribe_*.py\"`
+
+Debug:
+- `TRANSCRIBE_DEBUG=1` logs request payload metadata for transcribe presets.
+- `TRANSCRIBE_DEBUG_FULL=1` additionally logs full messages (use with care).
 
 ## Curl tests (one per persona)
 ```bash
 curl -sS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"char-transcript","messages":[{"role":"user","content":"i was uh walking down the street"}]}'
+  -d '{"model":"char-transcribe","messages":[{"role":"user","content":"i was uh walking down the street"}]}'
 
 curl -sS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"p-transcript","messages":[{"role":"user","content":"i was uh walking down the street"}]}'
+  -d '{"model":"p-transcribe","messages":[{"role":"user","content":"i was uh walking down the street"}]}'
 
 curl -sS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
