@@ -37,9 +37,9 @@ use-case. Hopes of branching into enterprise-land later.
 - OptiLLM techniques are selected per-request via `optillm_approach` (no alias explosion).
 - Health policy: use LiteLLM `/health/readiness` as the default health signal; `/health`
   is a deep probe that can flag offline backends.
-- Personas: `char-*` model aliases are rewritten server‑side (LiteLLM callback).
-- Presets: `p-*` model aliases provide fast/safe/deep/chat defaults with OptiLLM chaining.
-- Transcribe presets: `p-transcribe`, `p-transcribe-vivid`, `p-transcribe-clarify` (server-side cleaning).
+- Roles: `main`, `deep`, `fast`, `swap` are the stable client-facing aliases.
+- Experiments: `x1`–`x4` are reserved experimental aliases.
+- Transcribe tasks: `task-transcribe`, `task-transcribe-vivid` (server-side cleaning).
 - OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
   `layer-gateway/optillm-proxy/README.md`.
 - Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` and pins

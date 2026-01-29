@@ -4,7 +4,7 @@ Date: 2026-01-24
 
 ## Current design focus
 Presets are the active design axis for the system. We are standardizing how
-LiteLLM exposes preset aliases (`p-*`), how OptiLLM chaining is applied, and how
+LiteLLM exposes stable aliases (`main`, `deep`, `fast`, `swap`), how OptiLLM chaining is applied, and how
 clients (Open WebUI, OpenCode, Shortcuts) consume these presets.
 
 ## Active decisions
@@ -12,8 +12,7 @@ clients (Open WebUI, OpenCode, Shortcuts) consume these presets.
   default params, and OptiLLM approach.
 - Preset tiers: fast / safe / deep / chat, with optional “super” variants for extra compute.
 - Keep client usage minimal: callers only choose a preset name.
-- Transcribe personas are finalized in LiteLLM (`char-transcribe`, `p-transcribe`, `p-transcribe-md`,
-  `p-transcribe-clarify`, `p-transcribe-vivid`) with
+- Transcribe tasks are finalized in LiteLLM (`task-transcribe`, `task-transcribe-vivid`) with
   server-side punctuation stripping and vivid-but-not-theatrical rules.
 - Transcript personas default to the medium MLX model (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`).
 

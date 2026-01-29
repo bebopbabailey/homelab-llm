@@ -26,8 +26,8 @@
   as LiteLLM handles. Seagate storage is **backroom only** and never receives handles.
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
-- Personas: `char-*` model aliases are rewritten server‑side via LiteLLM callbacks.
-- Presets: `p-*` model aliases provide fast/safe/deep/chat defaults with OptiLLM chaining.
+- Aliases: `main`, `deep`, `fast`, `swap` are the stable LiteLLM handles.
+- Experiments: `x1`–`x4` are reserved for experimental routing.
   See `layer-gateway/litellm-orch/docs/personas.md`.
 
 ### Param support probe (LiteLLM + MLX backends)
@@ -77,10 +77,16 @@ if a param is rejected by the backend.
 ## OpenCode (client)
 - Config: `~/.config/opencode/opencode.json` (MacBook).
 - Provider: LiteLLM OpenAI-compatible `baseURL=http://100.69.99.60:4000/v1`.
-- Models: use LiteLLM handles (e.g., `p-plan`, `p-seek`, `p-make`, `p-plan-max`).
+- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`).
 - Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
 - Web search uses MCP `web-fetch` (stdio) with `search.web` routed to
   LiteLLM `/v1/search/searxng-search`.
+
+## OptiLLM boost lane (opt-in)
+- `boost`: OptiLLM router decides whether to apply an approach (including “none”) using the main base model.
+- `boost-deep`: same, but uses the deep base model.
+- Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
+- Observability: OptiLLM logs the selected approach at INFO level (`Using approach(es) [...]`) in `optillm-proxy` logs. No response header is currently documented for approach selection.
 
 ## LiteLLM extension points (summary)
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
