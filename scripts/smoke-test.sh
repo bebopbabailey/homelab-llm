@@ -13,7 +13,7 @@ echo "Checking /v1/chat/completions on ${BASE_URL}..."
 curl -fsS "${BASE_URL}/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "jerry-weak",
+    "model": "main",
     "messages": [{"role": "user", "content": "ping"}],
     "max_tokens": 16
   }' | jq -e '.choices | length > 0' >/dev/null

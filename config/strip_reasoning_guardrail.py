@@ -11,6 +11,8 @@ TRANSCRIPT_PERSONAS = {
     "p-transcribe-vivid",
     "p-transcribe-clarify",
     "p-transcribe-md",
+    "task-transcribe",
+    "task-transcribe-vivid",
 }
 
 

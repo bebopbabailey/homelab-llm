@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run LiteLLM proxy with jerry-chat enabled (now default in config/router.yaml).
+# Run LiteLLM proxy with the current router config.
 # Usage: scripts/run-dev-chat.sh
 
 if [[ -f "config/env.local" ]]; then
@@ -20,5 +20,5 @@ fi
 
 export LITELLM_LOG="${LITELLM_LOG:-INFO}"
 
-echo "Starting LiteLLM proxy (with jerry-chat) on port ${PORT}..."
+echo "Starting LiteLLM proxy on port ${PORT}..."
 exec uv run litellm --config config/router.yaml --host 0.0.0.0 --port "${PORT}"

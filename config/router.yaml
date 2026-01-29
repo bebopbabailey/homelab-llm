@@ -1,183 +1,77 @@
 model_list:
-# BEGIN MLXCTL AUTO
-- model_name: mlx-gpt-oss-120b-mxfp4-q4
-  litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
-    max_tokens: 65536
-  model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
-- model_name: mlx-qwen3-next-80b-mxfp4-a3b-instruct
+# 1) Core role aliases: main / deep / fast / swap
+- model_name: main
   litellm_params:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
-    max_tokens: 32768
-  model_info:
-    max_input_tokens: 65536
-    max_output_tokens: 32768
-- model_name: mlx-gpt-oss-20b-mxfp4-q4
+- model_name: deep
+  litellm_params:
+    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
+    api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
+    api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
+- model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 65536
-  model_info:
-    max_input_tokens: 131072
-    max_output_tokens: 65536
-# END MLXCTL AUTO
-- model_name: char-transcribe
+- model_name: swap
   litellm_params:
-    model: openai/mlx-gpt-oss-20b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-transcribe
+    # swap placeholder: points at fast until a dedicated swap endpoint is added
+    model: os.environ/SWAP_MODEL
+    api_base: os.environ/SWAP_API_BASE
+    api_key: os.environ/SWAP_API_KEY
+
+# 2) OptiLLM boost lane (opt-in)
+- model_name: boost
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-transcribe-vivid
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+- model_name: boost-deep
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-transcribe-clarify
+    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+
+# 3) Experimental aliases: x1..x4
+- model_name: x1
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-transcribe-md
+    # x1 placeholder: swap
+    model: os.environ/SWAP_MODEL
+    api_base: os.environ/SWAP_API_BASE
+    api_key: os.environ/SWAP_API_KEY
+- model_name: x2
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: char-casual
+    # x2 placeholder: swap
+    model: os.environ/SWAP_MODEL
+    api_base: os.environ/SWAP_API_BASE
+    api_key: os.environ/SWAP_API_KEY
+- model_name: x3
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: char-duck
+    # x3 placeholder: swap
+    model: os.environ/SWAP_MODEL
+    api_base: os.environ/SWAP_API_BASE
+    api_key: os.environ/SWAP_API_KEY
+- model_name: x4
   litellm_params:
-    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: char-careful
+    # x4 placeholder: swap
+    model: os.environ/SWAP_MODEL
+    api_base: os.environ/SWAP_API_BASE
+    api_key: os.environ/SWAP_API_KEY
+
+# 4) Task aliases (optional): task-transcribe, task-transcribe-vivid
+- model_name: task-transcribe
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: char-brainstorm
+    model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
+    api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
+    api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
+- model_name: task-transcribe-vivid
   litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-opt-fast
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-opt-balanced
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-opt-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: char-jsonclerk
-  litellm_params:
-    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-fast
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-safe
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-deep
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-chat
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-fast-super
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-safe-super
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-deep-super
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-plan
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-care
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-seek
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-make
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-spark
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-plan-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-care-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-seek-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-make-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
-- model_name: p-spark-max
-  litellm_params:
-    model: openai/mlx-gpt-oss-120b-mxfp4-q4
-    api_base: http://127.0.0.1:4020/v1
-    api_key: dummy
+    model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
+    api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
+    api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
+
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
