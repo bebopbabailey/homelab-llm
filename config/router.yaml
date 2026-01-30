@@ -92,27 +92,3 @@ router_settings:
 litellm_settings:
   json_logs: true
   drop_params: false
-  callbacks:
-  - prompt_injector.prompt_injector_instance
-  - persona_router.persona_router_instance
-guardrails:
-  - guardrail_name: promptopt-max-guardrail
-    litellm_params:
-      guardrail: promptopt_guardrail.PromptOptMaxGuardrail
-      mode: "post_call"
-      default_on: false
-  - guardrail_name: verb-max-guardrail
-    litellm_params:
-      guardrail: verb_max_guardrail.VerbMaxGuardrail
-      mode: "post_call"
-      default_on: false
-  - guardrail_name: strip-reasoning-guardrail
-    litellm_params:
-      guardrail: strip_reasoning_guardrail.StripReasoningGuardrail
-      mode: "post_call"
-      default_on: false
-  - guardrail_name: transcribe-guardrail
-    litellm_params:
-      guardrail: transcribe_guardrail.TranscribeGuardrail
-      mode: "post_call"
-      default_on: false
