@@ -5,18 +5,19 @@ model_list:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
+    max_tokens: 2048
 - model_name: deep
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
-    max_tokens: 256
+    max_tokens: 2048
 - model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 256
+    max_tokens: 2048
 - model_name: swap
   litellm_params:
     # swap placeholder: points at fast until a dedicated swap endpoint is added
@@ -68,13 +69,13 @@ model_list:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 256
+    max_tokens: 2048
 - model_name: task-transcribe-vivid
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 256
+    max_tokens: 2048
 
 search_tools:
 - search_tool_name: searxng-search
