@@ -5,6 +5,31 @@
 - Mac Studio: MLX OpenAI servers, OptiLLM local inference.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
+- Jetson Orin AGX (planned): edge inference + optimization experiments.
+
+## Host Dossier (new-agent quickstart)
+Each host entry: role, access path, source-of-truth docs, and safe validation commands.
+
+### Mini (Ubuntu 24.04)
+- Role: gateway + UI + search + orchestration.
+- Access: local repo on Mini.
+- Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.
+- Safe checks: `curl http://127.0.0.1:4000/health`, `curl http://127.0.0.1:4020/v1/models`.
+
+### Studio (macOS)
+- Role: MLX inference and Studio-local OptiLLM.
+- Access: `ssh studio`.
+- Sources of truth: `docs/foundation/mlx-registry.md`.
+- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`.
+
+### Orin AGX (planned)
+- Role: edge inference + performance experiments.
+- Access: `ssh orin` (final name TBD).
+- Sources of truth: `docs/foundation/orin-agx.md`.
+
+### OV LLM Server (Mini)
+- Role: OpenVINO server on Mini.
+- Sources of truth: `docs/foundation/ov-llm-server.md`.
 
 ## Ports and Endpoints (authoritative)
 Ports are immutable unless a migration is explicitly planned.

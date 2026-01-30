@@ -38,6 +38,15 @@ Optional fields:
 `mlxctl` is the single command to manage MLX models. It runs locally on the
 Studio and can be invoked from the Mini via SSH.
 
+## MLX Server Provenance (Required)
+- Upstream repo: https://github.com/cubist38/mlx-openai-server
+- Fork (if any): none detected (installed from upstream)
+- Pin/version: 1.4.2 (pyproject.toml + package metadata)
+- Install path: `/opt/mlx-launch` (uv/venv + install steps)
+- Boot entrypoint: `/opt/mlx-launch/bin/start.sh`
+- Local patches: `/opt/mlx-launch/.venv/lib/python3.12/site-packages/app/api/endpoints.py` —
+  ensure `message.content` is populated when only `reasoning_content` exists (OpenAI compatibility)
+
 Supported commands:
 - `init` — scan HF cache and initialize registry entries.
 - `list` — show registered models and port assignments.

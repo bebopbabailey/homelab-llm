@@ -10,6 +10,9 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `docs/foundation/constraints-and-decisions.md`
     - `docs/foundation/overview.md`
     - `docs/INTEGRATIONS.md`
+    - `docs/foundation/mlx-registry.md`
+    - `docs/foundation/ov-llm-server.md`
+    - `docs/foundation/orin-agx.md`
 - Registry/template data (prefer data over summaries):
     - `layer-gateway/registry/handles.jsonl`
     - `layer-inference/registry/models.jsonl`
