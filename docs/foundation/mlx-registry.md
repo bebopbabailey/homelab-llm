@@ -41,11 +41,10 @@ Studio and can be invoked from the Mini via SSH.
 ## MLX Server Provenance (Required)
 - Upstream repo: https://github.com/cubist38/mlx-openai-server
 - Fork (if any): none detected (installed from upstream)
-- Pin/version: 1.4.2 (pyproject.toml + package metadata)
+- Pin/version: 1.5.1 (pyproject.toml)
 - Install path: `/opt/mlx-launch` (uv/venv + install steps)
 - Boot entrypoint: `/opt/mlx-launch/bin/start.sh`
-- Local patches: `/opt/mlx-launch/.venv/lib/python3.12/site-packages/app/api/endpoints.py` —
-  ensure `message.content` is populated when only `reasoning_content` exists (OpenAI compatibility)
+- Local patches: none (use supported Harmony parsers + templates)
 
 Supported commands:
 - `init` — scan HF cache and initialize registry entries.
@@ -135,6 +134,12 @@ is set. For these, set in the registry entry:
 - `reasoning_parser: harmony`
 If short prompts return `reasoning_content` without `content`, increase
 `max_tokens` or set a lower `reasoning_effort` via `request_params`.
+
+Studio note (2026-01-30):
+- GPT‑OSS 20B snapshot lacks `chat_template.jinja`. We supply a supported override:
+  `/opt/mlx-launch/templates/gpt-oss-20b-chat_template.jinja`.
+- For GPT‑OSS handles, a higher `max_tokens` (>= 256) ensures `content` is emitted
+  alongside `reasoning_content`.
 
 This ensures OpenAI-compatible responses without raw `<|channel|>` tags.
 

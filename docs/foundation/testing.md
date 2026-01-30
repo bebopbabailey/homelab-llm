@@ -38,6 +38,14 @@ Load a test model into the experimental range (8120+):
 mlxctl load mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4 auto
 ```
 
+Verify GPT‑OSS content channel is present (requires adequate max_tokens):
+```bash
+curl -fsS http://127.0.0.1:8102/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"mlx-gpt-oss-20b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":256}' \
+  | jq -r '.choices[0].message | {content, reasoning_content}'
+```
+
 After any MLX port change:
 ```bash
 mlxctl sync-gateway

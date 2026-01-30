@@ -38,7 +38,7 @@ curl -sS --max-time 10 http://127.0.0.1:4000/v1/chat/completions \
   -d '{
     "model": "mlx-gpt-oss-20b-mxfp4-q4",
     "messages": [{"role": "user", "content": "ping"}],
-    "max_tokens": 16,
+    "max_tokens": 256,
     "temperature": 0.2,
     "top_p": 0.9,
     "presence_penalty": 0.4,
