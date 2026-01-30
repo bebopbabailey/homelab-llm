@@ -102,3 +102,9 @@ router_settings:
 litellm_settings:
   json_logs: true
   drop_params: false
+guardrails:
+  - guardrail_name: transcribe-guardrail
+    litellm_params:
+      guardrail: transcribe_guardrail.TranscribeGuardrail
+      mode: "post_call"
+      default_on: true

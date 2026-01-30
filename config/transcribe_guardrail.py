@@ -6,11 +6,7 @@ from typing import Any, Optional
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
 
-TRANSCRIBE_PERSONAS = {
-    "p-transcribe",
-    "p-transcribe-vivid",
-    "p-transcribe-clarify",
-    "p-transcribe-md",
+TASK_TRANSCRIBE_MODELS = {
     "task-transcribe",
     "task-transcribe-vivid",
 }
@@ -80,21 +76,14 @@ class TranscribeGuardrail(CustomGuardrail):
         data: dict,
         response: Any,
     ) -> Any:
-        metadata = data.get("metadata") or data.get("litellm_metadata") or {}
-        persona = metadata.get("persona")
-        if persona not in TRANSCRIBE_PERSONAS:
+        model = data.get("model")
+        if model not in TASK_TRANSCRIBE_MODELS:
             return response
 
         if data.get("stream"):
             return response
 
         output = _extract_text(response)
-        if not output:
-            return response
-
-        cleaned = _strip_wrappers(output)
-        if cleaned == output:
-            return response
 
         if hasattr(response, "model_dump"):
             try:
@@ -107,6 +96,12 @@ class TranscribeGuardrail(CustomGuardrail):
                 if isinstance(choices[0], dict):
                     message = choices[0].get("message")
                     if isinstance(message, dict):
-                        message["content"] = cleaned
+                        if isinstance(output, str):
+                            cleaned = _strip_wrappers(output)
+                            if cleaned:
+                                message["content"] = cleaned
+                        # Remove reasoning content for task responses.
+                        message.pop("reasoning_content", None)
+                        message.pop("provider_specific_fields", None)
                         return response
         return response
