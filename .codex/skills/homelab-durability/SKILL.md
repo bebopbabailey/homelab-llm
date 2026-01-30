@@ -19,9 +19,14 @@ description: Enforce docs-first, minimal-contract, validation-heavy workflow; pr
 
 ## Defaults (Conservative)
 - Download approval threshold: 500MB.
-- Disk check required before any MLX/model/cache action: YES.
-- Host confirmation: strict every time before ops commands.
+- Disk check required before any model download/cache action or any explicitly large (>5GB) action: YES.
+- Host confirmation: strict for ops commands, but may be treated as sticky within the same session after explicit confirmation.
 - Violations: HARD-BLOCK for MLX/disk/host/file-list rules; WARN for stylistic rules.
+
+## Workflow Rules (Behavioral)
+- Long outputs, large diffs, or copy/paste blocks must be written to `SCRATCH_PAD.md` for review.
+- `NOW.md` must reflect the active task; update it when the active work changes.
+- `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.
 
 ### Required startup declarations
 Every response MUST begin by stating:
@@ -38,7 +43,7 @@ Every response MUST begin by stating:
 - Any download/cache/model pull > 500MB requires explicit user approval.
 
 ### Disk guardrail
-- Before any action that may consume >5GB or any model cache/download, require a disk free check command suggestion and STOP until user confirms.
+- Before any model download/cache action or any explicitly large (>5GB) action, require a disk free check command suggestion and STOP until user confirms.
 
 ### Default stance
 - Default to read-only inspection first.

@@ -16,6 +16,9 @@ This is the working style for this repo. Agents should mirror this cadence.
 - Keep tasks short; prefer small, repeated loops.
 - Measure before optimizing; keep baselines.
 - Document only what changed; avoid stale plans.
+- Put long outputs, large diffs, or copy/paste blocks in `SCRATCH_PAD.md` for review.
+- `NOW.md` must reflect the active task; update it when the active work changes.
+- `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.
 
 ---
 

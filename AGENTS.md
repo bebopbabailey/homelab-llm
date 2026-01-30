@@ -8,6 +8,11 @@ Primary navigation entry: `docs/_core/README.md`.
 - No new LAN exposure, port changes, or host-binding changes without an explicit plan and approval.
 - No dependency or lockfile churn unless the task explicitly asks for it.
 - No unrelated refactors, renames, or drive-by cleanups.
+- **MLX control:** All MLX backend actions MUST use `mlxctl` (load/unload/assign-team/sync).
+  Never start/stop `mlx-openai-server` directly on the Studio.
+- Large outputs or long copy/paste blocks must go into `SCRATCH_PAD.md` for review.
+- `NOW.md` must reflect the active task; update it when the active work changes.
+- `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.
 
 ## Before making changes (required)
 - State the goal in 1–3 lines.
