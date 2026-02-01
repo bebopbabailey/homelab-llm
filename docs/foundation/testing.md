@@ -71,6 +71,7 @@ curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^ov-'
 ```bash
 curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
 ```
+Note: missing the `Authorization` header returns `Invalid Authorization header`.
 
 ## OptiLLM local (Studio)
 ```bash

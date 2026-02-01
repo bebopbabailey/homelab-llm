@@ -28,7 +28,6 @@
   a deep probe that can report unhealthy when backends are intentionally offline.
 - Aliases: `main`, `deep`, `fast`, `swap` are the stable LiteLLM handles.
 - Experiments: `x1`–`x4` are reserved for experimental routing.
-  See `layer-gateway/litellm-orch/docs/personas.md`.
 
 ### Param support probe (LiteLLM + MLX backends)
 Run this on the **Mini** to verify which optional params are accepted or ignored:
@@ -87,6 +86,14 @@ if a param is rejected by the backend.
 - `boost-deep`: same, but uses the deep base model.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: OptiLLM logs the selected approach at INFO level (`Using approach(es) [...]`) in `optillm-proxy` logs. No response header is currently documented for approach selection.
+ - OptiLLM proxy default approach is `router` (systemd flag); requests without `optillm_approach` use router.
+ - OptiLLM proxy requires `Authorization: Bearer <OPTILLM_API_KEY>` even on localhost; missing headers return an “Invalid Authorization header” error.
+
+### OptiLLM validation checklist (router + plugins)
+1) Router is active (log line: `Using approach(es) ['router']`).
+2) `web_search` returns results **without** Chrome errors (SearXNG path).
+3) `deep_research` uses the same SearXNG path (no Selenium dependency).
+4) `boost` and `boost-deep` return 200 with non-empty `message.content`.
 
 ## LiteLLM extension points (summary)
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
@@ -104,6 +111,7 @@ and where this repo uses callbacks vs guardrails.
 - **Current (ergonomic) usage:** call OptiLLM directly and set `optillm_approach`
   as a top-level JSON field. This works from Open WebUI (custom params), curl,
   iOS Shortcuts, and any OpenAI-compatible client.
+- Requests must include `Authorization: Bearer <OPTILLM_API_KEY>` (even for localhost tests).
 - **Deprecated:** routing all MLX handles through OptiLLM and maintaining
   `router-mlx-*` loop-avoidance entries in LiteLLM.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to

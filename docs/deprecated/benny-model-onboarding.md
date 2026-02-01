@@ -156,10 +156,7 @@ for the current alias mapping.
   be re-imported to bump the version.
 - Prompt index (latest versions): `docs/prompts/benny/index.json`.
 - Sync script: `platform/ops/scripts/sync-benny-prompts` (updates index only).
-- LiteLLM injects these prompts automatically per model via
-  `layer-gateway/litellm-orch/config/prompt_injector.py` and
-  `layer-gateway/litellm-orch/config/router.yaml` callbacks, so clients do **not**
-  need to pass `prompt_id`.
+- Prompt injection is now client-side; the server does not auto-inject prompts.
 
 ## Notes
 - Conversion always uses `--trust-remote-code` (required by some model families).

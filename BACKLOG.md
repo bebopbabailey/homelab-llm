@@ -14,4 +14,3 @@ Short list of future work not active right now.
 - Model table design (database-backed, size-on-disk + idle-memory fields).
 - OptiLLM local inference (Studio) for decode-time techniques.
 - Optional second-pass tone classification for transcripts (separate endpoint).
-- Remove remaining bespoke LiteLLM hooks once client-side prompts are stable (persona_router, prompt_injector, guardrails).

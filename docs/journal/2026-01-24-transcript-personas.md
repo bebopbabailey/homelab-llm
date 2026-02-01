@@ -1,9 +1,8 @@
 # 2026-01-24 — Transcript personas finalized
 
 ## Summary
-- Implemented transcript presets as LiteLLM personas (pre-call hook).
-- Presets strip punctuation outside words, preserve apostrophes and hyphens in words, and apply a strict transcript-cleaning prompt.
-- Renamed transcript presets to transcribe aliases: `p-transcribe`, `p-transcribe-vivid`, `p-transcribe-clarify`.
+- Deprecated: transcript personas were removed in favor of stable task handles.
+- Current contract uses `task-transcribe` and `task-transcribe-vivid` with a minimal post-call cleaner.
 
 ## Decisions
 - Transcript personas are **locked** and treated as production defaults.
@@ -17,9 +16,8 @@
 - Inner-voice quotes allowed when clearly implied ("I thought / I was like").
 
 ## Implementation
-- `layer-gateway/litellm-orch/config/persona_router.py`
 - `layer-gateway/litellm-orch/config/router.yaml`
-- `layer-gateway/litellm-orch/docs/personas.md`
+- `layer-gateway/litellm-orch/config/transcribe_guardrail.py`
 
 ## Tests
 - Verified `p-transcribe` responses against longer, varied transcripts.
