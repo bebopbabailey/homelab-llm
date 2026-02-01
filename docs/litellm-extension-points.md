@@ -41,10 +41,7 @@ LiteLLM supports sending standard logging payloads to external endpoints via
 `success_callback` / `failure_callback` (Enterprise feature).
 
 ## Where we use these
-- `config/persona_router.py` → CustomLogger pre-call rewrites (personas).
-- `config/transcribe_guardrail.py` → post-call wrapper stripping (transcribe).
-- `config/strip_reasoning_guardrail.py` → remove reasoning content for select aliases.
-- `config/promptopt_guardrail.py` → post-call fan-out reducer (p-opt-max).
+- `config/transcribe_guardrail.py` → post-call wrapper stripping (task-transcribe* only).
 
 ## Keep in mind
 - Pre-call hooks can mutate requests; guardrails should enforce correctness.

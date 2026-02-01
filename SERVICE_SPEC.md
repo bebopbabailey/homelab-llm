@@ -38,12 +38,8 @@ the Mini, MLX on the Studio, AFM planned).
 - Log destination: stdout/journald for now; switch to file output when ingestion pipeline is ready.
 
 ## Guardrails
-- `promptopt-max-guardrail` is enabled only for `p-opt-max`.
-- It performs an explicit triad fan‑out across 20B/80B/120B, then reduces on 80B.
-- `verb-max-guardrail` is enabled only for `p-plan-max` and `p-seek-max`.
-  It runs heavy compute on 20B (plansearch&re2) and a light re2 cleanup on 120B.
-- Guardrail code: `config/promptopt_guardrail.py`.
-- Transcript personas strip reasoning fields via `strip-reasoning-guardrail`.
+- `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
+  It strips wrappers/labels and removes reasoning fields from transcript outputs.
 
 ## Service Management (Planned)
 - User systemd service with explicit port binding
