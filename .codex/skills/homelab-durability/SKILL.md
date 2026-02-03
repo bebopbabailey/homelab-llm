@@ -24,7 +24,7 @@ description: Enforce docs-first, minimal-contract, validation-heavy workflow; pr
 - Violations: HARD-BLOCK for MLX/disk/host/file-list rules; WARN for stylistic rules.
 
 ## Workflow Rules (Behavioral)
-- Long outputs, large diffs, or copy/paste blocks must be written to `SCRATCH_PAD.md` for review.
+- Use `SCRATCH_PAD.md` only when the user needs to run commands or when outputs/diffs are too large for chat; otherwise inline is acceptable.
 - `NOW.md` must reflect the active task; update it when the active work changes.
 - `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.
 

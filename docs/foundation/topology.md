@@ -41,6 +41,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy | Mini | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
+| OptiLLM proxy (Studio, optional) | Studio | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
 | OptiLLM local (high) | Studio | 4040 | http://192.168.1.72:4040/v1 | /v1/models |
 | OptiLLM local (balanced) | Studio | 4041 | http://192.168.1.72:4041/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |

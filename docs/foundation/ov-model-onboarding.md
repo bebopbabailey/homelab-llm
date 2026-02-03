@@ -18,6 +18,9 @@ The former role-based `ov-*` aliases are deprecated.
 - `ov-phi-3-5-mini-instruct-fp16`
 - `ov-llama-3-2-3b-instruct-fp16`
 - `ov-mistral-7b-instruct-v0-3-fp16`
+- `ov-modernbert-large-encoder-fp16` (feature-extraction encoder; router POC)
+- `ov-modernbert-large-router-encoder-fp16` (router checkpoint encoder; parity POC)
+- `ov-modernbert-large-router-encoder-fp32` (router checkpoint encoder; parity stable)
 
 ## Where to update
 - LiteLLM env: `layer-gateway/litellm-orch/config/env.local`

@@ -3,6 +3,7 @@
 ## Hard constraints
 - Must remain routing/observability only (no inference).
 - Clients must call LiteLLM only; do not bypass the gateway.
+- OptiLLM proxy may call MLX endpoints directly when configured; avoid routing loops.
 - Optimization proxies (OptiLLM) must bind to localhost and sit behind LiteLLM.
 - Do not change port bindings without a migration plan.
 

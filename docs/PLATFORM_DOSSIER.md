@@ -18,6 +18,7 @@
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `curl http://127.0.0.1:3000/health` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | OptiLLM proxy | Mini | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-proxy/SERVICE_SPEC.md`, local install |
+| OptiLLM proxy (Studio, optional) | Studio | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-local/launchd/optillm-proxy-studio.plist` |
 | OptiLLM local (high) | Studio | 4040 | 0.0.0.0 | http://192.168.1.72:4040/v1 | /v1/models | `layer-gateway/optillm-local/SERVICE_SPEC.md`, launchd |
 | OptiLLM local (balanced) | Studio | 4041 | 0.0.0.0 | http://192.168.1.72:4041/v1 | /v1/models | `layer-gateway/optillm-local/SERVICE_SPEC.md`, launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
@@ -41,8 +42,10 @@
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
   Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for OpenVINO).
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
-- OptiLLM: systemd unit `/etc/systemd/system/optillm-proxy.service`, env `/etc/optillm-proxy/env`, localhost-only proxy.
+- OptiLLM: systemd unit `/etc/systemd/system/optillm-proxy.service`, env `/etc/optillm-proxy/env`, localhost-only proxy. Upstream can be LiteLLM or MLX depending on policy.
 - OptiLLM local (Studio): launchd units, HF cache `/Users/thestudio/models/hf/hub`, pin `transformers<5` for router.
+  Local inference should disable the router plugin and load local-only approaches
+  (bon, moa, mcts, pvg, cot_decoding, entropy_decoding, deepconf, thinkdeeper, autothink).
   Local OptiLLM launchd is disabled by default until setup is finalized.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.

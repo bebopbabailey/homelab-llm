@@ -24,3 +24,5 @@ Local OpenVINO-based LLM endpoint for fast/low-cost inference on the Mini.
 ## Notes
 - Keep config changes documented in `docs/foundation/ov-llm-server.md`.
 - Do not change ports without updating `docs/foundation/topology.md`.
+- Router POC script: `layer-inference/ov-llm-server/scripts/ov-router-poc.py` (run with `.venv-convert`).
+- POC encoders: `ov-modernbert-large-encoder-fp16` (base), `ov-modernbert-large-router-encoder-fp16` (router checkpoint), and `ov-modernbert-large-router-encoder-fp32` (parity stable).

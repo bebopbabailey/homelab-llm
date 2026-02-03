@@ -86,8 +86,14 @@ if a param is rejected by the backend.
 - `boost-deep`: same, but uses the deep base model.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: OptiLLM logs the selected approach at INFO level (`Using approach(es) [...]`) in `optillm-proxy` logs. No response header is currently documented for approach selection.
- - OptiLLM proxy default approach is `router` (systemd flag); requests without `optillm_approach` use router.
- - OptiLLM proxy requires `Authorization: Bearer <OPTILLM_API_KEY>` even on localhost; missing headers return an “Invalid Authorization header” error.
+- OptiLLM proxy default approach is `none`; requests without `optillm_approach` do not route.
+- OptiLLM proxy requires `Authorization: Bearer <OPTILLM_API_KEY>` even on localhost; missing headers return an “Invalid Authorization header” error.
+
+### router_meta (proxy-to-local split)
+- `router_meta` predicts an approach and routes to opti-proxy or opti-local.
+- Local-only approaches: `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`,
+  `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`.
+- Use `optillm_approach=router_meta` in the request body.
 
 ### OptiLLM validation checklist (router + plugins)
 1) Router is active (log line: `Using approach(es) ['router']`).
@@ -112,8 +118,7 @@ and where this repo uses callbacks vs guardrails.
   as a top-level JSON field. This works from Open WebUI (custom params), curl,
   iOS Shortcuts, and any OpenAI-compatible client.
 - Requests must include `Authorization: Bearer <OPTILLM_API_KEY>` (even for localhost tests).
-- **Deprecated:** routing all MLX handles through OptiLLM and maintaining
-  `router-mlx-*` loop-avoidance entries in LiteLLM.
+- Upstream can be LiteLLM or MLX directly; avoid routing loops.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
 
@@ -133,6 +138,9 @@ Set `optillm_approach` in the request body:
 - `bon`: best-of-n sampling (faster than MoA, moderate gains)
 - `plansearch`: planning/search (slower, good for multi-step tasks)
 - `self_consistency`: consistency voting (slower, robust)
+Local-only (best on opti-local due to multi-sample or decoding-level control):
+- `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`, `entropy_decoding`,
+  `deepconf`, `thinkdeeper`, `autothink`
 
 Example:
 ```json

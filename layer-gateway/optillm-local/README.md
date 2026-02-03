@@ -25,3 +25,12 @@ This service hosts **OptiLLM in local inference mode** on the Studio using
 - The proxy on the Mini remains the primary ensemble path; this is additive.
 - Only models that are **present on a showroom machine** (Mini/Studio) receive
   LiteLLM handles. The Seagate is **backroom storage** and never has handles.
+
+## Local-only plugin policy
+- opti-local must **not** load the router plugin to avoid recursion.
+- opti-local should load only local-only approaches (e.g., `bon`, `moa`, `mcts`, `pvg`).
+
+## Launch templates
+- `launchd/optillm-local.plist` — local inference instance (MPS).
+- `launchd/optillm-proxy-studio.plist` — proxy instance on Studio; `router_meta` is invoked per-request.
+- `scripts/disable-plugins.sh` — disable router/privacy plugins in the local venv.

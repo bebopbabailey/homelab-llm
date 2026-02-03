@@ -23,7 +23,11 @@ Each instance serves one model and exposes an OpenAI-compatible API.
 
 ## Notes
 - Use one OptiLLM process per model.
-- Router approach is default.
+- Router approach is **disabled** on opti-local to avoid recursion.
 - Pin `transformers<5` (router plugin depends on `encode_plus`).
 - This service is **not** the Mini proxy; it is a separate local inference tier.
 - Only **showroom** machines (Mini/Studio) receive handles. The Seagate is storage-only.
+
+## Plugin policy
+- opti-local loads only local-only approaches (no router).
+- If plugins must be disabled, rename the plugin file in the venv to `*.disabled`.
