@@ -5,26 +5,22 @@ model_list:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
-    max_tokens: 2048
 - model_name: deep
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
-    max_tokens: 2048
 - model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 2048
 - model_name: swap
   litellm_params:
     # swap placeholder: points at fast until a dedicated swap endpoint is added
     model: os.environ/SWAP_MODEL
     api_base: os.environ/SWAP_API_BASE
     api_key: os.environ/SWAP_API_KEY
-    max_tokens: 2048
 
 # 2) OptiLLM boost lane (opt-in)
 - model_name: boost
@@ -45,28 +41,24 @@ model_list:
     model: os.environ/SWAP_MODEL
     api_base: os.environ/SWAP_API_BASE
     api_key: os.environ/SWAP_API_KEY
-    max_tokens: 2048
 - model_name: x2
   litellm_params:
     # x2 placeholder: swap
     model: os.environ/SWAP_MODEL
     api_base: os.environ/SWAP_API_BASE
     api_key: os.environ/SWAP_API_KEY
-    max_tokens: 2048
 - model_name: x3
   litellm_params:
     # x3 placeholder: swap
     model: os.environ/SWAP_MODEL
     api_base: os.environ/SWAP_API_BASE
     api_key: os.environ/SWAP_API_KEY
-    max_tokens: 2048
 - model_name: x4
   litellm_params:
     # x4 placeholder: swap
     model: os.environ/SWAP_MODEL
     api_base: os.environ/SWAP_API_BASE
     api_key: os.environ/SWAP_API_KEY
-    max_tokens: 2048
 
 # 4) Task aliases (optional): task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
@@ -74,13 +66,11 @@ model_list:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 2048
 - model_name: task-transcribe-vivid
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-    max_tokens: 2048
 
 search_tools:
 - search_tool_name: searxng-search
