@@ -2,7 +2,7 @@
 
 ## What this service is
 
-**OptiLLM** is an **OpenAI API-compatible optimizing inference proxy**. It sits in front of an OpenAI-compatible upstream (in this homelab, upstream is **LiteLLM**) and applies **inference-time strategies** (e.g., Mixture-of-Agents, planning/search, best-of-n) to improve reasoning and coding outputs.
+**OptiLLM** is an **OpenAI API-compatible optimizing inference proxy**. It sits in front of an OpenAI-compatible upstream (in this homelab, upstream is **LiteLLM or MLX**) and applies **inference-time strategies** (e.g., Mixture-of-Agents, planning/search, best-of-n) to improve reasoning and coding outputs.
 
 This service behaves like “just another OpenAI-compatible provider” from LiteLLM’s point of view.
 
@@ -49,6 +49,27 @@ Example (raw HTTP):
 }
 ```
 
+### router_meta (proxy-to-local split)
+
+`router_meta` is a custom plugin that predicts an approach with ModernBERT and
+then routes either to:
+- **optillm-proxy** (proxy-safe approaches), or
+- **optillm-local** (local-only approaches).
+Local-only approaches: `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`,
+`entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`.
+
+It forwards the full request payload and adds `optillm_meta` to the response.
+Set it by request body:
+```json
+{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"router_meta"}
+```
+
+Environment knobs (proxy instance):
+- `ROUTER_META_LOCAL_URL` (default `http://127.0.0.1:4040/v1`)
+- `ROUTER_META_PROXY_URL` (default `http://127.0.0.1:4020/v1`)
+- `ROUTER_META_LOCAL_MODEL` (required for local-only routes)
+- `ROUTER_META_LOCAL_AUTH` / `ROUTER_META_PROXY_AUTH` (optional auth overrides)
+
 ### Prompt tag selection (secondary)
 
 OptiLLM also supports prompt tags in the message content. Use this only when a client
@@ -79,7 +100,7 @@ Authorization: Bearer <OPTILLM_API_KEY>
 Missing this header returns `Invalid Authorization header` even on localhost.
 
 ### 2) Upstream authentication
-- Used when OptiLLM calls LiteLLM
+- Used when OptiLLM calls the upstream (LiteLLM or MLX)
 - Usually provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
 - This is unrelated to `OPTILLM_API_KEY`
 
@@ -93,7 +114,7 @@ OptiLLM's proxy plugin reads its provider list from:
 ~/.optillm/proxy_config.yaml
 ```
 
-For this homelab, it must point **only** to LiteLLM:
+For this homelab, it should point to the configured upstream (LiteLLM or MLX):
 ```yaml
 providers:
   - name: litellm
@@ -122,15 +143,15 @@ uv run optillm \
   --host 127.0.0.1 \
   --port 4020 \
   --base-url http://127.0.0.1:4000/v1 \
-  --approach proxy \
+  --approach none \
   --model <base-model> \
   --optillm-api-key "<optillm-proxy-key>"
 ```
 
 Notes:
-- `OPENAI_API_KEY` is used by OptiLLM when calling the LiteLLM upstream.
+- `OPENAI_API_KEY` is used by OptiLLM when calling the upstream (LiteLLM or MLX).
 - `--optillm-api-key` protects the OptiLLM proxy itself.
-- `--base-url` must point at the LiteLLM gateway.
+- `--base-url` points at LiteLLM or directly at an MLX OpenAI-compatible endpoint.
 - OptiLLM local (Studio) uses `/Users/thestudio/models/hf/hub` and pins
   `transformers<5` for router compatibility (see `layer-gateway/optillm-local`).
 
@@ -168,6 +189,16 @@ Example:
 ```json
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
 ```
+
+## router_meta routing policy
+`router_meta` keeps the routing policy in env vars so it can change without code edits:
+- `ROUTER_META_LOCAL_ONLY` (comma-separated approaches, default: bon,moa,mcts,pvg)
+- `ROUTER_META_PROXY_ONLY` (comma-separated, optional)
+- `ROUTER_META_DEFAULT_DESTINATION` (proxy|local, default: proxy)
+- `ROUTER_META_FALLBACK` (none|re2|cot_reflection|error, default: none)
+
+Loop protection:
+- Incoming `X-Opti-Hop` or `X-Opti-From` headers disable re-routing.
 
 ## Ensemble Matrix (v0)
 See `ENSEMBLES.md` for the initial OptiLLM ensemble matrix used for evaluation.

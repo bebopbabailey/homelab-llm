@@ -7,7 +7,7 @@
 
 ## Purpose
 
-Runs OptiLLM as a **localhost-only OpenAI-compatible inference proxy** that applies inference-time optimization strategies before forwarding requests upstream to LiteLLM.
+Runs OptiLLM as a **localhost-only OpenAI-compatible inference proxy** that applies inference-time optimization strategies before forwarding requests upstream to LiteLLM or MLX endpoints.
 
 End-user clients must never access this service directly.
 
@@ -39,8 +39,8 @@ Minimum required:
 | Item | Value |
 |----|------|
 | Upstream type | OpenAI-compatible API |
-| Upstream service | LiteLLM |
-| Upstream base URL | http://127.0.0.1:<LITELLM_PORT>/v1 |
+| Upstream service | LiteLLM or MLX |
+| Upstream base URL | http://127.0.0.1:<LITELLM_PORT>/v1 or http://<studio>:<mlx-port>/v1 |
 
 ---
 
@@ -56,7 +56,7 @@ Missing this header returns `Invalid Authorization header` (even on localhost).
 
 ### Upstream auth
 - Provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
-- Used only for OptiLLM → LiteLLM calls
+- Used only for OptiLLM → upstream calls
 
 Important: setting `OPTILLM_API_KEY` in the environment triggers OptiLLM's
 local inference mode. Use the flag instead.
@@ -98,13 +98,27 @@ Example env file path (systemd): `/etc/optillm-proxy/env`.
 Runtime flags (systemd `ExecStart` should pass explicitly):
 - `--host 127.0.0.1`
 - `--port 4020`
-- `--base-url http://127.0.0.1:4000/v1`
-- `--approach router`
+- `--base-url <upstream OpenAI-compatible endpoint>`
+- `--approach none`
 - `--model <base_model>` (example: `qwen3-235b-a22b-instruct-2507-6bit`)
 - `--plugins-dir <path>` (local plugin overrides)
 - `--optillm-api-key <key>` (proxy auth)
 
 Exact variable names depend on pinned OptiLLM version.
+
+### router_meta configuration
+`router_meta` routes between opti-proxy and opti-local based on env policy:
+- `ROUTER_META_LOCAL_ONLY` (comma-separated approaches, default: bon,moa,mcts,pvg,cot_decoding,entropy_decoding,deepconf,thinkdeeper,autothink)
+- `ROUTER_META_PROXY_ONLY` (comma-separated, optional)
+- `ROUTER_META_DEFAULT_DESTINATION` (proxy|local, default: proxy)
+- `ROUTER_META_FALLBACK` (none|re2|cot_reflection|error, default: none)
+
+Loop protection:
+- Incoming `X-Opti-Hop` or `X-Opti-From` headers disable re-routing.
+- `ROUTER_META_LOCAL_URL` (default `http://127.0.0.1:4040/v1`)
+- `ROUTER_META_PROXY_URL` (default `http://127.0.0.1:4020/v1`)
+- `ROUTER_META_LOCAL_MODEL` (required for local-only routes)
+- `ROUTER_META_LOCAL_AUTH` / `ROUTER_META_PROXY_AUTH` (optional auth overrides)
 
 ---
 
@@ -189,7 +203,7 @@ Pinned release:
 OptiLLM proxy plugin loads providers from:
 `/home/christopherbailey/.optillm/proxy_config.yaml`.
 
-This must point to LiteLLM only:
+This should point to the configured upstream (LiteLLM or MLX), e.g.:
 ```yaml
 providers:
   - name: litellm

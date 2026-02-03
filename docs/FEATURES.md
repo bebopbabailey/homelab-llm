@@ -3,9 +3,9 @@
 Status: running with **all bundled plugins loaded** (as of 2026-01-19).
 
 ## Core
-- **Approach**: proxy (per-request technique selection).
+- **Approach**: none (per-request technique selection via `optillm_approach`).
 - **Bind**: 127.0.0.1:4020
-- **Upstream**: LiteLLM (`http://127.0.0.1:4000/v1`)
+- **Upstream**: LiteLLM or MLX (`http://127.0.0.1:4000/v1` or MLX ports)
 
 ## Techniques (Approaches)
 These are inference-time strategies selectable via `optillm_approach` (request body) or prompt tags. Descriptions are based on OptiLLM docs.
@@ -25,7 +25,7 @@ These are inference-time strategies selectable via `optillm_approach` (request b
 - `mcts` — Monte Carlo Tree Search for decision-making in chat responses. citeturn3view0
 - `pvg` — Prover-Verifier Game (PV Game) at inference time. citeturn3view0
 
-Other techniques exist in OptiLLM but are not available in proxy mode (e.g., deep confidence, CoT decoding, entropy decoding, thinkdeeper, autothink). citeturn3view0
+Other techniques exist in OptiLLM but are not available in proxy mode (e.g., deepconf, cot_decoding, entropy_decoding, thinkdeeper, autothink). citeturn3view0
 
 ## Plugins (Loaded)
 Plugins are chained with `&` and can be combined with approaches. Descriptions are from OptiLLM docs.
@@ -51,6 +51,13 @@ Plugins are chained with `&` and can be combined with approaches. Descriptions a
 - The router plugin uses a ModernBERT-based classifier: `codelion/optillm-modernbert-large`. citeturn3view1turn0search2
 - This model is internal to OptiLLM (not exposed via LiteLLM handles).
 - Proxy cache location (Mini): `~/.cache/huggingface/hub` for the OptiLLM service user.
+
+## router_meta (proxy-to-local split)
+- Custom router plugin that selects an approach and forwards requests either to
+  opti-proxy (proxy-safe) or opti-local (local-only).
+- Local-only approaches: `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`,
+  `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`.
+  - Routing policy is controlled by `ROUTER_META_*` env vars.
 
 ## Notes
 - Plugin chaining with `&`/`|` still works, but technique selection is set per request.

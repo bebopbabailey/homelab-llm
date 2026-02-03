@@ -10,7 +10,7 @@
 Use `uv` only. Do not use Docker.
 - `uv venv .venv`
 - `uv pip install optillm==0.3.12`
-- `OPENAI_API_KEY="<key>" OPTILLM_API_KEY="<key>" uv run optillm --host 127.0.0.1 --port 4020 --base-url http://127.0.0.1:4000/v1 --approach auto --model <base-model>`
+- `OPENAI_API_KEY="<key>" OPTILLM_API_KEY="<key>" uv run optillm --host 127.0.0.1 --port 4020 --base-url http://127.0.0.1:4000/v1 --approach none --model <base-model>`
 
 ## Coding Style & Naming Conventions
 - This service is a thin proxy; keep changes configuration-driven.
@@ -23,7 +23,7 @@ Use `uv` only. Do not use Docker.
 
 ## Operational Constraints
 - Bind to `127.0.0.1` only; never expose on LAN.
-- Do not bypass LiteLLM. OptiLLM must call LiteLLM upstream only.
+- OptiLLM may call LiteLLM or MLX upstream depending on the active routing policy.
 - Ports are immutable; this service uses port `4020`.
 - MCP or other plugins should be planned and documented before enabling.
 - Do not store secrets in the repo.
