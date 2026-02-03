@@ -1,17 +1,17 @@
-# NOW — Transcript Reliability (Contract-First)
+# NOW — OptiLLM Router Latency (OV Router Service)
 
 ## Current focus
-1) Upgrade mlx-openai-server to 1.5.1 on Studio. (done)
-2) Ensure Harmony parsers + chat template are correctly applied for GPT-OSS models. (done)
-3) Verify MLX returns standard OpenAI-compatible `message.content` with reasoning optional. (done)
-4) Remove local response-shaping patch once verified. (done; using supported config)
-5) Set sane `max_tokens` defaults for GPT-OSS handles in LiteLLM. (done; 2048)
-6) Only then consider a minimal, supported post-cleaner if needed. (done; task-only post-cleaner guardrail)
+1) Baseline OptiLLM router latency vs direct LiteLLM. (done)
+2) Design a phased, reversible move to an OpenVINO-backed router classifier. (in progress)
+3) Stand up OV router service in isolation and validate latency/accuracy. (next)
+4) Add a parallel OptiLLM `router_ov` plugin that calls the OV service. (next)
+5) Shadow‑mode comparison, then switch `router` to OV with fallback. (next)
 
 ## NEXT UP
-Enable LiteLLM UI access so client-side system prompts/presets can be managed there.
+Phase 1: Stand up the OpenVINO router service (local-only), validate outputs/latency.
 
 ## Out of scope (for now)
+- LiteLLM UI access / prompt management
 - OptiLLM local inference (Studio)
-- New model downloads/conversions
+- New model downloads/conversions (beyond router classifier)
 - New registries beyond presets/handles

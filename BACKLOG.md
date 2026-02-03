@@ -7,6 +7,7 @@ Short list of future work not active right now.
 - Validate preset behavior via LiteLLM/OptiLLM (routing, chain applied, responses).
 - Keep OpenCode config aligned with current handles and tool access.
 - Open WebUI preset sync from LiteLLM presets.
+- Enable LiteLLM UI access so client-side system prompts/presets can be managed there.
 - Formalize a presets registry (JSONL + validator + CLI).
 - Document SDLC mapping and usage guidance.
 - Transcript pipeline service (server-side chaining, stateless + stateful interviewer, SQLite persistence, strict JSON outputs).
