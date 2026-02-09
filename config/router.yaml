@@ -33,6 +33,12 @@ model_list:
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
 
+- model_name: boost-2
+  litellm_params:
+    model: openai/Qwen/Qwen2.5-14B-Instruct
+    api_base: os.environ/ORIN_OPTILLM_LOCAL_API_BASE
+    api_key: os.environ/ORIN_OPTILLM_LOCAL_API_KEY
+
 # 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
   litellm_params:
