@@ -1,4 +1,5 @@
 # Journal Index
+- 2026-02-09 — OptiLLM local on Orin (inference layer)
 - 2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)
 
 - [2026-02-08 — Lexicon registry (data layer)](2026-02-08-lexicon-registry.md)

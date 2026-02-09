@@ -1,7 +1,7 @@
 # NOW
 
 Active
-- OptiLLM proxy dev→deploy workflow (Mini → Studio) + smoke/bench wiring
+- Scaffold OptiLLM local (Orin) inference service + deploy helper
 
 NEXT UP
-- (placeholder)
+- Wire LiteLLM routing to Orin when ready for production traffic

@@ -212,3 +212,8 @@ Example:
 ## Client base URL recommendation
 - Prefer tailnet HTTPS: `https://gateway.tailfd1400.ts.net/v1`.
 - Local host-only calls use `http://127.0.0.1:4000/v1` (on the Mini).
+
+## OptiLLM local (Orin)
+- LiteLLM routes to Orin at `http://<orin-ip>:4040/v1`.
+- OptiLLM local is an inference backend (not a gateway).
+- Auth: `OPTILLM_API_KEY` required on all requests.

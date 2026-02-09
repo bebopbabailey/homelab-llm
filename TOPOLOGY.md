@@ -19,3 +19,5 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - Clients call **LiteLLM** only (`https://gateway.<tailnet>/v1` or localhost for on-host services).
 - Tool search flows through LiteLLM `/v1/search` to SearXNG.
 - MLX ports are managed via `platform/ops/scripts/mlxctl`.
+
+- Orin: OptiLLM local on port 4040 (LAN only, routed via LiteLLM)

@@ -5,7 +5,7 @@
 - Mac Studio: MLX OpenAI servers.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX (planned): edge inference + optimization experiments.
+- Jetson Orin AGX: inference backends (OptiLLM local) and future CV/STT/TTS services.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
@@ -44,6 +44,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy | Mini | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
 | OptiLLM proxy (Studio, optional) | Studio | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
+| OptiLLM local (Orin) | Orin | 4040 | http://<orin-ip>:4040/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
 | MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
@@ -58,7 +59,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - Current boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
 
 ### OptiLLM local (status)
-- OptiLLM local inference is deferred until Orin AGX setup.
+- OptiLLM local inference runs on Orin via systemd (service contract in repo).
 - Studio-local OptiLLM runtime is not part of the active platform path.
 
 ## MCP Tools (stdio, no ports)
