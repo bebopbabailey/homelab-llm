@@ -1,7 +1,7 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, OpenVINO, OptiLLM, SearXNG, Ollama.
+- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, OptiLLM, SearXNG, Ollama.
 - Mac Studio: MLX OpenAI servers, OptiLLM local inference.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
@@ -37,8 +37,10 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 
 | service | host | port | base URL | health |
 | --- | --- | --- | --- | --- |
-| LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
-| Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
+| LiteLLM proxy | Mini | 4000 | http://127.0.0.1:4000 | /health, /health/readiness, /health/liveliness |
+| Open WebUI | Mini | 3000 | http://127.0.0.1:3000 | /health |
+| Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
+| Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy | Mini | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
 | OptiLLM proxy (Studio, optional) | Studio | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
@@ -55,7 +57,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 ### MLX port management
 - Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.
 - Ports 8120-8139 are reserved for experimental test loads and are not registered until a model is loaded.
-- Current boot ensemble: `8100` (gpt-oss-120b), `8101` (gemma-27b), `8102` (gpt-oss-20b).
+- Current boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
 
 ### OptiLLM local cache (Studio)
 - HF cache: `/Users/thestudio/models/hf/hub`
@@ -67,9 +69,10 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - `search.web` — stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.
 
 ## Exposure and Secrets
-- LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000 (maintenance), Ollama 11434,
+- LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   MLX 8100-8119, Home Assistant 8123, AFM 9999 (planned).
-- Local-only: OptiLLM 4020 (must not be LAN-exposed), SearXNG 8888.
+- Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
+  Prometheus 9090, Grafana 3001, OptiLLM 4020 (must not be LAN-exposed), SearXNG 8888.
 - LAN-exposed: OptiLLM local 4040/4041 (Studio).
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:

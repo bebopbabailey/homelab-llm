@@ -29,7 +29,7 @@ mlxctl reconcile
 ```
 
 ## MLX Launchd Boot Model (Studio)
-After reboot or launchd restart, confirm port 8100 is serving Qwen3-235B:
+After reboot or launchd restart, confirm port 8100 is serving gpt-oss:120b
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
 
@@ -54,17 +54,40 @@ mlxctl sync-gateway
 
 ## LiteLLM Aliases (Mini)
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/models | jq .
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_API_KEY" | jq .
+```
+
+## LiteLLM Prometheus (Mini)
+```bash
+curl -fsS -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  http://127.0.0.1:4000/metrics/ | head -n 20
+```
+Note: `/metrics` redirects to `/metrics/` (307).
+
+## Prometheus (Mini)
+```bash
+curl -fsS http://127.0.0.1:9090/-/ready
+curl -fsS http://127.0.0.1:9090/-/healthy
+```
+
+## Grafana (Mini)
+```bash
+curl -fsS http://127.0.0.1:3001/api/health
 ```
 
 Check for MLX aliases:
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^(mlx|ov|opt)-'
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  | jq -r '.data[].id' | rg '^mlx-'
 ```
 
-Check for OpenVINO aliases:
+Check for OpenVINO aliases (only when OpenVINO is intentionally wired into LiteLLM):
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^ov-'
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  | jq -r '.data[].id' | rg '^ov-'
 ```
 
 ## OptiLLM (Mini)
@@ -90,6 +113,7 @@ curl -fsS http://127.0.0.1:4020/v1/chat/completions \
 Verify direct MLX handles (when models are registered):
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"mlx-<base-model>","messages":[{"role":"user","content":"ping"}],"max_tokens":128}' \
   | jq .
@@ -140,7 +164,7 @@ curl -fsS "http://127.0.0.1:8888/search?q=ping&format=json" | jq .
 ## LiteLLM Search Proxy (Mini)
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/search/searxng-search \
-  -H "Authorization: Bearer dummy" \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"query":"openvino llm","max_results":3}' | jq .
 ```

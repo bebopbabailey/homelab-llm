@@ -18,10 +18,10 @@ backends (local and remote) to evolve independently.
 - **Where**: Runs on the Mini for now
  - **Monitoring**: system-monitor (planned) lives here
 ## Layer 3 — Inference
-- **Local specialist**: OpenVINO GenAI server on the Mini (ov-*)
+- **Local specialist**: OpenVINO GenAI server on the Mini (standalone backend; not currently wired as active LiteLLM handles)
 - **Remote specialists**: MLX OpenAI servers on the Studio (mlx-*; ports 8100-8119 team, 8120-8139 experimental).
 - **MLX registry**: canonical `model_id` links to inference artifacts via `source_path`/`cache_path`.
-- **Optimization proxy**: OptiLLM behind LiteLLM (localhost-only)
+- **Optimization proxy**: OptiLLM localhost-only proxy, called directly when optimization techniques are needed
 - **OptiLLM local**: Studio MPS/FP16 inference tier (ports 4040–4042)
 
 ## Layer 4 — Tools

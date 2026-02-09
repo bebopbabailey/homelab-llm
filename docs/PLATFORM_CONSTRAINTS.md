@@ -1,5 +1,17 @@
 # PLATFORM_CONSTRAINTS
 
+## Authority and precedence
+- This file is a **platform-facing summary** only.
+- Canonical global non-negotiables: `CONSTRAINTS.md`.
+- Canonical agent execution behavior: `AGENTS.md`.
+- Canonical documentation obligations: `DOCS_CONTRACT.md`.
+- Canonical sandbox scope summary: `SANDBOX_PERMISSIONS.md`.
+- Resolve conflicts via `docs/_core/SOURCES_OF_TRUTH.md`.
+
+## Scope note
+- Keep this file concise and pointer-first.
+- Do not introduce policy here that is not already defined in canonical root governance docs.
+
 ## Must
 - Routing-only; no inference in Tiny Agents.
 - Use `uv` only; no system Python mutations.

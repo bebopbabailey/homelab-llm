@@ -16,6 +16,7 @@ Current, canonical statements of the system, its contracts, and its integration 
 - Registry/template data (prefer data over summaries):
     - `layer-gateway/registry/handles.jsonl`
     - `layer-inference/registry/models.jsonl`
+    - `layer-data/registry/lexicon.jsonl`
     - `platform/ops/templates/mcp-registry.json`
 - Per-service canon (most specific truth for a service):
     - `layer-*/<service>/SERVICE_SPEC.md`

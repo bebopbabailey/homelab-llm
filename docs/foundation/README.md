@@ -1,10 +1,11 @@
 # Foundation Docs (for future service additions)
 
 These documents are the durable, agent-focused reference for extending this repo
-with new services under `/services`. They summarize the current topology, routing,
+with new services under each `layer-*` directory. They summarize the current topology, routing,
 and constraints so new work stays compatible with the existing platform.
 
 ## Contents
+- `autonomy-roadmap.md` — phased strategy for safe, scalable local autonomy.
 - `overview.md` — system architecture, data flow, and key roles.
 - `topology.md` — authoritative ports/endpoints and host mapping.
 - `service-additions.md` — step-by-step process for adding services/backends.
@@ -29,7 +30,7 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/OPENCODE.md` — OpenCode client setup + LiteLLM presets + MCP tooling.
 - `docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
 - `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
-- `docs/foundation/opt-techniques.md` — OptiLLM technique prefixes + use cases.
+- `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
 - `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
 - `layer-*/<service>/SERVICE_SPEC.md` — per-service runtime contract and env locations.
 - `layer-gateway/litellm-orch/ARCHITECTURE.md` and `layer-inference/ov-llm-server/ARCHITECTURE.md`

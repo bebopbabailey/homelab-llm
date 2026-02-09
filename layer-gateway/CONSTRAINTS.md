@@ -4,12 +4,11 @@
 - Must remain routing/observability only (no inference).
 - Clients must call LiteLLM only; do not bypass the gateway.
 - OptiLLM proxy may call MLX endpoints directly when configured; avoid routing loops.
-- Optimization proxies (OptiLLM) must bind to localhost and sit behind LiteLLM.
 - Do not change port bindings without a migration plan.
 
 ## System monitor boundaries
 - **Read‑only** health checks and status queries only.
-- **No direct restarts** from the monitor.
+- **No direct restarts** from the system-monitor service.
 - Escalation via bulletin/DB entry (planned in system docs DB).
 
 ## Sandbox permissions

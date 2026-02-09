@@ -11,10 +11,10 @@
   OptiLLM techniques are selected per-request via `optillm_approach` rather than
   exploding model handles.
 - For OpenAI-compatible upstreams, keep model aliases as handles and set the backend `litellm_params.model` to `openai/<base-model>`.
-- Logs: JSON logs enabled (`litellm_settings.json_logs: true`).
+- Logs: JSON logs are currently disabled (`litellm_settings.json_logs: false`).
 - OptiLLM request fields are passed through by setting `litellm_settings.drop_params: false`
   (only relevant when calling OptiLLM directly).
-- Auth: proxy key planned via `LITELLM_PROXY_KEY`.
+- Auth: gateway requests currently require bearer auth (`LITELLM_MASTER_KEY` in deployment).
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
 - MLX alias set (fixed ports): `mlx-*` (ports `8100-8119` team); `8120-8139` reserved for experimental tests.
 - MLX registry is the canonical link from `model_id` to inference source:
@@ -27,7 +27,52 @@
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
 - Aliases: `main`, `deep`, `fast`, `swap` are the stable LiteLLM handles.
-- Experiments: `x1`–`x4` are reserved for experimental routing.
+- LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
+
+### LiteLLM Prometheus metrics (enabled)
+- `/metrics/` endpoint is exposed by the LiteLLM proxy on the same port (4000).
+- **Auth is required** (same bearer auth as `/v1/*` endpoints).
+- Hitting `/metrics` (no trailing slash) returns **307** → use `/metrics/`.
+- Enable via `litellm_settings.callbacks: ["prometheus"]` in `router.yaml`.
+- Metric names vary by version; verify in `/metrics/` before building dashboards.
+
+PromQL examples (Grafana):
+```promql
+# Requests per second (proxy)
+sum(rate(litellm_proxy_total_requests_metric_total[1m]))
+
+# End-to-end request p95 latency (seconds)
+histogram_quantile(0.95, sum(rate(litellm_request_total_latency_metric_bucket[5m])) by (le, model))
+
+# Time-to-first-token (TTFT) p95 (seconds)
+histogram_quantile(0.95, sum(rate(litellm_llm_api_time_to_first_token_metric_bucket[5m])) by (le, model))
+
+# Error rate (proxy)
+sum(rate(litellm_proxy_failed_requests_metric_total[1m])) 
+  / sum(rate(litellm_proxy_total_requests_metric_total[1m]))
+
+# Tokens per second (total)
+sum(rate(litellm_total_tokens_metric_total[1m]))
+
+# Tokens per second (input/output)
+sum(rate(litellm_input_tokens_metric_total[1m]))
+sum(rate(litellm_output_tokens_metric_total[1m]))
+```
+- Common metric families observed (verify via `/metrics/`):
+  - `litellm_proxy_total_requests_metric_total`
+  - `litellm_proxy_failed_requests_metric_total`
+  - `litellm_request_total_latency_metric_*` (histogram)
+  - `litellm_llm_api_time_to_first_token_metric_*` (histogram)
+  - `litellm_total_tokens_metric_total`, `litellm_input_tokens_metric_total`, `litellm_output_tokens_metric_total`
+  - `litellm_deployment_latency_per_output_token_*` (histogram)
+
+### Prometheus + Grafana (Mini)
+- Prometheus: `http://127.0.0.1:9090` (localhost only).
+- Grafana: `http://127.0.0.1:3001` (localhost only).
+- Grafana datasource is provisioned to Prometheus on startup.
+- Dashboards live in `layer-interface/grafana/dashboards/` (deployed copy under `/etc/homelab-llm/grafana/dashboards/`).
+- Prometheus runtime config: `/etc/homelab-llm/prometheus/prometheus.yml` (deployed from repo).
+- Experimental aliases (`x1`–`x4`) are not currently configured in active router config.
 
 ### Param support probe (LiteLLM + MLX backends)
 Run this on the **Mini** to verify which optional params are accepted or ignored:
@@ -54,6 +99,15 @@ if a param is rejected by the backend.
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
 - Health: `/health` on port 3000.
  - Web search (via LiteLLM): `/v1/search/searxng-search`.
+
+## Tailscale Services (tailnet HTTPS)
+- Services are exposed via `tailscale serve --service=svc:<name>` on the Mini.
+- Hostnames (tailnet only):
+  - `https://code.tailfd1400.ts.net/` → code-server (8080)
+  - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)
+  - `https://gateway.tailfd1400.ts.net/` → LiteLLM (4000)
+  - `https://search.tailfd1400.ts.net/` → SearXNG (8888)
+- Access is controlled by **grants** (not legacy ACLs). Use `svc:*` in `dst`.
 
 ## SearXNG search
 - Local SearXNG: `http://127.0.0.1:8888/search?q=<query>&format=json`
@@ -83,23 +137,20 @@ if a param is rejected by the backend.
 
 ## OptiLLM boost lane (opt-in)
 - `boost`: OptiLLM router decides whether to apply an approach (including “none”) using the main base model.
-- `boost-deep`: same, but uses the deep base model.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: OptiLLM logs the selected approach at INFO level (`Using approach(es) [...]`) in `optillm-proxy` logs. No response header is currently documented for approach selection.
 - OptiLLM proxy default approach is `none`; requests without `optillm_approach` do not route.
 - OptiLLM proxy requires `Authorization: Bearer <OPTILLM_API_KEY>` even on localhost; missing headers return an “Invalid Authorization header” error.
 
-### router_meta (proxy-to-local split)
-- `router_meta` predicts an approach and routes to opti-proxy or opti-local.
-- Local-only approaches: `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`,
-  `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`.
-- Use `optillm_approach=router_meta` in the request body.
+### router_meta (deferred)
+- `router_meta` is **deferred** until OptiLLM local inference is deployed
+  on the Orin AGX (CUDA). Do not use it on the Studio.
 
 ### OptiLLM validation checklist (router + plugins)
 1) Router is active (log line: `Using approach(es) ['router']`).
 2) `web_search` returns results **without** Chrome errors (SearXNG path).
 3) `deep_research` uses the same SearXNG path (no Selenium dependency).
-4) `boost` and `boost-deep` return 200 with non-empty `message.content`.
+4) `boost` returns 200 with non-empty `message.content`.
 
 ## LiteLLM extension points (summary)
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
@@ -122,16 +173,6 @@ and where this repo uses callbacks vs guardrails.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
 
-## OptiLLM local inference (Studio)
-- Separate local inference instances (PyTorch/MPS) run on the Studio:
-  - `4040` → `opt-router-high`
-  - `4041` → `opt-router-balanced`
-  - `4042` → `opt-router-fast`
-- These are distinct from the Mini proxy and use single-model local inference.
-- Local instances are currently disabled by default until setup is finalized.
-- Standard HF cache on Studio: `/Users/thestudio/models/hf/hub`.
-- Pin `transformers<5` for router compatibility.
-
 ### Technique selection (request body)
 Set `optillm_approach` in the request body:
 - `moa`: Mixture-of-Agents (strong reasoning, higher latency)
@@ -141,6 +182,7 @@ Set `optillm_approach` in the request body:
 Local-only (best on opti-local due to multi-sample or decoding-level control):
 - `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`, `entropy_decoding`,
   `deepconf`, `thinkdeeper`, `autothink`
+Local-only approaches are **deferred** until the Orin AGX setup.
 
 Example:
 ```json
@@ -168,5 +210,5 @@ Example:
   execution by default.
 
 ## Client base URL recommendation
-- Prefer `http://mini:4000` only if name resolution is configured.
-- Fallback: `http://192.168.1.71:4000`.
+- Prefer tailnet HTTPS: `https://gateway.tailfd1400.ts.net/v1`.
+- Local host-only calls use `http://127.0.0.1:4000/v1` (on the Mini).

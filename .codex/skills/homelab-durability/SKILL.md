@@ -10,7 +10,6 @@ description: Enforce docs-first, minimal-contract, validation-heavy workflow; pr
 - docs/_core/SOURCES_OF_TRUTH.md
 - docs/_core/CHANGE_RULES.md
 - docs/foundation/operating-rhythm.md
-- docs/OPENCODE.md
 - layer-gateway/CONSTRAINTS.md
 - docs/foundation/topology.md
 - docs/PLATFORM_DOSSIER.md
@@ -24,9 +23,12 @@ description: Enforce docs-first, minimal-contract, validation-heavy workflow; pr
 - Violations: HARD-BLOCK for MLX/disk/host/file-list rules; WARN for stylistic rules.
 
 ## Workflow Rules (Behavioral)
-- Use `SCRATCH_PAD.md` only when the user needs to run commands or when outputs/diffs are too large for chat; otherwise inline is acceptable.
-- `NOW.md` must reflect the active task; update it when the active work changes.
+- Use `SCRATCH_PAD.md` only when the user asks. This is mainly for use if user needs to run 
+  commands themselves or asks to review commands/outputs/diffs; otherwise inline is acceptable.
+- `NOW.md` must reflect the active development task; update it when the active work changes.
 - `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.
+- Journal entries are append-only. Do not move or delete files in `docs/journal/`.
+  If a correction is needed, add a new dated entry and update `docs/journal/index.md`.
 
 ### Required startup declarations
 Every response MUST begin by stating:
@@ -51,9 +53,8 @@ Every response MUST begin by stating:
 ### Host Check (required before ops commands)
 - Explicitly confirm target host and its role.
 - If not confirmed, STOP and ask for confirmation.
-- Never do cross-host guessing; require explicit host confirmation in the same response before ops commands.
 
-## Operating Rhythm (must follow)
+## Preferred Operating Rhythm
 Inventory → Constraints → Minimal contract → Wire → Validate → Codify → Prune
 
 ## Output Format (Required)

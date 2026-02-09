@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>optillm.proxy.studio</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/thestudio/optillm-proxy/.venv/bin/optillm</string>
+      <string>--host</string>
+      <string>127.0.0.1</string>
+      <string>--port</string>
+      <string>4020</string>
+      <string>--base-url</string>
+      <string>${OPTILLM_PROXY_BASE_URL}</string>
+      <string>--model</string>
+      <string>${OPTILLM_PROXY_MODEL}</string>
+      <string>--approach</string>
+      <string>none</string>
+      <string>--optillm-api-key</string>
+      <string>${OPTILLM_PROXY_API_KEY}</string>
+      <string>--plugins-dir</string>
+      <string>/Users/thestudio/optillm-proxy</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>OPENAI_API_KEY</key>
+      <string>${OPTILLM_PROXY_UPSTREAM_KEY}</string>
+      <key>ROUTER_META_LOCAL_URL</key>
+      <string>http://127.0.0.1:4040/v1</string>
+      <key>ROUTER_META_LOCAL_MODEL</key>
+      <string>${OPTILLM_LOCAL_MODEL}</string>
+      <key>ROUTER_META_PROXY_URL</key>
+      <string>http://127.0.0.1:4020/v1</string>
+    </dict>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>/Users/thestudio/optillm-proxy</string>
+    <key>StandardOutPath</key>
+    <string>/Users/thestudio/Library/Logs/optillm-proxy.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/thestudio/Library/Logs/optillm-proxy.err</string>
+  </dict>
+</plist>

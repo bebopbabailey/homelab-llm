@@ -12,7 +12,7 @@ point for all model requests; backends are never called directly by clients.
 - **Data**: future vector/memory storage
 
 ## Principle
-- **Everything goes through LiteLLM** unless explicitly documented otherwise.
+- **Everything goes through LiteLLM** unless explicitly documented otherwise (for example, direct localhost OptiLLM optimization calls).
 - **New network exposure is opt-in**, never the default.
 - **Services are independently serviceable** (submodules where active).
 

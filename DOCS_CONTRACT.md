@@ -3,6 +3,14 @@
 This file defines the minimum documentation required at each directory level so
 agents can operate safely within their sandbox.
 
+## Authority and precedence
+- `CONSTRAINTS.md` is canonical for global non-negotiables.
+- `AGENTS.md` governs execution behavior and reporting requirements.
+- This file defines documentation obligations by scope.
+- `SANDBOX_PERMISSIONS.md` provides sandbox scope summaries.
+- `docs/PLATFORM_CONSTRAINTS.md` is a platform-facing summary and must not override this contract.
+- Resolve conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
+
 ## Root (monorepo) — “National manager” agent
 Purpose: read-only orientation, safe diagnostics, and escalation routing.
 
@@ -38,3 +46,4 @@ Must include:
 - Keep constraints short, explicit, and enforceable.
 - Avoid duplicating global constraints in every service; reference root docs when possible.
 - Prefer facts over aspirations. If a service is not active, say so explicitly.
+- If this contract conflicts with root constraints or source hierarchy, update this file to align with canon.

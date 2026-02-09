@@ -978,35 +978,12 @@ def _update_router_yaml(path: Path, mlx_entries):
             continue
         new_lines.append(line)
 
-    block = [begin]
-    for item in mlx_entries:
-        handle = item["handle"]
-        env_base = _env_key(handle, "API_BASE")
-        env_model = _env_key(handle, "MODEL")
-        env_key = _env_key(handle, "API_KEY")
-        ctx = item.get("context_length") or 65536
-        max_output = item.get("max_output_tokens")
-        if not max_output:
-            max_output = min(32768, max(1024, int(ctx) // 2))
-        block += [
-            f"- model_name: {handle}",
-            "  litellm_params:",
-            f"    model: os.environ/{env_model}",
-            f"    api_base: os.environ/{env_base}",
-            f"    api_key: os.environ/{env_key}",
-            f"    max_tokens: {max_output}",
-        ]
-        request_params = item.get("request_params") or {}
-        if request_params:
-            for key in sorted(request_params.keys()):
-                block.append(f"    {key}: {_yaml_scalar(request_params[key])}")
-        block += [
-            "  model_info:",
-            f"    max_input_tokens: {int(ctx)}",
-            f"    max_output_tokens: {int(max_output)}",
-        ]
-        # OptiLLM routing via router-* handles is deprecated and removed.
-    block.append(end)
+    block = [
+        begin,
+        "# MLX model entries omitted (aliases-only model_list).",
+        "# Canonical model_ids remain in the MLX registry and env.local.",
+        end,
+    ]
 
     inserted = False
     output = []

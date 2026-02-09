@@ -22,5 +22,5 @@
 - LiteLLM is the single gateway.
 - Plain logical model names for clients.
 - Open WebUI points to LiteLLM.
-- OpenVINO stays behind LiteLLM.
+- OpenVINO runs as a standalone backend and is not currently wired as active LiteLLM handles.
 - Ports treated as immutable.

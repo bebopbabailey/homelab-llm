@@ -1,11 +1,12 @@
 # PLATFORM_DOSSIER
 
 ## Topology (current)
-- Mac Mini: LiteLLM :4000, Open WebUI :3000, OpenVINO :9000 (LAN-exposed for maintenance),
-  OptiLLM :4020 (localhost-only), SearXNG :8888 (localhost-only), Ollama :11434
+- Mac Mini: LiteLLM :4000 (localhost-only), Open WebUI :3000 (localhost-only),
+  Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
+  OpenVINO :9000 (LAN-exposed for maintenance), OptiLLM :4020 (localhost-only),
+  SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX OpenAI servers :8100-:8119 (mlx-* team); :8120-:8139 reserved for experimental tests.
   Current default boot ensemble: 8100/8101/8102.
-  OptiLLM local inference: :4040 (high), :4041 (balanced), :4042 reserved.
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.
@@ -14,13 +15,12 @@
 
 | service | host | port | bind | base URL | health | evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `/proc/net/fib_trie` |
-| Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `curl http://127.0.0.1:3000/health` |
+| LiteLLM proxy | Mini | 4000 | 127.0.0.1 | http://127.0.0.1:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `/proc/net/fib_trie` |
+| Open WebUI | Mini | 3000 | 127.0.0.1 | http://127.0.0.1:3000 | /health | `/etc/systemd/system/open-webui.service`, `curl http://127.0.0.1:3000/health` |
+| Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
+| Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | OptiLLM proxy | Mini | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-proxy/SERVICE_SPEC.md`, local install |
-| OptiLLM proxy (Studio, optional) | Studio | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-local/launchd/optillm-proxy-studio.plist` |
-| OptiLLM local (high) | Studio | 4040 | 0.0.0.0 | http://192.168.1.72:4040/v1 | /v1/models | `layer-gateway/optillm-local/SERVICE_SPEC.md`, launchd |
-| OptiLLM local (balanced) | Studio | 4041 | 0.0.0.0 | http://192.168.1.72:4041/v1 | /v1/models | `layer-gateway/optillm-local/SERVICE_SPEC.md`, launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
 | MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
@@ -35,21 +35,23 @@
 ## Service inventory (concise)
 - LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `layer-gateway/litellm-orch/config/router.yaml`.
   Auth: API calls require `Authorization: Bearer <LITELLM_MASTER_KEY>` (even on localhost).
+  Prometheus metrics: `/metrics/` (same port, auth required; use trailing slash).
+- Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
+- Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
+  provisioning `/etc/homelab-llm/grafana/provisioning/`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
   Working dir: `/home/christopherbailey/homelab-llm/layer-interface/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
 - OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env`.
-  LiteLLM now uses `ov-*` aliases that map directly to base OpenVINO model IDs; `ov-*` is deprecated.
+  OpenVINO is currently available as a standalone backend and is not wired as active LiteLLM handles.
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
   Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for OpenVINO).
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
 - OptiLLM: systemd unit `/etc/systemd/system/optillm-proxy.service`, env `/etc/optillm-proxy/env`, localhost-only proxy. Upstream can be LiteLLM or MLX depending on policy.
-- OptiLLM local (Studio): launchd units, HF cache `/Users/thestudio/models/hf/hub`, pin `transformers<5` for router.
-  Local inference should disable the router plugin and load local-only approaches
-  (bon, moa, mcts, pvg, cot_decoding, entropy_decoding, deepconf, thinkdeeper, autothink).
-  Local OptiLLM launchd is disabled by default until setup is finalized.
+- OptiLLM local inference is **deferred** to the Orin AGX (CUDA).
+  Studio has no opti-local runtime enabled.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.
-  Current default boot ensemble: `8100` (gpt-oss-120b), `8101` (gemma-27b), `8102` (gpt-oss-20b).
+  Current default boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
@@ -60,13 +62,22 @@
   `search.web` are implemented, registry/systemd still pending.
 - AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
 
+## Data registries (authoritative)
+- Lexicon registry (term correction): `layer-data/registry/lexicon.jsonl`
+
 ## Exposure and secrets (short)
-- LAN-exposed: LiteLLM 4000, Open WebUI 3000, OpenVINO 9000 (maintenance), Ollama 11434,
+- LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   MLX 8100-8119, Home Assistant 8123, AFM 9999 (planned).
-- Local-only: OptiLLM 4020, SearXNG 8888.
+- Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
+  Prometheus 9090, Grafana 3001, OptiLLM 4020, SearXNG 8888.
+- Tailnet HTTPS (Tailscale Serve on Mini):
+  - `https://code.tailfd1400.ts.net/` → code-server (8080)
+  - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)
+  - `https://gateway.tailfd1400.ts.net/` → LiteLLM (4000)
+  - `https://search.tailfd1400.ts.net/` → SearXNG (8888)
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`.
-- Tailscale ACLs managed in admin (details not documented).
+- Tailscale ACLs/grants managed in admin (use `svc:*` grants for Services access).
 
 ## Decisions (ADR-lite)
 - LiteLLM is the single gateway.

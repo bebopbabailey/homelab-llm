@@ -39,3 +39,8 @@ Use these rules to keep documentation and registries consistent. Each rule is an
   - `docs/foundation/testing.md`
   - `scripts/validate_handles.py` (implementation)
   - Example: adding a new handle validation rule should also add a corresponding test step in testing docs.
+
+## Journal Integrity
+- Journal entries are **append-only**. Do not move or delete entries from `docs/journal/`.
+- If a correction is needed, add a **new** entry that references the original.
+- Always update `docs/journal/index.md` when adding a new entry.

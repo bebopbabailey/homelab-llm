@@ -32,13 +32,13 @@ use-case. Hopes of branching into enterprise-land later.
 - Naming: registry keys use `snake_case`; registry values use `kebab-case` where applicable.
 - Showroom/backroom rule: only models present on the Mini or Studio are exposed as
   LiteLLM handles; Seagate storage is backroom-only.
-- OpenVINO backend is offline for now; OV health checks are suppressed (1s timeout, no background checks).
+- OpenVINO backend is available as a standalone service and is not currently wired as active LiteLLM handles.
 - OptiLLM router targets suppress background health checks to avoid false negatives when downstream MLX is cold.
 - OptiLLM techniques are selected per-request via `optillm_approach` (no alias explosion).
 - Health policy: use LiteLLM `/health/readiness` as the default health signal; `/health`
   is a deep probe that can flag offline backends.
 - Roles: `main`, `deep`, `fast`, `swap` are the stable client-facing aliases.
-- Experiments: `x1`–`x4` are reserved experimental aliases.
+- Experimental aliases (`x1`–`x4`) are not currently configured in active router config.
 - Transcribe tasks: `task-transcribe`, `task-transcribe-vivid` (server-side cleaning).
 - OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
   `layer-gateway/optillm-proxy/README.md`.

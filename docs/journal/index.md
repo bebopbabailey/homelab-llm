@@ -1,5 +1,16 @@
 # Journal Index
 
+- [2026-02-08 — Lexicon registry (data layer)](2026-02-08-lexicon-registry.md)
+- [2026-02-08 — OptiLLM local deferred + tailnet services](2026-02-08-optillm-local-defer-and-tailnet-services.md)
+- [2026-02-08 — Tailnet services + SSH console](2026-02-08-tailnet-services-and-ssh.md)
+- [2026-02-08 — Open WebUI localhost bind](2026-02-08-open-webui-localhost-bind.md)
+- [2026-02-08 — Journal integrity policy + restoration](2026-02-08-journal-integrity-policy.md)
+- [2026-02-09 — LiteLLM localhost bind](2026-02-09-litellm-localhost-bind.md)
+- [2026-02-09 — Alias-only LiteLLM model list](2026-02-09-alias-only-model-list.md)
+- [2026-02-09 — LiteLLM Prometheus metrics](2026-02-09-litellm-prometheus-metrics.md)
+- [2026-02-09 — Prometheus + Grafana (Mini)](2026-02-09-prometheus-grafana-setup.md)
+- [2026-01-24 — Transcript personas finalized](2026-01-24-transcript-personas.md)
+- [2026-01-24 — Presets + SDLC mapping](2026-01-24-presets-sdlc-mapping.md)
 - [2026-01-20 — OptiLLM approach selection via request body](2026-01-20-optillm-approach-selection.md)
 - [2026-01-20 — LiteLLM direct MLX routing + handle pruning](2026-01-20-lite-mlx-direct-routing.md)
 - [2026-01-20 — OptiLLM fork + pin](2026-01-20-optillm-fork-and-pin.md)
@@ -10,17 +21,15 @@
 - [2026-01-19 — OptiLLM web_search uses SearXNG](2026-01-19-optillm-searxng-integration.md)
 - [2026-01-19 — mlxctl command updates](2026-01-19-mlxctl-updates.md)
 - [2026-01-19 — OptiLLM default ensemble refresh](2026-01-19-optillm-default-ensemble-update.md)
-- [2026-01-24 — Transcript personas finalized](2026-01-24-transcript-personas.md)
-- [2026-01-24 — Presets + SDLC mapping](2026-01-24-presets-sdlc-mapping.md)
+- [2026-01-19 — OptiLLM local inference plan (Studio)](2026-01-19-optillm-local-plan.md)
+- [2026-01-19 — OptiLLM local setup + showroom rule](2026-01-19-optillm-local-setup.md)
+- [2026-01-19 — OptiLLM local router + HF cache standard](2026-01-19-optillm-local-router-and-cache.md)
 
 - [2026-01-15 — Registries, Entity IDs, and JSONL Plan](2026-01-15-registries-and-ids.md)
 - [2026-01-16 — Benny deprecation + ov-* alias alignment](2026-01-16-benny-deprecation.md)
 - [2026-01-16 — Gateway handles registry v0](2026-01-16-gateway-handles-registry.md)
 - [2026-01-19 — MLX context defaults (all models)](2026-01-19-mlx-context-defaults.md)
 - [2026-01-19 — OptiLLM features + quality matrix](2026-01-19-optillm-features-and-quality-matrix.md)
-- [2026-01-19 — OptiLLM local inference plan (Studio)](2026-01-19-optillm-local-plan.md)
-- [2026-01-19 — OptiLLM local setup + showroom rule](2026-01-19-optillm-local-setup.md)
-- [2026-01-19 — OptiLLM local router + HF cache standard](2026-01-19-optillm-local-router-and-cache.md)
 
 - `2026-01-13-docs-afm.md` — Doc sweep + AFM wiring plan.
 - `2026-01-13-openvino-strengths-plan.md` — OpenVINO strengths plan + device mode evaluation.

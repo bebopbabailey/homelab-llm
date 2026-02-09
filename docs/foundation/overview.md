@@ -21,7 +21,7 @@ while allowing backend models to evolve independently.
    - Clients include `optillm_approach` in the request body.
    - OptiLLM local inference runs on the Studio (ports 4040–4042) for MPS/FP16.
 5) Specialist Backends (current)
-   - OpenVINO LLM server on the Mac Mini (`ov-*`).
+   - OpenVINO LLM server on the Mac Mini (standalone backend; not currently wired as active LiteLLM handles).
    - MLX OpenAI servers on the Mac Studio (`mlx-*`).
    - AFM OpenAI-compatible API on the Studio (planned).
    - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.

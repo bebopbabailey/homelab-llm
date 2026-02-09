@@ -1,7 +1,18 @@
 # Sandbox Permissions (Draft)
 
 This defines what an agent sandbox is allowed to read/write/execute by scope.
-These will be folded into AGENTS.md later; for now they live in constraints.
+
+## Authority and precedence
+- This file is a **sandbox scope summary**.
+- Canonical global rules live in `CONSTRAINTS.md`.
+- Agent execution behavior lives in `AGENTS.md`.
+- Documentation obligations live in `DOCS_CONTRACT.md`.
+- `docs/PLATFORM_CONSTRAINTS.md` is a platform-facing summary only.
+- Resolve conflicts via `docs/_core/SOURCES_OF_TRUTH.md`.
+
+## Scope note
+- Keep this file pointer-first and concise.
+- Layer-level `CONSTRAINTS.md` files remain the most specific sandbox rules for each layer.
 
 ## Root (Monorepo Overseer)
 - **Read:** full repo (all layers + docs)

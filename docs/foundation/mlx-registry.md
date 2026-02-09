@@ -125,6 +125,9 @@ Sync order is: model service → MLX registry → gateway router/env → handles
 - When run from the Studio, it SSHes to `GATEWAY_HOST` (default: `mini`) and
   uses `GATEWAY_MLXCTL` (default: `/home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl`).
 - Gateway sync uses `MLX_HOST` (default: `192.168.1.72`) for generated API base URLs.
+- **Alias-only model list:** `router.yaml` exposes only alias handles (e.g. `main/deep/fast/swap`).
+  Canonical `mlx-*` model IDs remain in the MLX registry + env vars but are omitted from
+  LiteLLM’s `/v1/models` list to avoid duplicate entries in clients.
 
 ## Harmony-format models (gpt-oss)
 Some MLX models (e.g., gpt-oss) output Harmony tags unless a template/parser
@@ -147,7 +150,7 @@ This ensures OpenAI-compatible responses without raw `<|channel|>` tags.
 The boot ensemble is the **source-of-truth** for default MLX availability.
 Current boot ensemble:
 - `mlx-gpt-oss-120b-mxfp4-q4` → port `8100`
-- `mlx-gemma-3-27b-it-qat-4bit` → port `8101`
+- `mlx-qwen3-next-80b-mxfp4-a3b-instruct` → port `8101`
 - `mlx-gpt-oss-20b-mxfp4-q4` → port `8102`
 
 ## Port policy
