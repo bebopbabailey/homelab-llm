@@ -68,7 +68,7 @@ Optional:
 | Execution | systemd service |
 | Restart | automatic |
 | Logging | journald |
-| Privileges | non-root |
+| Privileges | non-root (user: christopherbailey) |
 
 ---
 
@@ -82,7 +82,8 @@ GET /v1/models
 
 ## Deployment
 - **Source of truth:** Mini monorepo (`layer-inference/optillm-local`).
-- **Deploy target:** Orin clone at `/opt/homelab/optillm-local`.
+- **Deploy target:** Orin monorepo clone at `/opt/homelab/optillm-local`.
+- **Service dir:** `/opt/homelab/optillm-local/layer-inference/optillm-local`.
 - **Deploy helper:** `platform/ops/scripts/deploy-optillm-local-orin.sh`.
 
 ---

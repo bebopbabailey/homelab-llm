@@ -5,8 +5,13 @@
 sudo mkdir -p /opt/homelab
 sudo chown -R $USER:$USER /opt/homelab
 cd /opt/homelab
-# clone from the Mini-pushed repo
+# clone monorepo (source of truth)
 # git clone <repo> optillm-local
+```
+
+Service directory:
+```
+/opt/homelab/optillm-local/layer-inference/optillm-local
 ```
 
 ## Env file
@@ -19,6 +24,7 @@ sudo chmod 640 /etc/optillm-local/env
 ## systemd unit
 ```bash
 sudo cp systemd/optillm-local.service /etc/systemd/system/optillm-local.service
+# runs as user: christopherbailey
 sudo systemctl daemon-reload
 sudo systemctl enable --now optillm-local.service
 ```

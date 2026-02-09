@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=optillm
-WorkingDirectory=/opt/homelab/optillm-local
+User=christopherbailey
+WorkingDirectory=/opt/homelab/optillm-local/layer-inference/optillm-local
 EnvironmentFile=/etc/optillm-local/env
-ExecStart=/opt/homelab/optillm-local/.venv/bin/optillm \
+ExecStart=/opt/homelab/optillm-local/layer-inference/optillm-local/.venv/bin/optillm \
   --host 0.0.0.0 \
   --port 4040 \
   --model ${OPTILLM_MODEL} \
