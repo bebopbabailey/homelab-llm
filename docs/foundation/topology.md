@@ -2,7 +2,7 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, OptiLLM, SearXNG, Ollama.
-- Mac Studio: MLX OpenAI servers, OptiLLM local inference.
+- Mac Studio: MLX OpenAI servers.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX (planned): edge inference + optimization experiments.
@@ -17,7 +17,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Safe checks: `curl http://127.0.0.1:4000/health`, `curl http://127.0.0.1:4020/v1/models`.
 
 ### Studio (macOS)
-- Role: MLX inference and Studio-local OptiLLM.
+- Role: MLX inference host.
 - Access: `ssh studio`.
 - Sources of truth: `docs/foundation/mlx-registry.md`.
 - Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`.
@@ -44,8 +44,6 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy | Mini | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
 | OptiLLM proxy (Studio, optional) | Studio | 4020 | http://127.0.0.1:4020/v1 | /v1/models |
-| OptiLLM local (high) | Studio | 4040 | http://192.168.1.72:4040/v1 | /v1/models |
-| OptiLLM local (balanced) | Studio | 4041 | http://192.168.1.72:4041/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
 | MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
@@ -59,10 +57,9 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - Ports 8120-8139 are reserved for experimental test loads and are not registered until a model is loaded.
 - Current boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
 
-### OptiLLM local cache (Studio)
-- HF cache: `/Users/thestudio/models/hf/hub`
-- Router compatibility: pin `transformers<5`
-- Local OptiLLM launchd is disabled by default until setup is finalized.
+### OptiLLM local (status)
+- OptiLLM local inference is deferred until Orin AGX setup.
+- Studio-local OptiLLM runtime is not part of the active platform path.
 
 ## MCP Tools (stdio, no ports)
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
@@ -73,7 +70,6 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
   MLX 8100-8119, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
   Prometheus 9090, Grafana 3001, OptiLLM 4020 (must not be LAN-exposed), SearXNG 8888.
-- LAN-exposed: OptiLLM local 4040/4041 (Studio).
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
   - LiteLLM: `layer-gateway/litellm-orch/config/env.local`

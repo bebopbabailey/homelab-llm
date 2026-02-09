@@ -6,11 +6,13 @@ Set the approach per request via `optillm_approach`, e.g.:
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon"}
 ```
 
-Local inference note (Studio):
+Local inference note (deferred):
 - HF cache: `/Users/thestudio/models/hf/hub`
 - Router compatibility: pin `transformers<5`
 - Local-only approaches (best on opti-local): `bon`, `moa`, `mcts`, `pvg`,
   `cot_decoding`, `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`
+- Local inference is deferred until Orin AGX setup; treat this section as
+  planning guidance, not active runtime behavior.
 
 ## Strategy overview (techniques vs plugins)
 - Techniques (request-based) change how a model is queried (e.g., `moa`).

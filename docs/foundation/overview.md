@@ -19,7 +19,7 @@ while allowing backend models to evolve independently.
 4) Optimization proxy (current)
    - OptiLLM runs localhost-only and is called directly when a technique is needed.
    - Clients include `optillm_approach` in the request body.
-   - OptiLLM local inference runs on the Studio (ports 4040–4042) for MPS/FP16.
+   - OptiLLM local inference is deferred until Orin AGX setup (not an active Studio runtime path).
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (standalone backend; not currently wired as active LiteLLM handles).
    - MLX OpenAI servers on the Mac Studio (`mlx-*`).
@@ -56,5 +56,5 @@ while allowing backend models to evolve independently.
 - MLX registry maps canonical `model_id` to `source_path`/`cache_path` for inference.
 - OpenVINO server: local lightweight backend on the Mini (port 9000).
 - OptiLLM proxy: localhost-only optimization proxy called directly (port 4020).
-- OptiLLM local: Studio MPS/FP16 inference tier (ports 4040–4042, HF cache at `/Users/thestudio/models/hf/hub`).
+- OptiLLM local: deferred until Orin AGX setup.
 - TinyAgents: planned orchestration client that calls LiteLLM only.

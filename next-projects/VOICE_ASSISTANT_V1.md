@@ -1,5 +1,8 @@
 # Voice Assistant v1 — Local-First, Reliable, Multi-Backend
 
+> Status: planning artifact only (non-canonical). Validate active runtime ports,
+> handles, and service bindings against canonical docs before implementation.
+
 ## Purpose
 
 This document defines **Voice Assistant v1**, a local-first voice interaction loop built on top of the homelab-llm platform.

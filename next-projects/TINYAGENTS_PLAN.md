@@ -1,5 +1,8 @@
 # TINYAGENTS_PLAN
 
+> Status: planning artifact only (non-canonical). Validate all model handles and
+> runtime endpoints against active canonical docs before implementation.
+
 ## Phases (compact)
 - Phase 0: repo skeleton, env template, smoke tests, verify LiteLLM health/models.
 - Phase 1: minimal LiteLLM client, model list validation, request ID logging.
@@ -19,7 +22,7 @@ curl -fsS http://127.0.0.1:4000/health | jq .
 curl -fsS http://127.0.0.1:4000/v1/models | jq -e '.data | length > 0'
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"mlx-qwen2-5-coder-32b-instruct-8bit","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  -d '{"model":"main","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
   | jq -e '.choices | length > 0'
 curl -fsS http://127.0.0.1:9000/health | jq .
 curl -fsS http://127.0.0.1:3000/health | jq .

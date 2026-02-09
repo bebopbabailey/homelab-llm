@@ -22,7 +22,7 @@ backends (local and remote) to evolve independently.
 - **Remote specialists**: MLX OpenAI servers on the Studio (mlx-*; ports 8100-8119 team, 8120-8139 experimental).
 - **MLX registry**: canonical `model_id` links to inference artifacts via `source_path`/`cache_path`.
 - **Optimization proxy**: OptiLLM localhost-only proxy, called directly when optimization techniques are needed
-- **OptiLLM local**: Studio MPS/FP16 inference tier (ports 4040–4042)
+- **OptiLLM local**: deferred until Orin AGX setup
 
 ## Layer 4 — Tools
 - **Services**: MCP tools, web-fetch, search services (SearXNG)
