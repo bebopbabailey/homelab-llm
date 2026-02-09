@@ -217,3 +217,9 @@ This service will own a JSONL registry for OptiLLM ensembles (planned):
 - Requests via LiteLLM alias reach OptiLLM
 - OptiLLM makes multiple upstream calls to LiteLLM
 - No routing loops occur
+
+
+## Dev → Deploy (Mini → Studio)
+- **Source of truth**: Mini repo (`layer-gateway/optillm-proxy`).
+- **Deploy target**: Studio clone at `/Users/thestudio/optillm-proxy`.
+- **Deploy helper**: `scripts/deploy_studio.sh` (pulls, uv sync, launchd restart, smoke test; optional bench).

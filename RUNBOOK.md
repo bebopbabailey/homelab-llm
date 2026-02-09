@@ -52,3 +52,23 @@ uv venv .venv
 uv sync
 sudo systemctl restart optillm-proxy.service
 ```
+
+
+## Studio deploy (launchd)
+Use the deploy helper from the Mini (source of truth):
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/deploy_studio.sh
+```
+
+Overrides (all optional):
+- `OPTILLM_STUDIO_HOST` (default: `studio`)
+- `OPTILLM_LAUNCHD_LABEL` (default: `optillm.proxy.studio`)
+- `OPTILLM_API_KEY_ENV` (default: `/etc/optillm-proxy/env`)
+- `OPTILLM_SMOKE_MODEL` (default: `mlx-gpt-oss-120b-mxfp4-q4`)
+- `OPTILLM_SMOKE_APPROACH` (default: `bon`)
+- `OPTILLM_SMOKE_MAX_TOKENS` (default: `32`)
+- `OPTILLM_RUN_BENCH=1` to run a benchmark after deploy
+- `OPTILLM_BENCH_MODEL` (default: `p-plan-max`)
+- `OPTILLM_BENCH_PROMPT` (default prompt defined in script)
+- `OPTILLM_BENCH_MAX_TOKENS` (default: `1200`)

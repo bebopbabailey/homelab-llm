@@ -219,3 +219,9 @@ providers:
 - Direct client access
 - MCP integration
 - Automatic model discovery
+
+
+## Studio deployment (source of truth = Mini)
+- Development and commits happen on the Mini repo.
+- Studio deploy is a **git pull** into `/Users/thestudio/optillm-proxy` plus launchd restart.
+- Use `scripts/deploy_studio.sh` from the Mini to deploy + smoke test.
