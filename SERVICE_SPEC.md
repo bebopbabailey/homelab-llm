@@ -9,12 +9,14 @@ the Mini, MLX on the Studio, AFM planned).
 - **Host**: Mac mini (Intel i7, 64 GB RAM), Ubuntu 24.04
 - **Language/Framework**: Python 3.12, LiteLLM proxy behavior, FastAPI + Uvicorn
 - **Inference**: None (upstream only)
+- **Bind**: `127.0.0.1:4000` (tailnet HTTPS via Tailscale Serve)
 
 ## Endpoints
 - `POST /v1/chat/completions` (OpenAI-compatible; forwards to upstream)
 - `GET /v1/models` (logical model names from router config)
 - `GET /health` (LiteLLM health check across configured deployments)
 - `GET /health/readiness` and `GET /health/liveliness` (service readiness/liveness)
+- `GET /metrics/` (Prometheus; requires bearer auth; **use trailing slash**)
 
 ## Configuration
 - Declarative routing in `config/router.yaml` with env-var substitution.
@@ -44,9 +46,9 @@ the Mini, MLX on the Studio, AFM planned).
 ## Service Management (Planned)
 - User systemd service with explicit port binding
 
-## Auth (Planned)
-- API key enforcement will be enabled once non-local access is required.
-- Proposed approach: set `LITELLM_PROXY_KEY` and require `Authorization: Bearer <key>` from clients.
+## Auth (Current)
+- API key enforcement is enabled (bearer auth required for `/v1/*`, `/health`, `/metrics/`).
+- Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
 
 ## Orchestration (Planned)
 - TinyAgents will be a client of LiteLLM (not a direct backend caller).

@@ -1,4 +1,8 @@
 model_list:
+# BEGIN MLXCTL AUTO
+# MLX model entries omitted (aliases-only model_list).
+# Canonical model_ids remain in the MLX registry and env.local.
+# END MLXCTL AUTO
 # 1) Core role aliases: main / deep / fast / swap
 - model_name: main
   litellm_params:
@@ -28,49 +32,30 @@ model_list:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
-- model_name: boost-deep
-  litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: os.environ/OPTILLM_API_KEY
 
-# 3) Experimental aliases: x1..x4
-- model_name: x1
-  litellm_params:
-    # x1 placeholder: swap
-    model: os.environ/SWAP_MODEL
-    api_base: os.environ/SWAP_API_BASE
-    api_key: os.environ/SWAP_API_KEY
-- model_name: x2
-  litellm_params:
-    # x2 placeholder: swap
-    model: os.environ/SWAP_MODEL
-    api_base: os.environ/SWAP_API_BASE
-    api_key: os.environ/SWAP_API_KEY
-- model_name: x3
-  litellm_params:
-    # x3 placeholder: swap
-    model: os.environ/SWAP_MODEL
-    api_base: os.environ/SWAP_API_BASE
-    api_key: os.environ/SWAP_API_KEY
-- model_name: x4
-  litellm_params:
-    # x4 placeholder: swap
-    model: os.environ/SWAP_MODEL
-    api_base: os.environ/SWAP_API_BASE
-    api_key: os.environ/SWAP_API_KEY
-
-# 4) Task aliases (optional): task-transcribe, task-transcribe-vivid
+# 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
   litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
+    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
+    temperature: 0.05
+    top_p: 1.0
+    max_tokens: 4096
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+
 - model_name: task-transcribe-vivid
   litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
+    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
+    temperature: 0.4
+    top_p: 1.0
+    max_tokens: 4096
+    presence_penalty: 0.0
+    frequency_penalty: 0.2
+
 
 search_tools:
 - search_tool_name: searxng-search
@@ -90,11 +75,22 @@ router_settings:
     RateLimitError: 0
     ServiceUnavailableError: 1
 litellm_settings:
-  json_logs: true
+  json_logs: false
   drop_params: false
+  callbacks: ["prometheus"]
 guardrails:
-  - guardrail_name: transcribe-guardrail
+  - guardrail_name: "prompt-pre"
     litellm_params:
-      guardrail: transcribe_guardrail.TranscribeGuardrail
+      guardrail: "prompt_guardrail.PromptGuardrail"
+      mode: "pre_call"
+      default_on: true
+  - guardrail_name: "transcribe-pre"
+    litellm_params:
+      guardrail: "transcribe_guardrail.TranscribeGuardrail"
+      mode: "pre_call"
+      default_on: true
+  - guardrail_name: "transcribe-post"
+    litellm_params:
+      guardrail: "transcribe_guardrail.TranscribeGuardrail"
       mode: "post_call"
       default_on: true

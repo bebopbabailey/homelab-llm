@@ -1,0 +1,10 @@
+---
+model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+temperature: 0.05
+input:
+  schema:
+    user_message: string
+---
+System: Say "SYS_OK".
+
+User: Say "USR_OK {{user_message}}".
