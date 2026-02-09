@@ -45,6 +45,9 @@ Authorization: Bearer <OPTILLM_API_KEY>
 - Model is a HuggingFace model ID passed as `--model` (e.g. `meta-llama/…`).
 - Local mode supports LoRAs via `model+adapter1+adapter2` (OptiLLM convention).
 
+Current model on Orin:
+- `Qwen/Qwen2.5-14B-Instruct`
+
 ---
 
 ## Runtime configuration (expected)

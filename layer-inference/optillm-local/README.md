@@ -10,6 +10,7 @@ LiteLLM on the Mini.
 - **Auth:** `OPTILLM_API_KEY`
 - **Repo root (Orin):** `/opt/homelab/optillm-local`
 - **Service dir (Orin):** `/opt/homelab/optillm-local/layer-inference/optillm-local`
+- **Current model:** `Qwen/Qwen2.5-14B-Instruct`
 
 ## Quick smoke test
 ```bash
