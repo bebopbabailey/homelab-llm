@@ -1,4 +1,5 @@
 # Journal Index
+- 2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)
 
 - [2026-02-08 — Lexicon registry (data layer)](2026-02-08-lexicon-registry.md)
 - [2026-02-08 — OptiLLM local deferred + tailnet services](2026-02-08-optillm-local-defer-and-tailnet-services.md)
