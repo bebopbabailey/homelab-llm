@@ -62,6 +62,9 @@ Optional:
 - `TRANSFORMERS_CACHE`
 - `TORCH_HOME`
 - `CUDA_VISIBLE_DEVICES`
+ - `PYTHONPATH` (set to service `runtime/` for startup patches)
+ - `OPTILLM_DISABLE_SKLEARN=1` (recommended on Jetson)
+ - `TRANSFORMERS_NO_SKLEARN=1` (defensive; may not be honored by Transformers)
 
 ---
 

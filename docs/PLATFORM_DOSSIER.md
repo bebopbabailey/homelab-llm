@@ -3,10 +3,11 @@
 ## Topology (current)
 - Mac Mini: LiteLLM :4000 (localhost-only), Open WebUI :3000 (localhost-only),
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
-  OpenVINO :9000 (LAN-exposed for maintenance), OptiLLM :4020 (localhost-only),
+  OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX OpenAI servers :8100-:8119 (mlx-* team); :8120-:8139 reserved for experimental tests.
   Current default boot ensemble: 8100/8101/8102.
+  OptiLLM proxy :4020 (localhost-only; used via LiteLLM `boost`).
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.
@@ -20,8 +21,8 @@
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
-| OptiLLM proxy | Mini | 4020 | 127.0.0.1 | http://127.0.0.1:4020/v1 | /v1/models | `layer-gateway/optillm-proxy/SERVICE_SPEC.md`, local install |
-| OptiLLM local (Orin) | Orin | 4040 | 0.0.0.0 | http://<orin-ip>:4040/v1 | /v1/models | service contract (planned) |
+| OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy` (deploy doc + unit), `router.yaml` `boost` |
+| OptiLLM local (Orin) | Orin | 4040 | 0.0.0.0 | http://<orin-ip>:4040/v1 | /v1/models | service contract (active), systemd on Orin |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
 | MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
@@ -47,9 +48,14 @@
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
   Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for OpenVINO).
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
-- OptiLLM: systemd unit `/etc/systemd/system/optillm-proxy.service`, env `/etc/optillm-proxy/env`, localhost-only proxy. Upstream can be LiteLLM or MLX depending on policy.
-- OptiLLM local inference is **planned** for Orin AGX (CUDA) and will be deployed via systemd.
+- OptiLLM proxy (Studio): currently running as a user-managed process on the Studio.
+  Evidence: `ps` shows `optillm --host 0.0.0.0 --port 4020 --approach router`.
+  Upstream: MLX (current base URL points at `http://192.168.1.72:8101/v1`).
+  LiteLLM routes to it via the `boost` handle (`OPTILLM_API_BASE` in `router.yaml`).
+- OptiLLM local inference is **active** on Orin AGX (CUDA) via systemd.
   Studio has no opti-local runtime enabled.
+  Note: Orin uses a startup patch (`PYTHONPATH` → `runtime/`) to disable sklearn
+  imports on Jetson (`OPTILLM_DISABLE_SKLEARN=1`).
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.
   Current default boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
@@ -70,7 +76,7 @@
 - LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   MLX 8100-8119, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
-  Prometheus 9090, Grafana 3001, OptiLLM 4020, SearXNG 8888.
+  Prometheus 9090, Grafana 3001, SearXNG 8888.
 - Tailnet HTTPS (Tailscale Serve on Mini):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)

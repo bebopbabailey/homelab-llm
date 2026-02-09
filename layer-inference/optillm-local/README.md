@@ -26,3 +26,5 @@ curl -fsS http://127.0.0.1:4040/v1/models \
 ## Notes
 - This service is **inference layer** (not gateway).
 - CV/STT/TTS are **separate services**.
+- On Jetson, set `PYTHONPATH` to `runtime/` and `OPTILLM_DISABLE_SKLEARN=1`
+  to avoid scikit-learn TLS import crashes in Transformers.
