@@ -8,7 +8,8 @@ LiteLLM on the Mini.
 - **Port:** 4040
 - **Bind:** 0.0.0.0 (LAN only)
 - **Auth:** `OPTILLM_API_KEY`
-- **Repo path (Orin):** `/opt/homelab/optillm-local`
+- **Repo root (Orin):** `/opt/homelab/optillm-local`
+- **Service dir (Orin):** `/opt/homelab/optillm-local/layer-inference/optillm-local`
 
 ## Quick smoke test
 ```bash
@@ -18,7 +19,7 @@ curl -fsS http://127.0.0.1:4040/v1/models \
 
 ## Deployment model
 - **Source of truth:** Mini monorepo (`layer-inference/optillm-local`).
-- **Deploy target:** Orin clone at `/opt/homelab/optillm-local`.
+- **Deploy target:** Orin monorepo clone at `/opt/homelab/optillm-local`.
 - **Deploy helper:** `platform/ops/scripts/deploy-optillm-local-orin.sh`.
 
 ## Notes

@@ -5,21 +5,22 @@ set -Eeuo pipefail
 
 ORIN_HOST="${OPTILLM_ORIN_HOST:-orin}"
 REPO_DIR="/opt/homelab/optillm-local"
+SVC_DIR="$REPO_DIR/layer-inference/optillm-local"
 SYSTEMD_SERVICE="${OPTILLM_SYSTEMD_SERVICE:-optillm-local.service}"
 ENV_FILE="${OPTILLM_ENV_FILE:-/etc/optillm-local/env}"
-SMOKE_MODEL="${OPTILLM_SMOKE_MODEL:-}" # unused here, kept for parity
 
 log() { printf "\n[%s] %s\n" "$(date +'%F %T')" "$*"; }
 ssh_orin() { ssh -o BatchMode=yes "$ORIN_HOST" "$@"; }
 
 log "Deploying optillm-local to $ORIN_HOST"
 log "Repo: $REPO_DIR"
+log "Service dir: $SVC_DIR"
 
 log "Pulling latest on Orin"
 ssh_orin "cd '$REPO_DIR' && git pull --ff-only"
 
 log "Syncing deps (uv sync if uv.lock exists)"
-ssh_orin "cd '$REPO_DIR' && if [ -f uv.lock ]; then uv sync; fi"
+ssh_orin "cd '$SVC_DIR' && if [ -f uv.lock ]; then uv sync; fi"
 
 log "Restarting systemd service: $SYSTEMD_SERVICE"
 ssh_orin "sudo systemctl restart '$SYSTEMD_SERVICE'"
