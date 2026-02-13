@@ -54,7 +54,6 @@ Example (raw HTTP):
 `router_meta` is a custom plugin that predicts an approach with ModernBERT and
 then routes either to:
 - **optillm-proxy** (proxy-safe approaches), or
-- **optillm-local** (local-only approaches).
 Local-only approaches: `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`,
 `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`.
 
@@ -153,7 +152,7 @@ Notes:
 - `--optillm-api-key` protects the OptiLLM proxy itself.
 - `--base-url` points at LiteLLM or directly at an MLX OpenAI-compatible endpoint.
 - OptiLLM local (Studio) uses `/Users/thestudio/models/hf/hub` and pins
-  `transformers<5` for router compatibility (see `layer-gateway/optillm-local`).
+  `transformers<5` for router compatibility.
 
 ## Pinned fork (durability)
 
