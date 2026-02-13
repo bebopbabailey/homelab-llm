@@ -1,9 +1,10 @@
 # Journal Index
-- 2026-02-09 — OptiLLM local on Orin (inference layer)
+- [2026-02-11 - MLX runtime/boot single-contract on Studio](2026-02-11-mlx-runtime-single-contract.md)
+- [2026-02-11 - MLXCTL GPT-OSS auto-harmony defaults](2026-02-11-mlxctl-gpt-oss-auto-harmony.md)
 - 2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)
+- [2026-02-09 — Reality snapshot (Mini + Studio)](2026-02-09-reality-snapshot-mini-studio.md)
 
 - [2026-02-08 — Lexicon registry (data layer)](2026-02-08-lexicon-registry.md)
-- [2026-02-08 — OptiLLM local deferred + tailnet services](2026-02-08-optillm-local-defer-and-tailnet-services.md)
 - [2026-02-08 — Tailnet services + SSH console](2026-02-08-tailnet-services-and-ssh.md)
 - [2026-02-08 — Open WebUI localhost bind](2026-02-08-open-webui-localhost-bind.md)
 - [2026-02-08 — Journal integrity policy + restoration](2026-02-08-journal-integrity-policy.md)
@@ -23,10 +24,6 @@
 - [2026-01-19 — OptiLLM web_search uses SearXNG](2026-01-19-optillm-searxng-integration.md)
 - [2026-01-19 — mlxctl command updates](2026-01-19-mlxctl-updates.md)
 - [2026-01-19 — OptiLLM default ensemble refresh](2026-01-19-optillm-default-ensemble-update.md)
-- [2026-01-19 — OptiLLM local inference plan (Studio)](2026-01-19-optillm-local-plan.md)
-- [2026-01-19 — OptiLLM local setup + showroom rule](2026-01-19-optillm-local-setup.md)
-- [2026-01-19 — OptiLLM local router + HF cache standard](2026-01-19-optillm-local-router-and-cache.md)
-
 - [2026-01-15 — Registries, Entity IDs, and JSONL Plan](2026-01-15-registries-and-ids.md)
 - [2026-01-16 — Benny deprecation + ov-* alias alignment](2026-01-16-benny-deprecation.md)
 - [2026-01-16 — Gateway handles registry v0](2026-01-16-gateway-handles-registry.md)

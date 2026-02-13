@@ -8,15 +8,11 @@ layer. It is the current human‑readable source of truth.
 |---|---|---|---|---|---|---|---|---|
 | LiteLLM (litellm-orch) | Primary gateway/router | 0.0.0.0 | 4000 | LAN | `/health`, `/health/readiness`, `/health/liveliness` | `/etc/systemd/system/litellm-orch.service` | `layer-gateway/litellm-orch/config/router.yaml`, `layer-gateway/litellm-orch/config/env.local` | Clients must call LiteLLM only. |
 | OptiLLM proxy | Optimization proxy behind LiteLLM | 127.0.0.1 | 4020 | Local only | none documented | `/etc/systemd/system/optillm-proxy.service` | `/etc/optillm-proxy/env`, `~/.optillm/proxy_config.yaml` | Upstream may be LiteLLM or MLX; avoid routing loops. |
-| OptiLLM local (Studio) | Local inference tier (MPS) | 0.0.0.0 | 4040–4042 | LAN (Studio) | `/v1/models` | (launchd) | `layer-gateway/optillm-local/*` | Single-model OptiLLM instances; HF cache at `/Users/thestudio/models/hf/hub`; pin `transformers<5`; currently disabled by default. |
 | System monitor | Health/telemetry aggregator | (planned) | (planned) | Local only | N/A | (planned) | (planned) | Read‑only monitor; escalates via DB bulletin. |
 
 ## Ports (Gateway layer)
 - **4000** — LiteLLM (LAN)
 - **4020** — OptiLLM (localhost only)
-- **4040** — OptiLLM local (Studio, high)
-- **4041** — OptiLLM local (Studio, balanced)
-- **4042** — OptiLLM local (Studio, fast, reserved)
 
 ## Contracts
 - Client → **LiteLLM only** (`http://<mini>:4000/v1`).

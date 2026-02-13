@@ -11,4 +11,3 @@
 - Smoke test + optional benchmark live beside deploy script for shared ownership.
 
 ## Follow-ups
-- Keep optillm-local deferred to Orin AGX.

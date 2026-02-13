@@ -136,15 +136,10 @@ if a param is rejected by the backend.
   LiteLLM `/v1/search/searxng-search`.
 
 ## OptiLLM boost lane (opt-in)
-- `boost`: OptiLLM router decides whether to apply an approach (including “none”) using the main base model.
+- `boost` routes to the Studio OptiLLM proxy (`http://192.168.1.72:4020/v1`) via `OPTILLM_API_BASE`.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
-- Observability: OptiLLM logs the selected approach at INFO level (`Using approach(es) [...]`) in `optillm-proxy` logs. No response header is currently documented for approach selection.
-- OptiLLM proxy default approach is `none`; requests without `optillm_approach` do not route.
-- OptiLLM proxy requires `Authorization: Bearer <OPTILLM_API_KEY>` even on localhost; missing headers return an “Invalid Authorization header” error.
-
-### router_meta (deferred)
-- `router_meta` is **deferred** until OptiLLM local inference is deployed
-  on the Orin AGX (CUDA). Do not use it on the Studio.
+- Observability: `boost` appears in Studio `optillm-proxy` logs.
+- Requests must include bearer auth for the target backend key (`OPTILLM_API_KEY` for `boost`).
 
 ### OptiLLM validation checklist (router + plugins)
 1) Router is active (log line: `Using approach(es) ['router']`).
@@ -164,14 +159,17 @@ and where this repo uses callbacks vs guardrails.
 - Status: available as a standalone backend; no LiteLLM handles are currently registered.
 
 ## OptiLLM optimization proxy
-- Local-only proxy: `http://127.0.0.1:4020/v1`.
-- **Current (ergonomic) usage:** call OptiLLM directly and set `optillm_approach`
-  as a top-level JSON field. This works from Open WebUI (custom params), curl,
-  iOS Shortcuts, and any OpenAI-compatible client.
+- Studio-local proxy: `http://192.168.1.72:4020/v1` (binds `0.0.0.0:4020` on the Studio).
+- Current usage: active LiteLLM `boost` path.
 - Requests must include `Authorization: Bearer <OPTILLM_API_KEY>` (even for localhost tests).
 - Upstream can be LiteLLM or MLX directly; avoid routing loops.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
+
+### Boost handle routing (current)
+- LiteLLM `boost` routes to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
+- This keeps clients LiteLLM-only while still allowing request-body technique
+  selection (e.g., `optillm_approach`).
 
 ### Technique selection (request body)
 Set `optillm_approach` in the request body:
@@ -180,9 +178,8 @@ Set `optillm_approach` in the request body:
 - `plansearch`: planning/search (slower, good for multi-step tasks)
 - `self_consistency`: consistency voting (slower, robust)
 Local-only (best on opti-local due to multi-sample or decoding-level control):
-- `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`, `entropy_decoding`,
+  - `bon`, `moa`, `mcts`, `pvg`, `cot_decoding`, `entropy_decoding`,
   `deepconf`, `thinkdeeper`, `autothink`
-Local-only approaches are **deferred** until the Orin AGX setup.
 
 Example:
 ```json
@@ -212,8 +209,3 @@ Example:
 ## Client base URL recommendation
 - Prefer tailnet HTTPS: `https://gateway.tailfd1400.ts.net/v1`.
 - Local host-only calls use `http://127.0.0.1:4000/v1` (on the Mini).
-
-## OptiLLM local (Orin)
-- LiteLLM routes to Orin at `http://<orin-ip>:4040/v1`.
-- OptiLLM local is an inference backend (not a gateway).
-- Auth: `OPTILLM_API_KEY` required on all requests.

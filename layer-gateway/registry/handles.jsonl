@@ -1,5 +1,5 @@
-{"handle":"mlx-gpt-oss-120b-mxfp4-q4","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8100","selector":{"model":"mlx-gpt-oss-120b-mxfp4-q4"}}
+{"handle":"boost","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_optillm_proxy_studio_4020","selector":{"model":"boost"}}
+{"handle":"txgsync-gpt-oss-120b-derestricted-mxfp4-mlx","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8100","selector":{"model":"txgsync-gpt-oss-120b-derestricted-mxfp4-mlx"}}
 {"handle":"mlx-qwen3-next-80b-mxfp4-a3b-instruct","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8101","selector":{"model":"mlx-qwen3-next-80b-mxfp4-a3b-instruct"}}
 {"handle":"mlx-gpt-oss-20b-mxfp4-q4","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8102","selector":{"model":"mlx-gpt-oss-20b-mxfp4-q4"}}
 {"handle":"pchamart-schematron8b-mlx-8bit","kind":"model","invoke":"openai-chat","managed_by":"launchd","endpoint_ref":"ep_mlx_slot_8103","selector":{"model":"pchamart-schematron8b-mlx-8bit"}}
-{"handle":"boost-2","kind":"model","invoke":"openai-chat","managed_by":"systemd","endpoint_ref":"ep_optillm_local_orin_4040","selector":{"model":"Qwen/Qwen2.5-14B-Instruct"}}

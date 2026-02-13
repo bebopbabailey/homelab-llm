@@ -8,7 +8,12 @@ appropriate host and confirm outputs before declaring a change complete.
 mlxctl init
 mlxctl list
 mlxctl status
+mlxctl verify
 ```
+
+`mlxctl verify` now also fails when runtime and registry disagree on an assigned
+port (for example, registry says Qwen on `8101` but the process model-path is
+Gemma).
 
 Load and unload a model (example):
 ```bash
@@ -30,6 +35,8 @@ mlxctl reconcile
 
 ## MLX Launchd Boot Model (Studio)
 After reboot or launchd restart, confirm port 8100 is serving gpt-oss:120b
+Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
+as the model `id`. Use `mlxctl status` for the canonical `mlx-*` model IDs.
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
 
@@ -46,17 +53,28 @@ curl -fsS http://127.0.0.1:8102/v1/chat/completions \
   | jq -r '.choices[0].message | {content, reasoning_content}'
 ```
 
+Smoke check for raw Harmony-tag leakage (should return no `<|channel|>`):
+```bash
+curl -fsS http://127.0.0.1:8100/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"Return one short sentence about oranges."}],"max_tokens":128}' \
+  | jq -r '.choices[0].message.content'
+```
+
 After any MLX port change:
 ```bash
 mlxctl sync-gateway
 ```
-```
+
 
 ## LiteLLM Aliases (Mini)
 ```bash
 curl -fsS http://127.0.0.1:4000/v1/models \
   -H "Authorization: Bearer $LITELLM_API_KEY" | jq .
 ```
+
+Note: in the current deployment, unauthenticated `GET /health` may return `401`.
+Prefer `/health/readiness` as the default probe when validating service liveness.
 
 ## LiteLLM Prometheus (Mini)
 ```bash
@@ -90,25 +108,44 @@ curl -fsS http://127.0.0.1:4000/v1/models \
   | jq -r '.data[].id' | rg '^ov-'
 ```
 
-## OptiLLM (Mini)
+## OptiLLM via LiteLLM `boost` (Mini)
+Confirm `boost` handle is present:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  | jq -r '.data[].id' | rg '^boost$'
+```
+
+Then send a request through `boost` (Studio OptiLLM proxy path) and confirm a 200 response:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  | jq .
+```
+
+Then send a request through `boost` (Studio OptiLLM proxy path):
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"max_tokens":16}' \
+  | jq .
+```
+
+## OptiLLM proxy (Studio)
 ```bash
 curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
 ```
 Note: missing the `Authorization` header returns `Invalid Authorization header`.
 
-## OptiLLM local (Studio)
+## OptiLLM local (Orin)
 ```bash
-curl -fsS http://192.168.1.72:4041/v1/models -H "Authorization: Bearer dummy" | jq .
+ssh orin "curl -fsS http://127.0.0.1:4040/v1/models -H 'Authorization: Bearer <OPTILLM_API_KEY>' | jq ."
 ```
 
-Verify OptiLLM directly (Mini):
-```bash
-curl -fsS http://127.0.0.1:4020/v1/chat/completions \
-  -H "Authorization: Bearer dummy" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"mlx-<base-model>","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' \
-  | jq .
-```
+Verify OptiLLM directly (Mini): see “OptiLLM via LiteLLM `boost` (Mini)” above.
 
 Verify direct MLX handles (when models are registered):
 ```bash

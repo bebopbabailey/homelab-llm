@@ -7,7 +7,9 @@
   SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX OpenAI servers :8100-:8119 (mlx-* team); :8120-:8139 reserved for experimental tests.
   Current default boot ensemble: 8100/8101/8102.
-  OptiLLM proxy :4020 (localhost-only; used via LiteLLM `boost`).
+  OptiLLM proxy :4020 (active LiteLLM `boost` path).
+- Jetson Orin AGX: OptiLLM local :4040 and persistent offload mount `/mnt/seagate`
+  (sshfs to Mini `/mnt/seagate/orin-offload`).
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.
@@ -21,8 +23,7 @@
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
-| OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy` (deploy doc + unit), `router.yaml` `boost` |
-| OptiLLM local (Orin) | Orin | 4040 | 0.0.0.0 | http://<orin-ip>:4040/v1 | /v1/models | service contract (active), systemd on Orin |
+| OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, LiteLLM `boost` in `router.yaml` |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
 | MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
@@ -48,14 +49,11 @@
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
   Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for OpenVINO).
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
-- OptiLLM proxy (Studio): currently running as a user-managed process on the Studio.
-  Evidence: `ps` shows `optillm --host 0.0.0.0 --port 4020 --approach router`.
+- OptiLLM proxy (Studio): managed by launchd.
+  Evidence: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`.
+  Runtime args include: `--host 0.0.0.0 --port 4020 --approach router --base-url http://192.168.1.72:8101/v1`.
   Upstream: MLX (current base URL points at `http://192.168.1.72:8101/v1`).
-  LiteLLM routes to it via the `boost` handle (`OPTILLM_API_BASE` in `router.yaml`).
-- OptiLLM local inference is **active** on Orin AGX (CUDA) via systemd.
-  Studio has no opti-local runtime enabled.
-  Note: Orin uses a startup patch (`PYTHONPATH` → `runtime/`) to disable sklearn
-  imports on Jetson (`OPTILLM_DISABLE_SKLEARN=1`).
+  LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.
   Current default boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
