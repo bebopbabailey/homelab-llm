@@ -47,7 +47,6 @@ Goal: Make routing resilient but still boring.
   - [ ] optional fallback mapping (config-driven; defer until standard model lineup)
 - [x] Add request logging (JSON): model name, upstream, latency, status, error
 - [ ] Add AFM backend (Studio) once API base URL + model IDs are confirmed
-- [ ] Add Orin optillm-local alias (boost-2) to LiteLLM routing + handles registry
 
 ## Phase 4 — Service Hardening (Boot + Security)
 Goal: Make it long-running and safe.

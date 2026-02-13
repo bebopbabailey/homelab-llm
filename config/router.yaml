@@ -11,9 +11,9 @@ model_list:
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
 - model_name: deep
   litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
-    api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
+    model: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_MODEL
+    api_base: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_API_BASE
+    api_key: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_API_KEY
 - model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
@@ -32,12 +32,6 @@ model_list:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
-
-- model_name: boost-2
-  litellm_params:
-    model: openai/Qwen/Qwen2.5-14B-Instruct
-    api_base: os.environ/ORIN_OPTILLM_LOCAL_API_BASE
-    api_key: os.environ/ORIN_OPTILLM_LOCAL_API_KEY
 
 # 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
