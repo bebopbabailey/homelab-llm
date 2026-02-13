@@ -13,6 +13,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
+from urllib import request as urlrequest
 
 try:
     import fcntl
@@ -32,6 +33,7 @@ DEFAULT_ENSEMBLES_DOC = "/home/christopherbailey/homelab-llm/layer-gateway/optil
 DEFAULT_MLX_HOST = "192.168.1.72"
 DEFAULT_CONTEXT_LENGTH = 131072
 DEFAULT_MAX_OUTPUT_TOKENS = 64000
+DEFAULT_TEMPLATE_DIR = "/opt/mlx-launch/templates"
 
 TEAM_RANGE = range(8100, 8120)
 EXPERIMENTAL_RANGE = range(8120, 8140)
@@ -400,6 +402,7 @@ def cmd_init(_args):
             continue
         slug = _canonical_model_id(repo_id)
         if slug in models:
+            _ensure_defaults(models[slug])
             continue
         snapshot = _latest_snapshot(model_dir)
         if not snapshot:
@@ -411,6 +414,7 @@ def cmd_init(_args):
             "format": _guess_format(repo_id),
             "port": None,
         }
+        _ensure_defaults(models[slug])
         added += 1
 
     _write_registry(registry_path, data)
@@ -460,12 +464,172 @@ def _infer_context_length(entry: dict) -> Optional[int]:
     return None
 
 
+def _entry_identity_text(entry: dict) -> str:
+    parts = [
+        str(entry.get("model_id") or ""),
+        str(entry.get("repo_id") or ""),
+        str(entry.get("cache_path") or ""),
+    ]
+    return " ".join(parts).lower()
+
+
+def _is_gpt_oss_entry(entry: dict) -> bool:
+    return "gpt-oss" in _entry_identity_text(entry)
+
+
+def _is_qwen3_entry(entry: dict) -> bool:
+    text = _entry_identity_text(entry)
+    return "qwen3" in text or "qwen-3" in text
+
+
+def _resolve_gpt_oss_chat_template(entry: dict) -> Optional[str]:
+    text = _entry_identity_text(entry)
+    tokens = {tok for tok in re.split(r"[^a-z0-9]+", text) if tok}
+    template_dir = Path(os.environ.get("MLX_TEMPLATE_DIR", DEFAULT_TEMPLATE_DIR))
+    if not template_dir.exists():
+        return None
+    candidates = []
+    if "120b" in tokens:
+        candidates.append("gpt-oss-120b-chat_template.jinja")
+    if "20b" in tokens:
+        candidates.append("gpt-oss-20b-chat_template.jinja")
+    candidates.extend(
+        [
+            "gpt-oss-chat_template.jinja",
+            "gpt-oss-120b-chat_template.jinja",
+            "gpt-oss-20b-chat_template.jinja",
+        ]
+    )
+    for name in candidates:
+        candidate = template_dir / name
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def _resolve_local_chat_template(entry: dict) -> Optional[str]:
+    cache_path = entry.get("cache_path")
+    if not cache_path:
+        return None
+    path = Path(cache_path)
+    candidates = [path / "chat_template.jinja", path.parent / "chat_template.jinja"]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def _ensure_defaults(entry: dict):
+    changed = False
     if not entry.get("context_length"):
         inferred = _infer_context_length(entry)
         entry["context_length"] = inferred or DEFAULT_CONTEXT_LENGTH
+        changed = True
     if not entry.get("max_output_tokens"):
         entry["max_output_tokens"] = min(DEFAULT_MAX_OUTPUT_TOKENS, int(entry["context_length"]))
+        changed = True
+
+    # Family-safe defaults: GPT-OSS models require Harmony parsing/template.
+    if _is_gpt_oss_entry(entry):
+        if not entry.get("tool_call_parser"):
+            entry["tool_call_parser"] = "harmony"
+            changed = True
+        if not entry.get("reasoning_parser"):
+            entry["reasoning_parser"] = "harmony"
+            changed = True
+        template = _resolve_gpt_oss_chat_template(entry)
+        current_template = entry.get("chat_template")
+        if template and not current_template:
+            entry["chat_template"] = template
+            changed = True
+        elif template and current_template:
+            tokens = {tok for tok in re.split(r"[^a-z0-9]+", _entry_identity_text(entry)) if tok}
+            current_name = Path(current_template).name
+            if ("120b" in tokens and "20b" in current_name) or ("20b" in tokens and "120b" in current_name):
+                entry["chat_template"] = template
+                changed = True
+    elif _is_qwen3_entry(entry):
+        if not entry.get("tool_call_parser"):
+            entry["tool_call_parser"] = "qwen3"
+            changed = True
+        if not entry.get("reasoning_parser"):
+            entry["reasoning_parser"] = "qwen3"
+            changed = True
+        if not entry.get("chat_template"):
+            local_template = _resolve_local_chat_template(entry)
+            if local_template:
+                entry["chat_template"] = local_template
+                changed = True
+    return changed
+
+
+def _raw_harmony_tags_detected(port: int, model_name: str) -> bool:
+    payload = {
+        "model": model_name,
+        "messages": [{"role": "user", "content": "Return one short sentence about oranges."}],
+        "max_tokens": 128,
+    }
+    try:
+        req = urlrequest.Request(
+            f"http://127.0.0.1:{port}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode("utf-8")
+        data = json.loads(body)
+    except Exception:
+        return False
+    content = data.get("choices", [{}])[0].get("message", {}).get("content")
+    return isinstance(content, str) and "<|channel|>" in content
+
+
+def _raw_qwen3_tags_detected(port: int, model_name: str) -> bool:
+    payload = {
+        "model": model_name,
+        "messages": [{"role": "user", "content": "Return one short sentence about apples."}],
+        "max_tokens": 96,
+    }
+    try:
+        req = urlrequest.Request(
+            f"http://127.0.0.1:{port}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode("utf-8")
+        data = json.loads(body)
+    except Exception:
+        return False
+    content = data.get("choices", [{}])[0].get("message", {}).get("content")
+    if not isinstance(content, str):
+        return False
+    return any(marker in content for marker in ("<think>", "<tool_call>", "<|im_start|>", "<|im_end|>"))
+
+
+def _mlx_command_for_port(port: int) -> Optional[str]:
+    port_token = re.compile(rf"--port(?:=|\s+){port}\b")
+    for _pid, _ppid, cmd in _ps_snapshot():
+        if "mlx-openai-server" not in cmd:
+            continue
+        if port_token.search(cmd):
+            return cmd
+    return None
+
+
+def _command_arg_value(command: str, flag: str) -> Optional[str]:
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return None
+    for idx, token in enumerate(parts):
+        if token == flag and idx + 1 < len(parts):
+            return parts[idx + 1]
+        if token.startswith(flag + "="):
+            return token.split("=", 1)[1]
+    return None
 
 
 def _download_and_register(data, model_ref: str):
@@ -609,12 +773,15 @@ def cmd_load(args):
             raise SystemExit("load cancelled")
 
     running_pids = _mlx_pids_for_port(port)
-    if (running_pids or _port_listening(port)) and not args.force:
-        slug, _entry = _model_on_port(data, port)
-        model_name = slug if slug else "unknown"
-        if not _prompt_yes_no(f"model {model_name} already in port {port}. Unload model?"):
-            raise SystemExit("load cancelled")
-        cmd_unload(argparse.Namespace(port=str(port)))
+    if running_pids or _port_listening(port):
+        if args.force:
+            cmd_unload(argparse.Namespace(port=str(port), sync=False))
+        else:
+            slug, _entry = _model_on_port(data, port)
+            model_name = slug if slug else "unknown"
+            if not _prompt_yes_no(f"model {model_name} already in port {port}. Unload model?"):
+                raise SystemExit("load cancelled")
+            cmd_unload(argparse.Namespace(port=str(port), sync=False))
 
     slug, entry = _find_entry(data, args.model)
     converted = False
@@ -628,6 +795,21 @@ def cmd_load(args):
     _launch_server(entry, port)
     if not _wait_for_port(port):
         raise SystemExit(f"model failed to start on port {port}")
+
+    if _is_gpt_oss_entry(entry):
+        model_name = entry.get("model_id") or slug
+        if _raw_harmony_tags_detected(port, model_name):
+            print(
+                "warning: raw Harmony tags detected after load. "
+                "check chat_template/tool_call_parser/reasoning_parser settings."
+            )
+    elif _is_qwen3_entry(entry):
+        model_name = entry.get("model_id") or slug
+        if _raw_qwen3_tags_detected(port, model_name):
+            print(
+                "warning: raw Qwen protocol tags detected after load. "
+                "check qwen3 parser/template settings."
+            )
 
     entry["port"] = port
     _write_registry(registry_path, data)
@@ -702,13 +884,51 @@ def cmd_reconcile(_args):
 
 
 def cmd_verify(_args):
-    data = _load_registry(_registry_path())
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
     missing = []
+    port_to_models = {}
     for slug, entry in data["models"].items():
+        _ensure_defaults(entry)
         if not entry.get("context_length"):
             missing.append(f"{slug}: missing context_length")
         if not entry.get("max_output_tokens"):
             missing.append(f"{slug}: missing max_output_tokens")
+        if _is_gpt_oss_entry(entry):
+            if entry.get("tool_call_parser") != "harmony":
+                missing.append(f"{slug}: tool_call_parser must be 'harmony'")
+            if entry.get("reasoning_parser") != "harmony":
+                missing.append(f"{slug}: reasoning_parser must be 'harmony'")
+            template = entry.get("chat_template")
+            if not template:
+                missing.append(f"{slug}: missing chat_template")
+            elif not Path(template).exists():
+                missing.append(f"{slug}: chat_template path missing: {template}")
+        if _is_qwen3_entry(entry):
+            if entry.get("tool_call_parser") != "qwen3":
+                missing.append(f"{slug}: tool_call_parser must be 'qwen3'")
+            if entry.get("reasoning_parser") != "qwen3":
+                missing.append(f"{slug}: reasoning_parser must be 'qwen3'")
+            template = entry.get("chat_template")
+            if template and not Path(template).exists():
+                missing.append(f"{slug}: chat_template path missing: {template}")
+        port = entry.get("port")
+        if port:
+            port_to_models.setdefault(int(port), []).append(slug)
+            cmd = _mlx_command_for_port(int(port))
+            if not cmd:
+                missing.append(f"{slug}: registry port {port} set but no MLX process listening")
+            else:
+                model_path = _command_arg_value(cmd, "--model-path")
+                if model_path and entry.get("cache_path") and model_path != entry.get("cache_path"):
+                    missing.append(
+                        f"{slug}: runtime path mismatch on {port} "
+                        f"(registry={entry.get('cache_path')} runtime={model_path})"
+                    )
+    for port, slugs in sorted(port_to_models.items()):
+        if len(slugs) > 1:
+            missing.append(f"port {port}: multiple registry assignments ({', '.join(sorted(slugs))})")
+    _write_registry(registry_path, data)
     if missing:
         raise SystemExit("mlxctl verify failed:\n  - " + "\n  - ".join(missing))
     print("mlxctl verify ok: registry defaults and routing state are consistent")
