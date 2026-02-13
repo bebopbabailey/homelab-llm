@@ -1,4 +1,6 @@
-# Golden Set — Summarize
+# 2026-02-golden-set-summarize (Archived)
+
+Status: archived test fixture from the OpenVINO/ONNX evaluation era.
 
 1) input:
    "We met today to review the onboarding plan. The team agreed to move the deadline to next Friday and requested a short checklist by Wednesday. Chris will draft the checklist and send it for review."

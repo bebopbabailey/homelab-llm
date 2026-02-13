@@ -12,7 +12,7 @@ changing user-facing handles.
 - Default: `MLX_ROUTE_VIA_OPTILLM=1`
 
 ## Behavior (when enabled)
-- MLX handles point to OptiLLM (`127.0.0.1:4020`).
+- MLX handles point to OptiLLM on the Studio (`192.168.1.72:4020`).
 - OptiLLM calls LiteLLM using `router-mlx-*` model names.
 - LiteLLM maps `router-mlx-*` entries directly to MLX ports.
 - `router-mlx-*` entries are internal (not in `handles.jsonl`) but appear in `/v1/models`.

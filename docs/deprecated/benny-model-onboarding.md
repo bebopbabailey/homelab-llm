@@ -163,4 +163,4 @@ for the current alias mapping.
 - Keep names stable; the registry key is the model name LiteLLM will reference.
 - OpenVINO currently errors if `temperature` is exactly `0` while sampling is enabled,
   so router defaults use `0.01` for deterministic-ish tasks.
-- Golden test set for cleaning: `docs/foundation/golden-set-cleaning.md`.
+- Golden test set for cleaning (archived): `docs/archive/2026-02-golden-set-cleaning.md`.

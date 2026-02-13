@@ -38,6 +38,11 @@ Optional fields:
 `mlxctl` is the single command to manage MLX models. It runs locally on the
 Studio and can be invoked from the Mini via SSH.
 
+Contract:
+- Runtime and boot both follow the Studio MLX registry (`registry.json`).
+- `mlxctl` is authoritative for changes; launchd boot should read registry
+  assignments rather than hardcoded model lists.
+
 ## MLX Server Provenance (Required)
 - Upstream repo: https://github.com/cubist38/mlx-openai-server
 - Fork (if any): none detected (installed from upstream)
@@ -84,7 +89,7 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
   `context_length` → `max_input_tokens` and `max_output_tokens` (currently 65k).
   Defaults persist in the Studio registry and are synced by `mlxctl sync-gateway`.
 - Current routing mode: MLX handles route **directly** to MLX ports.
-- OptiLLM is used only when clients call `http://127.0.0.1:4020/v1` directly
+- OptiLLM proxy runs on the Studio (`:4020`) and is typically used via the LiteLLM `boost` handle.
   and include `optillm_approach` in the request body.
 - Ports 8100–8119 are the team range; 8120–8139 are experimental.
 - The Studio boot ensemble is defined in `/opt/mlx-launch/bin/start.sh`
@@ -137,6 +142,25 @@ is set. For these, set in the registry entry:
 - `reasoning_parser: harmony`
 If short prompts return `reasoning_content` without `content`, increase
 `max_tokens` or set a lower `reasoning_effort` via `request_params`.
+
+`mlxctl` now auto-applies and persists these fields for `gpt-oss*` entries
+when running `init`, `ensure`, `load`, and `verify`:
+- `tool_call_parser: harmony`
+- `reasoning_parser: harmony`
+- `chat_template` resolved from `MLX_TEMPLATE_DIR` (default:
+  `/opt/mlx-launch/templates`) using GPT-OSS 20B/120B template fallbacks.
+
+`mlxctl verify` is now strict for GPT-OSS entries and fails if Harmony parser
+fields are missing or the `chat_template` path does not exist.
+
+For `qwen3*` entries, `mlxctl` auto-applies:
+- `tool_call_parser: qwen3`
+- `reasoning_parser: qwen3`
+- optional `chat_template` from the model snapshot when available
+
+`mlxctl verify` is strict for Qwen3 parser fields and also checks runtime
+parity (registry `cache_path` must match the live `--model-path` on assigned
+ports).
 
 Studio note (2026-01-30):
 - GPT‑OSS 20B snapshot lacks `chat_template.jinja`. We supply a supported override:

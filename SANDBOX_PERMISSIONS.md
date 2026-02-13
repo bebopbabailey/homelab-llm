@@ -2,13 +2,8 @@
 
 This defines what an agent sandbox is allowed to read/write/execute by scope.
 
-## Authority and precedence
-- This file is a **sandbox scope summary**.
-- Canonical global rules live in `CONSTRAINTS.md`.
-- Agent execution behavior lives in `AGENTS.md`.
-- Documentation obligations live in `DOCS_CONTRACT.md`.
-- `docs/PLATFORM_CONSTRAINTS.md` is a platform-facing summary only.
-- Resolve conflicts via `docs/_core/SOURCES_OF_TRUTH.md`.
+## Sources of truth
+Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 
 ## Scope note
 - Keep this file pointer-first and concise.

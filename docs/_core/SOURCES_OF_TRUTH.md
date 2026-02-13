@@ -58,6 +58,11 @@ Archived or deprecated material kept for reference only.
 - `docs/archive/10-TASKS_TINYAGENTS.md`
 - `docs/archive/11-TEST_PLAN_SMOKES.md`
 - `docs/archive/12-DECISIONS_LOG.md`
+- `docs/archive/13-EXTRACTION_MAP_2026-02.md`
+- `docs/archive/2026-02-onnx-evaluation.md`
+- `docs/archive/2026-02-golden-set-cleaning.md`
+- `docs/archive/2026-02-golden-set-route.md`
+- `docs/archive/2026-02-golden-set-summarize.md`
 - `docs/archive/DECISIONS.md.old`
 - `docs/archive/EXTRACTION_MAP.md.old`
 - `docs/archive/INTEGRATIONS.md.old`

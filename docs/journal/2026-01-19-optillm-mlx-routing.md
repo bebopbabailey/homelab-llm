@@ -7,7 +7,7 @@ All MLX handles now route through OptiLLM with intelligent routing enabled.
 
 ## Wiring
 - Client calls: `model=mlx-...`
-- LiteLLM forwards to OptiLLM at `127.0.0.1:4020` with `model=router-mlx-...`
+- LiteLLM forwards to OptiLLM on the Studio at `192.168.1.72:4020` (via `OPTILLM_API_BASE`).
 - OptiLLM keeps the `router-` prefix for upstream calls.
 - LiteLLM maps `router-mlx-*` models **directly** to MLX ports.
 

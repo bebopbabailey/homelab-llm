@@ -2,6 +2,14 @@
 
 Use these rules to keep documentation and registries consistent. Each rule is an explicit "if X changes, update Y" instruction.
 
+## Consistency gate
+After any change that affects runtime behavior (ports, bindings, auth, routing, handles/registries), validate the
+high-risk claim families in `docs/_core/CONSISTENCY_DOD.md`.
+
+If drift is discovered:
+- record a claim entry in the dated audit ledger (`docs/_core/consistency_audit_2026-02.md` or current month), and
+- fix now or disposition explicitly (fix_now / defer / accepted).
+
 ## Topology and Ports
 - If any service port, host binding, or endpoint path changes, update:
   - `docs/foundation/topology.md`

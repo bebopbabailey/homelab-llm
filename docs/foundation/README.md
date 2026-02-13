@@ -17,7 +17,7 @@ and constraints so new work stays compatible with the existing platform.
 - `mlx-registry.md` — MLX registry and controller overview.
 - `ov-model-onboarding.md` — OpenVINO model onboarding + ov-* naming.
 - `testing.md` — verification steps and smoke tests.
-- `onnx-evaluation.md` — non-LLM ONNX evaluation plan for routing/summarization.
+- (archived) `docs/archive/2026-02-onnx-evaluation.md` — OpenVINO/ONNX evaluation plan (deprecated direction).
 - `git-submodules.md` — how to work with submodules in this repo.
 - `git-submodules-intellij.md` — IntelliJ workflow for submodules.
 - `docs/journal/index.md` — experiment journal index.

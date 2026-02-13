@@ -1,12 +1,7 @@
 # PLATFORM_CONSTRAINTS
 
-## Authority and precedence
-- This file is a **platform-facing summary** only.
-- Canonical global non-negotiables: `CONSTRAINTS.md`.
-- Canonical agent execution behavior: `AGENTS.md`.
-- Canonical documentation obligations: `DOCS_CONTRACT.md`.
-- Canonical sandbox scope summary: `SANDBOX_PERMISSIONS.md`.
-- Resolve conflicts via `docs/_core/SOURCES_OF_TRUTH.md`.
+## Sources of truth
+Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 
 ## Scope note
 - Keep this file concise and pointer-first.

@@ -3,13 +3,8 @@
 This file defines predictable agent behavior for this monorepo.
 Primary navigation entry: `docs/_core/README.md`.
 
-## Authority and precedence
-- Use `CONSTRAINTS.md` as the canonical source for global non-negotiables.
-- Use this file (`AGENTS.md`) for execution behavior, scope control, and reporting rules.
-- Use `DOCS_CONTRACT.md` for documentation obligations by directory scope.
-- Use `SANDBOX_PERMISSIONS.md` for condensed sandbox scope summaries.
-- Use `docs/PLATFORM_CONSTRAINTS.md` as a platform-facing summary only.
-- If conflict exists, resolve using `docs/_core/SOURCES_OF_TRUTH.md`.
+## Sources of truth
+Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 
 ## Guardrails (hard rules)
 - No secrets in git (keys, tokens, credentials, private URLs). If discovered, stop and ask.

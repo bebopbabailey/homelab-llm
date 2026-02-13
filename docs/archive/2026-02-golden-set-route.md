@@ -1,4 +1,6 @@
-# Golden Set — Route/Classify
+# 2026-02-golden-set-route (Archived)
+
+Status: archived test fixture from the OpenVINO/ONNX evaluation era.
 
 Expected labels: clean, summarize, extract, rewrite, tool
 

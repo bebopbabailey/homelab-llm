@@ -1,7 +1,7 @@
 # NOW
 
 Active
-- Stand up OptiLLM local on Orin (Qwen2.5-14B) and expose via LiteLLM alias boost-2.
+- Stabilize Orin `optillm-local` (`boost-2`) for reliable inference (offline mode + cache hygiene + low-latency).
 
 NEXT UP
-- Resume OptiLLM local (Orin) smoke testing and viability assessment
+- If Orin root remains tight on disk, add Orin-attached SSD/NVMe (or 10GbE + NFS to Studio SSD) and move `HF_HOME` there.

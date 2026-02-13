@@ -3,13 +3,8 @@
 These apply to all agents and all layers unless explicitly overridden by a
 written migration plan.
 
-## Authority and precedence
-- This file is the canonical source for **global non-negotiables**.
-- `AGENTS.md` defines agent execution behavior and verification/reporting rules.
-- `DOCS_CONTRACT.md` defines documentation obligations by scope.
-- `SANDBOX_PERMISSIONS.md` provides per-layer sandbox scope details.
-- `docs/PLATFORM_CONSTRAINTS.md` is a platform-facing summary and must not override this file.
-- If these documents conflict, follow `docs/_core/SOURCES_OF_TRUTH.md`.
+## Sources of truth
+Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 
 ## Networking
 - **Do not change or reuse ports** without a port‑migration plan.

@@ -1,4 +1,7 @@
-# ONNX Evaluation (Non-LLM Benchmarks)
+# 2026-02-onnx-evaluation (Archived)
+
+Status: archived. This evaluation plan is OpenVINO/ONNX-centric and is no longer
+an active direction.
 
 Purpose: identify faster, smaller models for OpenVINO roles that do not require full
 LLM generation (routing/classification, summarization, cleaning, and extraction).
@@ -8,9 +11,9 @@ Evaluate:
 - ONNX embeddings for routing/classification (MiniLM).
 - ONNX seq2seq summarization (T5-small).
 
-Golden sets:
-- `docs/foundation/golden-set-route.md`
-- `docs/foundation/golden-set-summarize.md`
+Golden sets (archived with this plan):
+- `docs/archive/2026-02-golden-set-route.md`
+- `docs/archive/2026-02-golden-set-summarize.md`
 
 ## Execution
 Use `platform/ops/scripts/onnx_eval.py` (creates per-role outputs and timing).

@@ -1,4 +1,6 @@
-# Golden Set — Cleaning (OpenVINO)
+# 2026-02-golden-set-cleaning (Archived)
+
+Status: archived test fixture from the OpenVINO/ONNX evaluation era.
 
 ## Transcripts
 1. hey um i i i can send the draft tonight if you want i just need fifteen minutes

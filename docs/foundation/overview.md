@@ -55,6 +55,6 @@ while allowing backend models to evolve independently.
 - MLX servers: remote OpenAI-compatible backends on the Studio (team ports 8100-8119; experimental 8120-8139).
 - MLX registry maps canonical `model_id` to `source_path`/`cache_path` for inference.
 - OpenVINO server: local lightweight backend on the Mini (port 9000).
-- OptiLLM proxy: localhost-only optimization proxy called directly (port 4020).
+- OptiLLM proxy (Studio): optimization proxy on port 4020; used primarily via LiteLLM `boost`.
 - OptiLLM local: deferred until Orin AGX setup.
 - TinyAgents: planned orchestration client that calls LiteLLM only.

@@ -9,8 +9,8 @@ they meet speed and quality requirements for the Mini.
 - Summarization: `sshleifer/distilbart-cnn-12-6` (exported to ONNX via optimum)
 
 ## Golden sets
-- Route: `docs/foundation/golden-set-route.md`
-- Summarize: `docs/foundation/golden-set-summarize.md`
+- Route: `docs/archive/2026-02-golden-set-route.md`
+- Summarize: `docs/archive/2026-02-golden-set-summarize.md`
 
 ## Results (first pass)
 ### Routing (embeddings + cosine)

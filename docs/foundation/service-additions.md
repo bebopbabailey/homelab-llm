@@ -4,7 +4,12 @@ This repo treats LiteLLM as the only client-facing entry point. New services
 should either be:
 - A backend that LiteLLM routes to, or
 - A client/orchestrator that calls LiteLLM (never backends directly).
-Optimization proxies (e.g., OptiLLM) bind to localhost only and can be called directly when explicitly using `optillm_approach` workflows.
+Optimization proxies (e.g., OptiLLM) bind to localhost only.
+
+Current preferred usage: clients call LiteLLM only and select OptiLLM techniques
+via the LiteLLM `boost` handle (with `optillm_approach` in the request body).
+Direct calls to the proxy port are reserved for operator debugging on the host
+that runs the proxy.
 
 ## Before You Start
 - Confirm you are not adding a new LAN-exposed service without approval.

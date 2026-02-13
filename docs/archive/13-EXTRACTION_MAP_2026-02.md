@@ -1,4 +1,7 @@
-# EXTRACTION_MAP
+# 13-EXTRACTION_MAP_2026-02
+
+Status: archived snapshot (historical). This file was moved from `docs/` during
+Wave C strict-temporal relocation.
 
 ## Key artifacts scanned
 - `/home/christopherbailey/homelab-llm/layer-gateway/litellm-orch` (configs, docs, scripts)

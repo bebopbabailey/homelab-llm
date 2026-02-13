@@ -22,5 +22,5 @@ Short list of future work not active right now.
 - Model table design (database-backed, size-on-disk + idle-memory fields).
 - OptiLLM local inference (Orin AGX, CUDA) for decode-time techniques.
 - Optional second-pass tone classification for transcripts (separate endpoint).
-- OV router service (OpenVINO-backed router classifier for OptiLLM).
+- OpenVINO re-think (if ever): capture design notes here first, not in canonical docs; only proceed with explicit decision + migration plan.
 - OptiLLM router caching follow-up (re-verify after any OV work).

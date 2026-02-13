@@ -22,7 +22,7 @@ Quantizations tested:
 - int4 (OpenVINO weight compression)
 
 ## Golden set
-`docs/foundation/golden-set-cleaning.md` (5 transcripts).
+`docs/archive/2026-02-golden-set-cleaning.md` (5 transcripts).
 
 ## Key results
 ### 1500-character (non-stream) latency
