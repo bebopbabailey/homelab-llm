@@ -1,40 +1,65 @@
 # TinyAgents (MVP orchestration)
 
 ## Overview
-TinyAgents is a minimalist agent implementation that uses LLMs plus MCP tools.
-Upstream project: `https://github.com/albertvillanova/tinyagents`.
+TinyAgents here is a local homelab orchestrator package that provides:
 
-In this homelab, TinyAgents is used as a **client/orchestrator MVP** that calls
-LiteLLM only. It must not call backends directly.
+1) a CLI runner (`tiny-agents`), and
+2) a localhost-only HTTP service (`tiny-agents-service`).
+
+It calls LiteLLM as the single LLM gateway and uses MCP tools via the runtime
+registry. It must not call inference backends directly.
 
 ## Status and Constraints
-- MCP tools are implemented locally; TinyAgents is the MVP client.
+- MCP tools are implemented locally; TinyAgents is the MVP orchestrator.
 - No new LAN-exposed services without approval.
 - Use `uv` for Python dependency management.
 
 ## Install (uv-only)
-TinyAgents is a small repo with a `pyproject.toml`. Install from a pinned commit:
+Install dependencies from local `pyproject.toml`:
 
 ```bash
 cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
-uv venv .venv
-uv pip install "tinyagents @ git+https://github.com/albertvillanova/tinyagents.git@<PINNED_COMMIT>"
+uv sync
 ```
 
 ## Configuration (MVP)
-- TinyAgents uses Hugging Face InferenceClient upstream by default.
-- If using HF, set `HUGGINGFACEHUB_API_TOKEN` (or the token your HF client reads).
-- For homelab integration, adapt TinyAgents to call LiteLLM instead of Hugging Face.
-  LiteLLM base URL: `http://127.0.0.1:4000/v1`.
-- MCP registry (runtime): `MCP_REGISTRY_PATH=/etc/homelab-llm/mcp-registry.json`.
+- LiteLLM base URL: `LITELLM_API_BASE=http://127.0.0.1:4000/v1`
+- LiteLLM auth env key name: `LITELLM_API_KEY_ENV=LITELLM_API_KEY` (default)
+- MCP registry (runtime): `MCP_REGISTRY_PATH=/etc/homelab-llm/mcp-registry.json`
+- Service bind: `TINY_AGENTS_HOST=127.0.0.1`
+- Service port: `TINY_AGENTS_PORT=4030`
 - Template env: `platform/ops/templates/tiny-agents.env`.
 
-## Usage (upstream examples)
-Upstream scripts (from the repo):
+## CLI usage
 
 ```bash
-python tinytoolcallingagent.py servers/weather/weather.py
-python tinycodeagent.py servers/weather/weather.py
+# List tools from registry
+uv run tiny-agents list-tools
+
+# One-shot run
+uv run tiny-agents run --model main --message "openvino llm"
+
+# Scaffold a new MCP tool skeleton (not auto-enabled)
+uv run tiny-agents scaffold-tool demo-tool
+```
+
+## Service usage (localhost only)
+
+```bash
+# Start service
+uv run tiny-agents-service
+
+# Health
+curl -fsS http://127.0.0.1:4030/health | cat
+
+# Run request
+curl -fsS http://127.0.0.1:4030/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "main",
+    "messages": [{"role": "user", "content": "openvino llm"}],
+    "max_tool_calls": 1
+  }' | cat
 ```
 
 ## MCP smoke (local tools)
@@ -47,6 +72,14 @@ uv pip install -e .
 .venv/bin/python3 /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents/scripts/mcp_smoke.py --tool search.web
 ```
 
+## TinyAgents smoke
+
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
+bash scripts/smoke_tiny_agents.sh
+```
+
 ## References
-- Upstream README: `https://github.com/albertvillanova/tinyagents`
 - MCP overview: `https://modelcontextprotocol.io/`
+- Plain-English explainer: `docs/WHAT_TINY_AGENTS_DOES.md`
+- Request/response examples: `docs/REQUEST_FLOW_EXAMPLE.md`
