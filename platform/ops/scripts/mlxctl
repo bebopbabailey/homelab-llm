@@ -1587,8 +1587,16 @@ def cmd_mlx_launch_stop(args):
         f"launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true",
         check=False,
     )
+    # Prevent it from re-loading on reboot (can be re-enabled via mlx-launch-start).
+    _studio_sudo_cmd(
+        studio_ssh,
+        f"launchctl disable system/{shlex.quote(label)} >/dev/null 2>&1 || true",
+        check=False,
+    )
 
-    # Ensure listeners are gone (they can outlive the supervisor).
+    # Ensure legacy listeners are gone (they can outlive the supervisor).
+    # Be conservative: only kill processes that look like mlx-openai-server, so we don't
+    # accidentally terminate mlx-omni-server if ports overlap.
     remote = ["set -euo pipefail"]
     for raw in ports.split(","):
         raw = raw.strip()
@@ -1596,7 +1604,11 @@ def cmd_mlx_launch_stop(args):
             continue
         port = int(raw)
         remote.append(f"pids=$(lsof -tiTCP:{port} -sTCP:LISTEN 2>/dev/null || true)")
-        remote.append('if [ -n "${pids}" ]; then kill ${pids} >/dev/null 2>&1 || true; sleep 0.2; kill -9 ${pids} >/dev/null 2>&1 || true; fi')
+        remote.append('for pid in ${pids}; do')
+        remote.append('  cmd=$(ps -p ${pid} -o command= 2>/dev/null || true)')
+        remote.append('  echo \"${cmd}\" | rg -q \"mlx-openai-server|mlx_openai_server\" || continue')
+        remote.append('  kill ${pid} >/dev/null 2>&1 || true; sleep 0.2; kill -9 ${pid} >/dev/null 2>&1 || true')
+        remote.append('done')
     _studio_sudo_cmd(studio_ssh, "\n".join(remote), check=False)
     print(f"stopped legacy supervisor {label} and cleared listeners for ports: {ports}")
 
@@ -1612,6 +1624,7 @@ if [ ! -f {shlex.quote(plist)} ]; then
   echo "missing launchd plist: {plist}" >&2
   exit 2
 fi
+launchctl enable system/{shlex.quote(label)} >/dev/null 2>&1 || true
 launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
 launchctl bootstrap system {shlex.quote(plist)}
 launchctl kickstart -k system/{shlex.quote(label)}
