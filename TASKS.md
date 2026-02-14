@@ -70,6 +70,6 @@ Goal: Keep gateway tool-agnostic but orchestration-friendly.
 
 ## Nice to Haves
 - [ ] Add a helper script to detect or extract MLX chat templates and launch MLX servers with `--chat-template-file` automatically (durable model swaps).
-- [ ] Fork `mlx-openai-server` and apply a permanent BatchEncoding→input_ids fix; point `/opt/mlx-launch` to the fork.
+- [ ] If we ever revive legacy per-port `mlx-openai-server`, fork it and apply a permanent BatchEncoding→input_ids fix; otherwise prefer extending `mlx-omni-server`.
 - [ ] Add tag/capability metadata for health output (compact JSON enrichment).
 - [ ] Add a lightweight routing rule to force short/low‑complexity prompts (e.g., transcript cleaning) to `none` to avoid heavy OptiLLM techniques.
