@@ -48,6 +48,7 @@ DEFAULT_OMNI_REPO = "https://github.com/madroidmaq/mlx-omni-server.git"
 DEFAULT_OMNI_REF = "adc8dd2025f6574f6ccebaa7b4bb6a6d735a9780"  # v0.5.2
 DEFAULT_OMNI_DIR = "/opt/mlx-omni-launch"
 DEFAULT_OMNI_LABEL_PREFIX = "com.bebop.mlx-omni"
+DEFAULT_MLX_OPENAI_LAUNCHD_LABEL = "com.bebop.mlx-launch"
 
 
 def _run(cmd, *, input_bytes=None, check=True):
@@ -104,8 +105,8 @@ def _maybe_forward_to_studio(args):
         return
     if getattr(args, "command", None) == "sync-gateway":
         return
-    # Omni canary install/ops orchestrate Studio actions from the caller host.
-    if getattr(args, "command", None) in {"omni-install", "omni-stop", "omni-status"}:
+    # Omni + cutover ops orchestrate Studio actions from the caller host.
+    if getattr(args, "command", None) in {"omni-install", "omni-stop", "omni-status", "mlx-launch-stop", "mlx-launch-start"}:
         return
     if getattr(args, "command", None) == "assign-team":
         return
@@ -1334,6 +1335,7 @@ def _update_env_local(path: Path, mlx_entries, host: str):
 def _update_handles(path: Path, mlx_entries):
     if not path.exists():
         raise SystemExit(f"handles.jsonl not found: {path}")
+    replace_handles = {item["handle"] for item in mlx_entries}
     rows = []
     for line in path.read_text().splitlines():
         if not line.strip():
@@ -1345,7 +1347,14 @@ def _update_handles(path: Path, mlx_entries):
             continue
         handle = obj.get("handle", "")
         endpoint = obj.get("endpoint_ref", "")
-        if handle.startswith("mlx-") or endpoint.startswith("ep_mlx_slot_"):
+        # Drop any previously-generated MLX handle entries so we can re-add them deterministically.
+        if (
+            handle in replace_handles
+            or handle.startswith("mlx-")
+            or endpoint.startswith("ep_mlx_slot_")
+            or endpoint.startswith("ep_mlx_omni_")
+            or endpoint.startswith("ep_mlx_")
+        ):
             continue
         rows.append(obj)
 
@@ -1562,6 +1571,54 @@ def cmd_omni_status(args):
     )
 
 
+def cmd_mlx_launch_stop(args):
+    """Stop the legacy mlx-openai-server supervisor launchd job (non-interactive).
+
+    This does NOT mutate registry port assignments; it only stops the running services so
+    we can free ports for mlx-omni-server cutover.
+    """
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    label = os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_OPENAI_LAUNCHD_LABEL)
+    ports = (args.ports or "8100,8101,8102,8103").strip()
+
+    # Stop the supervisor first (prevents immediate respawn).
+    _studio_sudo_cmd(
+        studio_ssh,
+        f"launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true",
+        check=False,
+    )
+
+    # Ensure listeners are gone (they can outlive the supervisor).
+    remote = ["set -euo pipefail"]
+    for raw in ports.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        port = int(raw)
+        remote.append(f"pids=$(lsof -tiTCP:{port} -sTCP:LISTEN 2>/dev/null || true)")
+        remote.append('if [ -n "${pids}" ]; then kill ${pids} >/dev/null 2>&1 || true; sleep 0.2; kill -9 ${pids} >/dev/null 2>&1 || true; fi')
+    _studio_sudo_cmd(studio_ssh, "\n".join(remote), check=False)
+    print(f"stopped legacy supervisor {label} and cleared listeners for ports: {ports}")
+
+
+def cmd_mlx_launch_start(args):
+    """Start the legacy mlx-openai-server supervisor launchd job (rollback helper)."""
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    label = os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_OPENAI_LAUNCHD_LABEL)
+    plist = os.environ.get("MLX_OPENAI_LAUNCHD_PLIST", f"/Library/LaunchDaemons/{label}.plist")
+    remote = f"""
+set -euo pipefail
+if [ ! -f {shlex.quote(plist)} ]; then
+  echo "missing launchd plist: {plist}" >&2
+  exit 2
+fi
+launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
+launchctl bootstrap system {shlex.quote(plist)}
+launchctl kickstart -k system/{shlex.quote(label)}
+"""
+    _studio_sudo_cmd(studio_ssh, remote, check=True)
+    print(f"started legacy supervisor {label}")
+
 def _collect_offload_candidates(studio_ssh: str):
     script = """
 import json
@@ -1681,6 +1738,9 @@ def main():
     omni_stop.add_argument("--port", default="8120", help="Port label to stop (default: 8120)")
     omni_status = sub.add_parser("omni-status", help="Check mlx-omni-server status on the Studio")
     omni_status.add_argument("--port", default="8120", help="Port to check (default: 8120)")
+    mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop legacy com.bebop.mlx-launch (non-interactive)")
+    mlx_launch_stop.add_argument("--ports", default="8100,8101,8102,8103", help="Comma-separated ports to clear listeners")
+    sub.add_parser("mlx-launch-start", help="Start legacy com.bebop.mlx-launch (rollback helper)")
 
     load = sub.add_parser("load", help="Download/register a model and launch on a port")
     load.add_argument("model", help="HF repo_id or existing registry model_id")
@@ -1750,6 +1810,8 @@ def main():
         "omni-install": cmd_omni_install,
         "omni-stop": cmd_omni_stop,
         "omni-status": cmd_omni_status,
+        "mlx-launch-stop": cmd_mlx_launch_stop,
+        "mlx-launch-start": cmd_mlx_launch_start,
         "load": cmd_load,
         "unload": cmd_unload,
         "unload-all": cmd_unload_all,
