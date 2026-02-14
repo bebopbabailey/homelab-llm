@@ -2,7 +2,7 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, OptiLLM, SearXNG, Ollama.
-- Mac Studio: MLX OpenAI servers.
+- Mac Studio: MLX inference host (canonical OpenAI-compatible endpoint: `mlx-omni-server` on `:8100`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX: inference backends (OptiLLM local) and future CV/STT/TTS services.
@@ -49,9 +49,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
 | OptiLLM local (Orin) | Orin | 4040 | http://192.168.1.93:4040/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
-| MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
-| MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
-| MLX (mlx-gpt-oss-20b-mxfp4-q4) | Studio | 8102 | http://192.168.1.72:8102/v1 | /v1/models |
+| MLX Omni (served by Omni; model selected by `model`) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
@@ -59,7 +57,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 ### MLX port management
 - Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.
 - Ports 8120-8139 are reserved for experimental test loads and are not registered until a model is loaded.
-- Current boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
+- Canonical endpoint: `8100` (mlx-omni-server). Additional ports may be unused unless explicitly enabled.
 
 Note: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal.

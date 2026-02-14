@@ -3,7 +3,7 @@
 ## LiteLLM routing
 - Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
-- Upstreams: MLX `http://192.168.1.72:<port>/v1`,
+- Upstreams: MLX Omni (canonical) `http://192.168.1.72:8100/v1`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: canonical model IDs with prefix `mlx-`.
   Format: `mlx-<family>-<params>-<quant>-<variant>` in that order (dash-only,
@@ -16,7 +16,8 @@
   (only relevant when calling OptiLLM directly).
 - Auth: gateway requests currently require bearer auth (`LITELLM_MASTER_KEY` in deployment).
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
-- MLX alias set (fixed ports): `mlx-*` (ports `8100-8119` team); `8120-8139` reserved for experimental tests.
+- MLX alias set (canonical endpoint): `mlx-*` routes to Omni `:8100` and selects the model via the request `model` field.
+  `8120-8139` remain reserved for experimental canaries (only used when explicitly configured).
 - MLX registry is the canonical link from `model_id` to inference source:
   `model_id` → `registry.json` → `source_path` / `cache_path`.
 - Context defaults: `router.yaml` uses MLX registry fields:

@@ -78,7 +78,5 @@ fi
 check_http "http://127.0.0.1:8888/search?q=ping&format=json"
 check_http_post http://127.0.0.1:4000/v1/search/searxng-search '{"query":"ping","max_results":1}' -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http http://192.168.1.72:8100/v1/models
-check_http http://192.168.1.72:8101/v1/models
-check_http http://192.168.1.72:8102/v1/models
-check_http http://192.168.1.72:8103/v1/models
-check_http http://192.168.1.72:8109/v1/models
+# Legacy per-port MLX servers (8101/8102/8103) were cut over to Omni-on-8100.
+# If we ever restore additional ports, add explicit checks back here.

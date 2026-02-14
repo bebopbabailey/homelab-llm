@@ -43,13 +43,12 @@ Contract:
 - `mlxctl` is authoritative for changes; launchd boot should read registry
   assignments rather than hardcoded model lists.
 
-## MLX Server Provenance (Required)
-- Upstream repo: https://github.com/cubist38/mlx-openai-server
-- Fork (if any): none detected (installed from upstream)
-- Pin/version: 1.5.1 (pyproject.toml)
-- Install path: `/opt/mlx-launch` (uv/venv + install steps)
-- Boot entrypoint: `/opt/mlx-launch/bin/start.sh`
-- Local patches: none (use supported Harmony parsers + templates)
+## MLX Server Provenance (Current)
+- Canonical server: `mlx-omni-server` (OpenAI-compatible)
+- Launchd label (canonical): `com.bebop.mlx-omni.8100`
+- Install path (canonical): `/opt/mlx-omni-launch`
+- Registry (source of truth): `/Users/thestudio/models/hf/hub/registry.json`
+- Legacy (disabled after cutover): `com.bebop.mlx-launch` + per-port `mlx-openai-server`
 
 Supported commands:
 - `init` — scan HF cache and initialize registry entries.
@@ -70,7 +69,11 @@ Place `platform/ops/scripts/mlxctl` on both hosts and ensure it is on PATH:
 ln -s /home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl /usr/local/bin/mlxctl
 ```
 
-On the Studio, the script assumes:
+On the Studio, `mlxctl` supports:
+- Canonical Omni mode: manages the single `mlx-omni-server` endpoint on `:8100` (see `mlxctl omni-*` commands).
+- Legacy per-port mode: manages `com.bebop.mlx-launch` + per-port `mlx-openai-server` listeners.
+
+For legacy per-port mode only, the script assumes:
 - `mlx-openai-server` is available on PATH (or set `MLX_LAUNCH_CMD`).
 - `huggingface_hub` is installed for downloads.
 If `mlx-openai-server` is not on PATH, `mlxctl` will try:
@@ -78,7 +81,8 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
 `/opt/homebrew/bin/uv run --project /opt/mlx-launch mlx-openai-server launch`.
 
 ## Notes
-- One port, one model. Ports are immutable.
+- Canonical mode: one endpoint (`8100`) serving multiple models; the requested `model` selects which to run.
+- Ports are immutable.
 - LiteLLM aliases are fixed; port swaps must keep the alias semantics consistent.
 - Only models present on the Studio are exposed via LiteLLM handles; Seagate is backroom storage only.
 - Naming: `mlxctl` defaults to canonical model IDs in the form
@@ -92,8 +96,7 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
 - OptiLLM proxy runs on the Studio (`:4020`) and is typically used via the LiteLLM `boost` handle.
   and include `optillm_approach` in the request body.
 - Ports 8100–8119 are the team range; 8120–8139 are experimental.
-- The Studio boot ensemble is defined in `/opt/mlx-launch/bin/start.sh`
-  (current ports: `8100`, `8101`, `8102`).
+- Canonical boot is the Omni launchd job for `:8100` (`com.bebop.mlx-omni.8100`).
 - Offload happens only when `og_path` is set and `og_path != cache_path`.
   This prevents removing artifacts that are used for inference.
 - `mlxctl list` now shows `context_length` and `max_output_tokens`.
@@ -170,12 +173,10 @@ Studio note (2026-01-30):
 
 This ensures OpenAI-compatible responses without raw `<|channel|>` tags.
 
-## Current Boot Ensemble
-The boot ensemble is the **source-of-truth** for default MLX availability.
-Current boot ensemble:
-- `mlx-gpt-oss-120b-mxfp4-q4` → port `8100`
-- `mlx-qwen3-next-80b-mxfp4-a3b-instruct` → port `8101`
-- `mlx-gpt-oss-20b-mxfp4-q4` → port `8102`
+## Current Boot (Canonical)
+The canonical MLX endpoint is Omni on port `8100`:
+- Base URL: `http://192.168.1.72:8100/v1`
+- Model selection is via the `model` field (e.g. `openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct`).
 
 ## Port policy
 - New downloads intended for testing should load into the lowest available

@@ -12,7 +12,7 @@ mlxctl verify
 ```
 
 `mlxctl verify` now also fails when runtime and registry disagree on an assigned
-port (for example, registry says Qwen on `8101` but the process model-path is
+port (for example, registry says Qwen on `8100` but the process model-path is
 Gemma).
 
 Load and unload a model (example):
@@ -33,8 +33,8 @@ Reconcile after reboot:
 mlxctl reconcile
 ```
 
-## MLX Launchd Boot Model (Studio)
-After reboot or launchd restart, confirm port 8100 is serving gpt-oss:120b
+## MLX Omni (Studio)
+After reboot or launchd restart, confirm port 8100 (Omni) is serving `/v1/models`.
 Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
 as the model `id`. Use `mlxctl status` for the canonical `mlx-*` model IDs.
 ```bash
@@ -47,7 +47,7 @@ mlxctl load mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4 auto
 
 Verify GPT‑OSS content channel is present (requires adequate max_tokens):
 ```bash
-curl -fsS http://127.0.0.1:8102/v1/chat/completions \
+curl -fsS http://127.0.0.1:8100/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"mlx-gpt-oss-20b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":256}' \
   | jq -r '.choices[0].message | {content, reasoning_content}'

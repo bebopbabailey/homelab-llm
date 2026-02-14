@@ -5,8 +5,8 @@
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
-- Mac Studio: MLX OpenAI servers :8100-:8119 (mlx-* team); :8120-:8139 reserved for experimental tests.
-  Current default boot ensemble: 8100/8101/8102.
+- Mac Studio: MLX inference host. Canonical OpenAI-compatible endpoint is `mlx-omni-server` on `:8100`.
+  Ports :8120-:8139 remain reserved for experimental tests.
   OptiLLM proxy :4020 (active LiteLLM `boost` path).
 - Jetson Orin AGX: OptiLLM local :4040 and persistent offload mount `/mnt/seagate`
   (sshfs to Mini `/mnt/seagate/orin-offload`).
@@ -25,9 +25,7 @@
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, LiteLLM `boost` in `router.yaml` |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
-| MLX (mlx-gpt-oss-120b-mxfp4-q4) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
-| MLX (mlx-qwen3-next-80b-mxfp4-a3b-instruct) | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
-| MLX (mlx-gpt-oss-20b-mxfp4-q4) | Studio | 8102 | 0.0.0.0 | http://192.168.1.72:8102/v1 | /v1/models | `/opt/mlx-launch/bin/start.sh`, registry |
+| MLX Omni (canonical) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | launchd `com.bebop.mlx-omni.8100`, registry |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
 | Home Assistant | DietPi | 8123 | 0.0.0.0 (assumed) | http://192.168.1.70:8123 | not documented | `/home/christopherbailey/.ssh/config`, owner confirmation |
@@ -51,16 +49,16 @@
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
 - OptiLLM proxy (Studio): managed by launchd.
   Evidence: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`.
-  Runtime args include: `--host 0.0.0.0 --port 4020 --approach router --base-url http://192.168.1.72:8101/v1`.
-  Upstream: MLX (current base URL points at `http://192.168.1.72:8101/v1`).
+  Runtime args include: `--host 0.0.0.0 --port 4020 --approach router --base-url http://192.168.1.72:8100/v1`.
+  Upstream: MLX Omni (base URL points at `http://192.168.1.72:8100/v1`).
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.
-  Current default boot ensemble: `8100` (gpt-oss-120b), `8101` (qwen3-next-80b), `8102` (gpt-oss-20b).
+  Canonical endpoint is `8100` (mlx-omni-server). Additional ports are unused unless explicitly enabled.
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
-  Launchd plist `/Library/LaunchDaemons/com.bebop.mlx-launch.plist`, runtime `/opt/mlx-launch`.
+  Legacy launchd `com.bebop.mlx-launch` is disabled after Omni cutover.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
