@@ -43,6 +43,54 @@ PORT_MAP = {}
 
 ENSEMBLES = {}
 
+# MLX Omni Server (canary + future cutover)
+DEFAULT_OMNI_REPO = "https://github.com/madroidmaq/mlx-omni-server.git"
+DEFAULT_OMNI_REF = "adc8dd2025f6574f6ccebaa7b4bb6a6d735a9780"  # v0.5.2
+DEFAULT_OMNI_DIR = "/opt/mlx-omni-launch"
+DEFAULT_OMNI_LABEL_PREFIX = "com.bebop.mlx-omni"
+
+
+def _run(cmd, *, input_bytes=None, check=True):
+    result = subprocess.run(
+        cmd,
+        input=input_bytes,
+        capture_output=True,
+        text=False,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        stderr = (result.stderr or b"").decode("utf-8", errors="replace")
+        raise SystemExit(f"command failed (exit {result.returncode}): {' '.join(cmd)}\n{stderr}")
+    return result
+
+
+def _ssh_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
+    # IMPORTANT: `ssh host cmd arg...` is re-serialized into a single command line on
+    # the remote side, so argument boundaries are not preserved. Always send a single
+    # quoted command string to be executed by `bash -lc`.
+    if isinstance(argv, str):
+        remote = argv
+    else:
+        remote = " ".join(shlex.quote(part) for part in argv)
+    cmd = "bash -lc " + shlex.quote(remote)
+    return _run(["ssh", studio_ssh, cmd], input_bytes=input_bytes, check=check)
+
+
+def _studio_sudo_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
+    # Same ssh boundary issue as _ssh_cmd: build a single quoted remote command string.
+    if isinstance(argv, str):
+        remote = argv
+    else:
+        remote = " ".join(shlex.quote(part) for part in argv)
+    cmd = "sudo -n bash -lc " + shlex.quote(remote)
+    return _run(["ssh", studio_ssh, cmd], input_bytes=input_bytes, check=check)
+
+
+def _read_patch_bytes(path: Path) -> bytes:
+    if not path.exists():
+        raise SystemExit(f"missing patch file: {path}")
+    return path.read_bytes()
+
 
 def _is_local_host():
     host = socket.gethostname().split(".")[0].lower()
@@ -55,6 +103,9 @@ def _maybe_forward_to_studio(args):
     if getattr(args, "command", None) == "offload-og":
         return
     if getattr(args, "command", None) == "sync-gateway":
+        return
+    # Omni canary install/ops orchestrate Studio actions from the caller host.
+    if getattr(args, "command", None) in {"omni-install", "omni-stop", "omni-status"}:
         return
     if getattr(args, "command", None) == "assign-team":
         return
@@ -1234,15 +1285,25 @@ def _update_env_local(path: Path, mlx_entries, host: str):
             continue
         if skip:
             continue
-        if line.startswith("JERRY_") or line.startswith("BENCH_") or line.startswith("MLX_") or line.startswith("ROUTER_"):
+        if (
+            line.startswith("JERRY_")
+            or line.startswith("BENCH_")
+            or line.startswith("MLX_")
+            or line.startswith("ROUTER_")
+            or line.startswith("SWAP_")
+        ):
             continue
         output.append(line)
 
     block = [begin, "# MLX OpenAI server base URLs (auto-generated)"]
+    single_api_base = os.environ.get("MLX_SINGLE_API_BASE")
     for item in mlx_entries:
         handle = item["handle"]
         port = item["port"]
-        block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
+        if single_api_base:
+            block.append(f"{_env_key(handle, 'API_BASE')}={single_api_base}")
+        else:
+            block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
     block.append("")
     block.append("# Upstream model IDs (prefix with \"openai/\" for OpenAI-compatible backends)")
     for item in mlx_entries:
@@ -1253,6 +1314,15 @@ def _update_env_local(path: Path, mlx_entries, host: str):
     for item in mlx_entries:
         handle = item["handle"]
         block.append(f"{_env_key(handle, 'API_KEY')}=dummy")
+    block.append("")
+    block.append("# Swap endpoint defaults (kept aligned with the MLX backend)")
+    if single_api_base:
+        # swap is a placeholder handle in router.yaml; keep it consistent when we consolidate.
+        block.append(f"SWAP_API_BASE={single_api_base}")
+        # swap remains a model id passed to the backend; keep it compatible with existing behavior.
+        # (The backend should strip the 'openai/' prefix if it does not use OpenAI provider routing.)
+        block.append("SWAP_MODEL=openai/mlx-gpt-oss-20b-mxfp4-q4")
+        block.append("SWAP_API_KEY=dummy")
     # OptiLLM routing block removed (deprecated).
     block.append(end)
 
@@ -1279,16 +1349,20 @@ def _update_handles(path: Path, mlx_entries):
             continue
         rows.append(obj)
 
+    single_endpoint_ref = os.environ.get("MLX_SINGLE_ENDPOINT_REF")
     for item in mlx_entries:
         handle = item["handle"]
         port = item["port"]
+        endpoint_ref = f"ep_mlx_slot_{port}"
+        if single_endpoint_ref:
+            endpoint_ref = single_endpoint_ref
         rows.append(
             {
                 "handle": handle,
                 "kind": "model",
                 "invoke": "openai-chat",
                 "managed_by": "launchd",
-                "endpoint_ref": f"ep_mlx_slot_{port}",
+                "endpoint_ref": endpoint_ref,
                 "selector": {"model": handle},
             }
         )
@@ -1330,6 +1404,162 @@ def cmd_sync_gateway(args):
     _update_router_yaml(router_path, mlx_entries)
     _update_env_local(env_path, mlx_entries, os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
     _update_handles(handles_path, mlx_entries)
+
+
+def cmd_omni_install(args):
+    """
+    Install and run mlx-omni-server on the Studio under /opt/mlx-omni-launch.
+
+    Orchestrated from the caller host (Mini) so we can ship a pinned patch without
+    requiring the monorepo to be present on the Studio.
+    """
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    repo = os.environ.get("MLX_OMNI_REPO", DEFAULT_OMNI_REPO)
+    ref = os.environ.get("MLX_OMNI_REF", DEFAULT_OMNI_REF)
+    install_dir = os.environ.get("MLX_OMNI_DIR", DEFAULT_OMNI_DIR)
+    port = int(args.port)
+    bind_host = args.host
+
+    label_prefix = os.environ.get("MLX_OMNI_LABEL_PREFIX", DEFAULT_OMNI_LABEL_PREFIX)
+    label = f"{label_prefix}.{port}"
+
+    # Disk check before installing python deps on Studio.
+    _ssh_cmd(studio_ssh, "df -h / /Users/thestudio 2>/dev/null || df -h /", check=False)
+
+    # Prepare install dir
+    _studio_sudo_cmd(studio_ssh, f"mkdir -p {shlex.quote(install_dir)}")
+    _studio_sudo_cmd(studio_ssh, f"chown -R thestudio:staff {shlex.quote(install_dir)}")
+
+    # Clone/update and pin
+    remote_setup = f"""
+set -euo pipefail
+cd {shlex.quote(install_dir)}
+if [ ! -d .git ]; then
+  git init
+  git remote add origin {shlex.quote(repo)}
+fi
+git fetch --tags --force origin
+git checkout -f {shlex.quote(ref)}
+"""
+    _ssh_cmd(studio_ssh, remote_setup)
+
+    # Apply patch (best-effort idempotency via --check)
+    gateway_root = Path(os.environ.get("GATEWAY_ROOT", DEFAULT_GATEWAY_ROOT))
+    patch_path = gateway_root / "platform/ops/patches/mlx-omni-server-v0.5.2.patch"
+    patch_bytes = _read_patch_bytes(patch_path)
+    remote_apply = f"""
+set -euo pipefail
+cd {shlex.quote(install_dir)}
+tmp_patch="$(mktemp)"
+cat > "$tmp_patch"
+if git apply --check "$tmp_patch" >/dev/null 2>&1; then
+  git apply "$tmp_patch"
+fi
+rm -f "$tmp_patch"
+"""
+    _ssh_cmd(studio_ssh, remote_apply, input_bytes=patch_bytes, check=True)
+
+    # Ensure uv exists on Studio
+    _ssh_cmd(
+        studio_ssh,
+        "command -v uv >/dev/null 2>&1 || (echo 'uv not found on Studio (install uv first)' >&2; exit 2)",
+    )
+
+    # Install into local venv (editable install to keep patch active)
+    remote_install = f"""
+set -euo pipefail
+cd {shlex.quote(install_dir)}
+uv venv .venv
+uv pip install -e .
+"""
+    _ssh_cmd(studio_ssh, remote_install)
+
+    # launchd plist (system-wide)
+    registry_path = os.environ.get("MLX_OMNI_REGISTRY_PATH", DEFAULT_REGISTRY)
+    hf_home = os.environ.get("HF_HOME", DEFAULT_HF_HOME)
+    cache_max = os.environ.get("MLX_OMNI_CACHE_MAX_SIZE", "3")
+    cache_ttl = os.environ.get("MLX_OMNI_CACHE_TTL_SECONDS", "0")
+    prewarm = os.environ.get(
+        "MLX_OMNI_PREWARM_MODELS",
+        "txgsync-gpt-oss-120b-derestricted-mxfp4-mlx,mlx-qwen3-next-80b-mxfp4-a3b-instruct,mlx-gpt-oss-20b-mxfp4-q4",
+    )
+
+    plist_path = f"/Library/LaunchDaemons/{label}.plist"
+    log_path = f"/tmp/mlx-omni-{port}.log"
+    program = f"{install_dir}/.venv/bin/mlx-omni-server"
+
+    plist = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{label}</string>
+  <key>WorkingDirectory</key><string>{install_dir}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{program}</string>
+    <string>--host</string><string>{bind_host}</string>
+    <string>--port</string><string>{port}</string>
+    <string>--workers</string><string>1</string>
+    <string>--log-level</string><string>info</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>{log_path}</string>
+  <key>StandardErrorPath</key><string>{log_path}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HF_HOME</key><string>{hf_home}</string>
+    <key>MLX_OMNI_REGISTRY_PATH</key><string>{registry_path}</string>
+    <key>MLX_OMNI_CACHE_MAX_SIZE</key><string>{cache_max}</string>
+    <key>MLX_OMNI_CACHE_TTL_SECONDS</key><string>{cache_ttl}</string>
+    <key>MLX_OMNI_PREWARM_MODELS</key><string>{prewarm}</string>
+  </dict>
+</dict>
+</plist>
+"""
+
+    remote_plist = f"""
+set -euo pipefail
+cat > {shlex.quote(plist_path)} <<'PLIST'
+{plist}
+PLIST
+chown root:wheel {shlex.quote(plist_path)}
+chmod 0644 {shlex.quote(plist_path)}
+launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
+launchctl bootstrap system {shlex.quote(plist_path)}
+launchctl kickstart -k system/{shlex.quote(label)}
+"""
+    _studio_sudo_cmd(studio_ssh, remote_plist)
+
+    # Basic health
+    _ssh_cmd(studio_ssh, f"curl -fsS http://127.0.0.1:{port}/v1/models | head -c 200 >/dev/null")
+    print(f"omni installed and started: {label} (port {port})")
+
+
+def cmd_omni_stop(args):
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    port = int(args.port)
+    label_prefix = os.environ.get("MLX_OMNI_LABEL_PREFIX", DEFAULT_OMNI_LABEL_PREFIX)
+    label = f"{label_prefix}.{port}"
+    plist_path = f"/Library/LaunchDaemons/{label}.plist"
+    remote = f"""
+set -euo pipefail
+launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
+rm -f {shlex.quote(plist_path)}
+"""
+    _studio_sudo_cmd(studio_ssh, remote, check=False)
+    print(f"omni stopped: {label}")
+
+
+def cmd_omni_status(args):
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    port = int(args.port)
+    _ssh_cmd(studio_ssh, f"lsof -nP -iTCP:{port} -sTCP:LISTEN || true", check=False)
+    _ssh_cmd(
+        studio_ssh,
+        f"curl -fsS http://127.0.0.1:{port}/v1/models | jq -r '.data[].id' 2>/dev/null || curl -fsS http://127.0.0.1:{port}/v1/models",
+        check=False,
+    )
 
 
 def _collect_offload_candidates(studio_ssh: str):
@@ -1444,6 +1674,13 @@ def main():
     sub.add_parser("init", help="Scan HF cache and initialize registry entries")
     sub.add_parser("list", help="List registered MLX models (model_id, repo_id, port, ctx, max_out)")
     sub.add_parser("status", help="Show MLX port status and routing mode")
+    omni_install = sub.add_parser("omni-install", help="Install + run mlx-omni-server on the Studio (canary)")
+    omni_install.add_argument("--port", default="8120", help="Port to run omni on (default: 8120)")
+    omni_install.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
+    omni_stop = sub.add_parser("omni-stop", help="Stop mlx-omni-server launchd job on the Studio")
+    omni_stop.add_argument("--port", default="8120", help="Port label to stop (default: 8120)")
+    omni_status = sub.add_parser("omni-status", help="Check mlx-omni-server status on the Studio")
+    omni_status.add_argument("--port", default="8120", help="Port to check (default: 8120)")
 
     load = sub.add_parser("load", help="Download/register a model and launch on a port")
     load.add_argument("model", help="HF repo_id or existing registry model_id")
@@ -1510,6 +1747,9 @@ def main():
         "init": cmd_init,
         "list": cmd_list,
         "status": cmd_status,
+        "omni-install": cmd_omni_install,
+        "omni-stop": cmd_omni_stop,
+        "omni-status": cmd_omni_status,
         "load": cmd_load,
         "unload": cmd_unload,
         "unload-all": cmd_unload_all,
