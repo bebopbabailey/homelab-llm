@@ -1554,7 +1554,7 @@ rm -f {shlex.quote(plist_path)}
 def cmd_omni_status(args):
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
     port = int(args.port)
-    _ssh_cmd(studio_ssh, f"lsof -nP -iTCP:{port} -sTCP:LISTEN || true", check=False)
+    _studio_sudo_cmd(studio_ssh, f"lsof -nP -iTCP:{port} -sTCP:LISTEN || true", check=False)
     _ssh_cmd(
         studio_ssh,
         f"curl -fsS http://127.0.0.1:{port}/v1/models | jq -r '.data[].id' 2>/dev/null || curl -fsS http://127.0.0.1:{port}/v1/models",
