@@ -980,6 +980,21 @@ def cmd_verify(_args):
     for port, slugs in sorted(port_to_models.items()):
         if len(slugs) > 1:
             missing.append(f"port {port}: multiple registry assignments ({', '.join(sorted(slugs))})")
+
+    # Omni-first routing: if we're on the gateway host, validate served MLX handles exist in registry.json.
+    handles_path = Path(os.environ.get("HANDLES_PATH", DEFAULT_HANDLES_PATH))
+    if handles_path.exists():
+        try:
+            handles_rows = _read_handles_jsonl(handles_path)
+            served = _served_mlx_handles(handles_rows)
+            for row in served:
+                handle = row["handle"]
+                if _registry_entry_for_handle(data.get("models", {}), handle) is None:
+                    missing.append(
+                        f"handles.jsonl: served handle missing from registry.json: {handle} ({row.get('endpoint_ref')})"
+                    )
+        except Exception as exc:
+            missing.append(f"handles.jsonl: failed to validate served handles: {exc}")
     _write_registry(registry_path, data)
     if missing:
         raise SystemExit("mlxctl verify failed:\n  - " + "\n  - ".join(missing))
@@ -1188,6 +1203,71 @@ def _env_key(handle: str, suffix: str):
     key = handle.upper().replace("-", "_")
     return f"MLX_{key}_{suffix}"
 
+_EP_PORT_RE = re.compile(r"^ep_mlx_(?:omni|slot)_(\d+)$")
+
+
+def _endpoint_ref_port(endpoint_ref: str) -> Optional[int]:
+    if not endpoint_ref:
+        return None
+    m = _EP_PORT_RE.match(endpoint_ref.strip())
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def _read_handles_jsonl(path: Path):
+    if not path.exists():
+        raise SystemExit(f"handles.jsonl not found: {path}")
+    rows = []
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            rows.append(obj)
+    return rows
+
+
+def _served_mlx_handles(handles_rows):
+    """Return handles served by MLX backends.
+
+    Omni-first: treat handles pointing at ep_mlx_omni_<port> as served.
+    Also accept legacy ep_mlx_slot_<port> for transition.
+    """
+    served = []
+    for obj in handles_rows:
+        handle = obj.get("handle")
+        if not handle or not isinstance(handle, str):
+            continue
+        endpoint_ref = obj.get("endpoint_ref") or ""
+        if not isinstance(endpoint_ref, str):
+            continue
+        if endpoint_ref.startswith("ep_mlx_omni_") or endpoint_ref.startswith("ep_mlx_slot_"):
+            served.append(
+                {
+                    "handle": handle,
+                    "endpoint_ref": endpoint_ref,
+                    "selector": obj.get("selector") or {},
+                }
+            )
+    return served
+
+
+def _registry_entry_for_handle(models: dict, handle: str) -> Optional[dict]:
+    entry = models.get(handle)
+    if entry:
+        return entry
+    for _slug, e in (models or {}).items():
+        if e.get("model_id") == handle:
+            return e
+    return None
+
 
 def _build_mlx_entries(models, host: str):
     items = []
@@ -1296,15 +1376,15 @@ def _update_env_local(path: Path, mlx_entries, host: str):
             continue
         output.append(line)
 
-    block = [begin, "# MLX OpenAI server base URLs (auto-generated)"]
+    block = [begin, "# MLX backend base URLs (auto-generated; Omni-first)"]
     single_api_base = os.environ.get("MLX_SINGLE_API_BASE")
+    default_omni_port = int(os.environ.get("MLX_OMNI_PORT", "8100"))
     for item in mlx_entries:
         handle = item["handle"]
-        port = item["port"]
-        if single_api_base:
-            block.append(f"{_env_key(handle, 'API_BASE')}={single_api_base}")
-        else:
-            block.append(f"{_env_key(handle, 'API_BASE')}=http://{host}:{port}/v1")
+        endpoint_port = item.get("endpoint_port")
+        port = int(endpoint_port) if endpoint_port else default_omni_port
+        api_base = single_api_base or f"http://{host}:{port}/v1"
+        block.append(f"{_env_key(handle, 'API_BASE')}={api_base}")
     block.append("")
     block.append("# Upstream model IDs (prefix with \"openai/\" for OpenAI-compatible backends)")
     for item in mlx_entries:
@@ -1317,13 +1397,12 @@ def _update_env_local(path: Path, mlx_entries, host: str):
         block.append(f"{_env_key(handle, 'API_KEY')}=dummy")
     block.append("")
     block.append("# Swap endpoint defaults (kept aligned with the MLX backend)")
-    if single_api_base:
-        # swap is a placeholder handle in router.yaml; keep it consistent when we consolidate.
-        block.append(f"SWAP_API_BASE={single_api_base}")
-        # swap remains a model id passed to the backend; keep it compatible with existing behavior.
-        # (The backend should strip the 'openai/' prefix if it does not use OpenAI provider routing.)
-        block.append("SWAP_MODEL=openai/mlx-gpt-oss-20b-mxfp4-q4")
-        block.append("SWAP_API_KEY=dummy")
+    swap_api_base = single_api_base or f"http://{host}:{default_omni_port}/v1"
+    block.append(f"SWAP_API_BASE={swap_api_base}")
+    # swap remains a model id passed to the backend; keep it compatible with existing behavior.
+    # (The backend should strip the 'openai/' prefix if it does not use OpenAI provider routing.)
+    block.append("SWAP_MODEL=openai/mlx-gpt-oss-20b-mxfp4-q4")
+    block.append("SWAP_API_KEY=dummy")
     # OptiLLM routing block removed (deprecated).
     block.append(end)
 
@@ -1404,7 +1483,28 @@ def cmd_sync_gateway(args):
     studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
     registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
     registry = _fetch_registry_from_studio(studio_ssh, registry_path)
-    mlx_entries = _build_mlx_entries(registry.get("models", {}), os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
+    handles_rows = _read_handles_jsonl(handles_path)
+    served = _served_mlx_handles(handles_rows)
+    models = registry.get("models", {}) or {}
+
+    # Omni-first: the served set is curated via handles.jsonl; do not rely on registry.port.
+    mlx_entries = []
+    for row in served:
+        handle = row["handle"]
+        endpoint_ref = row.get("endpoint_ref") or ""
+        endpoint_port = _endpoint_ref_port(endpoint_ref)
+        reg_entry = _registry_entry_for_handle(models, handle) or {}
+        mlx_entries.append(
+            {
+                "handle": handle,
+                "endpoint_ref": endpoint_ref,
+                "endpoint_port": endpoint_port,
+                "request_params": reg_entry.get("request_params", {}),
+                "context_length": reg_entry.get("context_length"),
+                "max_output_tokens": reg_entry.get("max_output_tokens"),
+            }
+        )
+    mlx_entries.sort(key=lambda r: ((r.get("endpoint_port") or 0), r.get("handle") or ""))
 
     if args.dry_run:
         print(json.dumps({"count": len(mlx_entries), "entries": mlx_entries}, indent=2))
@@ -1412,7 +1512,7 @@ def cmd_sync_gateway(args):
 
     _update_router_yaml(router_path, mlx_entries)
     _update_env_local(env_path, mlx_entries, os.environ.get("MLX_HOST", DEFAULT_MLX_HOST))
-    _update_handles(handles_path, mlx_entries)
+    # NOTE: handles.jsonl is treated as a curated served-set source; sync does not rewrite it.
 
 
 def cmd_omni_install(args):
@@ -1571,6 +1671,41 @@ def cmd_omni_status(args):
         f"curl -fsS http://127.0.0.1:{port}/v1/models | jq -r '.data[].id' 2>/dev/null || curl -fsS http://127.0.0.1:{port}/v1/models",
         check=False,
     )
+
+
+def cmd_omni_warm(args):
+    """Warm one or more models into the running mlx-omni-server process.
+
+    Omni loads models lazily on first request; warming makes the first "real" request fast.
+    """
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    port = int(args.port)
+    timeout = int(args.timeout)
+    max_tokens = int(args.max_tokens)
+
+    for model in args.models:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "warm"}],
+            "max_tokens": max_tokens,
+            "temperature": 0,
+        }
+        script = f"""
+import json
+from urllib import request as urlrequest
+
+payload = {json.dumps(payload)}
+req = urlrequest.Request(
+    "http://127.0.0.1:{port}/v1/chat/completions",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={{"Content-Type": "application/json"}},
+    method="POST",
+)
+with urlrequest.urlopen(req, timeout={timeout}) as resp:
+    resp.read()
+print("warmed", payload.get("model"))
+"""
+        _ssh_cmd(studio_ssh, "python3 -", input_bytes=script.encode("utf-8"), check=True)
 
 
 def cmd_mlx_launch_stop(args):
@@ -1753,6 +1888,11 @@ def main():
     omni_stop.add_argument("--port", default="8120", help="Port label to stop (default: 8120)")
     omni_status = sub.add_parser("omni-status", help="Check mlx-omni-server status on the Studio")
     omni_status.add_argument("--port", default="8120", help="Port to check (default: 8120)")
+    omni_warm = sub.add_parser("omni-warm", help="Warm models into mlx-omni-server cache (Omni-first)")
+    omni_warm.add_argument("models", nargs="+", help="Model IDs to warm (e.g. openai/mlx-..., mlx-..., etc.)")
+    omni_warm.add_argument("--port", default="8100", help="Omni port to warm against (default: 8100)")
+    omni_warm.add_argument("--timeout", default="60", help="Per-model request timeout seconds (default: 60)")
+    omni_warm.add_argument("--max-tokens", dest="max_tokens", default="8", help="Warmup max_tokens (default: 8)")
     mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop legacy com.bebop.mlx-launch (non-interactive)")
     mlx_launch_stop.add_argument("--ports", default="8100,8101,8102,8103", help="Comma-separated ports to clear listeners")
     sub.add_parser("mlx-launch-start", help="Start legacy com.bebop.mlx-launch (rollback helper)")
@@ -1808,7 +1948,7 @@ def main():
     ensure.set_defaults(sync=True)
     offload = sub.add_parser("offload-og", help="Offload OG base weights not used for inference")
     offload.add_argument("--dry-run", action="store_true")
-    sync = sub.add_parser("sync-gateway", help="Sync MLX registry to LiteLLM router/env/handles")
+    sync = sub.add_parser("sync-gateway", help="Sync MLX registry to LiteLLM router/env")
     sync.add_argument("--dry-run", action="store_true")
     assign = sub.add_parser("assign-team", help="Assign MLX models to team ports by size")
     assign.add_argument("--dry-run", action="store_true")
@@ -1825,6 +1965,7 @@ def main():
         "omni-install": cmd_omni_install,
         "omni-stop": cmd_omni_stop,
         "omni-status": cmd_omni_status,
+        "omni-warm": cmd_omni_warm,
         "mlx-launch-stop": cmd_mlx_launch_stop,
         "mlx-launch-start": cmd_mlx_launch_start,
         "load": cmd_load,

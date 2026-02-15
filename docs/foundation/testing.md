@@ -4,20 +4,27 @@ This doc captures the recommended test steps for new changes. Run these on the
 appropriate host and confirm outputs before declaring a change complete.
 
 ## MLX Registry and Controller (Studio)
+
+Omni-first baseline (current runtime reality):
 ```bash
 mlxctl init
+mlxctl ensure <hf_repo_id> --convert auto
 mlxctl list
 mlxctl status
 mlxctl verify
+mlxctl omni-status --port 8100
+mlxctl omni-warm <mlx-model-id> --port 8100
 ```
 
-`mlxctl verify` now also fails when runtime and registry disagree on an assigned
-port (for example, registry says Qwen on `8100` but the process model-path is
-Gemma).
+Notes:
+- `mlxctl ensure` takes a Hugging Face repo id (example: `mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4`).
+  Use `mlxctl list` to discover the canonical `mlx-*` model id to pass to Omni.
+- `mlxctl verify` checks registry defaults and also validates (on gateway hosts) that
+  served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
 
-Load and unload a model (example):
+Legacy slot runtime (only when using `mlx-openai-server` / per-port slots):
 ```bash
-mlxctl load mlx-community/Qwen3-235B-A22B-Instruct-2507-6bit 8100
+mlxctl load <hf_repo_id> 8100
 mlxctl status
 mlxctl unload 8100
 mlxctl status
@@ -39,10 +46,6 @@ Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
 as the model `id`. Use `mlxctl status` for the canonical `mlx-*` model IDs.
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
-
-Load a test model into the experimental range (8120+):
-```bash
-mlxctl load mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4 auto
 ```
 
 Verify GPT‑OSS content channel is present (requires adequate max_tokens):
@@ -61,7 +64,7 @@ curl -fsS http://127.0.0.1:8100/v1/chat/completions \
   | jq -r '.choices[0].message.content'
 ```
 
-After any MLX port change:
+After any MLX served-set change (handles) or Studio registry/defaults change:
 ```bash
 mlxctl sync-gateway
 ```

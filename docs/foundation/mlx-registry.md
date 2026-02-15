@@ -1,8 +1,10 @@
-# MLX Registry and Controller (Planned)
+# MLX Registry and Controller (Current)
 
 ## Purpose
-Manage MLX model assignments to ports 8100-8139 on the Studio without requiring
-LiteLLM reloads. This uses a registry file plus a single controller command.
+Keep MLX inference on the Studio stable and repeatable with an Omni-first runtime:
+- A single OpenAI-compatible backend (`mlx-omni-server`) serves multiple models.
+- A single registry file tracks model storage paths + defaults.
+- A single controller (`mlxctl`) manages downloads/conversion, the registry, and gateway wiring.
 
 ## Registry
 - Location (Studio): `/Users/thestudio/models/hf/hub/registry.json`
@@ -33,6 +35,8 @@ Optional fields:
 - `source_path`: canonical source path for the model artifact (default: initial cache_path).
 - `og_path`: base-weight path used only during conversion; if set and different from `cache_path`,
   it can be offloaded once the model is not serving inference.
+- `port`: legacy per-port runtime assignment (used by `mlx-openai-server`). In Omni-first mode,
+  Omni ignores per-model ports; models are selected by request `model` and resolved via `cache_path`.
 
 ## Controller (`mlxctl`)
 `mlxctl` is the single command to manage MLX models. It runs locally on the
@@ -54,14 +58,16 @@ Supported commands:
 - `init` — scan HF cache and initialize registry entries.
 - `list` — show registered models and port assignments.
 - `status` — show live ports vs registry.
-- `load <model> <port>` — download/register if missing, start server, update registry.
 - `ensure <repo>` — download and optionally convert a repo, update registry.
-- `unload <port>` — stop server and clear registry assignment.
-- `unload-all` — stop all MLX servers and clear registry assignments.
 - `reconcile` — clear registry entries for ports that are no longer listening.
 - `offload-og` — offload base-weight artifacts when they are not used for inference.
-- `sync-gateway` — sync MLX registry → LiteLLM router/env/handles.
-- `assign-team` — assign all current MLX models to team ports.
+- `sync-gateway` — sync MLX registry + served handles → LiteLLM router/env.
+- `omni-install|omni-stop|omni-status` — manage the canonical Omni launchd job(s).
+- `omni-warm` — warm one or more models into Omni cache.
+
+Legacy per-port commands (not used in Omni-first runtime):
+- `load <model> <port>` / `unload <port>` / `unload-all`
+- `assign-team`
 
 ## Install
 Place `platform/ops/scripts/mlxctl` on both hosts and ensure it is on PATH:
@@ -127,15 +133,23 @@ If `mlx-openai-server` is not on PATH, `mlxctl` will try:
 `mlxctl sync-gateway` updates:
 - `layer-gateway/litellm-orch/config/router.yaml`
 - `layer-gateway/litellm-orch/config/env.local`
-- `layer-gateway/registry/handles.jsonl`
 
-Sync order is: model service → MLX registry → gateway router/env → handles registry.
+Sync order is: MLX registry (Studio) → gateway router/env (Mini).
 - When run from the Studio, it SSHes to `GATEWAY_HOST` (default: `mini`) and
   uses `GATEWAY_MLXCTL` (default: `/home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl`).
 - Gateway sync uses `MLX_HOST` (default: `192.168.1.72`) for generated API base URLs.
 - **Alias-only model list:** `router.yaml` exposes only alias handles (e.g. `main/deep/fast/swap`).
   Canonical `mlx-*` model IDs remain in the MLX registry + env vars but are omitted from
   LiteLLM’s `/v1/models` list to avoid duplicate entries in clients.
+
+Omni-first served-set:
+- `layer-gateway/registry/handles.jsonl` is treated as the curated list of MLX handles that are exposed.
+- `sync-gateway` does **not** rewrite `handles.jsonl`.
+- A handle is considered "served by MLX" when its `endpoint_ref` starts with:
+  - `ep_mlx_omni_` (canonical), or
+  - `ep_mlx_slot_` (legacy transition)
+- Env generation prefers `MLX_SINGLE_API_BASE` when set; otherwise it uses `MLX_HOST` and the port parsed from
+  `endpoint_ref` (default Omni port: `MLX_OMNI_PORT`, default `8100`).
 
 ## Harmony-format models (gpt-oss)
 Some MLX models (e.g., gpt-oss) output Harmony tags unless a template/parser
@@ -179,7 +193,7 @@ The canonical MLX endpoint is Omni on port `8100`:
 - Model selection is via the `model` field (e.g. `openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct`).
 
 ## Port policy
-- New downloads intended for testing should load into the lowest available
-  experimental port (8120–8139). Use `mlxctl load <model> auto`.
-- Team models are promoted into 8100–8119 explicitly by choosing the port.
-  `mlxctl assign-team` orders by on-disk size.
+Omni-first does not require per-model ports:
+- Use `mlxctl ensure <hf_repo_id>` to download/convert/register a model.
+- Test by calling Omni with `model=<model_id>` (Omni lazy-loads on first request).
+- Keep the hot set warm using `MLX_OMNI_PREWARM_MODELS` and/or `mlxctl omni-warm`.
