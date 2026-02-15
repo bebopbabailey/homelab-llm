@@ -1,3 +1,112 @@
+diff --git a/src/mlx_omni_server/chat/mlx/chat_generator.py b/src/mlx_omni_server/chat/mlx/chat_generator.py
+index 338e16f..9ea6e34 100644
+--- a/src/mlx_omni_server/chat/mlx/chat_generator.py
++++ b/src/mlx_omni_server/chat/mlx/chat_generator.py
+@@ -17,6 +17,7 @@ from .core_types import (
+ )
+ from .logprobs_processor import LogprobsProcessor
+ from .model_types import MLXModel
++from .decoding.thinkdeeper import MinNewTokensBeforeEOSLogitsProcessor
+ 
+ # Default generation parameters
+ DEFAULT_MAX_TOKENS = 4096
+@@ -319,6 +320,7 @@ class ChatGenerator:
+             final_stream_result = None
+             all_text_tokens = []
+             all_reasoning_tokens = []
++            content_logprobs = []
+ 
+             for stream_result in self.generate_stream(
+                 messages,
+@@ -331,10 +333,13 @@ class ChatGenerator:
+                 **kwargs,
+             ):
+                 # Collect deltas to reconstruct complete content
+-                if stream_result.content.text_delta:
+-                    complete_raw_text += stream_result.content.text_delta
++                if stream_result.content.text_delta is not None:
++                    delta = stream_result.content.text_delta
++                    complete_raw_text += delta
+                     all_text_tokens.append(stream_result.content.token)
+-                elif stream_result.content.reasoning_delta:
++                    if stream_result.logprobs is not None:
++                        content_logprobs.append(stream_result.logprobs)
++                elif stream_result.content.reasoning_delta is not None:
+                     # Reasoning tokens should also be included in complete_raw_text
+                     complete_raw_text += stream_result.content.reasoning_delta
+                     all_reasoning_tokens.append(stream_result.content.token)
+@@ -361,12 +366,18 @@ class ChatGenerator:
+                 reasoning_tokens=all_reasoning_tokens if all_reasoning_tokens else None,
+             )
+ 
++            # Non-stream OpenAI responses expect a list of per-token logprobs.
++            # We only include tokens that were surfaced as "content" (not reasoning deltas).
++            final_logprobs = None
++            if content_logprobs:
++                final_logprobs = {"content": content_logprobs}
++
+             # Return final result with all processing applied
+             return GenerationResult(
+                 content=content,
+                 finish_reason=finish_reason,
+                 stats=final_stream_result.stats,
+-                logprobs=final_stream_result.logprobs,
++                logprobs=final_logprobs,
+                 from_draft=final_stream_result.from_draft,
+             )
+ 
+@@ -415,6 +426,7 @@ class ChatGenerator:
+ 
+             # Extract json_schema from kwargs for coordination with chat_template
+             json_schema = kwargs.get("json_schema")
++            min_new_tokens = kwargs.pop("min_new_tokens", None)
+ 
+             # Prepare prompt
+             prompt = self._prepare_prompt(messages, tools, template_kwargs, json_schema)
+@@ -431,6 +443,21 @@ class ChatGenerator:
+                     self.model, tokenized_prompt
+                 )
+ 
++            # Decode-time control: suppress EOS until a minimum number of new tokens.
++            # NOTE: prompt_cache can shorten the prompt tokens we pass to mlx-lm; we
++            # intentionally count "new tokens" relative to the prompt we actually send.
++            if isinstance(min_new_tokens, int) and min_new_tokens > 0:
++                existing = kwargs.get("logits_processors")
++                if existing is None:
++                    existing = []
++                kwargs["logits_processors"] = list(existing) + [
++                    MinNewTokensBeforeEOSLogitsProcessor(
++                        tokenizer=self.tokenizer,
++                        prompt_len=len(processed_prompt),
++                        min_new_tokens=min_new_tokens,
++                    )
++                ]
++
+             # Create MLX kwargs
+             mlx_kwargs = self._create_mlx_kwargs(
+                 sampler=sampler,
+@@ -476,7 +503,7 @@ class ChatGenerator:
+                 chunk_index = len(generated_tokens)
+ 
+                 # Determine which delta field to populate
+-                if parse_result.thinking:
++                if parse_result.thinking is not None:
+                     content = StreamContent(
+                         reasoning_delta=parse_result.thinking,
+                         token=response.token,
+diff --git a/src/mlx_omni_server/chat/mlx/logprobs_processor.py b/src/mlx_omni_server/chat/mlx/logprobs_processor.py
+index 09f6a28..64b9241 100644
+--- a/src/mlx_omni_server/chat/mlx/logprobs_processor.py
++++ b/src/mlx_omni_server/chat/mlx/logprobs_processor.py
+@@ -47,7 +47,7 @@ class LogprobsProcessor:
+         }
+ 
+         top_logprobs = []
+-        if top_k is not None:
++        if top_k is not None and top_k > 0:
+             top_indices = mx.argpartition(-current_logprobs, kth=top_k - 1)[:top_k]
+             top_probs = mx.clip(current_logprobs[top_indices], a_min=-100, a_max=None)
+ 
 diff --git a/src/mlx_omni_server/chat/mlx/model_types.py b/src/mlx_omni_server/chat/mlx/model_types.py
 index 298d6d2..347eba3 100644
 --- a/src/mlx_omni_server/chat/mlx/model_types.py
@@ -154,10 +263,73 @@ index af151ca..1cf095e 100644
          for repo_info, config_data in self.available_models:
              model_kwargs = {
 diff --git a/src/mlx_omni_server/chat/openai/openai_adapter.py b/src/mlx_omni_server/chat/openai/openai_adapter.py
-index f8e099e..668b54f 100644
+index f8e099e..fe79572 100644
 --- a/src/mlx_omni_server/chat/openai/openai_adapter.py
 +++ b/src/mlx_omni_server/chat/openai/openai_adapter.py
-@@ -165,8 +165,9 @@ class OpenAIAdapter:
+@@ -1,4 +1,5 @@
+ import json
++import os
+ import time
+ import uuid
+ from typing import Any, Generator, List, Optional, Tuple
+@@ -120,6 +121,8 @@ class OpenAIAdapter:
+         # Extract parameters from request and extra params
+         extra_params = request.get_extra_params()
+         extra_body = extra_params.get("extra_body", {})
++        if extra_body is None:
++            extra_body = {}
+ 
+         # Prepare sampler configuration
+         sampler_config = {
+@@ -140,6 +143,47 @@ class OpenAIAdapter:
+ 
+         # Prepare template parameters - include both extra_body and direct extra params
+         template_kwargs = dict(extra_body)
++        decoding = None
++        if isinstance(extra_body, dict):
++            decoding = extra_body.get("decoding")
++        if decoding is None and "decoding" in extra_params:
++            decoding = extra_params.get("decoding")
++
++        # Don't leak decoding control keys into the model template variables.
++        template_kwargs.pop("decoding", None)
++
++        logits_processors = []
++        min_new_tokens = None
++        if decoding == "entropy_decoding":
++            from mlx_omni_server.chat.mlx.decoding.entropy_decoding import (
++                EntropyTemperatureLogitsProcessor,
++            )
++
++            def _get_float(name: str, default: float) -> float:
++                raw = extra_body.get(name, default)
++                try:
++                    return float(raw)
++                except (TypeError, ValueError):
++                    return default
++
++            logits_processors.append(
++                EntropyTemperatureLogitsProcessor(
++                    entropy_low=_get_float("entropy_low", 1.5),
++                    entropy_high=_get_float("entropy_high", 4.0),
++                    temp_low=_get_float("temp_low", 0.7),
++                    temp_high=_get_float("temp_high", 1.3),
++                )
++            )
++        elif decoding == "thinkdeeper":
++            # v2: enable thinking + optionally enforce a minimum token budget before EOS.
++            template_kwargs["enable_thinking"] = True
++            if isinstance(extra_body, dict):
++                raw = extra_body.get("min_thinking_tokens")
++                if raw is not None:
++                    try:
++                        min_new_tokens = int(raw)
++                    except (TypeError, ValueError):
++                        min_new_tokens = None
+ 
+         # Handle direct extra parameters (for backward compatibility)
+         for key in ["enable_thinking"]:
+@@ -165,8 +209,9 @@ class OpenAIAdapter:
                  for tool in request.tools
              ]
  
@@ -169,8 +341,191 @@ index f8e099e..668b54f 100644
  
          json_schema = None
          if request.response_format and request.response_format.json_schema:
+@@ -177,11 +222,17 @@ class OpenAIAdapter:
+             "tools": tools,
+             "max_tokens": max_tokens,
+             "sampler": sampler_config,
+-            "top_logprobs": request.top_logprobs if request.logprobs else None,
++            "top_logprobs": (
++                (request.top_logprobs if request.top_logprobs is not None else 0)
++                if request.logprobs
++                else None
++            ),
+             "template_kwargs": template_kwargs,
+             "enable_prompt_cache": True,
+             "repetition_penalty": request.presence_penalty,
+             "json_schema": json_schema,
++            **({"logits_processors": logits_processors} if logits_processors else {}),
++            **({"min_new_tokens": min_new_tokens} if min_new_tokens else {}),
+         }
+ 
+     def _filter_stream_content(
+@@ -268,6 +319,7 @@ class OpenAIAdapter:
+         chat_id: str,
+         model: str,
+         content: Optional[str] = None,
++        reasoning: Optional[str] = None,
+         tool_calls: Optional[List[ToolCall]] = None,
+         finish_reason: Optional[str] = None,
+         logprobs: Optional[Any] = None,
+@@ -278,6 +330,7 @@ class OpenAIAdapter:
+             chat_id: The chat completion ID
+             model: The model name
+             content: Text content for the delta (mutually exclusive with tool_calls)
++            reasoning: Reasoning content for the delta (mutually exclusive with tool_calls/content)
+             tool_calls: Tool calls for the delta (mutually exclusive with content)
+             finish_reason: The finish reason (None for intermediate chunks)
+             logprobs: Log probabilities if requested
+@@ -287,7 +340,9 @@ class OpenAIAdapter:
+         """
+         if tool_calls:
+             delta = ChatMessage(role=Role.ASSISTANT, tool_calls=tool_calls)
+-        elif content:
++        elif reasoning is not None:
++            delta = ChatMessage(role=Role.ASSISTANT, reasoning=reasoning)
++        elif content is not None:
+             delta = ChatMessage(role=Role.ASSISTANT, content=content)
+         else:
+             delta = ChatMessage(role=Role.ASSISTANT)
+@@ -312,11 +367,68 @@ class OpenAIAdapter:
+     ) -> ChatCompletionResponse:
+         """Generate complete response using the wrapper."""
+         try:
++            extra_params = request.get_extra_params()
++            extra_body = extra_params.get("extra_body") or {}
++            decoding = None
++            if isinstance(extra_body, dict):
++                decoding = extra_body.get("decoding")
++            if decoding is None and "decoding" in extra_params:
++                decoding = extra_params.get("decoding")
++
+             # Prepare parameters
+             params = self._prepare_generation_params(request)
+ 
+-            # Directly use wrapper's generate method for complete response
+-            result = self._generate_wrapper.generate(**params)
++            # Decode-time multi-run selection (non-stream).
++            if decoding == "deepconf":
++                max_n = 8
++                try:
++                    max_n = int(os.environ.get("MLX_OMNI_DEEPCONF_MAX_N", "8"))
++                except ValueError:
++                    max_n = 8
++                deepconf_n = 4
++                if isinstance(extra_body, dict):
++                    raw_n = extra_body.get("deepconf_n")
++                    if raw_n is not None:
++                        try:
++                            deepconf_n = int(raw_n)
++                        except (TypeError, ValueError):
++                            deepconf_n = 4
++                deepconf_n = max(1, min(max_n, deepconf_n))
++
++                # Ensure we compute token logprobs for scoring even if the client didn't request them.
++                params["top_logprobs"] = 0
++
++                def _score(logprobs_obj: Any) -> float:
++                    if not isinstance(logprobs_obj, dict):
++                        return float("-inf")
++                    items = logprobs_obj.get("content")
++                    if not isinstance(items, list) or not items:
++                        return float("-inf")
++                    total = 0.0
++                    count = 0
++                    for it in items:
++                        if not isinstance(it, dict):
++                            continue
++                        lp = it.get("logprob")
++                        if isinstance(lp, (int, float)):
++                            total += float(lp)
++                            count += 1
++                    return (total / count) if count else float("-inf")
++
++                best = None
++                best_score = float("-inf")
++                for _ in range(deepconf_n):
++                    candidate = self._generate_wrapper.generate(**params)
++                    s = _score(candidate.logprobs)
++                    if s > best_score or best is None:
++                        best = candidate
++                        best_score = s
++                result = best
++                if result is None:
++                    raise RuntimeError("deepconf: no candidates generated")
++            else:
++                # Directly use wrapper's generate method for complete response
++                result = self._generate_wrapper.generate(**params)
+ 
+             logger.debug(f"Model Response:\n{result.content.text}")
+ 
+@@ -356,15 +468,15 @@ class OpenAIAdapter:
+                 created=int(time.time()),
+                 model=request.model,
+                 choices=[
+-                    ChatCompletionChoice(
+-                        index=0,
+-                        message=message,
+-                        finish_reason=(
+-                            "tool_calls" if message.tool_calls else (result.finish_reason or "stop")
+-                        ),
+-                        logprobs=result.logprobs,
+-                    )
+-                ],
++                ChatCompletionChoice(
++                    index=0,
++                    message=message,
++                    finish_reason=(
++                        "tool_calls" if message.tool_calls else (result.finish_reason or "stop")
++                    ),
++                    logprobs=(result.logprobs if request.logprobs else None),
++                )
++            ],
+                 usage=ChatCompletionUsage(
+                     prompt_tokens=result.stats.prompt_tokens + cached_tokens,
+                     completion_tokens=result.stats.completion_tokens,
+@@ -414,14 +526,14 @@ class OpenAIAdapter:
+             # Stream content chunks
+             for chunk in self._generate_wrapper.generate_stream(**params):
+                 # Extract content from chunk
+-                if chunk.content.text_delta:
++                content = None
++                reasoning = None
++                if chunk.content.text_delta is not None:
+                     content = chunk.content.text_delta
+                     accumulated_text += content
+-                elif chunk.content.reasoning_delta:
+-                    content = chunk.content.reasoning_delta
+-                    accumulated_text += content
+-                else:
+-                    content = ""
++                elif chunk.content.reasoning_delta is not None:
++                    reasoning = chunk.content.reasoning_delta
++                    accumulated_text += reasoning
+ 
+                 # Filter tool call XML when tools are available
+                 if has_tools and content:
+@@ -429,10 +541,17 @@ class OpenAIAdapter:
+                         content, pending_buffer, in_tool_call
+                     )
+                 else:
+-                    stream_content = content
++                    stream_content = content or ""
+ 
+                 # Yield content chunk
+-                if stream_content:
++                if reasoning:
++                    yield self._create_stream_chunk(
++                        chat_id,
++                        request.model,
++                        reasoning=reasoning,
++                        logprobs=chunk.logprobs,
++                    )
++                elif stream_content:
+                     yield self._create_stream_chunk(
+                         chat_id,
+                         request.model,
 diff --git a/src/mlx_omni_server/chat/openai/router.py b/src/mlx_omni_server/chat/openai/router.py
-index 5881888..9d8e0c8 100644
+index 5881888..917e383 100644
 --- a/src/mlx_omni_server/chat/openai/router.py
 +++ b/src/mlx_omni_server/chat/openai/router.py
 @@ -1,3 +1,5 @@
@@ -179,10 +534,42 @@ index 5881888..9d8e0c8 100644
  import json
  from typing import Generator, Optional
  
-@@ -14,6 +16,29 @@ from mlx_omni_server.chat.openai.schema import (
+@@ -13,12 +15,92 @@ from mlx_omni_server.chat.openai.schema import (
+ 
  router = APIRouter(tags=["chat—completions"])
  
- 
++_DEFAULT_SUPPORTED_DECODERS = {"entropy_decoding", "thinkdeeper", "deepconf"}
++
++
++def _extract_decoding(request: ChatCompletionRequest) -> Optional[str]:
++    extra_params = request.get_extra_params()
++    extra_body = extra_params.get("extra_body") or {}
++    decoding = None
++    if isinstance(extra_body, dict):
++        decoding = extra_body.get("decoding")
++    if decoding is None and "decoding" in extra_params:
++        decoding = extra_params.get("decoding")
++    return decoding if isinstance(decoding, str) and decoding.strip() else None
++
++
++def _enabled_decoders() -> Optional[set[str]]:
++    raw = os.environ.get("MLX_OMNI_ENABLED_DECODERS")
++    if raw is None:
++        return None
++    decoders = {d.strip() for d in raw.split(",") if d.strip()}
++    return decoders
++
++
++def _decoder_policy_violation(decoding: str, request: ChatCompletionRequest) -> Optional[str]:
++    # v1 policy: deepconf is non-stream and does not support tool calls.
++    if decoding == "deepconf":
++        if request.stream:
++            return "decoding=deepconf is non-streamable; set stream=false"
++        if request.tools:
++            return "decoding=deepconf does not support tools in v1"
++    return None
++
++
 +def _prewarm_models_async() -> None:
 +    models = os.environ.get("MLX_OMNI_PREWARM_MODELS", "").strip()
 +    if not models:
@@ -205,310 +592,38 @@ index 5881888..9d8e0c8 100644
 +
 +_prewarm_models_async()
 +
-+
+ 
  @router.post("/chat/completions", response_model=ChatCompletionResponse)
  @router.post("/v1/chat/completions", response_model=ChatCompletionResponse)
  async def create_chat_completion(request: ChatCompletionRequest):
-diff --git a/src/mlx_omni_server/chat/mlx/decoding/__init__.py b/src/mlx_omni_server/chat/mlx/decoding/__init__.py
-new file mode 100644
-index 0000000..2f65c7c
---- /dev/null
-+++ b/src/mlx_omni_server/chat/mlx/decoding/__init__.py
-@@ -0,0 +1 @@
-+"""Decode-time algorithms that must run in-process with the MLX decode loop."""
-diff --git a/src/mlx_omni_server/chat/mlx/decoding/entropy_decoding.py b/src/mlx_omni_server/chat/mlx/decoding/entropy_decoding.py
-new file mode 100644
-index 0000000..c2c8e0a
---- /dev/null
-+++ b/src/mlx_omni_server/chat/mlx/decoding/entropy_decoding.py
-@@ -0,0 +1,52 @@
-+"""Entropy-based decoding helpers for MLX-LM.
-+
-+These are decode-time algorithms (not proxy-safe). They must run where the
-+decode loop and logits are available.
-+"""
-+
-+from __future__ import annotations
-+
-+from dataclasses import dataclass
-+
-+import mlx.core as mx
-+
-+
-+@dataclass
-+class EntropyTemperatureLogitsProcessor:
-+    """Adapt temperature based on the entropy of the current next-token distribution.
-+
-+    This processor rescales logits by 1/temp, where temp is mapped from entropy.
-+    It composes cleanly with existing samplers like top-k/top-p/min-p.
-+    """
-+
-+    entropy_low: float = 1.5
-+    entropy_high: float = 4.0
-+    temp_low: float = 0.7
-+    temp_high: float = 1.3
-+
-+    def __call__(self, tokens: mx.array, logits: mx.array) -> mx.array:
-+        # logits is typically shape (1, vocab). Keep that convention.
-+        if logits.ndim == 1:
-+            logits = logits[None, :]
-+
-+        # logprobs = logits - logsumexp(logits)
-+        logprobs = logits - mx.logsumexp(logits, keepdims=True)
-+        probs = mx.exp(logprobs)
-+        entropy = (-mx.sum(probs * logprobs)).item()
-+
-+        # Map entropy -> temperature (piecewise linear).
-+        if self.entropy_high <= self.entropy_low:
-+            temp = self.temp_high
-+        elif entropy <= self.entropy_low:
-+            temp = self.temp_low
-+        elif entropy >= self.entropy_high:
-+            temp = self.temp_high
-+        else:
-+            frac = (entropy - self.entropy_low) / (self.entropy_high - self.entropy_low)
-+            temp = self.temp_low + frac * (self.temp_high - self.temp_low)
-+
-+        # Safety clamp.
-+        if temp <= 1e-6:
-+            temp = 1e-6
-+
-+        return logits / temp
-diff --git a/src/mlx_omni_server/chat/mlx/logprobs_processor.py b/src/mlx_omni_server/chat/mlx/logprobs_processor.py
-index acb44b0..d7877f5 100644
---- a/src/mlx_omni_server/chat/mlx/logprobs_processor.py
-+++ b/src/mlx_omni_server/chat/mlx/logprobs_processor.py
-@@ -47,13 +47,13 @@ class LogprobsProcessor:
-         }
+     """Create a chat completion"""
  
-         top_logprobs = []
--        if top_k is not None:
-+        if top_k is not None and top_k > 0:
-             top_indices = mx.argpartition(-current_logprobs, kth=top_k - 1)[:top_k]
-             top_probs = mx.clip(current_logprobs[top_indices], a_min=-100, a_max=None)
- 
-             for idx, logprob in zip(top_indices.tolist(), top_probs.tolist()):
-                 token = self.tokenizer.decode([idx])
-                 token_bytes = token.encode("utf-8")
-                 top_logprobs.append(
-                     {"token": token, "logprob": logprob, "bytes": list(token_bytes)}
-                 )
-diff --git a/src/mlx_omni_server/chat/mlx/chat_generator.py b/src/mlx_omni_server/chat/mlx/chat_generator.py
-index b44ddcc..daed19d 100644
---- a/src/mlx_omni_server/chat/mlx/chat_generator.py
-+++ b/src/mlx_omni_server/chat/mlx/chat_generator.py
-@@ -319,6 +319,7 @@ class ChatGenerator:
-             final_stream_result = None
-             all_text_tokens = []
-             all_reasoning_tokens = []
-+            content_logprobs = []
- 
-             for stream_result in self.generate_stream(
-                 messages,
-@@ -331,13 +332,16 @@ class ChatGenerator:
-                 enable_prompt_cache,
-                 **kwargs,
-             ):
-                 # Collect deltas to reconstruct complete content
--                if stream_result.content.text_delta:
--                    complete_raw_text += stream_result.content.text_delta
-+                if stream_result.content.text_delta is not None:
-+                    delta = stream_result.content.text_delta
-+                    complete_raw_text += delta
-                     all_text_tokens.append(stream_result.content.token)
--                elif stream_result.content.reasoning_delta:
-+                    if stream_result.logprobs is not None:
-+                        content_logprobs.append(stream_result.logprobs)
-+                elif stream_result.content.reasoning_delta is not None:
-                     # Reasoning tokens should also be included in complete_raw_text
--                    complete_raw_text += stream_result.content.reasoning_delta
-+                    complete_raw_text += stream_result.content.reasoning_delta
-                     all_reasoning_tokens.append(stream_result.content.token)
- 
-                 final_stream_result = stream_result
-@@ -362,11 +366,17 @@ class ChatGenerator:
-                 reasoning_tokens=all_reasoning_tokens if all_reasoning_tokens else None,
-             )
- 
-+            # Non-stream OpenAI responses expect a list of per-token logprobs.
-+            # We only include tokens that were surfaced as "content" (not reasoning deltas).
-+            final_logprobs = None
-+            if content_logprobs:
-+                final_logprobs = {"content": content_logprobs}
-+
-             # Return final result with all processing applied
-             return GenerationResult(
-                 content=content,
-                 finish_reason=finish_reason,
-                 stats=final_stream_result.stats,
--                logprobs=final_stream_result.logprobs,
-+                logprobs=final_logprobs,
-                 from_draft=final_stream_result.from_draft,
-             )
-@@ -476,15 +485,15 @@ class ChatGenerator:
-                 chunk_index = len(generated_tokens)
- 
-                 # Determine which delta field to populate
--                if parse_result.thinking:
-+                if parse_result.thinking is not None:
-                     content = StreamContent(
-                         reasoning_delta=parse_result.thinking,
-                         token=response.token,
-                         chunk_index=chunk_index,
-                     )
-                 else:
-                     content = StreamContent(
-                         text_delta=parse_result.content or response.text,
-                         token=response.token,
-                         chunk_index=chunk_index,
-                     )
-diff --git a/src/mlx_omni_server/chat/openai/openai_adapter.py b/src/mlx_omni_server/chat/openai/openai_adapter.py
-index 668b54f..aa8d03b 100644
---- a/src/mlx_omni_server/chat/openai/openai_adapter.py
-+++ b/src/mlx_omni_server/chat/openai/openai_adapter.py
-@@ -119,8 +119,10 @@ class OpenAIAdapter:
-         # Extract parameters from request and extra params
-         extra_params = request.get_extra_params()
-         extra_body = extra_params.get("extra_body", {})
-+        if extra_body is None:
-+            extra_body = {}
- 
-         # Prepare sampler configuration
-         sampler_config = {
-             "temp": 1.0 if request.temperature is None else request.temperature,
-             "top_p": 1.0 if request.top_p is None else request.top_p,
-@@ -139,9 +141,42 @@ class OpenAIAdapter:
-             sampler_config["xtc_threshold"] = extra_body.get("xtc_threshold")
- 
-         # Prepare template parameters - include both extra_body and direct extra params
-         template_kwargs = dict(extra_body)
-+        decoding = None
-+        if isinstance(extra_body, dict):
-+            decoding = extra_body.get("decoding")
-+        if decoding is None and "decoding" in extra_params:
-+            decoding = extra_params.get("decoding")
-+
-+        # Don't leak decoding control keys into the model template variables.
-+        template_kwargs.pop("decoding", None)
-+
-+        logits_processors = []
-+        if decoding == "entropy_decoding":
-+            from mlx_omni_server.chat.mlx.decoding.entropy_decoding import (
-+                EntropyTemperatureLogitsProcessor,
++    decoding = _extract_decoding(request)
++    if decoding:
++        enabled = _enabled_decoders()
++        supported = enabled if enabled is not None else _DEFAULT_SUPPORTED_DECODERS
++        if decoding not in supported:
++            return JSONResponse(
++                status_code=400,
++                content={
++                    "error": {
++                        "message": f"Unsupported decoding '{decoding}'. Supported: {sorted(supported)}",
++                        "type": "invalid_request_error",
++                    }
++                },
++            )
++        policy_error = _decoder_policy_violation(decoding, request)
++        if policy_error:
++            return JSONResponse(
++                status_code=400,
++                content={
++                    "error": {
++                        "message": policy_error,
++                        "type": "invalid_request_error",
++                    }
++                },
 +            )
 +
-+            def _get_float(name: str, default: float) -> float:
-+                raw = extra_body.get(name, default)
-+                try:
-+                    return float(raw)
-+                except (TypeError, ValueError):
-+                    return default
-+
-+            logits_processors.append(
-+                EntropyTemperatureLogitsProcessor(
-+                    entropy_low=_get_float("entropy_low", 1.5),
-+                    entropy_high=_get_float("entropy_high", 4.0),
-+                    temp_low=_get_float("temp_low", 0.7),
-+                    temp_high=_get_float("temp_high", 1.3),
-+                )
-+            )
-+        elif decoding == "thinkdeeper":
-+            # v1: map to the existing in-process thinking parser path.
-+            template_kwargs["enable_thinking"] = True
- 
-         # Handle direct extra parameters (for backward compatibility)
-         for key in ["enable_thinking"]:
-             if key in extra_params:
-                 template_kwargs[key] = extra_params[key]
-@@ -192,9 +230,14 @@ class OpenAIAdapter:
-             "tools": tools,
-             "max_tokens": max_tokens,
-             "sampler": sampler_config,
--            "top_logprobs": request.top_logprobs if request.logprobs else None,
-+            "top_logprobs": (
-+                (request.top_logprobs if request.top_logprobs is not None else 0)
-+                if request.logprobs
-+                else None
-+            ),
-             "template_kwargs": template_kwargs,
-             "enable_prompt_cache": True,
-             "repetition_penalty": request.presence_penalty,
-             "json_schema": json_schema,
-+            **({"logits_processors": logits_processors} if logits_processors else {}),
-         }
-@@ -272,6 +316,7 @@ class OpenAIAdapter:
-         chat_id: str,
-         model: str,
-         content: Optional[str] = None,
-+        reasoning: Optional[str] = None,
-         tool_calls: Optional[List[ToolCall]] = None,
-         finish_reason: Optional[str] = None,
-         logprobs: Optional[Any] = None,
-@@ -284,15 +329,18 @@ class OpenAIAdapter:
-             model: The model name
-             content: Text content for the delta (mutually exclusive with tool_calls)
-+            reasoning: Reasoning content for the delta (mutually exclusive with tool_calls/content)
-             tool_calls: Tool calls for the delta (mutually exclusive with content)
-             finish_reason: The finish reason (None for intermediate chunks)
-             logprobs: Log probabilities if requested
- 
-         Returns:
-             ChatCompletionChunk ready to yield
-         """
-         if tool_calls:
-             delta = ChatMessage(role=Role.ASSISTANT, tool_calls=tool_calls)
--        elif content:
-+        elif reasoning is not None:
-+            delta = ChatMessage(role=Role.ASSISTANT, reasoning=reasoning)
-+        elif content is not None:
-             delta = ChatMessage(role=Role.ASSISTANT, content=content)
-         else:
-             delta = ChatMessage(role=Role.ASSISTANT)
-@@ -416,29 +465,36 @@ class OpenAIAdapter:
-             # Stream content chunks
-             for chunk in self._generate_wrapper.generate_stream(**params):
-                 # Extract content from chunk
--                if chunk.content.text_delta:
--                    content = chunk.content.text_delta
--                    accumulated_text += content
--                elif chunk.content.reasoning_delta:
--                    content = chunk.content.reasoning_delta
--                    accumulated_text += content
--                else:
--                    content = ""
-+                content = None
-+                reasoning = None
-+                if chunk.content.text_delta is not None:
-+                    content = chunk.content.text_delta
-+                    accumulated_text += content
-+                elif chunk.content.reasoning_delta is not None:
-+                    reasoning = chunk.content.reasoning_delta
-+                    accumulated_text += reasoning
- 
-                 # Filter tool call XML when tools are available
--                if has_tools and content:
-+                if has_tools and content:
-                     stream_content, pending_buffer, in_tool_call = self._filter_stream_content(
-                         content, pending_buffer, in_tool_call
-                     )
-                 else:
--                    stream_content = content
-+                    stream_content = content or ""
- 
-                 # Yield content chunk
--                if stream_content:
-+                if reasoning:
-+                    yield self._create_stream_chunk(
-+                        chat_id,
-+                        request.model,
-+                        reasoning=reasoning,
-+                        logprobs=chunk.logprobs,
-+                    )
-+                elif stream_content:
-                     yield self._create_stream_chunk(
-                         chat_id,
-                         request.model,
-                         content=stream_content,
-                         logprobs=chunk.logprobs,
-                     )
-                 result = chunk
+     text_model = _create_text_model(
+         request.model,
+         request.get_extra_params().get("adapter_path"),

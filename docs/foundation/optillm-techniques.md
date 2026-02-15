@@ -6,13 +6,22 @@ Set the approach per request via `optillm_approach`, e.g.:
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon"}
 ```
 
-Local inference note (deferred):
-- HF cache: `/Users/thestudio/models/hf/hub`
-- Router compatibility: pin `transformers<5`
-- Local-only approaches (best on opti-local): `bon`, `moa`, `mcts`, `pvg`,
-  `cot_decoding`, `entropy_decoding`, `deepconf`, `thinkdeeper`, `autothink`
-- Local inference is deferred until Orin AGX setup; treat this section as
-  planning guidance, not active runtime behavior.
+Decode-time techniques note (current direction):
+- Proxy-safe orchestration stays in OptiLLM (`optillm_approach=...`).
+- Decode-loop algorithms (not proxy-safe) live in MLX Omni (Studio) as `decoding=...`.
+- MLX Omni accepts extra request fields (`extra = "allow"`), so we can pass `decoding` and params
+  without breaking OpenAI clients.
+
+Examples (direct to Omni via LiteLLM MLX handles):
+```json
+{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"decoding":"thinkdeeper","min_thinking_tokens":256,"stream":true}
+```
+```json
+{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"decoding":"deepconf","deepconf_n":4,"stream":false}
+```
+```json
+{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"logprobs":true,"top_logprobs":3,"max_tokens":16}
+```
 
 ## Strategy overview (techniques vs plugins)
 - Techniques (request-based) change how a model is queried (e.g., `moa`).

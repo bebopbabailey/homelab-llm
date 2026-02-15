@@ -1593,6 +1593,11 @@ uv pip install -e .
         "MLX_OMNI_PREWARM_MODELS",
         "txgsync-gpt-oss-120b-derestricted-mxfp4-mlx,mlx-qwen3-next-80b-mxfp4-a3b-instruct,mlx-gpt-oss-20b-mxfp4-q4",
     )
+    enabled_decoders = os.environ.get(
+        "MLX_OMNI_ENABLED_DECODERS",
+        "entropy_decoding,thinkdeeper,deepconf",
+    )
+    deepconf_max_n = os.environ.get("MLX_OMNI_DEEPCONF_MAX_N", "8")
 
     plist_path = f"/Library/LaunchDaemons/{label}.plist"
     log_path = f"/tmp/mlx-omni-{port}.log"
@@ -1616,13 +1621,15 @@ uv pip install -e .
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>{log_path}</string>
   <key>StandardErrorPath</key><string>{log_path}</string>
-  <key>EnvironmentVariables</key>
+    <key>EnvironmentVariables</key>
   <dict>
     <key>HF_HOME</key><string>{hf_home}</string>
     <key>MLX_OMNI_REGISTRY_PATH</key><string>{registry_path}</string>
     <key>MLX_OMNI_CACHE_MAX_SIZE</key><string>{cache_max}</string>
     <key>MLX_OMNI_CACHE_TTL_SECONDS</key><string>{cache_ttl}</string>
     <key>MLX_OMNI_PREWARM_MODELS</key><string>{prewarm}</string>
+    <key>MLX_OMNI_ENABLED_DECODERS</key><string>{enabled_decoders}</string>
+    <key>MLX_OMNI_DEEPCONF_MAX_N</key><string>{deepconf_max_n}</string>
   </dict>
 </dict>
 </plist>

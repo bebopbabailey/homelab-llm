@@ -11,6 +11,7 @@ Short list of future work not active right now.
  - Harden Studio OptiLLM proxy for remote maintenance (tailnet-only serve: bind localhost + Tailscale Serve + LiteLLM upstream update).
 - Confirm alias naming and mapping (main / deep / fast / swap, + x1..x4).
 - Validate preset behavior via LiteLLM/OptiLLM (routing, chain applied, responses).
+- [LiteLLM] Optional “lane-policy” pre_call guardrail: enforce that `optillm_approach`/`optillm_base_model` are only accepted when `model=boost`, and reject `decoding=*` on `boost` (decode-loop requests should route directly to Omni). Not required for correctness; ergonomics/safety only.
 - Keep OpenCode config aligned with current handles and tool access.
 - Open WebUI preset sync from LiteLLM presets.
 - Enable LiteLLM UI access so client-side system prompts/presets can be managed there.
