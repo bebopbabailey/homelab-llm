@@ -12,7 +12,8 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - **Ollama**: `0.0.0.0:11434` (do not modify)
 
 ## Studio (macOS, MLX)
-- **MLX LaunchDaemon**: `com.bebop.mlx-launch` (team ports `8100–8119`; experimental `8120–8139`)
+- **MLX Omni LaunchDaemon**: `com.bebop.mlx-omni.8100` (canonical endpoint `:8100`; team ports `8100–8119`; experimental `8120–8139`)
+- **Legacy disabled**: `com.bebop.mlx-launch` (per-port `mlx-openai-server`)
 - **OptiLLM proxy**: `0.0.0.0:4020` (active LiteLLM `boost` path)
 
 ## Contracts
@@ -20,5 +21,3 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - Tool search flows through LiteLLM `/v1/search` to SearXNG.
 - MLX ports are managed via `platform/ops/scripts/mlxctl`.
 - LiteLLM `boost` routes to Studio OptiLLM proxy on `192.168.1.72:4020`.
-
-- Orin: OptiLLM local on port 4040 (LAN only, routed via LiteLLM)

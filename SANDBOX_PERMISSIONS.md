@@ -15,6 +15,13 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - **Execute:** read‑only diagnostics (status/logs), no restarts
 - **Forbidden:** editing service code/config, changing ports, network exposure
 
+## Code Execution (All Scopes)
+- Treat code execution as a **privileged capability**.
+- Default: execute untrusted/generated code only inside a containerized sandbox
+  (Docker snippet executor pattern). Do not mount secrets into the sandbox.
+- If a task requires secrets, networking, or privileged host access, escalate to
+  a purpose-built ops agent or require explicit human approval.
+
 ## Layer: Interface
 - **Read:** layer-interface/*
 - **Write:** layer-interface/* docs and configs

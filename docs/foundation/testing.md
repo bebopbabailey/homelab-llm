@@ -140,9 +140,10 @@ curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq 
 ```
 Note: missing the `Authorization` header returns `Invalid Authorization header`.
 
-## OptiLLM local (Orin)
+## Orin (mount + no inference listener)
 ```bash
-ssh orin "curl -fsS http://127.0.0.1:4040/v1/models -H 'Authorization: Bearer <OPTILLM_API_KEY>' | jq ."
+ssh orin "findmnt /mnt/seagate -o TARGET,SOURCE,FSTYPE,OPTIONS"
+ssh orin "ss -ltn | rg -n ':4040\\b' || echo 'ok: 4040 not listening'"
 ```
 
 Verify OptiLLM directly (Mini): see “OptiLLM via LiteLLM `boost` (Mini)” above.

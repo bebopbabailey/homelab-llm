@@ -8,8 +8,8 @@
 - Mac Studio: MLX inference host. Canonical OpenAI-compatible endpoint is `mlx-omni-server` on `:8100`.
   Ports :8120-:8139 remain reserved for experimental tests.
   OptiLLM proxy :4020 (active LiteLLM `boost` path).
-- Jetson Orin AGX: OptiLLM local :4040 and persistent offload mount `/mnt/seagate`
-  (sshfs to Mini `/mnt/seagate/orin-offload`).
+- Jetson Orin AGX: persistent offload mount `/mnt/seagate`
+  (sshfs to Mini `/mnt/seagate/orin-offload`). No inference services are currently deployed.
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.

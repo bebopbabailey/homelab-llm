@@ -57,11 +57,11 @@ in `implementation_plan.md`.
 | Claim | Evidence source(s) | Status | Notes |
 |---|---|---|---|
 | OpenVINO posture-sensitive guidance | `docs/INTEGRATIONS.md`, `docs/PLATFORM_DOSSIER.md`, `docs/foundation/ov-model-onboarding.md` | resolved | Docs now consistently state OpenVINO is standalone and not active LiteLLM handles. |
-| OptiLLM posture-sensitive guidance | `docs/INTEGRATIONS.md`, `docs/foundation/optillm-techniques.md`, `layer-gateway/optillm-*` docs | resolved | Docs now consistently treat OptiLLM local inference as deferred and active proxy path as localhost-only/direct. |
+| OptiLLM posture-sensitive guidance | `docs/INTEGRATIONS.md`, `docs/foundation/optillm-techniques.md`, `layer-gateway/optillm-*` docs | resolved | Docs treat OptiLLM local inference as deferred; active proxy path is Studio `:4020` via LiteLLM `boost`. |
 | Ops governance discoverability | `platform/ops/scripts/*`, `platform/ops/systemd/*`, `platform/ops/templates/*`, `platform/ops/README.md` | resolved | Added `platform/ops/README.md` as ops narrative/index. |
 | Scripts discoverability contract | `scripts/validate_handles.py`, `scripts/README.md` | resolved | Added `scripts/README.md` documenting script purpose and usage. |
 | Next-project temporal hygiene | `next-projects/TINYAGENTS_PLAN.md`, `next-projects/VOICE_ASSISTANT_V1.md` | resolved | Added explicit non-canonical planning status notes and refreshed stale model example. |
-| Service-doc shape consistency | Service-tier matrix coverage | accepted | `voice-gateway` remains an intentionally sparse exception for now. |
+| Service-doc shape consistency | Service-tier matrix coverage | accepted | `voice-gateway` is intentionally sparse (will be expanded when implementation starts). |
 
 ### Round-2 drift candidate disposition
 - Service-doc bundle sparsity exceptions (`layer-interface/voice-gateway`): **accepted for now**.

@@ -53,7 +53,8 @@ that runs the proxy.
    - `layer-gateway/litellm-orch/scripts/health-check.sh` for LiteLLM.
 
 ## Add a New Client/Orchestrator (TinyAgents)
-1) Client must call LiteLLM only (`http://192.168.1.71:4000/v1`).
+1) Client must call LiteLLM only (`http://127.0.0.1:4000/v1` on-host).
+   Off-host clients should use the tailnet HTTPS gateway service.
    OptiLLM proxy may call MLX directly when configured.
 2) Add env vars for model selection (`*_API_BASE`, `*_MODEL`) and
    keep them out of git.

@@ -5,7 +5,7 @@
 - Mac Studio: MLX inference host (canonical OpenAI-compatible endpoint: `mlx-omni-server` on `:8100`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX: inference backends (OptiLLM local) and future CV/STT/TTS services.
+- Jetson Orin AGX: future edge inference backends and CV/STT/TTS services.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
@@ -47,7 +47,6 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
-| OptiLLM local (Orin) | Orin | 4040 | http://192.168.1.93:4040/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX Omni (served by Omni; model selected by `model`) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
@@ -63,9 +62,9 @@ Note: on the Studio, `GET /v1/models` may return a local snapshot path as the mo
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal.
 
 ### OptiLLM local (status)
-- OptiLLM local inference runs on Orin via systemd (service contract in repo).
-- Studio-local OptiLLM runtime serves LiteLLM `boost`.
-- Orin offload storage is available at `/mnt/seagate` and persists across reboot via `/etc/fstab`.
+- No inference services are currently deployed on Orin.
+- Orin offload storage is available at `/mnt/seagate` and persists across reboot.
+- Studio OptiLLM proxy serves LiteLLM `boost`.
 
 ## MCP Tools (stdio, no ports)
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
