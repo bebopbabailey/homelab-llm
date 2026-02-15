@@ -7,7 +7,9 @@
 
 ## Purpose
 
-Runs OptiLLM as a **localhost-only OpenAI-compatible inference proxy** that applies inference-time optimization strategies before forwarding requests upstream to LiteLLM or MLX endpoints.
+Runs OptiLLM as an OpenAI-compatible inference proxy that applies proxy-safe
+optimization strategies before forwarding requests upstream to an OpenAI-compatible
+backend (currently MLX Omni on the Studio).
 
 End-user clients must never access this service directly.
 
@@ -17,10 +19,11 @@ End-user clients must never access this service directly.
 
 | Property | Value |
 |--------|------|
-| Bind address | 127.0.0.1 |
+| Host | Mac Studio (launchd) |
+| Bind address | 0.0.0.0 |
 | Port | 4020 |
-| External access | Forbidden |
-| TLS | Not required (localhost only) |
+| External access | LAN-exposed (auth required); intended caller is LiteLLM `boost` |
+| TLS | Not required (LAN; protected by bearer auth) |
 
 ---
 
@@ -39,8 +42,8 @@ Minimum required:
 | Item | Value |
 |----|------|
 | Upstream type | OpenAI-compatible API |
-| Upstream service | LiteLLM or MLX |
-| Upstream base URL | http://127.0.0.1:<LITELLM_PORT>/v1 or http://<studio>:<mlx-port>/v1 |
+| Upstream service | MLX Omni (canonical) |
+| Upstream base URL | http://192.168.1.72:8100/v1 |
 
 ---
 
@@ -74,9 +77,8 @@ local inference mode. Use the flag instead.
 ---
 
 ## Wiring note
-- OptiLLM is not wired into LiteLLM by default.
-- Clients that want OptiLLM should call `http://127.0.0.1:4020/v1` directly and
-  include `optillm_approach` in the request body.
+- Clients should stay LiteLLM-only. This service is used via the LiteLLM `boost` handle.
+- Requests must include `optillm_approach` in the request body to select a technique.
 - Deprecated: routing all MLX handles through OptiLLM via `router-mlx-*` entries.
 
 ---
@@ -96,7 +98,7 @@ Expected external configuration (env file, not committed):
 Example env file path (systemd): `/etc/optillm-proxy/env`.
 
 Runtime flags (systemd `ExecStart` should pass explicitly):
-- `--host 127.0.0.1`
+- `--host 0.0.0.0`
 - `--port 4020`
 - `--base-url <upstream OpenAI-compatible endpoint>`
 - `--approach none`

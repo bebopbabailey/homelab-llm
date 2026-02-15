@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - Service docs live in `README.md` and `SERVICE_SPEC.md`.
-- This service is a localhost-only proxy that sits behind LiteLLM.
+- This service is a Studio-hosted proxy that sits behind LiteLLM.
 - Reference platform constraints in `docs/foundation/constraints-and-decisions.md`.
 - Reference topology in `docs/foundation/topology.md`.
 
@@ -22,8 +22,9 @@ Use `uv` only. Do not use Docker.
 - Keep tests light; prefer curl-based smoke checks unless code is added.
 
 ## Operational Constraints
-- Bind to `127.0.0.1` only; never expose on LAN.
-- OptiLLM may call LiteLLM or MLX upstream depending on the active routing policy.
+- Current deployment is a Studio launchd service on `0.0.0.0:4020` (LAN-exposed, auth required).
+- Clients should not call this directly; use LiteLLM `boost`.
+- OptiLLM may call MLX upstream (currently Omni `:8100`) depending on the active routing policy.
 - Ports are immutable; this service uses port `4020`.
 - MCP or other plugins should be planned and documented before enabling.
 - Do not store secrets in the repo.
@@ -31,7 +32,7 @@ Use `uv` only. Do not use Docker.
 ## Integration Requirements
 When adding this service to the system:
 - Keep LiteLLM routing **direct** to MLX by default.
-- OptiLLM is called explicitly at `http://127.0.0.1:4020/v1` when needed.
+- OptiLLM is called via LiteLLM `boost` (Studio `http://192.168.1.72:4020/v1`).
 - Update `platform/ops/scripts/healthcheck.sh` and `platform/ops/scripts/restart-all.sh`.
 - Add a systemd unit in `platform/ops/systemd/` and an env file outside the repo.
 
