@@ -19,7 +19,8 @@ It is a **client of LiteLLM** (gateway) and must never call inference backends d
 ## Dependencies
 ### Required
 - LiteLLM (OpenAI-compatible)
-  - Base URL: `http://192.168.1.71:4000/v1`
+  - Base URL (on-host): `http://127.0.0.1:4000/v1`
+  - Auth: bearer token required (do not commit; comes from local deployment env)
 - Local audio input device (USB mic)
 - Local audio output device (speaker / default sink)
 
@@ -47,7 +48,7 @@ No LAN exposure without an explicit topology change and approval.
 ## Environment Variables
 
 ### Core
-- `LITELLM_BASE_URL` (default: `http://192.168.1.71:4000/v1`)
+- `LITELLM_BASE_URL` (default: `http://127.0.0.1:4000/v1`)
 - `LITELLM_MODEL` (logical model name, e.g. `mlx-qwen2-5-coder-32b-instruct-8bit` or `ov-qwen2-5-3b-instruct-fp16`)
 - `SYSTEM_PROMPT` (short stable assistant prompt)
 - `PTT_MODE` (`keyboard` | `gpio` | `none`) — v1 typically `keyboard`

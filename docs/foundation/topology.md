@@ -14,7 +14,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Role: gateway + UI + search + orchestration.
 - Access: local repo on Mini.
 - Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.
-- Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires auth for `/health`).
+- Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires bearer auth for `/v1/*`, `/health/*`, and `/metrics/`).
   LiteLLM `boost` routes to Studio OptiLLM proxy (`:4020`).
 
 ### Studio (macOS)

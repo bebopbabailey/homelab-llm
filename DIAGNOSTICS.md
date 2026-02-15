@@ -19,7 +19,7 @@ journalctl -u prometheus.service -n 200 --no-pager
 
 ## Health checks (Mini)
 ```bash
-curl -sS http://127.0.0.1:4000/health/readiness
+curl -sS http://127.0.0.1:4000/health/readiness -H "Authorization: Bearer $LITELLM_API_KEY"
 curl -sS http://127.0.0.1:3000/health
 curl -sS http://127.0.0.1:9000/health
 ```
