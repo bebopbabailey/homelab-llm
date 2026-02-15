@@ -130,7 +130,9 @@ if a param is rejected by the backend.
 
 ## OpenCode (client)
 - Config: `~/.config/opencode/opencode.json` (MacBook).
-- Provider: LiteLLM OpenAI-compatible `baseURL=http://100.69.99.60:4000/v1`.
+- Provider: LiteLLM OpenAI-compatible.
+  - On Mini: `baseURL=http://127.0.0.1:4000/v1`
+  - On tailnet devices: `baseURL=https://gateway.tailfd1400.ts.net/v1`
 - Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`).
 - Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
 - Web search uses MCP `web-fetch` (stdio) with `search.web` routed to

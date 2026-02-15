@@ -5,7 +5,7 @@
 - Mac Studio: MLX inference host (canonical OpenAI-compatible endpoint: `mlx-omni-server` on `:8100`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX: future edge inference backends and CV/STT/TTS services.
+- Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
@@ -24,7 +24,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`.
 
 ### Orin AGX
-- Role: edge inference + performance experiments.
+- Role: voice services (STT/TTS via Voice Gateway) + edge inference + performance experiments.
 - Access: `ssh orin` (final name TBD).
 - Sources of truth: `docs/foundation/orin-agx.md`.
 - Storage offload mount: `/mnt/seagate` from Mini path
@@ -62,7 +62,8 @@ Note: on the Studio, `GET /v1/models` may return a local snapshot path as the mo
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal.
 
 ### OptiLLM local (status)
-- No inference services are currently deployed on Orin.
+- No inference backends are currently deployed on Orin.
+- Voice Gateway (Interface-layer STT/TTS) is planned to run on Orin.
 - Orin offload storage is available at `/mnt/seagate` and persists across reboot.
 - Studio OptiLLM proxy serves LiteLLM `boost`.
 

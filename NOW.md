@@ -1,7 +1,7 @@
 # NOW
 
 Active
-- Stabilize Orin `optillm-local` (`boost-2`) for reliable inference (offline mode + cache hygiene + low-latency).
+- Refresh `layer-interface/voice-gateway` docs to reflect Orin-hosted Voice Gateway (STT/TTS) calling Mini-hosted LiteLLM, plus the correct network/topology boundaries.
 
 NEXT UP
-- If Orin root remains tight on disk, add Orin-attached SSD/NVMe (or 10GbE + NFS to Studio SSD) and move `HF_HOME` there.
+- Start Voice Gateway implementation on Orin (service contract first, then backend selection, then smoke tests through LiteLLM).

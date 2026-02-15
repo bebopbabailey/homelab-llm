@@ -39,10 +39,10 @@ This mirrors how production AI systems are built and operated.
 
 ### In Scope
 - Push-to-talk voice input
-- Speech-to-Text (STT) running locally on the Mac Mini
+- Speech-to-Text (STT) running locally on the Orin (Voice Gateway host)
 - Text reasoning via LiteLLM (single gateway)
-- Text-to-Speech (TTS) running locally on the Mac Mini
-- Spoken audio output on the same machine
+- Text-to-Speech (TTS) running locally on the Orin (Voice Gateway host)
+- Spoken audio output on the Orin
 - Clear failure signaling (spoken or logged)
 - Measurable end-to-end latency
 
@@ -62,7 +62,7 @@ Anything not listed as “In Scope” is deferred by design.
 ## Supported Interaction Flow
 
 1. User presses push-to-talk and speaks
-2. Audio is captured locally on the Mac Mini
+2. Audio is captured locally on the Orin (Voice Gateway)
 3. STT transcribes speech to text
 4. Text is sent to LiteLLM (`/v1/chat/completions`)
 5. LiteLLM routes to an appropriate backend model
@@ -96,18 +96,19 @@ At no point does the interface layer call inference backends directly.
 
 ## Hardware Placement (v1)
 
+- **Jetson Orin AGX (Ubuntu / JetPack)**
+    - Voice Gateway service (STT + TTS + audio I/O)
+    - Calls LiteLLM on the Mini for LLM requests
+
 - **Mac Mini (Ubuntu)**
-    - Voice Gateway service
-    - STT
-    - TTS
     - LiteLLM gateway (existing)
+    - Open WebUI (existing)
 
 - **Mac Studio**
     - “Smart” LLM backends via MLX (behind LiteLLM)
 
-- **Jetson Orin AGX**
-    - Not used in v1
-    - Reserved for future low-latency or multimodal extensions
+Note: inference backends remain separate from the voice interface. The Orin hosts
+STT/TTS and audio I/O, while LiteLLM continues to be the single LLM gateway.
 
 ---
 

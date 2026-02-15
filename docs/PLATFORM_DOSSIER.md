@@ -9,7 +9,8 @@
   Ports :8120-:8139 remain reserved for experimental tests.
   OptiLLM proxy :4020 (active LiteLLM `boost` path).
 - Jetson Orin AGX: persistent offload mount `/mnt/seagate`
-  (sshfs to Mini `/mnt/seagate/orin-offload`). No inference services are currently deployed.
+  (sshfs to Mini `/mnt/seagate/orin-offload`). No inference backends are currently deployed.
+  Voice Gateway (Interface-layer STT/TTS) is planned to run here.
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.

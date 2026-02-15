@@ -12,4 +12,6 @@ Edge compute host for targeted on-device experiments.
 - Access method: SSH (`ssh orin`)
 
 ## Runtime role (current)
-- No inference services are currently deployed on Orin.
+- No inference backends are currently deployed on Orin.
+- Voice Gateway (Interface-layer STT/TTS) is planned to run on Orin and will call
+  LiteLLM on the Mini for LLM requests.

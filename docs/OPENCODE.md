@@ -12,17 +12,24 @@ ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
 ```
 
 ## Config
-Config file:FlFloF
+Config file:
 - `~/.config/opencode/opencode.json`
 
 Provider setup (LiteLLM OpenAI-compatible):
-- Base URL: `http://100.69.99.60:4000/v1`
+- If OpenCode runs on the Mini: `http://127.0.0.1:4000/v1`
+- If OpenCode runs on any other tailnet device: `https://gateway.tailfd1400.ts.net/v1`
 - Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`)
 
 Permissions:
 - Use `permission` rules to require approval (e.g., `bash: "ask"`, `edit: "ask"`).
 - The legacy `tools` config still works, but `permission` is the supported control plane.
   (Legacy `tools` booleans are deprecated upstream.)
+
+Auth:
+- LiteLLM requires a bearer token for `/v1/*`.
+- Prefer `opencode.json` indirection rather than storing keys inline, e.g.:
+  - `"{env:LITELLM_API_KEY}"`
+  - `"{file:~/.config/opencode/litellm_api_key}"`
 
 ## Web Search (SearXNG via LiteLLM)
 OpenCode uses MCP for tools. The recommended MCP server is the local `web-fetch`
@@ -38,8 +45,8 @@ MCP server config (in `opencode.json`):
     "command": ["/Users/christopherbailey/.local/share/mcp/web-fetch/.venv/bin/web-fetch-mcp"],
     "enabled": true,
     "environment": {
-      "LITELLM_SEARCH_API_BASE": "http://100.69.99.60:4000/v1/search/searxng-search",
-      "LITELLM_SEARCH_API_KEY": "dummy"
+      "LITELLM_SEARCH_API_BASE": "https://gateway.tailfd1400.ts.net/v1/search/searxng-search",
+      "LITELLM_SEARCH_API_KEY": "{file:~/.config/opencode/litellm_api_key}"
     }
   }
 }

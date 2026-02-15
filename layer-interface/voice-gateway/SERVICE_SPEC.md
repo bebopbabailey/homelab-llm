@@ -1,7 +1,7 @@
 # Voice Gateway — SERVICE SPEC
 
 ## Role
-Voice Gateway is a **local-only interface service** that provides the v1 voice loop:
+Voice Gateway is an **internal interface service** that provides the v1 voice loop:
 
 Mic audio → STT → LiteLLM → TTS → speaker output
 
@@ -10,16 +10,17 @@ It is a **client of LiteLLM** (gateway) and must never call inference backends d
 ## Classification
 - Layer: Interface
 - Type: Client/orchestrator (no inference)
-- Exposure: Localhost-only (no LAN exposure in v1)
+- Exposure: LAN-private on the Orin. It must be reachable from the Mini
+  (LiteLLM/Open WebUI) but must not be exposed to the public internet.
 
 ## Host Placement (v1)
-- Host: Mac Mini (Ubuntu)
-- Reason: always-on, connected microphone (Shure MV51), co-located with LiteLLM gateway
+- Host: Orin (`192.168.1.93`)
+- Reason: Orin is the realtime audio box (STT/TTS). LiteLLM remains on the Mini.
 
 ## Dependencies
 ### Required
 - LiteLLM (OpenAI-compatible)
-  - Base URL (on-host): `http://127.0.0.1:4000/v1`
+  - Base URL: LiteLLM on the Mini (must be set via env; do not hardcode localhost)
   - Auth: bearer token required (do not commit; comes from local deployment env)
 - Local audio input device (USB mic)
 - Local audio output device (speaker / default sink)
@@ -30,28 +31,30 @@ It is a **client of LiteLLM** (gateway) and must never call inference backends d
 ## Interfaces
 
 ### Primary Interface (v1)
-Command-line / systemd service:
-- Push-to-talk activation
-- Logs latency and failures
-- Speaks results aloud
+HTTP API (internal) + systemd service on the Orin:
+- STT endpoint (audio -> text)
+- TTS endpoint (text -> audio)
+- Optional "one-shot" voice loop endpoint (PTT / automation)
 
-### Optional Local Control Interface (v1)
-If an HTTP control plane is used, it MUST bind to localhost only:
-- Bind: `127.0.0.1`
-- Endpoints:
-  - `GET /health`
-  - `POST /ptt` (trigger one listen→respond cycle)
-  - `POST /speak` (speak provided text, for diagnostics)
+Implementation detail: we prefer OpenAI-compatible shapes where feasible
+(e.g., `/v1/audio/transcriptions`, `/v1/audio/speech`), but the exact contract is
+finalized during implementation.
 
-No LAN exposure without an explicit topology change and approval.
+### Local Admin / Control Interface (optional)
+If a separate admin/control plane is introduced, it MUST bind to localhost only
+on the Orin (e.g., for debugging, device selection, or diagnostics).
 
 ## Environment Variables
 
 ### Core
-- `LITELLM_BASE_URL` (default: `http://127.0.0.1:4000/v1`)
+- `LITELLM_BASE_URL` (required; LiteLLM on the Mini, e.g. `http://<mini-ip>:4000/v1`)
 - `LITELLM_MODEL` (logical model name, e.g. `mlx-qwen2-5-coder-32b-instruct-8bit` or `ov-qwen2-5-3b-instruct-fp16`)
 - `SYSTEM_PROMPT` (short stable assistant prompt)
 - `PTT_MODE` (`keyboard` | `gpio` | `none`) — v1 typically `keyboard`
+
+### Service Networking (v1)
+- `VOICE_GATEWAY_BIND_ADDR` (recommended: Orin LAN addr; do not bind to public interfaces)
+- `VOICE_GATEWAY_PORT`
 
 ### Audio Device Selection
 - `AUDIO_INPUT_DEVICE` (ALSA/Pulse device identifier; optional)

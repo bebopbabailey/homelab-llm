@@ -1,12 +1,13 @@
 # Voice Gateway — RUNBOOK
 
 ## Start / Stop
-- Start via systemd (preferred) or CLI in a tmux session.
+- Start via systemd on the Orin (preferred) or CLI in a tmux session.
 - Verify microphone device is present before starting.
 
 ## Health Checks
-If using localhost HTTP health:
-- `curl -s http://127.0.0.1:<port>/health`
+If the service exposes HTTP health:
+- On Orin: `curl -s http://127.0.0.1:<port>/health`
+- From Mini (connectivity check): `curl -s http://192.168.1.93:<port>/health`
 
 Otherwise:
 - confirm process is running
