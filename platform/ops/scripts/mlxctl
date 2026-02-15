@@ -1449,6 +1449,7 @@ if [ ! -d .git ]; then
 fi
 git fetch --tags --force origin
 git checkout -f {shlex.quote(ref)}
+git clean -fd
 """
     _ssh_cmd(studio_ssh, remote_setup)
 
@@ -1534,7 +1535,8 @@ cat > {shlex.quote(plist_path)} <<'PLIST'
 PLIST
 chown root:wheel {shlex.quote(plist_path)}
 chmod 0644 {shlex.quote(plist_path)}
-launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
+# bootout-by-path is more reliable than bootout-by-label on recent macOS.
+launchctl bootout system {shlex.quote(plist_path)} >/dev/null 2>&1 || true
 launchctl bootstrap system {shlex.quote(plist_path)}
 launchctl kickstart -k system/{shlex.quote(label)}
 """
@@ -1553,7 +1555,7 @@ def cmd_omni_stop(args):
     plist_path = f"/Library/LaunchDaemons/{label}.plist"
     remote = f"""
 set -euo pipefail
-launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
+launchctl bootout system {shlex.quote(plist_path)} >/dev/null 2>&1 || true
 rm -f {shlex.quote(plist_path)}
 """
     _studio_sudo_cmd(studio_ssh, remote, check=False)
