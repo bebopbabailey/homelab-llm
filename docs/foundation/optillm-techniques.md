@@ -8,19 +8,19 @@ Set the approach per request via `optillm_approach`, e.g.:
 
 Decode-time techniques note (current direction):
 - Proxy-safe orchestration stays in OptiLLM (`optillm_approach=...`).
-- Decode-loop algorithms (not proxy-safe) live in MLX Omni (Studio) as `decoding=...`.
-- MLX Omni accepts extra request fields (`extra = "allow"`), so we can pass `decoding` and params
-  without breaking OpenAI clients.
+- Decode-loop algorithms (not proxy-safe) are backend-runtime specific and are not
+  part of the default LiteLLM + `mlx_lm.server` contract.
+- For durability, prefer `optillm_approach` and standard OpenAI fields at the gateway layer.
 
-Examples (direct to Omni via LiteLLM MLX handles):
+Examples (request-body techniques via gateway):
 ```json
-{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"decoding":"thinkdeeper","min_thinking_tokens":256,"stream":true}
+{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"router","stream":true}
 ```
 ```json
-{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"decoding":"deepconf","deepconf_n":4,"stream":false}
+{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa","stream":false}
 ```
 ```json
-{"model":"openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct","messages":[{"role":"user","content":"ping"}],"logprobs":true,"top_logprobs":3,"max_tokens":16}
+{"model":"boost-deep","messages":[{"role":"user","content":"ping"}],"optillm_approach":"plansearch","max_tokens":256}
 ```
 
 ## Strategy overview (techniques vs plugins)

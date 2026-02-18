@@ -22,7 +22,7 @@ while allowing backend models to evolve independently.
    - Single OptiLLM instance serves both `boost` and `boost-deep`.
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (standalone backend; not currently wired as active LiteLLM handles).
-   - MLX OpenAI servers on the Mac Studio (`8100/8101/8102`, registry-driven).
+   - MLX `mlx_lm.server` lanes on the Mac Studio (`8100/8101/8102`, registry-driven).
    - AFM OpenAI-compatible API on the Studio (planned).
    - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.
    - Non-LLM model evaluation (planned): routing/classification, summarization, cleaning.

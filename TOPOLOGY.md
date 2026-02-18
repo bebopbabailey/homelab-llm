@@ -12,7 +12,7 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - **Ollama**: `0.0.0.0:11434` (do not modify)
 
 ## Studio (macOS, MLX)
-- **MLX per-port lanes** (`mlx-openai-server`):
+- **MLX per-port lanes** (`mlx_lm.server`):
   - `8100` deep (`mlx-gpt-oss-120b-mxfp4-q4`)
   - `8101` main (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
   - `8102` fast (`mlx-gpt-oss-20b-mxfp4-q4`)

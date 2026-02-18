@@ -2,7 +2,7 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
-- Mac Studio: MLX inference host (per-port `mlx-openai-server` lanes on `:8100/:8101/:8102`) and OptiLLM proxy (`:4020`).
+- Mac Studio: MLX inference host (per-port `mlx_lm.server` lanes on `:8100/:8101/:8102`) and OptiLLM proxy (`:4020`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.

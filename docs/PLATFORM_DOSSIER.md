@@ -5,7 +5,7 @@
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
-- Mac Studio: MLX inference host using per-port `mlx-openai-server` lanes:
+- Mac Studio: MLX inference host using per-port `mlx_lm.server` lanes:
   `:8100` deep (gpt-oss-120b), `:8101` main (qwen3-next-80b),
   `:8102` fast (gpt-oss-20b).
   OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
@@ -62,7 +62,7 @@
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
-  Current runtime command family is `mlx-openai-server launch` per active lane.
+  Current runtime command family is `mlx_lm.server` per active lane.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and

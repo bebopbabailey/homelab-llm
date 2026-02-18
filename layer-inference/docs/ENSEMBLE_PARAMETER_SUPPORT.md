@@ -1,6 +1,6 @@
 # MLX Ensemble — Request Parameter Support (2026)
 
-Scope: the default MLX ensemble served via `mlx-openai-server` and routed through
+Scope: the default MLX ensemble served via per-port `mlx_lm.server` and routed through
 LiteLLM (and OptiLLM proxy when enabled). This document captures the **complete
 request parameter surface** for the ensemble by referencing the official
 OpenAI-compatible Chat Completions API, plus the MLX server and LiteLLM behavior
@@ -16,7 +16,7 @@ served by the same OpenAI-compatible server and routed uniformly.
 
 ## Canonical parameter list (authoritative)
 The OpenAI Chat Completions API defines the full request body schema and
-parameter list. Because `mlx-openai-server` is OpenAI-compatible, this is the
+parameter list. Because `mlx_lm.server` is OpenAI-compatible, this is the
 canonical parameter surface for the ensemble.
 
 Reference (authoritative list):
@@ -42,8 +42,8 @@ commonly used for chat completions:
 
 See the OpenAI reference for the complete schema and any new fields. citeturn0search1
 
-## Parameters supported by MLX OpenAI server (per upstream docs)
-The MLX OpenAI server advertises OpenAI compatibility and supports standard
+## Parameters supported by MLX server runtime (per upstream docs)
+The MLX runtime advertises OpenAI compatibility and supports standard
 Chat Completions parameters such as:
 - `model`, `messages`
 - `temperature`, `top_p`
@@ -55,8 +55,8 @@ It also notes compatibility with OpenAI’s request/response format.
 
 Reference:
 ```
-mlx-openai-server (MLX) — OpenAI-compatible API, function calling/tools
-https://github.com/ml-explore/mlx-examples/tree/main/llms/llm_server
+mlx_lm.server (MLX) — OpenAI-compatible API
+https://github.com/ml-explore/mlx-lm
 ```
 PyPI release notes also state OpenAI compatibility, tools, streaming, and
 common OpenAI params (e.g., `temperature`, `top_p`). citeturn1search0
@@ -135,7 +135,7 @@ curl -sS --max-time 10 http://127.0.0.1:4000/v1/chat/completions \
 ## Notes
 - If you need a strict list of **exactly honored** parameters per model, the
   most reliable method is to run end-to-end A/B tests or read the upstream
-  `mlx-openai-server` implementation for the deployed version.
+  `mlx_lm.server` implementation for the deployed version.
 - For agent use, default to `temperature` + `max_tokens` and avoid penalties
   unless you observe measurable differences.
 

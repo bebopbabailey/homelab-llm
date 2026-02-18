@@ -16,7 +16,7 @@ mlxctl verify
 
 Notes:
 - `mlxctl ensure` takes a Hugging Face repo id (example: `mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4`).
-  Use `mlxctl list` to discover the canonical `mlx-*` model id to pass to Omni.
+  Use `mlxctl list` to discover canonical `mlx-*` model ids.
 - `mlxctl verify` checks registry defaults and also validates (on gateway hosts) that
   served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
 
