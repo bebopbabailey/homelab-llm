@@ -11,9 +11,9 @@ model_list:
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
 - model_name: deep
   litellm_params:
-    model: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_MODEL
-    api_base: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_API_BASE
-    api_key: os.environ/MLX_TXGSYNC_GPT_OSS_120B_DERESTRICTED_MXFP4_MLX_API_KEY
+    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
+    api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
+    api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
 - model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
@@ -29,14 +29,20 @@ model_list:
 # 2) OptiLLM boost lane (opt-in)
 - model_name: boost
   litellm_params:
-    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    model: openai/main
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+
+- model_name: boost-deep
+  litellm_params:
+    model: openai/deep
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
 
 # 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
   litellm_params:
-    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
     temperature: 0.05
@@ -47,7 +53,7 @@ model_list:
 
 - model_name: task-transcribe-vivid
   litellm_params:
-    model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
     temperature: 0.4
@@ -83,6 +89,16 @@ guardrails:
     litellm_params:
       guardrail: "prompt_guardrail.PromptGuardrail"
       mode: "pre_call"
+      default_on: true
+  - guardrail_name: "harmony-pre"
+    litellm_params:
+      guardrail: "harmony_guardrail.HarmonyGuardrail"
+      mode: "pre_call"
+      default_on: true
+  - guardrail_name: "harmony-post"
+    litellm_params:
+      guardrail: "harmony_guardrail.HarmonyGuardrail"
+      mode: "post_call"
       default_on: true
   - guardrail_name: "transcribe-pre"
     litellm_params:

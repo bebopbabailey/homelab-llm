@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - Root docs: `README.md`, `ARCHITECTURE.md`, `SERVICE_SPEC.md`, `DEV_CONTRACT.md`, `TASKS.md`, `AIDER.md`, `AGENT_PREFERENCES.md`.
 - Runtime config: `config/router.yaml` and `config/env.example` (copy to `config/env.local` for real values).
-- External services: OpenVINO on `localhost:9000`; MLX Omni on the Studio at `:8100` (canonical), with `8120-8139` reserved for experimental canaries.
+- External services: OpenVINO on `localhost:9000`; Studio MLX lanes on `:8100/:8101/:8102`, with `8120-8139` reserved for experimental canaries.
 - Source code: currently minimal (`main.py` placeholder); gateway logic will live in this repo.
 - Scripts/tests: `scripts/`, `docs/`, `logs/`, and `callbacks/` are available; add runbooks and tests as phases progress.
 
@@ -38,6 +38,6 @@ When the LiteLLM proxy entrypoint is added, document the exact command here.
 
 ## Security & Configuration Tips
 - **DO NOT** touch existing services (OLLAMA on `11434`, OpenVINO on `9000`).
-- MLX canonical endpoint is `mlx-omni-server` on the Studio at `:8100` (LAN-exposed).
+- MLX active runtime is per-port `mlx-openai-server` lanes on Studio (`:8100/:8101/:8102`).
 - Keep secrets and hostnames in `config/env.local` (git-ignored).
 - The gateway is routing-only; inference must remain external.

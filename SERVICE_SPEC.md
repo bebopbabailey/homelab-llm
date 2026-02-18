@@ -43,6 +43,15 @@ the Mini, MLX on the Studio, AFM planned).
 ## Guardrails
 - `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
   It strips wrappers/labels and removes reasoning fields from transcript outputs.
+- `harmony-guardrail` is enabled globally on `post_call`.
+  A matching `pre_call` pass sanitizes prior assistant turns so upstream chat templates
+  don't receive raw protocol tags from conversation history.
+  It normalizes assistant output by:
+  - extracting GPT-OSS Harmony `final` channel content, and
+  - falling back to the best available non-analysis channel when `final` is absent, and
+  - stripping raw protocol tags when channel markers leak through, and
+  - removing `<think>...</think>` blocks from tag-based reasoning outputs.
+  This keeps downstream clients from receiving raw protocol artifacts.
 
 ## Service Management (Planned)
 - User systemd service with explicit port binding

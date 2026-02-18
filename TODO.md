@@ -1,8 +1,9 @@
 # Studio launchd update (requires sudo on Studio)
 
-Status: legacy notes for a GPT-OSS per-port launchd setup. Current MLX is served
-via `mlx-omni-server` on Studio `:8100` and managed via `platform/ops/scripts/mlxctl`.
-Only use this if you intentionally revert to legacy `com.bebop.mlx-launch` + per-port servers.
+Status: legacy notes for prior Studio launchd workflows. Current MLX is served
+via per-port `mlx-openai-server` lanes (`:8100/:8101/:8102`) and managed via
+`platform/ops/scripts/mlxctl`.
+Keep this file as historical reference only.
 
 Goal: run the default MLX boot ensemble at ports `8111` and `8113`
 via `com.bebop.mlx-launch`.

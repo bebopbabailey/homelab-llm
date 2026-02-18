@@ -42,6 +42,8 @@ LiteLLM supports sending standard logging payloads to external endpoints via
 
 ## Where we use these
 - `config/transcribe_guardrail.py` → post-call wrapper stripping (task-transcribe* only).
+- `config/harmony_guardrail.py` → post-call normalization for GPT-OSS Harmony
+  and tag-based reasoning outputs.
 
 ## Keep in mind
 - Pre-call hooks can mutate requests; guardrails should enforce correctness.
