@@ -27,7 +27,7 @@ tail -n 200 -f /Users/thestudio/Library/Logs/optillm-proxy.err
 - LaunchDaemon: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`
 - Label: `com.bebop.optillm-proxy`
 - Listener: `0.0.0.0:4020`
-- Upstream (current): MLX Omni (`http://192.168.1.72:8100/v1`)
+- Upstream (current): Mini LiteLLM via tailnet TCP forward (`http://100.69.99.60:4443/v1`)
 
 Do not commit secrets: the plist contains `--optillm-api-key` and may also set
 `OPENAI_API_KEY`. Keep real values out of git.
@@ -67,6 +67,15 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' \
+  | jq -r '.choices[0].message.content'
+```
+
+Deep lane check:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"boost-deep","messages":[{"role":"user","content":"ping"}],"optillm_approach":"router","max_tokens":32}' \
   | jq -r '.choices[0].message.content'
 ```
 

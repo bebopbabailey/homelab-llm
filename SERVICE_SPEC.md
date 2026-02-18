@@ -9,7 +9,7 @@
 
 Runs OptiLLM as an OpenAI-compatible inference proxy that applies proxy-safe
 optimization strategies before forwarding requests upstream to an OpenAI-compatible
-backend (currently MLX Omni on the Studio).
+backend (currently Mini LiteLLM via tailnet TCP forward).
 
 End-user clients must never access this service directly.
 
@@ -42,8 +42,8 @@ Minimum required:
 | Item | Value |
 |----|------|
 | Upstream type | OpenAI-compatible API |
-| Upstream service | MLX Omni (canonical) |
-| Upstream base URL | http://192.168.1.72:8100/v1 |
+| Upstream service | LiteLLM on Mini (localhost-bound, reached via tailnet TCP forward) |
+| Upstream base URL | http://100.69.99.60:4443/v1 |
 
 ---
 
