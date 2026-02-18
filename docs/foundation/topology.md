@@ -1,8 +1,8 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, OptiLLM, SearXNG, Ollama.
-- Mac Studio: MLX inference host (canonical OpenAI-compatible endpoint: `mlx-omni-server` on `:8100`).
+- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
+- Mac Studio: MLX inference host (per-port `mlx-openai-server` lanes on `:8100/:8101/:8102`) and OptiLLM proxy (`:4020`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.
@@ -48,7 +48,9 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
-| MLX Omni (served by Omni; model selected by `model`) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
+| MLX deep lane (gpt-oss 120b) | Studio | 8100 | http://192.168.1.72:8100/v1 | /v1/models |
+| MLX main lane (qwen next 80b) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
+| MLX fast lane (gpt-oss 20b) | Studio | 8102 | http://192.168.1.72:8102/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
@@ -56,7 +58,10 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 ### MLX port management
 - Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.
 - Ports 8120-8139 are reserved for experimental test loads and are not registered until a model is loaded.
-- Canonical endpoint: `8100` (mlx-omni-server). Additional ports may be unused unless explicitly enabled.
+- Current active lanes:
+  - `8100`: `mlx-gpt-oss-120b-mxfp4-q4`
+  - `8101`: `mlx-qwen3-next-80b-mxfp4-a3b-instruct`
+  - `8102`: `mlx-gpt-oss-20b-mxfp4-q4`
 
 Note: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal.
@@ -73,9 +78,11 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
-  MLX 8100-8119, Home Assistant 8123, AFM 9999 (planned).
+  MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
   Prometheus 9090, Grafana 3001, SearXNG 8888.
+- Internal tailnet transport used by Studio OptiLLM upstream:
+  - `100.69.99.60:4443` (Tailscale TCP forward on Mini -> `127.0.0.1:4000`)
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
   - LiteLLM: `layer-gateway/litellm-orch/config/env.local`

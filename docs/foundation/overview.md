@@ -17,12 +17,12 @@ while allowing backend models to evolve independently.
    - TinyAgents connects to MCP servers; LiteLLM remains the LLM gateway.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
-   - OptiLLM runs localhost-only and is called directly when a technique is needed.
-   - Clients include `optillm_approach` in the request body.
-   - OptiLLM local inference is deferred until Orin AGX setup (not an active Studio runtime path).
+   - OptiLLM runs on the Studio (`0.0.0.0:4020`) and is consumed through LiteLLM `boost` handles.
+   - Clients include `optillm_approach` in the request body when they want to override default router behavior.
+   - Single OptiLLM instance serves both `boost` and `boost-deep`.
 5) Specialist Backends (current)
    - OpenVINO LLM server on the Mac Mini (standalone backend; not currently wired as active LiteLLM handles).
-   - MLX OpenAI servers on the Mac Studio (`mlx-*`).
+   - MLX OpenAI servers on the Mac Studio (`8100/8101/8102`, registry-driven).
    - AFM OpenAI-compatible API on the Studio (planned).
    - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.
    - Non-LLM model evaluation (planned): routing/classification, summarization, cleaning.

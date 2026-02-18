@@ -3,7 +3,7 @@
 ## LiteLLM routing
 - Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
-- Upstreams: MLX Omni (canonical) `http://192.168.1.72:8100/v1`,
+- Upstreams: Studio MLX lanes `http://192.168.1.72:8100|8101|8102/v1`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: canonical model IDs with prefix `mlx-`.
   Format: `mlx-<family>-<params>-<quant>-<variant>` in that order (dash-only,
@@ -16,7 +16,10 @@
   (only relevant when calling OptiLLM directly).
 - Auth: gateway requests currently require bearer auth (`LITELLM_MASTER_KEY` in deployment).
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
-- MLX alias set (canonical endpoint): `mlx-*` routes to Omni `:8100` and selects the model via the request `model` field.
+- MLX alias set (current lane mapping):
+  - `deep` -> `8100` (`mlx-gpt-oss-120b-mxfp4-q4`)
+  - `main` -> `8101` (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
+  - `fast` -> `8102` (`mlx-gpt-oss-20b-mxfp4-q4`)
   `8120-8139` remain reserved for experimental canaries (only used when explicitly configured).
 - MLX registry is the canonical link from `model_id` to inference source:
   `model_id` → `registry.json` → `source_path` / `cache_path`.
@@ -109,6 +112,9 @@ if a param is rejected by the backend.
   - `https://gateway.tailfd1400.ts.net/` → LiteLLM (4000)
   - `https://search.tailfd1400.ts.net/` → SearXNG (8888)
 - Access is controlled by **grants** (not legacy ACLs). Use `svc:*` in `dst`.
+- Internal Studio upstream path (current):
+  - Studio OptiLLM uses Mini tailnet TCP forward `http://100.69.99.60:4443/v1`
+  - Mini maps `100.69.99.60:4443 -> 127.0.0.1:4000` via `tailscale serve --tcp`
 
 ## SearXNG search
 - Local SearXNG: `http://127.0.0.1:8888/search?q=<query>&format=json`
@@ -133,6 +139,7 @@ if a param is rejected by the backend.
 - Provider: LiteLLM OpenAI-compatible.
   - On Mini: `baseURL=http://127.0.0.1:4000/v1`
   - On tailnet devices: `baseURL=https://gateway.tailfd1400.ts.net/v1`
+  - Internal infra fallback (not default for end-user clients): `http://100.69.99.60:4443/v1`
 - Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`).
 - Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
 - Web search uses MCP `web-fetch` (stdio) with `search.web` routed to
@@ -140,6 +147,8 @@ if a param is rejected by the backend.
 
 ## OptiLLM boost lane (opt-in)
 - `boost` routes to the Studio OptiLLM proxy (`http://192.168.1.72:4020/v1`) via `OPTILLM_API_BASE`.
+- `boost-deep` routes to the same Studio OptiLLM proxy and sets `model=deep`.
+- Studio OptiLLM is a single instance; both handles share it.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: `boost` appears in Studio `optillm-proxy` logs.
 - Requests must include bearer auth for the target backend key (`OPTILLM_API_KEY` for `boost`).
@@ -165,12 +174,13 @@ and where this repo uses callbacks vs guardrails.
 - Studio-local proxy: `http://192.168.1.72:4020/v1` (binds `0.0.0.0:4020` on the Studio).
 - Current usage: active LiteLLM `boost` path.
 - Requests must include `Authorization: Bearer <OPTILLM_API_KEY>` (even for localhost tests).
+- Current upstream: Mini LiteLLM through tailnet TCP forward `http://100.69.99.60:4443/v1`.
 - Upstream can be LiteLLM or MLX directly; avoid routing loops.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
 
 ### Boost handle routing (current)
-- LiteLLM `boost` routes to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
+- LiteLLM `boost` and `boost-deep` route to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
 - This keeps clients LiteLLM-only while still allowing request-body technique
   selection (e.g., `optillm_approach`).
 

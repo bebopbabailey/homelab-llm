@@ -18,6 +18,7 @@ Config file:
 Provider setup (LiteLLM OpenAI-compatible):
 - If OpenCode runs on the Mini: `http://127.0.0.1:4000/v1`
 - If OpenCode runs on any other tailnet device: `https://gateway.tailfd1400.ts.net/v1`
+- Infra fallback (if service-hostname path is unstable): `http://100.69.99.60:4443/v1`
 - Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`)
 
 Permissions:
