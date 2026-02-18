@@ -11,7 +11,7 @@
 - Adopted plain client-facing model names (superseded; see 2026-01-13 update).
 
 ## 2026-01-03 — Backend Topology & Aider Roles
-- MLX OpenAI servers run on the Studio at ports `8100-8139`; OpenVINO remains on the Mini at `9000`.
+- MLX `mlx_lm.server` lanes run on the Studio at ports `8100-8139`; OpenVINO remains on the Mini at `9000`.
 - Aider uses three roles: main, editor, weak (model names updated in `AIDER.md`).
 
 ## 2026-01-03 — MLX Chat Template Issue

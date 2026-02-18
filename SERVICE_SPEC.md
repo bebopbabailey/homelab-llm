@@ -27,12 +27,12 @@ the Mini, MLX on the Studio, AFM planned).
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
-- **MLX Omni** on the Studio: canonical OpenAI-compatible endpoint on **8100**
-  (`http://192.168.1.72:8100/v1`, model selected via request `model` field).
+- **MLX Studio lanes** on the Studio: OpenAI-compatible per-port `mlx_lm.server`
+  endpoints on **8100/8101/8102** (`http://192.168.1.72:<port>/v1`).
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
 
 ## Default Logical Models
-- `mlx-*` → MLX Omni on `:8100` (canonical)
+- `mlx-*` → MLX Studio per-port lanes (`:8100/:8101/:8102`)
 - `ov-*` → OpenVINO on `localhost:9000`
 - `boost` → Studio OptiLLM proxy on `:4020` (optimization lane)
 

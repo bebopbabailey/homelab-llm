@@ -28,7 +28,7 @@ service) and serves as one specialist node.
     - Optimized for low-resource, always-on use
 - **Remote specialist (big box)**:
     - Heavy-inference models for deep reasoning and generation
-    - Accessed through LiteLLM as another backend (MLX OpenAI servers on the Studio)
+    - Accessed through LiteLLM as another backend (MLX `mlx_lm.server` lanes on the Studio)
     - AFM OpenAI-compatible API on the Studio (planned)
 
 ## Data Flow (Current)
@@ -36,7 +36,7 @@ service) and serves as one specialist node.
 2. LiteLLM routes based on the requested logical model name.
 3. LiteLLM forwards to the chosen backend:
     - Local OpenVINO server (external service on this Mini, mapped as `ov-*`), or
-    - Remote heavy-inference machine (MLX OpenAI servers on the Studio).
+    - Remote heavy-inference machine (MLX `mlx_lm.server` lanes on the Studio).
 4. LiteLLM returns the upstream response to the client.
 
 ## Data Flow (Planned)

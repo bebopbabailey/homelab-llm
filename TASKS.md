@@ -71,6 +71,6 @@ Goal: Keep gateway tool-agnostic but orchestration-friendly.
 ## Nice to Haves
 - [ ] Add a helper script to detect or extract MLX chat templates and launch MLX servers with `--chat-template-file` automatically (durable model swaps).
 - [ ] If we revise runtime strategy again, require a backend migration checklist with parser parity tests and rollback steps.
-  - Note (2026-02): per-port `mlx-openai-server` is currently the active runtime contract; reevaluate this item after runtime strategy is finalized again.
+  - Note (2026-02): per-port `mlx_lm.server` is currently the active runtime contract; reevaluate this item if runtime strategy changes again.
 - [ ] Add tag/capability metadata for health output (compact JSON enrichment).
 - [ ] Add a lightweight routing rule to force short/low‑complexity prompts (e.g., transcript cleaning) to `none` to avoid heavy OptiLLM techniques.

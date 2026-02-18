@@ -38,6 +38,6 @@ When the LiteLLM proxy entrypoint is added, document the exact command here.
 
 ## Security & Configuration Tips
 - **DO NOT** touch existing services (OLLAMA on `11434`, OpenVINO on `9000`).
-- MLX active runtime is per-port `mlx-openai-server` lanes on Studio (`:8100/:8101/:8102`).
+- MLX active runtime is per-port `mlx_lm.server` lanes on Studio (`:8100/:8101/:8102`).
 - Keep secrets and hostnames in `config/env.local` (git-ignored).
 - The gateway is routing-only; inference must remain external.
