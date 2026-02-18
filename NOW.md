@@ -1,7 +1,10 @@
 # NOW
 
 Active
-- Refresh `layer-interface/voice-gateway` docs to reflect Orin-hosted Voice Gateway (STT/TTS) calling Mini-hosted LiteLLM, plus the correct network/topology boundaries.
+- `mlxctl` backend alignment in progress: make `status/verify/load/unload` match
+  live Studio `mlx_lm.server` runtime so inference readiness checks are
+  trustworthy before further hardening.
 
 NEXT UP
-- Start Voice Gateway implementation on Orin (service contract first, then backend selection, then smoke tests through LiteLLM).
+- Validate lane quality gates (`fast/main/deep`) and parser leakage checks after
+  `mlxctl` runtime parity lands, then proceed with launchd durability hardening.

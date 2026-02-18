@@ -5,15 +5,13 @@ appropriate host and confirm outputs before declaring a change complete.
 
 ## MLX Registry and Controller (Studio)
 
-Omni-first baseline (current runtime reality):
+Current runtime baseline (per-port MLX lanes):
 ```bash
 mlxctl init
 mlxctl ensure <hf_repo_id> --convert auto
 mlxctl list
 mlxctl status
 mlxctl verify
-mlxctl omni-status --port 8100
-mlxctl omni-warm <mlx-model-id> --port 8100
 ```
 
 Notes:
@@ -22,12 +20,18 @@ Notes:
 - `mlxctl verify` checks registry defaults and also validates (on gateway hosts) that
   served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
 
-Legacy slot runtime (only when using `mlx-openai-server` / per-port slots):
+Expanded runtime inspection:
 ```bash
-mlxctl load <hf_repo_id> 8100
-mlxctl status
+mlxctl status --checks
+mlxctl status --checks --json
+```
+
+Lane load/unload:
+```bash
+mlxctl load <hf_repo_id_or_mlx_model_id> 8100
+mlxctl status --checks
 mlxctl unload 8100
-mlxctl status
+mlxctl status --checks
 ```
 
 Unload all ports:
@@ -40,12 +44,14 @@ Reconcile after reboot:
 mlxctl reconcile
 ```
 
-## MLX Omni (Studio)
-After reboot or launchd restart, confirm port 8100 (Omni) is serving `/v1/models`.
+## MLX lanes (Studio)
+After reboot or launchd restart, confirm ports 8100/8101/8102 are serving `/v1/models`.
 Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
 as the model `id`. Use `mlxctl status` for the canonical `mlx-*` model IDs.
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
+curl -fsS http://127.0.0.1:8101/v1/models | jq .
+curl -fsS http://127.0.0.1:8102/v1/models | jq .
 ```
 
 Verify GPT‑OSS content channel is present (requires adequate max_tokens):

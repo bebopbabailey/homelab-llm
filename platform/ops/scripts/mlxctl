@@ -333,14 +333,44 @@ def _ps_snapshot():
 
 
 def _mlx_pids_for_port(port: int):
-    port_token = re.compile(rf"--port(?:=|\s+){port}\b")
     pids = []
-    for pid, _ppid, cmd in _ps_snapshot():
-        if "mlx-openai-server" not in cmd:
-            continue
-        if port_token.search(cmd):
-            pids.append(pid)
+    for pid, _ppid, _cmd, _family in _mlx_processes_for_port(port):
+        pids.append(pid)
     return pids
+
+
+def _mlx_process_family(cmd: str) -> Optional[str]:
+    if "mlx_lm.server" in cmd:
+        return "mlx_lm.server"
+    if "mlx-openai-server" in cmd or "mlx_openai_server" in cmd:
+        return "mlx-openai-server"
+    return None
+
+
+def _mlx_processes_for_port(port: int):
+    port_token = re.compile(rf"--port(?:=|\s+){port}\b")
+    rows = []
+    for pid, ppid, cmd in _ps_snapshot():
+        family = _mlx_process_family(cmd)
+        if not family:
+            continue
+        if not port_token.search(cmd):
+            continue
+        rows.append((pid, ppid, cmd, family))
+    return rows
+
+
+def _mlx_runtime_command_for_port(port: int) -> Optional[str]:
+    rows = _mlx_processes_for_port(port)
+    if not rows:
+        return None
+    # Prefer mlx_lm.server when both families appear.
+    rows.sort(key=lambda row: (0 if row[3] == "mlx_lm.server" else 1, row[0]))
+    return rows[0][2]
+
+
+def _runtime_model_path_from_command(command: str) -> Optional[str]:
+    return _command_arg_value(command, "--model") or _command_arg_value(command, "--model-path")
 
 
 def _include_children(pids):
@@ -486,6 +516,7 @@ def cmd_list(_args):
 def cmd_status(_args):
     data = _load_registry(_registry_path())
     port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
+    rows = []
     for port in PORT_RANGE:
         pids = _port_listening(port)
         proc_pids = _mlx_pids_for_port(port)
@@ -493,7 +524,40 @@ def cmd_status(_args):
         status = "listening" if pids else ("starting" if proc_pids else "idle")
         pid_str = ",".join(pids if pids else [str(pid) for pid in proc_pids]) if (pids or proc_pids) else "-"
         model_str = slug if slug else "-"
+        runtime_cmd = _mlx_runtime_command_for_port(port)
+        runtime_family = "-"
+        runtime_model = "-"
+        if runtime_cmd:
+            runtime_family = _mlx_process_family(runtime_cmd) or "-"
+            runtime_model = _runtime_model_path_from_command(runtime_cmd) or "-"
+        row = {
+            "port": port,
+            "status": status,
+            "pids": pid_str,
+            "registry_model": model_str,
+            "runtime_family": runtime_family,
+            "runtime_model_path": runtime_model,
+        }
+        rows.append(row)
         print(f"{port}\t{status}\t{pid_str}\t{model_str}")
+
+    if getattr(_args, "checks", False):
+        print("")
+        print("# runtime checks")
+        for row in rows:
+            if row["status"] == "idle":
+                continue
+            mismatch = ""
+            if row["registry_model"] != "-" and row["runtime_model_path"] == "-":
+                mismatch = "missing-runtime-model"
+            print(
+                f"{row['port']}\tfamily={row['runtime_family']}\truntime_model={row['runtime_model_path']}"
+                + (f"\t{mismatch}" if mismatch else "")
+            )
+
+    if getattr(_args, "json", False):
+        print("")
+        print(json.dumps({"ports": rows}, indent=2))
 
 
 def _infer_context_length(entry: dict) -> Optional[int]:
@@ -662,13 +726,7 @@ def _raw_qwen3_tags_detected(port: int, model_name: str) -> bool:
 
 
 def _mlx_command_for_port(port: int) -> Optional[str]:
-    port_token = re.compile(rf"--port(?:=|\s+){port}\b")
-    for _pid, _ppid, cmd in _ps_snapshot():
-        if "mlx-openai-server" not in cmd:
-            continue
-        if port_token.search(cmd):
-            return cmd
-    return None
+    return _mlx_runtime_command_for_port(port)
 
 
 def _command_arg_value(command: str, flag: str) -> Optional[str]:
@@ -761,40 +819,83 @@ def _ensure_model(data, model_ref: str, name: Optional[str], convert_mode: str, 
 def _launch_server(entry, port: int):
     model_path = entry["cache_path"]
     cmd = os.environ.get("MLX_LAUNCH_CMD")
+    backend = os.environ.get("MLX_BACKEND", "mlx_lm.server").strip()
     if cmd:
         argv = cmd.split()
-    elif shutil.which("mlx-openai-server"):
-        argv = ["mlx-openai-server", "launch"]
-    elif shutil.which("uv"):
-        argv = ["uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
-    elif Path("/opt/homebrew/bin/uv").exists():
-        argv = ["/opt/homebrew/bin/uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
+    elif backend == "mlx-openai-server":
+        if shutil.which("mlx-openai-server"):
+            argv = ["mlx-openai-server", "launch"]
+        elif shutil.which("uv"):
+            argv = ["uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
+        elif Path("/opt/homebrew/bin/uv").exists():
+            argv = ["/opt/homebrew/bin/uv", "run", "--project", "/opt/mlx-launch", "mlx-openai-server", "launch"]
+        else:
+            raise SystemExit("mlx-openai-server not found; set MLX_LAUNCH_CMD or install it.")
+
+        argv += [
+            "--model-path",
+            model_path,
+            "--model-type",
+            "lm",
+            "--trust-remote-code",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+        ]
+
+        tool_call_parser = entry.get("tool_call_parser") or os.environ.get("MLX_TOOL_CALL_PARSER")
+        if tool_call_parser:
+            argv += ["--tool-call-parser", tool_call_parser]
+
+        reasoning_parser = entry.get("reasoning_parser") or os.environ.get("MLX_REASONING_PARSER")
+        if reasoning_parser:
+            argv += ["--reasoning-parser", reasoning_parser]
+
+        chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
+        if chat_template:
+            argv += ["--chat-template-file", chat_template]
     else:
-        raise SystemExit("mlx-openai-server not found; set MLX_LAUNCH_CMD or install it.")
+        mlx_lm_bin = os.environ.get("MLX_LM_SERVER_BIN", "/opt/mlx-launch/.venv/bin/mlx_lm.server")
+        if Path(mlx_lm_bin).exists():
+            argv = [mlx_lm_bin]
+        elif shutil.which("mlx_lm.server"):
+            argv = ["mlx_lm.server"]
+        else:
+            raise SystemExit("mlx_lm.server not found; set MLX_LM_SERVER_BIN or MLX_LAUNCH_CMD.")
 
-    argv += [
-        "--model-path",
-        model_path,
-        "--model-type",
-        "lm",
-        "--trust-remote-code",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        str(port),
-    ]
+        argv += [
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+            "--model",
+            model_path,
+            "--trust-remote-code",
+        ]
 
-    tool_call_parser = entry.get("tool_call_parser") or os.environ.get("MLX_TOOL_CALL_PARSER")
-    if tool_call_parser:
-        argv += ["--tool-call-parser", tool_call_parser]
+        chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
+        if chat_template:
+            argv += ["--chat-template", chat_template]
+        else:
+            argv += ["--use-default-chat-template"]
 
-    reasoning_parser = entry.get("reasoning_parser") or os.environ.get("MLX_REASONING_PARSER")
-    if reasoning_parser:
-        argv += ["--reasoning-parser", reasoning_parser]
+        chat_template_args = entry.get("chat_template_args")
+        if not chat_template_args and _is_gpt_oss_entry(entry):
+            chat_template_args = {"enable_thinking": False, "reasoning_effort": "low"}
+        if chat_template_args is None:
+            raw_args = os.environ.get("MLX_CHAT_TEMPLATE_ARGS_JSON", "").strip()
+            if raw_args:
+                try:
+                    chat_template_args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    raise SystemExit("MLX_CHAT_TEMPLATE_ARGS_JSON must be valid JSON")
+        if chat_template_args is not None:
+            argv += ["--chat-template-args", json.dumps(chat_template_args)]
 
-    chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
-    if chat_template:
-        argv += ["--chat-template-file", chat_template]
+        max_tokens = entry.get("max_output_tokens")
+        if isinstance(max_tokens, int) and max_tokens > 0:
+            argv += ["--max-tokens", str(max_tokens)]
 
     log_dir = os.environ.get("MLX_LOG_DIR", "/tmp")
     Path(log_dir).mkdir(parents=True, exist_ok=True)
@@ -967,11 +1068,11 @@ def cmd_verify(_args):
         port = entry.get("port")
         if port:
             port_to_models.setdefault(int(port), []).append(slug)
-            cmd = _mlx_command_for_port(int(port))
+            cmd = _mlx_runtime_command_for_port(int(port))
             if not cmd:
                 missing.append(f"{slug}: registry port {port} set but no MLX process listening")
             else:
-                model_path = _command_arg_value(cmd, "--model-path")
+                model_path = _runtime_model_path_from_command(cmd)
                 if model_path and entry.get("cache_path") and model_path != entry.get("cache_path"):
                     missing.append(
                         f"{slug}: runtime path mismatch on {port} "
@@ -1887,7 +1988,9 @@ def main():
 
     sub.add_parser("init", help="Scan HF cache and initialize registry entries")
     sub.add_parser("list", help="List registered MLX models (model_id, repo_id, port, ctx, max_out)")
-    sub.add_parser("status", help="Show MLX port status and routing mode")
+    status = sub.add_parser("status", help="Show MLX port status and routing mode")
+    status.add_argument("--checks", action="store_true", help="Include runtime family/model-path checks")
+    status.add_argument("--json", action="store_true", help="Include JSON status payload")
     omni_install = sub.add_parser("omni-install", help="Install + run mlx-omni-server on the Studio (canary)")
     omni_install.add_argument("--port", default="8120", help="Port to run omni on (default: 8120)")
     omni_install.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")

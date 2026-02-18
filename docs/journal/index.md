@@ -1,4 +1,8 @@
 # Journal Index
+- [2026-02-18 — mlxctl runtime alignment to mlx_lm.server](2026-02-18-mlxctl-mlx-lm-runtime-alignment.md)
+- [2026-02-18 — MLX-LM server Harmony stabilization (backend + gateway)](2026-02-18-mlx-lm-server-harmony-stabilization.md)
+- [2026-02-18 — MLX runtime backend loop and revert (Omni/llama.cpp -> mlx-openai-server)](2026-02-18-mlx-runtime-backend-loop-and-revert.md)
+- [2026-02-18 — Tailnet + OptiLLM connectivity recovery](2026-02-18-tailnet-optillm-connectivity-recovery.md)
 - [2026-02-11 - MLX runtime/boot single-contract on Studio](2026-02-11-mlx-runtime-single-contract.md)
 - [2026-02-11 - MLXCTL GPT-OSS auto-harmony defaults](2026-02-11-mlxctl-gpt-oss-auto-harmony.md)
 - 2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)
