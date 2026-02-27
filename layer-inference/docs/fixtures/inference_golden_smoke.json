@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "defaults": {
+    "request_timeout_s": 45,
+    "max_tokens": 64,
+    "endpoint": "chat.completions",
+    "forbidden_substrings": [
+      "<|channel|>",
+      "<|message|>",
+      "<|start|>",
+      "<|end|>",
+      "<think>",
+      "</think>",
+      "<tool_call>",
+      "</tool_call>"
+    ]
+  },
+  "cases": [
+    {
+      "lane": "deep",
+      "prompt": "Reply with exactly one short sentence about oranges.",
+      "required_substrings": []
+    },
+    {
+      "lane": "main",
+      "prompt": "Reply with exactly one short sentence about apples.",
+      "required_substrings": []
+    },
+    {
+      "lane": "fast",
+      "prompt": "Reply with exactly one short sentence about bananas.",
+      "required_substrings": []
+    }
+  ]
+}

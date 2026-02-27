@@ -1,0 +1,64 @@
+{
+  "name": "vllm-metal-8120-fast-targeted-phaseA",
+  "target_host": "studio",
+  "monitor_ports": [8120, 8121, 8122],
+  "lane": {
+    "name": "metal-test-fast",
+    "port": 8120,
+    "model_path": "/Users/thestudio/models/hf/models--mlx-community--gpt-oss-20b-MXFP4-Q4/snapshots/f356f2747216d7e98fee755df25987459fc19089",
+    "served_model_name": "default_model",
+    "log_path": "/Users/thestudio/vllm-8120.log",
+    "health_url": "http://192.168.1.72:8120/health",
+    "models_url": "http://192.168.1.72:8120/v1/models",
+    "chat_url": "http://192.168.1.72:8120/v1/chat/completions",
+    "metrics_url": "http://192.168.1.72:8120/metrics",
+    "launch_template": "nohup env VLLM_METAL_MEMORY_FRACTION={memory_fraction} /Users/thestudio/.venv-vllm-metal/bin/python3 /Users/thestudio/.venv-vllm-metal/bin/vllm serve {model_path} --served-model-name {served_model_name} --host 0.0.0.0 --port {port} --max-model-len {max_model_len} {async_flag} > {log_path} 2>&1 &"
+  },
+  "phase_a": {
+    "include_baseline_reference": true,
+    "baseline_reference": {
+      "max_model_len": 65536,
+      "memory_fraction": "auto"
+    },
+    "max_model_len_candidates": [32768, 65536, 131072],
+    "memory_fraction_candidates": ["0.60"],
+    "async_mode": "off"
+  },
+  "phase_b": {
+    "async_mode": "on",
+    "shortlist": []
+  },
+  "early_reject": {
+    "max_concurrency_floor_x": 1.2
+  },
+  "fixed_request_shape": {
+    "model": "default_model",
+    "system_prompt": "You are a deterministic benchmark assistant. Reply with one sentence only.",
+    "history_chars": 4000,
+    "history_unit_text": "Prior context block for deterministic benchmark traffic. ",
+    "user_prompt": "Provide one concise sentence about moonlight over a quiet lake.",
+    "max_tokens": 256,
+    "temperature": 0.2,
+    "top_p": 0.95,
+    "top_k": 40,
+    "n": 1,
+    "concurrency_sweep": [1, 2, 4],
+    "requests_per_stage": 6,
+    "warmup_requests": 2,
+    "request_timeout_s": 180,
+    "metrics_poll_interval_s": 1.0
+  },
+  "metric_names": {
+    "running": ["vllm:num_requests_running", "vllm_num_requests_running"],
+    "waiting": ["vllm:num_requests_waiting", "vllm_num_requests_waiting"],
+    "kv_usage_perc": ["vllm:kv_cache_usage_perc", "vllm_kv_cache_usage_perc"]
+  },
+  "budgets": {
+    "restart_timeout_s": 180,
+    "startup_ready_timeout_s": 240,
+    "quiescence_timeout_s": 180,
+    "quiescence_window_s": 10,
+    "stage_timeout_s": 420,
+    "candidate_timeout_s": 1200
+  }
+}

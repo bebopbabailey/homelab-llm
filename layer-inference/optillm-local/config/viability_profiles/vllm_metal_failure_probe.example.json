@@ -1,0 +1,43 @@
+{
+  "name": "vllm-metal-8121-failure-probe",
+  "litellm_chat_url": "http://127.0.0.1:4000/v1/chat/completions",
+  "litellm_health_url": "http://127.0.0.1:4000/health",
+  "model": "metal-test-main",
+  "token_env": "LITELLM_MASTER_KEY",
+  "studio_host": "studio",
+  "monitor_ports": [8120, 8121, 8122],
+  "request_timeout_s": 180,
+  "stop_on_failure": true,
+  "scenarios": [
+    {
+      "name": "s1-safe-small",
+      "prompt": "In one short sentence, describe a moonlit evening.",
+      "history_chars": 0,
+      "temperature": 0.2,
+      "n": 1,
+      "max_tokens": 64,
+      "concurrency": 2,
+      "repeats": 2
+    },
+    {
+      "name": "s2-multi-candidate-medium",
+      "prompt": "In one short sentence, describe a moonlit evening.",
+      "history_chars": 1500,
+      "temperature": 0.2,
+      "n": 2,
+      "max_tokens": 256,
+      "concurrency": 2,
+      "repeats": 2
+    },
+    {
+      "name": "s3-high-token-high-n",
+      "prompt": "in 1 short sentence, describe a moonlit night.",
+      "history_chars": 14000,
+      "temperature": 0.2,
+      "n": 4,
+      "max_tokens": 1886,
+      "concurrency": 1,
+      "repeats": 1
+    }
+  ]
+}

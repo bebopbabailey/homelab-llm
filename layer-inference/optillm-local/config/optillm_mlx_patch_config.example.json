@@ -1,0 +1,53 @@
+{
+  "workspace": "~/optillm-mlx-experimental/mlx-lm-optillm",
+  "upstream_repo": "https://github.com/ml-explore/mlx-lm.git",
+  "upstream_ref": "ad067ea627c752bddaa194a4e4e8adc858a62433",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8130,
+    "enable_optillm_decoding": true,
+    "streaming_for_decode_techniques": false
+  },
+  "viability_gate": {
+    "models": [
+      "main",
+      "gpt-oss-20b",
+      "gpt-oss-120b"
+    ],
+    "required_models": [
+      "main",
+      "gpt-oss-20b"
+    ],
+    "concurrency_values": [
+      1,
+      4,
+      8
+    ],
+    "repeats": 3,
+    "thresholds": {
+      "p50_overhead_pct": 25.0,
+      "p95_overhead_pct": 35.0,
+      "error_delta_pct": 1.0,
+      "entropy_metadata_rate_min": 0.95
+    }
+  },
+  "request_contract": {
+    "technique_selector_fields": [
+      "decoding",
+      "optillm_approach"
+    ],
+    "metadata_flag": "return_decoding_metadata",
+    "supported_decoding": [
+      "default",
+      "entropy_decoding"
+    ]
+  },
+  "entropy_defaults": {
+    "entropy_target": 2.6,
+    "entropy_alpha": 0.35,
+    "entropy_temp_min": 0.2,
+    "entropy_temp_max": 1.1,
+    "top_k": 40,
+    "min_p": 0.03
+  }
+}

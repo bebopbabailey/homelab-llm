@@ -1,0 +1,37 @@
+{
+  "viability_gate": {
+    "url": "http://127.0.0.1:8130/v1/chat/completions",
+    "models": [
+      "main",
+      "gpt-oss-20b",
+      "gpt-oss-120b"
+    ],
+    "required_models": [
+      "main",
+      "gpt-oss-20b"
+    ],
+    "concurrency_values": [
+      1,
+      4,
+      8
+    ],
+    "repeats": 3,
+    "max_tokens": 256,
+    "smoke_timeout": 180,
+    "bench_timeout": 240,
+    "output_dir": "/tmp",
+    "check_upstream_patch": true,
+    "thresholds": {
+      "p50_overhead_pct": 20.0,
+      "p95_overhead_pct": 20.0,
+      "error_delta_pct": 1.0,
+      "entropy_metadata_rate_min": 0.95,
+      "min_throughput_delta_pct": -15.0,
+      "max_error_rate_pct": 0.5
+    },
+    "quality": {
+      "required": true,
+      "report_path": "/tmp/optillm_mlx_quality_report.json"
+    }
+  }
+}

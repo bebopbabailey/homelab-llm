@@ -1,0 +1,273 @@
+diff --git a/mlx_lm/server.py b/mlx_lm/server.py
+index 36695aa..8b666e4 100644
+--- a/mlx_lm/server.py
++++ b/mlx_lm/server.py
+@@ -41,6 +41,12 @@ from .models.cache import (
+     trim_prompt_cache,
+ )
+ from .sample_utils import make_logits_processors, make_sampler
++from .optillm_decoding import (
++    DecodingArguments,
++    build_decoding_metadata,
++    make_decoding_logits_processor,
++    resolve_decoding_arguments,
++)
+ from .utils import load, sharded_load
+ 
+ 
+@@ -386,6 +392,7 @@ class GenerationArguments:
+     top_logprobs: int
+     seed: Optional[int]
+     chat_template_kwargs: Optional[Dict[str, Any]]
++    decoding: DecodingArguments
+ 
+ 
+ @dataclass
+@@ -412,6 +419,7 @@ class GenerationContext:
+     eos_token_ids: set
+     stop_token_sequences: List[List[int]]
+     prompt: List[int]
++    decoding_state: Optional[Any] = None
+     prompt_cache_count: int = -1
+ 
+     _should_stop: bool = False
+@@ -579,8 +587,11 @@ class ModelProvider:
+ 
+ 
+ def _make_sampler(args, tokenizer):
++    sampling_temperature = (
++        1.0 if args.decoding.technique == "entropy_decoding" else args.sampling.temperature
++    )
+     return make_sampler(
+-        args.sampling.temperature,
++        sampling_temperature,
+         top_p=args.sampling.top_p,
+         top_k=args.sampling.top_k,
+         min_p=args.sampling.min_p,
+@@ -594,11 +605,15 @@ def _make_sampler(args, tokenizer):
+ 
+ 
+ def _make_logits_processors(args):
+-    return make_logits_processors(
++    logits_processors = make_logits_processors(
+         args.logits.logit_bias,
+         args.logits.repetition_penalty,
+         args.logits.repetition_context_size,
+     )
++    decoding_processor, decoding_state = make_decoding_logits_processor(args.decoding)
++    if decoding_processor is not None:
++        logits_processors.append(decoding_processor)
++    return logits_processors, decoding_state
+ 
+ 
+ def _format_top_logprobs(logprobs, top_logprobs, tokenizer) -> Tuple[Dict[str, Any]]:
+@@ -722,9 +737,31 @@ class ResponseGenerator:
+ 
+         return True
+ 
++    def _batch_signature(self, args):
++        logit_bias_signature = ()
++        if args.logits.logit_bias:
++            logit_bias_signature = tuple(sorted(args.logits.logit_bias.items()))
++
++        return (
++            args.model.model,
++            args.model.draft,
++            args.model.adapter,
++            args.sampling.temperature,
++            args.sampling.top_p,
++            args.sampling.top_k,
++            args.sampling.min_p,
++            args.sampling.xtc_probability,
++            args.sampling.xtc_threshold,
++            args.logits.repetition_penalty,
++            args.logits.repetition_context_size,
++            logit_bias_signature,
++            args.num_draft_tokens,
++            args.decoding.batch_signature(),
++        )
++
+     def _generate(self):
+         current_model = None
+-        current_sampling = None
++        current_batch_signature = None
+         current_tokenizer = None
+         current_model_key = None
+         batch_generator = None
+@@ -762,10 +799,12 @@ class ResponseGenerator:
+             if request is not None:
+                 rqueue, request, args = request
+ 
++                request_signature = self._batch_signature(args)
++
+                 # Can it be added to the current batch?
+                 if (
+                     batch_generator is not None
+-                    and current_model == args.model
++                    and current_batch_signature == request_signature
+                     and self._is_batchable(args)
+                 ):
+                     try:
+@@ -775,17 +814,17 @@ class ResponseGenerator:
+                         continue
+ 
+                     ctx = GenerationContext(
+-                        has_tool_calling=tokenizer.has_tool_calling,
+-                        tool_call_start=tokenizer.tool_call_start,
+-                        tool_call_end=tokenizer.tool_call_end,
+-                        tool_parser=tokenizer.tool_parser,
+-                        has_thinking=tokenizer.has_thinking,
+-                        think_start_id=tokenizer.think_start_id,
+-                        think_end=tokenizer.think_end,
+-                        think_end_id=tokenizer.think_end_id,
+-                        eos_token_ids=tokenizer.eos_token_ids,
++                        has_tool_calling=current_tokenizer.has_tool_calling,
++                        tool_call_start=current_tokenizer.tool_call_start,
++                        tool_call_end=current_tokenizer.tool_call_end,
++                        tool_parser=current_tokenizer.tool_parser,
++                        has_thinking=current_tokenizer.has_thinking,
++                        think_start_id=current_tokenizer.think_start_id,
++                        think_end=current_tokenizer.think_end,
++                        think_end_id=current_tokenizer.think_end_id,
++                        eos_token_ids=current_tokenizer.eos_token_ids,
+                         stop_token_sequences=[
+-                            tokenizer.encode(stop_word, add_special_tokens=False)
++                            current_tokenizer.encode(stop_word, add_special_tokens=False)
+                             for stop_word in args.stop_words
+                         ],
+                         prompt=prompt,
+@@ -804,18 +843,23 @@ class ResponseGenerator:
+                         f"We have {ncaches} kv caches that take {nbytes/1e9:.2f} GB"
+                     )
+ 
++                    batch_logits_processors, decoding_state = _make_logits_processors(
++                        args
++                    )
++                    ctx.decoding_state = decoding_state
+                     (uid,) = batch_generator.insert(
+                         [rest],
+                         args.max_tokens,
+                         caches=[cache],
+-                        samplers=[_make_sampler(args, tokenizer)],
+-                        logits_processors=[_make_logits_processors(args)],
++                        samplers=[_make_sampler(args, current_tokenizer)],
++                        logits_processors=[batch_logits_processors],
+                     )
+                     batch_results[uid] = {
+                         "ctx": ctx,
+                         "cache_key": prompt[:],
+                         "rqueue": rqueue,
+-                        "detokenizer": tokenizer.detokenizer,
++                        "detokenizer": current_tokenizer.detokenizer,
++                        "top_logprobs": args.top_logprobs,
+                     }
+                     # just making sure we don't leave a reference around
+                     del cache
+@@ -843,6 +887,7 @@ class ResponseGenerator:
+                         continue
+ 
+                     current_model = args.model
++                    current_batch_signature = request_signature
+                     current_tokenizer = tokenizer
+                     current_model_key = self.model_provider.model_key
+                     batch_results = {}
+@@ -868,7 +913,7 @@ class ResponseGenerator:
+                 if len(batch_results) == 0:
+                     if drain_batch:
+                         current_model = None
+-                        current_sampling = None
++                        current_batch_signature = None
+                         current_tokenizer = None
+                         current_model_key = None
+                         batch_generator.close()
+@@ -895,7 +940,7 @@ class ResponseGenerator:
+                                 r.logprobs[r.token].item(),
+                                 r.finish_reason,
+                                 _format_top_logprobs(
+-                                    r.logprobs, args.top_logprobs, current_tokenizer
++                                    r.logprobs, result["top_logprobs"], current_tokenizer
+                                 ),
+                             )
+                         )
+@@ -966,7 +1011,8 @@ class ResponseGenerator:
+ 
+             # Make the sampler and logit processor
+             sampler = _make_sampler(args, tokenizer)
+-            logits_processors = _make_logits_processors(args)
++            logits_processors, decoding_state = _make_logits_processors(args)
++            ctx.decoding_state = decoding_state
+ 
+             # Load the KV cache
+             cache, rest = self.prompt_cache.fetch_nearest_cache(
+@@ -1157,7 +1203,18 @@ class APIHandler(BaseHTTPRequestHandler):
+         self.top_logprobs = self.body.get("top_logprobs", -1)
+         self.seed = self.body.get("seed", None)
+         self.chat_template_kwargs = self.body.get("chat_template_kwargs")
++        self.optillm_approach = self.body.get("optillm_approach")
++        self.decoding = self.body.get("decoding")
++        self.return_decoding_metadata = self.body.get("return_decoding_metadata", False)
+         self.validate_model_parameters()
++        self.decoding_args = resolve_decoding_arguments(
++            self.body,
++            allow_experimental=self.response_generator.cli_args.enable_optillm_decoding,
++        )
++        if self.decoding_args.technique != "default" and self.stream:
++            raise ValueError(
++                "decode-time techniques currently support non-streaming requests only"
++            )
+ 
+         # Get stop sequences
+         stop_words = self.body.get("stop")
+@@ -1237,6 +1294,15 @@ class APIHandler(BaseHTTPRequestHandler):
+         if self.seed is not None and not isinstance(self.seed, int):
+             raise ValueError("seed must be an integer")
+ 
++        if self.optillm_approach is not None and not isinstance(self.optillm_approach, str):
++            raise ValueError("optillm_approach must be a string")
++
++        if self.decoding is not None and not isinstance(self.decoding, str):
++            raise ValueError("decoding must be a string")
++
++        if not isinstance(self.return_decoding_metadata, bool):
++            raise ValueError("return_decoding_metadata must be a boolean")
++
+     def generate_response(
+         self,
+         text: str,
+@@ -1380,6 +1446,7 @@ class APIHandler(BaseHTTPRequestHandler):
+             top_logprobs=self.top_logprobs,
+             seed=self.seed,
+             chat_template_kwargs=self.chat_template_kwargs,
++            decoding=self.decoding_args,
+         )
+ 
+         # Create keepalive callback to send SSE comments during long prompt processing
+@@ -1589,6 +1656,13 @@ class APIHandler(BaseHTTPRequestHandler):
+                 reasoning_text=reasoning_text,
+                 tool_calls=parse_tools(tool_calls),
+             )
++            decoding_metadata = build_decoding_metadata(
++                args.decoding,
++                ctx.decoding_state,
++                self.requested_model,
++            )
++            if decoding_metadata is not None:
++                response["decoding_metadata"] = decoding_metadata
+             response_json = json.dumps(response).encode()
+             indent = "\t"  # Backslashes can't be inside of f-strings
+             logging.debug(f"Outgoing Response: {json.dumps(response, indent=indent)}")
+@@ -1920,6 +1994,14 @@ def main():
+         action="store_true",
+         help="Use pipelining instead of tensor parallelism",
+     )
++    parser.add_argument(
++        "--enable-optillm-decoding",
++        action="store_true",
++        help=(
++            "Enable experimental decode-time techniques exposed by the OptiLLM-compatible "
++            "request contract (non-streaming only)."
++        ),
++    )
+     args = parser.parse_args()
+     if mx.metal.is_available():
+         wired_limit = mx.device_info()["max_recommended_working_set_size"]

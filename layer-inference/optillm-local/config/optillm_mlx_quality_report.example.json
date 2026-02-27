@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "reason": "quality gates passed against stock baseline",
+  "metrics": {
+    "win_rate_delta_pct": 3.8,
+    "hallucination_delta_pct": -0.2,
+    "schema_validity_delta_pct": 0.0,
+    "factuality_delta_pct": 0.3
+  }
+}

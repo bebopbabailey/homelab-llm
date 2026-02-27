@@ -48,7 +48,11 @@ DEFAULT_OMNI_REPO = "https://github.com/madroidmaq/mlx-omni-server.git"
 DEFAULT_OMNI_REF = "adc8dd2025f6574f6ccebaa7b4bb6a6d735a9780"  # v0.5.2
 DEFAULT_OMNI_DIR = "/opt/mlx-omni-launch"
 DEFAULT_OMNI_LABEL_PREFIX = "com.bebop.mlx-omni"
-DEFAULT_MLX_OPENAI_LAUNCHD_LABEL = "com.bebop.mlx-launch"
+DEFAULT_MLX_LAUNCHD_LABEL = "com.bebop.mlx-launch"
+DEFAULT_MLX_LAUNCHD_PLIST = f"/Library/LaunchDaemons/{DEFAULT_MLX_LAUNCHD_LABEL}.plist"
+DEFAULT_MLX_LAUNCH_START_PATH = "/opt/mlx-launch/bin/start.sh"
+DEFAULT_VLLM_BIN = "/Users/thestudio/.venv-vllm-metal/bin/vllm"
+DEFAULT_VLLM_MEMORY_FRACTION = "0.60"
 
 
 def _run(cmd, *, input_bytes=None, check=True):
@@ -106,7 +110,14 @@ def _maybe_forward_to_studio(args):
     if getattr(args, "command", None) == "sync-gateway":
         return
     # Omni + cutover ops orchestrate Studio actions from the caller host.
-    if getattr(args, "command", None) in {"omni-install", "omni-stop", "omni-status", "mlx-launch-stop", "mlx-launch-start"}:
+    if getattr(args, "command", None) in {
+        "omni-install",
+        "omni-stop",
+        "omni-status",
+        "mlx-launch-stop",
+        "mlx-launch-start",
+        "mlx-launch-configure-vllm",
+    }:
         return
     if getattr(args, "command", None) == "assign-team":
         return
@@ -340,6 +351,18 @@ def _mlx_pids_for_port(port: int):
 
 
 def _mlx_process_family(cmd: str) -> Optional[str]:
+    try:
+        parts = shlex.split(cmd)
+    except ValueError:
+        parts = []
+    for idx, token in enumerate(parts):
+        if idx + 1 >= len(parts):
+            continue
+        name = Path(token).name
+        if name in {"vllm", "vllm.py"} and parts[idx + 1] == "serve":
+            return "vllm-metal"
+    if " vllm serve " in f" {cmd} ":
+        return "vllm-metal"
     if "mlx_lm.server" in cmd:
         return "mlx_lm.server"
     if "mlx-openai-server" in cmd or "mlx_openai_server" in cmd:
@@ -364,12 +387,23 @@ def _mlx_runtime_command_for_port(port: int) -> Optional[str]:
     rows = _mlx_processes_for_port(port)
     if not rows:
         return None
-    # Prefer mlx_lm.server when both families appear.
-    rows.sort(key=lambda row: (0 if row[3] == "mlx_lm.server" else 1, row[0]))
+    # Prefer vllm-metal when multiple runtime families appear.
+    rank = {"vllm-metal": 0, "mlx_lm.server": 1, "mlx-openai-server": 2}
+    rows.sort(key=lambda row: (rank.get(row[3], 9), row[0]))
     return rows[0][2]
 
 
 def _runtime_model_path_from_command(command: str) -> Optional[str]:
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        parts = []
+    if parts:
+        for idx, token in enumerate(parts):
+            if token == "serve" and idx + 1 < len(parts):
+                model_token = parts[idx + 1]
+                if not model_token.startswith("-"):
+                    return model_token
     return _command_arg_value(command, "--model") or _command_arg_value(command, "--model-path")
 
 
@@ -742,6 +776,208 @@ def _command_arg_value(command: str, flag: str) -> Optional[str]:
     return None
 
 
+def _coerce_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "y", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "n", "off"}:
+            return False
+    return default
+
+
+def _default_vllm_max_model_len(entry: dict) -> int:
+    explicit = entry.get("vllm_max_model_len")
+    if isinstance(explicit, int) and explicit > 0:
+        return explicit
+    text = _entry_identity_text(entry)
+    if "qwen3-next-80b" in text:
+        return 65536
+    if "gpt-oss-120b" in text:
+        return 65536
+    if "gpt-oss-20b" in text:
+        return 32768
+    context = entry.get("context_length")
+    if isinstance(context, int) and context > 0:
+        return min(context, 65536)
+    return 65536
+
+
+def _default_vllm_memory_fraction(entry: dict) -> str:
+    explicit = entry.get("vllm_memory_fraction")
+    if explicit is not None:
+        return str(explicit)
+    return os.environ.get("VLLM_METAL_MEMORY_FRACTION", DEFAULT_VLLM_MEMORY_FRACTION)
+
+
+def _default_vllm_async_scheduling(entry: dict) -> bool:
+    explicit = entry.get("vllm_async_scheduling")
+    return _coerce_bool(explicit, default=False)
+
+
+def _default_startup_timeout(entry: dict) -> int:
+    explicit = entry.get("startup_timeout_seconds")
+    if explicit is None:
+        explicit = entry.get("vllm_startup_timeout_seconds")
+    if isinstance(explicit, int) and explicit > 0:
+        return explicit
+    if isinstance(explicit, str) and explicit.strip().isdigit():
+        val = int(explicit.strip())
+        if val > 0:
+            return val
+
+    text = _entry_identity_text(entry)
+    if "gpt-oss-120b" in text:
+        return 900
+    if "qwen3-next-80b" in text:
+        return 600
+    if "gpt-oss-20b" in text:
+        return 300
+    return 180
+
+
+def _render_vllm_launch_start_script() -> str:
+    return """#!/bin/zsh
+set -euo pipefail
+cd /opt/mlx-launch
+
+export PATH="/opt/homebrew/bin:/Users/thestudio/.local/bin:/Users/thestudio/.venv-vllm-metal/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+REGISTRY_PATH="${MLX_REGISTRY_PATH:-/Users/thestudio/models/hf/hub/registry.json}"
+HOST="${MLX_BIND_HOST:-0.0.0.0}"
+LOG_DIR="${MLX_VLLM_LOG_DIR:-/Users/thestudio}"
+VLLM_BIN="${MLX_VLLM_BIN:-/Users/thestudio/.venv-vllm-metal/bin/vllm}"
+
+if [[ ! -x "$VLLM_BIN" ]]; then
+  echo "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ) missing vllm binary: $VLLM_BIN" >> /opt/mlx-launch/logs/server.log
+  exit 2
+fi
+
+ROWS=$(python3 - "$REGISTRY_PATH" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+reg = Path(sys.argv[1])
+if not reg.exists():
+    raise SystemExit(0)
+
+try:
+    data = json.loads(reg.read_text() or "{}")
+except Exception:
+    raise SystemExit(0)
+
+def identity(entry, slug):
+    parts = [str(entry.get("model_id") or slug), str(entry.get("repo_id") or ""), str(entry.get("cache_path") or "")]
+    return " ".join(parts).lower()
+
+def default_max_model_len(entry, slug):
+    val = entry.get("vllm_max_model_len")
+    if isinstance(val, int) and val > 0:
+        return val
+    text = identity(entry, slug)
+    if "qwen3-next-80b" in text:
+        return 65536
+    if "gpt-oss-120b" in text:
+        return 65536
+    if "gpt-oss-20b" in text:
+        return 32768
+    context = entry.get("context_length")
+    if isinstance(context, int) and context > 0:
+        return min(context, 65536)
+    return 65536
+
+def as_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "y", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "n", "off"}:
+            return False
+    return default
+
+rows = []
+for slug, entry in (data.get("models") or {}).items():
+    port = entry.get("port")
+    try:
+        port = int(port)
+    except Exception:
+        continue
+    if port < 8100 or port > 8119:
+        continue
+
+    model_path = entry.get("cache_path")
+    if not model_path:
+        continue
+    model_path_obj = Path(model_path)
+    if not model_path_obj.exists():
+        continue
+
+    served_model_name = entry.get("model_id") or slug
+    max_model_len = default_max_model_len(entry, slug)
+    memory_fraction = str(entry.get("vllm_memory_fraction", "0.60"))
+    async_enabled = as_bool(entry.get("vllm_async_scheduling"), default=False)
+
+    rows.append((served_model_name, str(port), str(model_path_obj), str(max_model_len), memory_fraction, "1" if async_enabled else "0"))
+
+rows.sort(key=lambda r: int(r[1]))
+for row in rows:
+    print("\\x1f".join(row))
+PY
+)
+
+if [[ -z "${ROWS}" ]]; then
+  echo "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ) no assigned team-lane models in registry; exiting" >> /opt/mlx-launch/logs/server.log
+  exit 0
+fi
+
+mkdir -p "$LOG_DIR"
+{
+  echo "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ) launching team lanes via vllm-metal:"
+  echo "$ROWS"
+} >> /opt/mlx-launch/logs/server.log
+
+typeset -a pids
+while IFS=$'\\x1f' read -r name port path max_len mem_frac async_enabled; do
+  [[ -z "${port}" ]] && continue
+  cmd=("$VLLM_BIN" serve "$path" --served-model-name "$name" --host "$HOST" --port "$port" --max-model-len "$max_len")
+  if [[ "$async_enabled" == "1" ]]; then
+    cmd+=(--async-scheduling)
+  else
+    cmd+=(--no-async-scheduling)
+  fi
+  (
+    export VLLM_METAL_MEMORY_FRACTION="$mem_frac"
+    exec "${cmd[@]}"
+  ) > "${LOG_DIR}/vllm-${port}.log" 2>&1 &
+  pids+=($!)
+  echo "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ) started $name on $port via vllm-metal (pid $!, max_len=$max_len, mem_frac=$mem_frac, async=$async_enabled)" >> /opt/mlx-launch/logs/server.log
+  /bin/sleep 1
+done <<< "$ROWS"
+
+cleanup() {
+  for pid in "${pids[@]:-}"; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+}
+trap cleanup INT TERM
+wait
+"""
+
+
 def _download_and_register(data, model_ref: str):
     try:
         from huggingface_hub import snapshot_download
@@ -819,9 +1055,44 @@ def _ensure_model(data, model_ref: str, name: Optional[str], convert_mode: str, 
 def _launch_server(entry, port: int):
     model_path = entry["cache_path"]
     cmd = os.environ.get("MLX_LAUNCH_CMD")
-    backend = os.environ.get("MLX_BACKEND", "mlx_lm.server").strip()
+    backend = os.environ.get("MLX_BACKEND", "vllm-metal").strip()
     if cmd:
         argv = cmd.split()
+        proc_env = None
+    elif backend in {"vllm-metal", "vllm", "vllm_metal"}:
+        vllm_bin = os.environ.get("MLX_VLLM_BIN", DEFAULT_VLLM_BIN)
+        if Path(vllm_bin).exists():
+            argv = [vllm_bin]
+        elif shutil.which("vllm"):
+            argv = ["vllm"]
+        else:
+            raise SystemExit("vllm not found; set MLX_VLLM_BIN or MLX_LAUNCH_CMD.")
+
+        served_model_name = entry.get("served_model_name") or entry.get("model_id")
+        if not served_model_name:
+            raise SystemExit("registry entry missing model_id/served_model_name for vllm launch")
+
+        argv += [
+            "serve",
+            model_path,
+            "--served-model-name",
+            served_model_name,
+            "--host",
+            "0.0.0.0",
+            "--port",
+            str(port),
+            "--max-model-len",
+            str(_default_vllm_max_model_len(entry)),
+        ]
+        if _default_vllm_async_scheduling(entry):
+            argv += ["--async-scheduling"]
+        else:
+            argv += ["--no-async-scheduling"]
+
+        proc_env = os.environ.copy()
+        mem_fraction = _default_vllm_memory_fraction(entry).strip()
+        if mem_fraction:
+            proc_env["VLLM_METAL_MEMORY_FRACTION"] = mem_fraction
     elif backend == "mlx-openai-server":
         if shutil.which("mlx-openai-server"):
             argv = ["mlx-openai-server", "launch"]
@@ -855,6 +1126,7 @@ def _launch_server(entry, port: int):
         chat_template = entry.get("chat_template") or os.environ.get("MLX_CHAT_TEMPLATE")
         if chat_template:
             argv += ["--chat-template-file", chat_template]
+        proc_env = None
     else:
         mlx_lm_bin = os.environ.get("MLX_LM_SERVER_BIN", "/opt/mlx-launch/.venv/bin/mlx_lm.server")
         if Path(mlx_lm_bin).exists():
@@ -896,12 +1168,13 @@ def _launch_server(entry, port: int):
         max_tokens = entry.get("max_output_tokens")
         if isinstance(max_tokens, int) and max_tokens > 0:
             argv += ["--max-tokens", str(max_tokens)]
+        proc_env = None
 
     log_dir = os.environ.get("MLX_LOG_DIR", "/tmp")
     Path(log_dir).mkdir(parents=True, exist_ok=True)
     log_file = Path(log_dir) / f"mlx-{port}.log"
     with log_file.open("a") as handle:
-        subprocess.Popen(argv, stdout=handle, stderr=handle)
+        subprocess.Popen(argv, stdout=handle, stderr=handle, env=proc_env, start_new_session=True)
 
 
 def cmd_load(args):
@@ -946,8 +1219,12 @@ def cmd_load(args):
         raise SystemExit(f"model already assigned to port {entry['port']}; unload first")
 
     _launch_server(entry, port)
-    if not _wait_for_port(port):
-        raise SystemExit(f"model failed to start on port {port}")
+    startup_timeout = _default_startup_timeout(entry)
+    if not _wait_for_port(port, timeout=startup_timeout):
+        raise SystemExit(
+            f"model failed to start on port {port} within {startup_timeout}s "
+            f"(set registry startup_timeout_seconds to override)"
+        )
 
     if _is_gpt_oss_entry(entry):
         model_name = entry.get("model_id") or slug
@@ -1816,14 +2093,31 @@ print("warmed", payload.get("model"))
         _ssh_cmd(studio_ssh, "python3 -", input_bytes=script.encode("utf-8"), check=True)
 
 
+def cmd_mlx_launch_configure_vllm(args):
+    """Write a registry-driven vLLM-metal start script for com.bebop.mlx-launch."""
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    start_path = os.environ.get("MLX_LAUNCH_START_PATH", DEFAULT_MLX_LAUNCH_START_PATH)
+    backup_path = f"{start_path}.bak-{int(time.time())}-pre-vllm-metal"
+
+    _ssh_cmd(
+        studio_ssh,
+        f"set -euo pipefail; if [ -f {shlex.quote(start_path)} ]; then cp {shlex.quote(start_path)} {shlex.quote(backup_path)}; fi",
+        check=True,
+    )
+    _ssh_cmd(studio_ssh, f"cat > {shlex.quote(start_path)}", input_bytes=_render_vllm_launch_start_script().encode("utf-8"), check=True)
+    _ssh_cmd(studio_ssh, f"chmod 0755 {shlex.quote(start_path)}", check=True)
+    print(f"configured mlx-launch start script for vllm-metal: {start_path}")
+    print(f"backup: {backup_path}")
+
+
 def cmd_mlx_launch_stop(args):
-    """Stop the legacy mlx-openai-server supervisor launchd job (non-interactive).
+    """Stop the team-lane supervisor launchd job (non-interactive).
 
     This does NOT mutate registry port assignments; it only stops the running services so
-    we can free ports for mlx-omni-server cutover.
+    we can safely reconfigure or restart managed team lanes.
     """
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    label = os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_OPENAI_LAUNCHD_LABEL)
+    label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
     ports = (args.ports or "8100,8101,8102,8103").strip()
 
     # Stop the supervisor first (prevents immediate respawn).
@@ -1839,9 +2133,8 @@ def cmd_mlx_launch_stop(args):
         check=False,
     )
 
-    # Ensure legacy listeners are gone (they can outlive the supervisor).
-    # Be conservative: only kill processes that look like mlx-openai-server, so we don't
-    # accidentally terminate mlx-omni-server if ports overlap.
+    # Ensure team-lane listeners are gone (they can outlive the supervisor).
+    # Be conservative: only kill MLX/vLLM families used for team lanes.
     remote = ["set -euo pipefail"]
     for raw in ports.split(","):
         raw = raw.strip()
@@ -1851,18 +2144,21 @@ def cmd_mlx_launch_stop(args):
         remote.append(f"pids=$(lsof -tiTCP:{port} -sTCP:LISTEN 2>/dev/null || true)")
         remote.append('for pid in ${pids}; do')
         remote.append('  cmd=$(ps -p ${pid} -o command= 2>/dev/null || true)')
-        remote.append('  echo \"${cmd}\" | rg -q \"mlx-openai-server|mlx_openai_server\" || continue')
+        remote.append('  echo \"${cmd}\" | rg -q \"vllm serve|mlx_lm\\.server|mlx-openai-server|mlx_openai_server\" || continue')
         remote.append('  kill ${pid} >/dev/null 2>&1 || true; sleep 0.2; kill -9 ${pid} >/dev/null 2>&1 || true')
         remote.append('done')
     _studio_sudo_cmd(studio_ssh, "\n".join(remote), check=False)
-    print(f"stopped legacy supervisor {label} and cleared listeners for ports: {ports}")
+    print(f"stopped supervisor {label} and cleared managed listeners for ports: {ports}")
 
 
 def cmd_mlx_launch_start(args):
-    """Start the legacy mlx-openai-server supervisor launchd job (rollback helper)."""
+    """Start com.bebop.mlx-launch supervisor after script/config changes."""
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    label = os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_OPENAI_LAUNCHD_LABEL)
-    plist = os.environ.get("MLX_OPENAI_LAUNCHD_PLIST", f"/Library/LaunchDaemons/{label}.plist")
+    label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
+    plist = os.environ.get(
+        "MLX_LAUNCHD_PLIST",
+        os.environ.get("MLX_OPENAI_LAUNCHD_PLIST", DEFAULT_MLX_LAUNCHD_PLIST),
+    )
     remote = f"""
 set -euo pipefail
 if [ ! -f {shlex.quote(plist)} ]; then
@@ -1875,7 +2171,7 @@ launchctl bootstrap system {shlex.quote(plist)}
 launchctl kickstart -k system/{shlex.quote(label)}
 """
     _studio_sudo_cmd(studio_ssh, remote, check=True)
-    print(f"started legacy supervisor {label}")
+    print(f"started supervisor {label}")
 
 def _collect_offload_candidates(studio_ssh: str):
     script = """
@@ -2003,9 +2299,10 @@ def main():
     omni_warm.add_argument("--port", default="8100", help="Omni port to warm against (default: 8100)")
     omni_warm.add_argument("--timeout", default="60", help="Per-model request timeout seconds (default: 60)")
     omni_warm.add_argument("--max-tokens", dest="max_tokens", default="8", help="Warmup max_tokens (default: 8)")
-    mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop legacy com.bebop.mlx-launch (non-interactive)")
+    sub.add_parser("mlx-launch-configure-vllm", help="Install registry-driven vllm-metal start.sh for com.bebop.mlx-launch")
+    mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop com.bebop.mlx-launch and clear managed listeners")
     mlx_launch_stop.add_argument("--ports", default="8100,8101,8102,8103", help="Comma-separated ports to clear listeners")
-    sub.add_parser("mlx-launch-start", help="Start legacy com.bebop.mlx-launch (rollback helper)")
+    sub.add_parser("mlx-launch-start", help="Start com.bebop.mlx-launch")
 
     load = sub.add_parser("load", help="Download/register a model and launch on a port")
     load.add_argument("model", help="HF repo_id or existing registry model_id")
@@ -2076,6 +2373,7 @@ def main():
         "omni-stop": cmd_omni_stop,
         "omni-status": cmd_omni_status,
         "omni-warm": cmd_omni_warm,
+        "mlx-launch-configure-vllm": cmd_mlx_launch_configure_vllm,
         "mlx-launch-stop": cmd_mlx_launch_stop,
         "mlx-launch-start": cmd_mlx_launch_start,
         "load": cmd_load,
