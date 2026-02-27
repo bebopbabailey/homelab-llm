@@ -2,6 +2,29 @@
 
 Short list of future work not active right now.
 
+## Web Search Quality Roadmap (Canonical)
+- Baseline (Completed):
+  - Open WebUI Phase A baseline harness and scoring workflow are in place.
+  - References: `docs/journal/2026-02-18-openwebui-websearch-phase-a-baseline.md`,
+    `docs/foundation/testing.md`.
+- Phase 1 (Completed):
+  - Local semantic reranker integrated in `websearch-orch` with fail-open
+    behavior and service runbook wiring.
+  - Reference: `docs/journal/2026-02-21-websearch-orch-local-reranker-phase1.md`.
+- Phase 2 (Active):
+  - Calibration Gate: extraction-size control + reranker calibration + strict
+    validation gate.
+  - Exit criteria:
+    1. No retrieval stability regressions in Phase A scoring.
+    2. Lower oversized-context incidence in Open WebUI search traces.
+    3. Consistent `websearch-orch` rerank telemetry without fail-open churn.
+- Phase 3 (Queued):
+  - Structured output/synthesis layer (schema-first output contract after
+    retrieval stage).
+- Phase 4 (Queued, Optional):
+  - Vector-store-assisted retrieval/reranking, evaluated only after
+    Phase 2/3 are stable.
+
 ## Docs cleanup waves (deferred)
 - Wave B: canonical boundary tightening (summary docs point to canon, reduce duplication).
 - Wave C: temporal relocation/lifecycle policy (snapshot-style docs moved to proper historical buckets).
@@ -9,9 +32,10 @@ Short list of future work not active right now.
 
 ## Nice-to-haves
  - Harden Studio OptiLLM proxy for remote maintenance (tailnet-only serve: bind localhost + Tailscale Serve + LiteLLM upstream update).
-- Confirm alias naming and mapping (main / deep / fast / swap, + x1..x4).
+- Confirm current alias policy remains documented consistently (`main`/`deep`/`fast` stable; `metal-test-*` temporary experimental labels; no active `swap*` usage).
 - Validate preset behavior via LiteLLM/OptiLLM (routing, chain applied, responses).
 - [mlxctl] Optional symmetry: if running `mlxctl sync-gateway` on the Studio, auto-forward to the gateway host (Mini) instead of requiring you to hop hosts manually. Would require a `GATEWAY_SSH` (or similar) and a `_maybe_forward_to_gateway()` that mirrors `_maybe_forward_to_studio()`. Not required for correctness; ergonomics only.
+- [studio-reboot] Mini-side automation for post-reboot Studio recovery: wake/retry loop, SSH preflight classification (`HOST_DOWN`/`LOCKED`/`AUTH_REJECTED`), and operator prompting until team lanes are reachable again.
 - [LiteLLM] Optional “lane-policy” pre_call guardrail: enforce that `optillm_approach`/`optillm_base_model` are only accepted when `model=boost`, and reject `decoding=*` on `boost` (decode-loop requests should route directly to Omni). Not required for correctness; ergonomics/safety only.
 - Keep OpenCode config aligned with current handles and tool access.
 - Open WebUI preset sync from LiteLLM presets.

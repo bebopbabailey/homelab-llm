@@ -1,10 +1,13 @@
 # NOW
 
 Active
-- Comprehensive doc sweep in progress to align canonical docs with current
-  runtime reality: Studio MLX lanes run via `mlx_lm.server` and are managed by
-  `mlxctl`.
+- Web Search Quality — Phase 2 (Calibration Gate): tune extraction budget and
+  reranker behavior in `websearch-orch` to reduce oversized prompt context and
+  improve grounded answer quality.
+- Validate Phase 2 changes with the Open WebUI end-user flow using
+  `scripts/openwebui_phase_a_baseline.py` scoring and journal-based pass/fail
+  checks.
 
 NEXT UP
-- Implement lane quality gates (`fast/main/deep`) and parser leakage checks, then
-  proceed with launchd durability hardening.
+- Web Search Quality — Phase 3 (Structured Output): add schema-first
+  synthesis after retrieval/extraction stability is proven.

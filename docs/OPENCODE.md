@@ -2,7 +2,7 @@
 
 ## Purpose
 OpenCode is the primary coding client for this repo. It uses LiteLLM aliases
-(`main`/`deep`/`fast`/`swap` handles) and can invoke tools with explicit permission prompts.
+(`main`/`deep`/`fast` handles, plus temporary experiment aliases when present) and can invoke tools with explicit permission prompts.
  
 ## Install (MacBook)
 Opencode installs into `~/.opencode/bin/opencode`. Ensure it is on PATH:
@@ -19,7 +19,7 @@ Provider setup (LiteLLM OpenAI-compatible):
 - If OpenCode runs on the Mini: `http://127.0.0.1:4000/v1`
 - If OpenCode runs on any other tailnet device: `https://gateway.tailfd1400.ts.net/v1`
 - Infra fallback (if service-hostname path is unstable): `http://100.69.99.60:4443/v1`
-- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`)
+- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `metal-test-fast` during this experiment)
 
 Permissions:
 - Use `permission` rules to require approval (e.g., `bash: "ask"`, `edit: "ask"`).

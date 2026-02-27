@@ -11,7 +11,9 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - No new LAN exposure, port changes, or host-binding changes without an explicit plan and approval.
 - No dependency or lockfile churn unless the task explicitly asks for it.
 - No unrelated refactors, renames, or drive-by cleanups.
-- **MLX control:** All MLX backend actions MUST use `mlxctl` (load/unload/assign-team/sync).
+- **MLX control:** Ports `8100-8119` are `mlxctl`-managed and MUST use `mlxctl`
+  (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
+  require `mlxctl`.
   Never start/stop `mlx-openai-server` directly on the Studio.
 - Large outputs or long copy/paste blocks must go into `SCRATCH_PAD.md` for review.
 - `NOW.md` must reflect the active task; update it when the active work changes.

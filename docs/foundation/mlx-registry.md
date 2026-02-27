@@ -4,12 +4,13 @@
 Keep Studio MLX inference stable and repeatable with registry-driven model mapping,
 Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM alias wiring.
 
-## Runtime Reality (2026-02-18)
+## Runtime Reality (2026-02-27)
 - Active Studio inference listeners:
   - `8100` -> `mlx-gpt-oss-120b-mxfp4-q4` (deep)
   - `8101` -> `mlx-qwen3-next-80b-mxfp4-a3b-instruct` (main)
   - `8102` -> `mlx-gpt-oss-20b-mxfp4-q4` (fast)
-- Runtime command family is per-port `mlx_lm.server`.
+- Team-lane runtime command family is `vllm serve` (`vllm-metal`) under
+  `com.bebop.mlx-launch` (`8100-8119`).
 - `mlxctl` remains the supported control plane for model/port lifecycle + gateway sync.
 
 ## Registry
@@ -51,8 +52,8 @@ Key fields:
 - `offload-og`
 
 Backend behavior:
-- Default launch backend is `mlx_lm.server`.
-- Legacy `mlx-openai-server` is fallback-only (set `MLX_BACKEND=mlx-openai-server`).
+- Default launch backend is `vllm-metal` (`vllm serve`).
+- `mlx_lm.server` and `mlx-openai-server` are legacy fallback references only and are not part of the active runtime contract.
 
 Source of truth contract:
 - Runtime and gateway wiring are derived from registry state.
@@ -95,3 +96,7 @@ Current alias intent:
 - Studio `/v1/models` may report snapshot-path IDs.
 - Use registry + `mlxctl status` as canonical identity mapping.
 - `mlxctl status --checks` reports runtime family and runtime model path for drift triage.
+- `mlxctl mlx-launch-configure-vllm` rewrites `/opt/mlx-launch/bin/start.sh`
+  to a registry-driven team-lane launcher for `vllm-metal`.
+- Output-quality gate: run `platform/ops/scripts/mlx_quality_gate.py` after
+  reboot/model changes to catch protocol leakage or hangs on `fast/main/deep`.

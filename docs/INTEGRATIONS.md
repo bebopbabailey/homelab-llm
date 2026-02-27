@@ -20,7 +20,7 @@
   - `deep` -> `8100` (`mlx-gpt-oss-120b-mxfp4-q4`)
   - `main` -> `8101` (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
   - `fast` -> `8102` (`mlx-gpt-oss-20b-mxfp4-q4`)
-  `8120-8139` remain reserved for experimental canaries (only used when explicitly configured).
+  `8120-8139` remain reserved for experimental canaries (only used when explicitly configured and not required to use `mlxctl`).
 - MLX registry is the canonical link from `model_id` to inference source:
   `model_id` → `registry.json` → `source_path` / `cache_path`.
 - Context defaults: `router.yaml` uses MLX registry fields:
@@ -30,7 +30,8 @@
   as LiteLLM handles. Seagate storage is **backroom only** and never receives handles.
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
-- Aliases: `main`, `deep`, `fast`, `swap` are the stable LiteLLM handles.
+- Stable aliases: `main`, `deep`, `fast`.
+- Current experiment aliases: `metal-test-fast`, `metal-test-main`, `metal-test-deep` (temporary).
 - LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
 
 ### LiteLLM Prometheus metrics (enabled)
@@ -140,7 +141,7 @@ if a param is rejected by the backend.
   - On Mini: `baseURL=http://127.0.0.1:4000/v1`
   - On tailnet devices: `baseURL=https://gateway.tailfd1400.ts.net/v1`
   - Internal infra fallback (not default for end-user clients): `http://100.69.99.60:4443/v1`
-- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `swap`).
+- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `metal-test-fast` during this experiment).
 - Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
 - Web search uses MCP `web-fetch` (stdio) with `search.web` routed to
   LiteLLM `/v1/search/searxng-search`.
@@ -162,6 +163,16 @@ if a param is rejected by the backend.
 ## LiteLLM extension points (summary)
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
 and where this repo uses callbacks vs guardrails.
+
+### Harmony normalization policy (gateway canonical layer)
+- MLX backend runtime is `vllm-metal` (`vllm serve` under `mlxctl`/launchd); Harmony normalization is done at LiteLLM.
+- Applied to GPT lanes only: `deep`, `fast`, `boost`, `boost-deep`.
+- Qwen lane (`main`) remains passthrough.
+- Guardrail pre-call mutates prior assistant history only when strict Harmony wire
+  markers are present (`<|channel|>`, `<|message|>`, plus `analysis|final` channel).
+- Guardrail post-call returns `final` channel content only for client-visible text.
+- Streaming is pass-through by default; callers can still force non-streaming
+  by setting `stream: false` per request.
 
 ## OpenVINO backend (not wired in LiteLLM)
 - Systemd unit: `/etc/systemd/system/ov-server.service` (binds `0.0.0.0` for maintenance).

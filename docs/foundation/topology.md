@@ -2,7 +2,7 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
-- Mac Studio: MLX inference host (per-port `mlx_lm.server` lanes on `:8100/:8101/:8102`) and OptiLLM proxy (`:4020`).
+- Mac Studio: MLX inference host (team-lane `vllm-metal` via `com.bebop.mlx-launch` on `:8100/:8101/:8102`) and OptiLLM proxy (`:4020`).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.
@@ -57,14 +57,14 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 
 ### MLX port management
 - Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.
-- Ports 8120-8139 are reserved for experimental test loads and are not registered until a model is loaded.
+- Ports 8120-8139 are reserved for experimental test loads; these ports do not require `mlxctl`.
 - Current active lanes:
   - `8100`: `mlx-gpt-oss-120b-mxfp4-q4`
   - `8101`: `mlx-qwen3-next-80b-mxfp4-a3b-instruct`
   - `8102`: `mlx-gpt-oss-20b-mxfp4-q4`
 
 Note: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.
-Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal.
+Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal for `8100-8119`.
 
 ### OptiLLM local (status)
 - No inference backends are currently deployed on Orin.

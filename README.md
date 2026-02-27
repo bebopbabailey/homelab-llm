@@ -37,8 +37,8 @@ use-case. Hopes of branching into enterprise-land later.
 - OptiLLM techniques are selected per-request via `optillm_approach` (no alias explosion).
 - Health policy: use LiteLLM `/health/readiness` as the default health signal; `/health`
   is a deep probe that can flag offline backends.
-- Roles: `main`, `deep`, `fast`, `swap` are the stable client-facing aliases.
-- Experimental aliases (`x1`–`x4`) are not currently configured in active router config.
+- Stable client-facing roles are `main`, `deep`, and `fast`.
+- `metal-test-*` aliases are temporary experimental labels; `swap*` aliases are deprecated.
 - Transcribe tasks: `task-transcribe`, `task-transcribe-vivid` (server-side cleaning).
 - OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
   `layer-gateway/optillm-proxy/README.md`.

@@ -5,7 +5,7 @@
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
-- Mac Studio: MLX inference host using per-port `mlx_lm.server` lanes:
+- Mac Studio: MLX inference host using per-port `vllm-metal` (`vllm serve`) lanes:
   `:8100` deep (gpt-oss-120b), `:8101` main (qwen3-next-80b),
   `:8102` fast (gpt-oss-20b).
   OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
@@ -41,6 +41,9 @@
 - LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `layer-gateway/litellm-orch/config/router.yaml`.
   Auth: API calls require `Authorization: Bearer <LITELLM_MASTER_KEY>` (even on localhost).
   Prometheus metrics: `/metrics/` (same port, auth required; use trailing slash).
+  Harmony normalization is canonical at this layer for GPT lanes (`deep`, `fast`,
+  `boost`, `boost-deep`) with strict wire-tag detection.
+  GPT lanes now preserve caller streaming intent by default (no forced `stream=false`).
 - Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
@@ -57,12 +60,12 @@
   Upstream: Mini LiteLLM via tailnet TCP forward (`100.69.99.60:4443 -> 127.0.0.1:4000`).
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
-- MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 reserved for experimental tests.
+- MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.
   Current active lane allocation: `8100/8101/8102`.
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
-  Current runtime command family is `mlx_lm.server` per active lane.
+  Current team-lane runtime command family is `vllm serve` (`vllm-metal`) under `com.bebop.mlx-launch`.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and

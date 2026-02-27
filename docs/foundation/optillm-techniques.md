@@ -9,7 +9,7 @@ Set the approach per request via `optillm_approach`, e.g.:
 Decode-time techniques note (current direction):
 - Proxy-safe orchestration stays in OptiLLM (`optillm_approach=...`).
 - Decode-loop algorithms (not proxy-safe) are backend-runtime specific and are not
-  part of the default LiteLLM + `mlx_lm.server` contract.
+  part of the default LiteLLM + `vllm-metal` contract.
 - For durability, prefer `optillm_approach` and standard OpenAI fields at the gateway layer.
 
 Examples (request-body techniques via gateway):

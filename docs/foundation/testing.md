@@ -75,6 +75,18 @@ After any MLX served-set change (handles) or Studio registry/defaults change:
 mlxctl sync-gateway
 ```
 
+Quality gate (post-reboot / post-change):
+```bash
+mlxctl status --checks
+mlxctl verify
+uv run python /home/christopherbailey/homelab-llm/platform/ops/scripts/mlx_quality_gate.py --host 192.168.1.72 --json
+```
+
+Expected:
+- exit code `0`
+- `failed: 0`
+- no raw protocol markers in output (`<|channel|>`, `<think>`, tool tags)
+
 
 ## LiteLLM Aliases (Mini)
 ```bash
@@ -206,6 +218,63 @@ curl -fsS http://192.168.1.72:9999/v1/models | jq .
 ## SearXNG (Mini, once installed)
 ```bash
 curl -fsS "http://127.0.0.1:8888/search?q=ping&format=json" | jq .
+```
+
+## Open WebUI Web Search Phase A Baseline (Mini, end-user flow)
+Goal: verify baseline search viability before adding rerankers/vector stores.
+
+1) Generate a run-specific prompt pack:
+```bash
+cd /home/christopherbailey/homelab-llm
+python3 scripts/openwebui_phase_a_baseline.py print-pack --run-id PHASEA-001
+```
+
+2) End-user test in Open WebUI:
+- Open the UI normally.
+- Ensure web search is enabled for the chat.
+- Send each printed prompt as a separate message (keep `[PHASEA-001:Qxx]` prefix intact).
+
+3) Score from logs:
+```bash
+cd /home/christopherbailey/homelab-llm
+python3 scripts/openwebui_phase_a_baseline.py score --run-id PHASEA-001 --since "45 minutes ago"
+```
+
+4) Fresh proof check (most recent activity only):
+```bash
+sudo journalctl -u open-webui.service --since "2 minutes ago" --no-pager \
+  | rg -n 'OWUI_SEARXNG_RAW_JSON|source id=|web search|loader|fetch'
+```
+
+Pass guidance:
+- `searx_rate_limit_or_429_errors == 0`
+- `cases_seen_in_openwebui_logs == cases_total`
+- `cases_with_source_blocks == cases_total`
+
+If pass criteria fail, fix retrieval/extraction baseline first and re-run Phase A.
+
+## websearch-orch hygiene proxy (Mini)
+Service checks:
+```bash
+systemctl status websearch-orch.service --no-pager
+curl -fsS "http://127.0.0.1:8899/health" | jq .
+```
+
+Search checks:
+```bash
+curl -fsS "http://127.0.0.1:8899/search?q=evidence-based+wok+tips&format=json" \
+  | jq '{count:(.results|length), unresponsive_engines}'
+```
+
+Open WebUI wiring check:
+```bash
+systemctl show open-webui.service -p Environment --no-pager \
+  | rg 'SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>'
+```
+
+Recent hygiene logs:
+```bash
+journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager
 ```
 
 ## LiteLLM Search Proxy (Mini)
