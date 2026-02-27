@@ -17,8 +17,6 @@ def _load_module(path: Path, name: str):
 harmony_guardrail = _load_module(MODULE_PATH, "harmony_guardrail")
 normalize_assistant_text = harmony_guardrail.normalize_assistant_text
 HarmonyGuardrail = harmony_guardrail.HarmonyGuardrail
-_looks_like_analysis_leak = harmony_guardrail._looks_like_analysis_leak
-_safe_fallback_reply = harmony_guardrail._safe_fallback_reply
 
 
 class TestHarmonyGuardrail(unittest.TestCase):
@@ -31,39 +29,23 @@ class TestHarmonyGuardrail(unittest.TestCase):
         self.assertTrue(changed)
         self.assertEqual(normalized, "Hello from final.")
 
-    def test_strips_think_blocks(self):
-        text = "<think>reasoning hidden</think>\nVisible answer."
-        normalized, changed = normalize_assistant_text(text)
-        self.assertTrue(changed)
-        self.assertEqual(normalized, "Visible answer.")
-
     def test_noop_for_normal_content(self):
         text = "Simple answer."
         normalized, changed = normalize_assistant_text(text)
         self.assertFalse(changed)
         self.assertEqual(normalized, text)
 
-    def test_fallback_when_no_final_channel(self):
+    def test_noop_when_harmony_missing_final_channel(self):
         text = "<|channel|>analysis<|message|>hidden<|end|><|channel|>assistant<|message|>Visible."
         normalized, changed = normalize_assistant_text(text)
-        self.assertTrue(changed)
-        self.assertEqual(normalized, "Visible.")
+        self.assertFalse(changed)
+        self.assertEqual(normalized, text)
 
-    def test_strips_raw_protocol_tokens_without_channels(self):
+    def test_strict_guard_passthrough_for_non_harmony_tokens(self):
         text = "<|start|>assistant<|message|>Hello there<|end|>"
         normalized, changed = normalize_assistant_text(text)
-        self.assertTrue(changed)
-        self.assertEqual(normalized, "assistant Hello there")
-
-    def test_detects_analysis_leak_prefix(self):
-        self.assertTrue(_looks_like_analysis_leak('User says "PENG". Probably wants...'))
-        self.assertFalse(_looks_like_analysis_leak("PONG"))
-
-    def test_safe_fallback_reply(self):
-        self.assertEqual(
-            _safe_fallback_reply("PENG"),
-            'Could you clarify what you mean by "PENG"?',
-        )
+        self.assertFalse(changed)
+        self.assertEqual(normalized, text)
 
 
 class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
@@ -93,7 +75,90 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["messages"][1]["content"], "PONG")
         self.assertNotIn("reasoning", out["messages"][1])
 
-    async def test_post_call_replaces_leaked_analysis_with_safe_reply(self):
+    async def test_pre_call_only_mutates_assistant_history(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-pre",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "deep",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "<|channel|>analysis<|message|>This is literal text from user.",
+                },
+                {"role": "assistant", "content": "No tags here."},
+            ],
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="acompletion",
+        )
+        self.assertEqual(out["messages"][0]["content"], data["messages"][0]["content"])
+        self.assertEqual(out["messages"][1]["content"], "No tags here.")
+
+    async def test_pre_call_preserves_stream_true_for_gpt_lanes_by_default(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-pre",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "fast",
+            "stream": True,
+            "messages": [{"role": "user", "content": "Ping"}],
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="acompletion",
+        )
+        self.assertTrue(out["stream"])
+
+    async def test_pre_call_can_force_stream_false_when_explicitly_enabled(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-pre",
+            event_hook="pre_call",
+            default_on=True,
+            coerce_stream_false=True,
+        )
+        data = {
+            "model": "fast",
+            "stream": True,
+            "messages": [{"role": "user", "content": "Ping"}],
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="acompletion",
+        )
+        self.assertFalse(out["stream"])
+
+    async def test_pre_call_does_not_force_stream_false_for_main(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-pre",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "main",
+            "stream": True,
+            "messages": [{"role": "user", "content": "Ping"}],
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="acompletion",
+        )
+        self.assertTrue(out["stream"])
+
+    async def test_post_call_normalizes_harmony_for_gpt_lanes(self):
         guardrail = HarmonyGuardrail(
             guardrail_name="harmony-post",
             event_hook="post_call",
@@ -108,7 +173,7 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
                 {
                     "message": {
                         "role": "assistant",
-                        "content": 'User says "PENG". Probably wants explanation.',
+                        "content": "<|channel|>analysis<|message|>hidden<|end|><|channel|>final<|message|>PONG",
                     }
                 }
             ]
@@ -118,10 +183,34 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
             user_api_key_dict=None,
             response=response,
         )
-        self.assertEqual(
-            out["choices"][0]["message"]["content"],
-            'Could you clarify what you mean by "PENG"?',
+        self.assertEqual(out["choices"][0]["message"]["content"], "PONG")
+
+    async def test_post_call_passthrough_for_main_lane(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-post",
+            event_hook="post_call",
+            default_on=True,
         )
+        data = {
+            "model": "main",
+            "messages": [{"role": "user", "content": "PENG"}],
+        }
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "<|channel|>analysis<|message|>hidden<|end|><|channel|>final<|message|>PONG",
+                    }
+                }
+            ]
+        }
+        out = await guardrail.async_post_call_success_hook(
+            data=data,
+            user_api_key_dict=None,
+            response=response,
+        )
+        self.assertEqual(out["choices"][0]["message"]["content"], response["choices"][0]["message"]["content"])
 
 
 if __name__ == "__main__":

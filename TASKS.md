@@ -46,6 +46,10 @@ Goal: Make routing resilient but still boring.
   - [x] clear error response if upstream down (LiteLLM default + retry/cooldown configured)
   - [ ] optional fallback mapping (config-driven; defer until standard model lineup)
 - [x] Add request logging (JSON): model name, upstream, latency, status, error
+- [x] Add Harmony gateway normalization for GPT lanes (`deep`, `fast`, `boost`,
+  `boost-deep`) with strict wire-tag detection and turn-history sanitation
+- [x] Force GPT lanes to non-streaming at gateway until streaming-hook behavior
+  is validated for the deployed LiteLLM version
 - [ ] Add AFM backend (Studio) once API base URL + model IDs are confirmed
 
 ## Phase 4 — Service Hardening (Boot + Security)
@@ -71,6 +75,6 @@ Goal: Keep gateway tool-agnostic but orchestration-friendly.
 ## Nice to Haves
 - [ ] Add a helper script to detect or extract MLX chat templates and launch MLX servers with `--chat-template-file` automatically (durable model swaps).
 - [ ] If we revise runtime strategy again, require a backend migration checklist with parser parity tests and rollback steps.
-  - Note (2026-02): per-port `mlx_lm.server` is currently the active runtime contract; reevaluate this item if runtime strategy changes again.
+  - Note (2026-02-27): per-port `vllm-metal` is the active runtime contract; this checklist should be revisited on future backend migrations.
 - [ ] Add tag/capability metadata for health output (compact JSON enrichment).
 - [ ] Add a lightweight routing rule to force short/low‑complexity prompts (e.g., transcript cleaning) to `none` to avoid heavy OptiLLM techniques.

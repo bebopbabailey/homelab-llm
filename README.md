@@ -9,7 +9,7 @@ provides routing only and does not implement inference.
 - Logical model names use base model names (kebab-case). MLX models are prefixed with `mlx-`.
 
 ## Backends (External Services)
-- MLX `mlx_lm.server` lanes on the Studio: `mlx-*` (ports `8100-8119` team; `8120-8139` experimental).
+- MLX `vllm-metal` lanes on the Studio: `mlx-*` (ports `8100-8119` team; `8120-8139` experimental).
 - OpenVINO LLM server on the Mini (external to this repo) is not wired into LiteLLM
   right now.
 

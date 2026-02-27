@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import re
 from typing import Any, AsyncGenerator, Optional
 
@@ -8,97 +7,71 @@ from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
 
 _HARMONY_HEADER_RE = re.compile(r"<\|channel\|>\s*([a-zA-Z0-9_-]+)\s*<\|message\|>", re.DOTALL)
-_HARMONY_TOKEN_RE = re.compile(r"<\|[^>]+?\|>")
-_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
-_LEAK_PREFIX_RE = re.compile(
-    r"^\s*(the user says|user says|we need to|i need to|probably wants|the user might)\b",
-    re.IGNORECASE,
-)
+_HARMONY_REQUIRED_CHANNELS = {"analysis", "final"}
+_DEFAULT_TARGET_MODELS = {"deep", "fast", "boost", "boost-deep"}
 
 # Keep task-transcribe behavior fully controlled by transcribe guardrail.
 _EXCLUDED_MODELS = {"task-transcribe", "task-transcribe-vivid"}
 
 
-def _strip_protocol_tokens(text: str) -> str:
-    text = _HARMONY_TOKEN_RE.sub(" ", text)
-    return re.sub(r"\s+", " ", text).strip()
+def _parse_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
 
 
-def _extract_harmony_final_text(text: str) -> Optional[str]:
+def _parse_model_targets(raw: Any) -> set[str]:
+    if not raw:
+        return set(_DEFAULT_TARGET_MODELS)
+    if isinstance(raw, str):
+        return {item.strip().lower() for item in raw.split(",") if item.strip()}
+    if isinstance(raw, (list, tuple, set)):
+        out: set[str] = set()
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                out.add(item.strip().lower())
+        return out or set(_DEFAULT_TARGET_MODELS)
+    return set(_DEFAULT_TARGET_MODELS)
+
+
+def _is_strict_harmony_payload(text: str) -> bool:
     if "<|channel|>" not in text or "<|message|>" not in text:
-        return None
+        return False
 
     matches = list(_HARMONY_HEADER_RE.finditer(text))
     if not matches:
+        return False
+
+    channels = {m.group(1).strip().lower() for m in matches}
+    return bool(channels & _HARMONY_REQUIRED_CHANNELS)
+
+
+def _strip_protocol_tokens(text: str) -> str:
+    return re.sub(r"<\|[^>]+?\|>", " ", text)
+
+
+def _extract_harmony_final_text(text: str) -> Optional[str]:
+    if not _is_strict_harmony_payload(text):
         return None
 
+    matches = list(_HARMONY_HEADER_RE.finditer(text))
     channel_messages: list[tuple[str, str]] = []
     for idx, match in enumerate(matches):
         channel = match.group(1).strip().lower()
         start = match.end()
         end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
-        message = _strip_protocol_tokens(text[start:end])
+        message = re.sub(r"\s+", " ", _strip_protocol_tokens(text[start:end])).strip()
         if message:
             channel_messages.append((channel, message))
 
     finals = [msg for ch, msg in channel_messages if ch == "final" and msg]
     if finals:
         return finals[-1]
-
-    # Fallback when a response streams/stops before an explicit `final` channel.
-    preferred_channels = {"assistant", "response", "output"}
-    preferred = [msg for ch, msg in channel_messages if ch in preferred_channels and msg]
-    if preferred:
-        return preferred[-1]
-
-    non_analysis = [msg for ch, msg in channel_messages if ch != "analysis" and msg]
-    if non_analysis:
-        return non_analysis[-1]
-
-    if channel_messages:
-        return channel_messages[-1][1]
     return None
-
-
-def _strip_think_blocks(text: str) -> str:
-    stripped = _THINK_BLOCK_RE.sub("", text)
-    stripped = re.sub(r"\n{3,}", "\n\n", stripped).strip()
-    return stripped if stripped else text.strip()
-
-
-def _last_user_text(data: dict) -> Optional[str]:
-    messages = data.get("messages")
-    if not isinstance(messages, list):
-        return None
-    for msg in reversed(messages):
-        if not isinstance(msg, dict):
-            continue
-        if msg.get("role") != "user":
-            continue
-        content = msg.get("content")
-        if isinstance(content, str) and content.strip():
-            return content.strip()
-    return None
-
-
-def _looks_like_analysis_leak(text: str) -> bool:
-    if not text:
-        return False
-    if _LEAK_PREFIX_RE.search(text):
-        return True
-    # Common degenerate loop observed in leakage.
-    if text.count("The user?") >= 3:
-        return True
-    return False
-
-
-def _safe_fallback_reply(last_user: Optional[str]) -> str:
-    if not last_user:
-        return "Could you clarify what you want me to do?"
-    short = last_user.strip().replace("\n", " ")
-    if len(short) > 120:
-        short = short[:117] + "..."
-    return f'Could you clarify what you mean by "{short}"?'
 
 
 def normalize_assistant_text(text: str) -> tuple[str, bool]:
@@ -110,20 +83,25 @@ def normalize_assistant_text(text: str) -> tuple[str, bool]:
     if harmony_final:
         return harmony_final, harmony_final != original
 
-    if "<|" in original and "|>" in original:
-        stripped = _strip_protocol_tokens(original)
-        return stripped, stripped != original
-
-    if "<think>" in original.lower() and "</think>" in original.lower():
-        cleaned = _strip_think_blocks(original)
-        return cleaned, cleaned != original
-
     return text, False
 
 
 def _extract_model_name(data: dict) -> str:
     model = data.get("model", "")
     return model if isinstance(model, str) else ""
+
+
+def _is_target_model(model: str, targets: set[str]) -> bool:
+    normalized = model.strip().lower()
+    if normalized in targets:
+        return True
+    # Requests may contain provider-prefixed model names.
+    if "/" in normalized:
+        normalized = normalized.rsplit("/", 1)[-1]
+        if normalized in targets:
+            return True
+    # Handle direct backend ids if an alias is bypassed.
+    return "gpt-oss" in normalized
 
 
 def _message_content_getter(response: Any) -> Optional[str]:
@@ -175,75 +153,12 @@ def _message_content_setter(response: Any, content: str) -> Any:
     return response
 
 
-def _extract_stream_content(item: Any) -> str:
-    if isinstance(item, dict):
-        try:
-            choices = item.get("choices") or []
-            content_parts: list[str] = []
-            for choice in choices:
-                if not isinstance(choice, dict):
-                    continue
-                delta = choice.get("delta") or {}
-                if not isinstance(delta, dict):
-                    continue
-                content = delta.get("content")
-                if isinstance(content, str):
-                    content_parts.append(content)
-            return "".join(content_parts)
-        except Exception:
-            return ""
-
-    try:
-        choices = getattr(item, "choices", None)
-        if not choices:
-            return ""
-        content_parts: list[str] = []
-        for choice in choices:
-            delta = getattr(choice, "delta", None)
-            if delta is None:
-                continue
-            content = getattr(delta, "content", None)
-            if isinstance(content, str):
-                content_parts.append(content)
-        return "".join(content_parts)
-    except Exception:
-        return ""
-
-
-def _set_stream_content(item: Any, text: str) -> Any:
-    if isinstance(item, dict):
-        try:
-            choices = item.get("choices")
-            if not choices or not isinstance(choices, list):
-                return item
-            first_choice = choices[0]
-            if not isinstance(first_choice, dict):
-                return item
-            delta = first_choice.get("delta")
-            if not isinstance(delta, dict):
-                return item
-            delta["content"] = text
-            return item
-        except Exception:
-            return item
-
-    try:
-        choices = getattr(item, "choices", None)
-        if not choices:
-            return item
-        first_choice = choices[0]
-        delta = getattr(first_choice, "delta", None)
-        if delta is not None:
-            setattr(delta, "content", text)
-    except Exception:
-        pass
-    return item
-
-
 class HarmonyGuardrail(CustomGuardrail):
     """Normalize GPT-OSS Harmony and Qwen think-tag output for downstream clients."""
 
     def __init__(self, guardrail_name: str, event_hook: str, default_on: bool, **kwargs):
+        self.target_models = _parse_model_targets(kwargs.get("target_models"))
+        self.coerce_stream_false = _parse_bool(kwargs.get("coerce_stream_false"), default=False)
         super().__init__(
             guardrail_name=guardrail_name,
             supported_event_hooks=[GuardrailEventHooks.pre_call, GuardrailEventHooks.post_call],
@@ -262,6 +177,11 @@ class HarmonyGuardrail(CustomGuardrail):
         model = _extract_model_name(data)
         if model in _EXCLUDED_MODELS:
             return data
+        if not _is_target_model(model, self.target_models):
+            return data
+
+        if self.coerce_stream_false and data.get("stream") is True:
+            data["stream"] = False
 
         messages = data.get("messages")
         if not isinstance(messages, list):
@@ -270,6 +190,8 @@ class HarmonyGuardrail(CustomGuardrail):
         changed = False
         for msg in messages:
             if not isinstance(msg, dict):
+                continue
+            if msg.get("role") != "assistant":
                 continue
             content = msg.get("content")
             if isinstance(content, str):
@@ -289,6 +211,8 @@ class HarmonyGuardrail(CustomGuardrail):
         model = _extract_model_name(data)
         if model in _EXCLUDED_MODELS:
             return response
+        if not _is_target_model(model, self.target_models):
+            return response
 
         content = _message_content_getter(response)
         if not content:
@@ -298,9 +222,6 @@ class HarmonyGuardrail(CustomGuardrail):
         if changed:
             return _message_content_setter(response, normalized)
 
-        if _looks_like_analysis_leak(content):
-            return _message_content_setter(response, _safe_fallback_reply(_last_user_text(data)))
-
         return response
 
     async def async_post_call_streaming_iterator_hook(
@@ -309,45 +230,5 @@ class HarmonyGuardrail(CustomGuardrail):
         response: Any,
         request_data: dict,
     ) -> AsyncGenerator[Any, None]:
-        model = _extract_model_name(request_data)
-        if model in _EXCLUDED_MODELS:
-            async for item in response:
-                yield item
-            return
-
-        buffered_text: list[str] = []
-        first_content_chunk: Any = None
-        non_content_chunks: list[Any] = []
-        finish_chunks: list[Any] = []
-
         async for item in response:
-            chunk_text = _extract_stream_content(item)
-            if chunk_text:
-                buffered_text.append(chunk_text)
-                if first_content_chunk is None:
-                    first_content_chunk = copy.deepcopy(item)
-                continue
-
-            try:
-                choices = getattr(item, "choices", None)
-                finish_reason = getattr(choices[0], "finish_reason", None) if choices else None
-            except Exception:
-                finish_reason = None
-
-            if finish_reason:
-                finish_chunks.append(item)
-            else:
-                non_content_chunks.append(item)
-
-        for item in non_content_chunks:
-            yield item
-
-        joined = "".join(buffered_text).strip()
-        if first_content_chunk is not None and joined:
-            normalized, _ = normalize_assistant_text(joined)
-            if _looks_like_analysis_leak(normalized):
-                normalized = _safe_fallback_reply(_last_user_text(request_data))
-            yield _set_stream_content(first_content_chunk, normalized)
-
-        for item in finish_chunks:
             yield item

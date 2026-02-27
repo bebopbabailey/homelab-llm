@@ -3,28 +3,44 @@ model_list:
 # MLX model entries omitted (aliases-only model_list).
 # Canonical model_ids remain in the MLX registry and env.local.
 # END MLXCTL AUTO
-# 1) Core role aliases: main / deep / fast / swap
+# 1) Core role aliases: main / deep / fast (+ temporary metal-test aliases)
 - model_name: main
   litellm_params:
     model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
     api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_KEY
+    max_tokens: 16384
 - model_name: deep
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY
+    max_tokens: 16384
 - model_name: fast
   litellm_params:
     model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
     api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
     api_key: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_KEY
-- model_name: swap
+    max_tokens: 16384
+- model_name: metal-test-fast
   litellm_params:
-    # swap placeholder: points at fast until a dedicated swap endpoint is added
-    model: os.environ/SWAP_MODEL
-    api_base: os.environ/SWAP_API_BASE
-    api_key: os.environ/SWAP_API_KEY
+    # temporary experimental vllm-metal canaries on Studio 8120-8139
+    model: os.environ/METAL_TEST_FAST_MODEL
+    api_base: os.environ/METAL_TEST_FAST_API_BASE
+    api_key: os.environ/METAL_TEST_FAST_API_KEY
+    max_tokens: 16384
+- model_name: metal-test-main
+  litellm_params:
+    model: os.environ/METAL_TEST_MAIN_MODEL
+    api_base: os.environ/METAL_TEST_MAIN_API_BASE
+    api_key: os.environ/METAL_TEST_MAIN_API_KEY
+    max_tokens: 16384
+- model_name: metal-test-deep
+  litellm_params:
+    model: os.environ/METAL_TEST_DEEP_MODEL
+    api_base: os.environ/METAL_TEST_DEEP_API_BASE
+    api_key: os.environ/METAL_TEST_DEEP_API_KEY
+    max_tokens: 16384
 
 # 2) OptiLLM boost lane (opt-in)
 - model_name: boost
@@ -32,12 +48,14 @@ model_list:
     model: openai/main
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
 
 - model_name: boost-deep
   litellm_params:
     model: openai/deep
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
 
 # 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
@@ -83,6 +101,8 @@ router_settings:
 litellm_settings:
   json_logs: false
   drop_params: false
+  modify_params: true
+  set_verbose: true
   callbacks: ["prometheus"]
 guardrails:
   - guardrail_name: "prompt-pre"
@@ -95,11 +115,15 @@ guardrails:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "pre_call"
       default_on: true
+      target_models: "deep,fast,boost,boost-deep"
+      coerce_stream_false: false
   - guardrail_name: "harmony-post"
     litellm_params:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "post_call"
       default_on: true
+      target_models: "deep,fast,boost,boost-deep"
+      coerce_stream_false: false
   - guardrail_name: "transcribe-pre"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"

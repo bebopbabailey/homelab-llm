@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "defaults": {
+    "request_timeout_s": 60,
+    "max_tokens": 64,
+    "forbidden_substrings": [
+      "<|channel|>",
+      "<|message|>",
+      "<|start|>",
+      "<|end|>",
+      "<think>",
+      "</think>",
+      "<tool_call>",
+      "</tool_call>"
+    ]
+  },
+  "cases": [
+    {
+      "model": "deep",
+      "prompt": "Reply with exactly one short sentence about oranges."
+    },
+    {
+      "model": "main",
+      "prompt": "Reply with exactly one short sentence about apples."
+    },
+    {
+      "model": "fast",
+      "prompt": "Reply with exactly one short sentence about bananas."
+    },
+    {
+      "model": "boost",
+      "prompt": "Reply with exactly one short sentence about pears."
+    },
+    {
+      "model": "boost-deep",
+      "prompt": "Reply with exactly one short sentence about grapes."
+    }
+  ]
+}

@@ -22,7 +22,7 @@
 * **API Standard:** OpenAI-compatible `/v1/*` for clients.
 * **Backends:**
   * **OpenVINO** backend on Mini: `http://localhost:9000` (supports `/health`, `/v1/models`, `/v1/chat/completions`).
-* **MLX** backend on Studio: OpenAI-compatible per-port `mlx_lm.server` endpoints.
+* **MLX** backend on Studio: OpenAI-compatible per-port `vllm-metal` (`vllm serve`) endpoints.
 
 ## 4. Required Behavior
 * Provide a single “front door” OpenAI-compatible endpoint for clients (Aider, tinyagents later).

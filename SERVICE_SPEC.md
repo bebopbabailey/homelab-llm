@@ -27,7 +27,7 @@ the Mini, MLX on the Studio, AFM planned).
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
-- **MLX Studio lanes** on the Studio: OpenAI-compatible per-port `mlx_lm.server`
+- **MLX Studio lanes** on the Studio: OpenAI-compatible per-port `vllm-metal` (`vllm serve`)
   endpoints on **8100/8101/8102** (`http://192.168.1.72:<port>/v1`).
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
 
@@ -43,15 +43,19 @@ the Mini, MLX on the Studio, AFM planned).
 ## Guardrails
 - `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
   It strips wrappers/labels and removes reasoning fields from transcript outputs.
-- `harmony-guardrail` is enabled globally on `post_call`.
-  A matching `pre_call` pass sanitizes prior assistant turns so upstream chat templates
-  don't receive raw protocol tags from conversation history.
-  It normalizes assistant output by:
-  - extracting GPT-OSS Harmony `final` channel content, and
-  - falling back to the best available non-analysis channel when `final` is absent, and
-  - stripping raw protocol tags when channel markers leak through, and
-  - removing `<think>...</think>` blocks from tag-based reasoning outputs.
-  This keeps downstream clients from receiving raw protocol artifacts.
+- `harmony-guardrail` is enabled in both `pre_call` and `post_call` for GPT lanes only
+  (`deep`, `fast`, `boost`, `boost-deep`):
+  - `pre_call`: sanitizes prior `assistant` history turns by extracting Harmony `final`
+    content when strict Harmony wire blocks are detected.
+  - `post_call`: converts Harmony wire output to `final` only for client-visible response
+    content.
+  - strict detection guard: no mutation unless real Harmony wire shape is present
+    (`<|channel|>` + `<|message|>` + `analysis|final` channel).
+  - streaming is pass-through by default; the guardrail does not coerce `stream=false`.
+    Clients may still request non-streaming per call.
+  - streaming iterator hook currently passes chunks through without post-normalization.
+    strict Harmony final-content normalization remains strongest on non-stream responses.
+  - Qwen lane (`main`) is passthrough for Harmony normalization.
 
 ## Service Management (Planned)
 - User systemd service with explicit port binding
