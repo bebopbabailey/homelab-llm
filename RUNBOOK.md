@@ -51,6 +51,18 @@ sudo launchctl print system/com.bebop.optillm-proxy \
   | head -n 80
 ```
 
+### Router baseline check (required before tuning)
+Verify the router plugin is active and not silently degrading to direct model usage:
+```bash
+rg -n "Error in router plugin|Falling back to direct model usage|Router predicted approach" \
+  /Users/thestudio/Library/Logs/optillm-proxy.log \
+  /Users/thestudio/Library/Logs/optillm-proxy.err \
+  | tail -n 80
+```
+Expected:
+- No `Error in router plugin` / `Falling back to direct model usage` lines after restart.
+- At least one `Router predicted approach: ...` line after a `router` request.
+
 ## Health / smoke checks
 
 ### Studio: direct proxy check
