@@ -8,7 +8,7 @@
 [Overview]
 Audit and reconcile canonical documentation so platform statements match current runtime/config/registry reality.
 
-This implementation will focus first on canonical platform documentation and root operational docs, then intentionally defer per-service documentation cleanup to a second phase. The immediate objective is to remove contradictory statements, stale aliases, and outdated operational assumptions that can mislead maintenance work (especially around routing, model handles, auth, and port ranges).
+This implementation will focus first on canonical platform documentation and root operational docs, then intentionally defer per-service documentation cleanup to a second phase. The immediate objective is to remove contradictory statements, stale aliases, and outdated operational assumptions that can misl tfead maintenance work (especially around routing, model handles, auth, and port ranges).
 
 The plan uses source-of-truth precedence already defined in `docs/_core/SOURCES_OF_TRUTH.md`: registry/config/service specs and active runtime contracts outweigh older summaries. We will use those sources to build a documented inconsistency ledger, then apply targeted doc edits only where claims are materially wrong or ambiguous. Historical and archived docs will not be edited except to ensure they are clearly treated as historical.
 
