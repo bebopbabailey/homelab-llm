@@ -29,6 +29,22 @@ curl -sS http://127.0.0.1:9000/health
 ss -lntp
 ```
 
+## Studio scheduling policy (Mini -> Studio)
+Local deterministic policy check:
+```bash
+uv run python platform/ops/scripts/validate_studio_policy.py --json
+uv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json
+```
+
+Remote read-only audit:
+```bash
+uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json
+uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json
+```
+
+References:
+- `docs/foundation/studio-scheduling-policy.md`
+
 ## Submodules
 ```bash
 git submodule status

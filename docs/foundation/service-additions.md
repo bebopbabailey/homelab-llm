@@ -25,6 +25,23 @@ that runs the proxy.
 - Systemd unit added under `platform/ops/systemd/` when applicable.
 - `docs/foundation/topology.md` and `docs/PLATFORM_DOSSIER.md` updated.
 
+## macOS Studio (launchd) Checklist (required when applicable)
+- Launchd identity documented in `SERVICE_SPEC.md`:
+  - label, domain (`system` or `gui/<uid>`), plist path
+  - bind address + ports
+  - deploy/restart method
+- Lane classification and policy manifest updated:
+  - `docs/foundation/studio-scheduling-policy.md`
+  - `platform/ops/templates/studio_scheduling_policy.json`
+- Strict policy validation/audit commands documented in service runbook:
+  - `uv run python platform/ops/scripts/validate_studio_policy.py --json`
+  - `uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json`
+  - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json`
+- If label/lane behavior changes, update:
+  - `docs/foundation/topology.md`
+  - `docs/PLATFORM_DOSSIER.md`
+  - service `SERVICE_SPEC.md` and `RUNBOOK.md`
+
 ## MCP Tool Checklist (when applicable)
 - Document tool purpose, inputs, outputs, and failure modes.
 - Declare transport (stdio vs HTTP/SSE) and any required ports.

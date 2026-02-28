@@ -15,6 +15,9 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
   require `mlxctl`.
   Never start/stop `mlx-openai-server` directly on the Studio.
+- **Studio launchd governance:** Owned Studio labels (`com.bebop.*`, `com.deploy.*`)
+  must be allowlisted and policy-audited via the Studio scheduling contract.
+  Unmanaged owned labels are policy violations.
 - Large outputs or long copy/paste blocks must go into `SCRATCH_PAD.md` for review.
 - `NOW.md` must reflect the active task; update it when the active work changes.
 - `NOW.md` contains only active work + a single “NEXT UP” section. Everything else goes to `BACKLOG.md`.

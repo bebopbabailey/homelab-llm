@@ -53,11 +53,21 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_csv_set(name: str, default: str) -> set[str]:
+    raw = os.getenv(name, default)
+    return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+
 UPSTREAM_SEARXNG_URL = os.getenv("UPSTREAM_SEARXNG_URL", "http://127.0.0.1:8888/search")
 SEARCH_TOP_N = _env_int("SEARCH_TOP_N", 24)
 SEARCH_KEEP_K = _env_int("SEARCH_KEEP_K", 8)
 REQUEST_TIMEOUT_SECONDS = _env_int("REQUEST_TIMEOUT_SECONDS", 12)
 MAX_RESULTS_PER_DOMAIN = _env_int("MAX_RESULTS_PER_DOMAIN", 2)
+MAX_SOURCES_PER_DOMAIN = _env_int("MAX_SOURCES_PER_DOMAIN", 2)
+MIN_RESULT_CONTENT_CHARS = _env_int("MIN_RESULT_CONTENT_CHARS", 120)
+CITATION_CONTRACT_ENABLED = _env_bool("CITATION_CONTRACT_ENABLED", True)
+MIN_GROUNDED_SOURCES = _env_int("MIN_GROUNDED_SOURCES", 2)
+SOURCE_TITLE_DEDUP_ENABLED = _env_bool("SOURCE_TITLE_DEDUP_ENABLED", True)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 RERANK_ENABLED = _env_bool("RERANK_ENABLED", False)
 RERANK_MODEL = os.getenv("RERANK_MODEL", "ms-marco-TinyBERT-L-2-v2")
@@ -77,6 +87,8 @@ EXTERNAL_WEB_LOADER_FETCH_TIMEOUT_SECONDS = _env_int("EXTERNAL_WEB_LOADER_FETCH_
 EXTERNAL_WEB_LOADER_MAX_PAGE_BYTES = _env_int("EXTERNAL_WEB_LOADER_MAX_PAGE_BYTES", 1_500_000)
 EXTERNAL_WEB_LOADER_MIN_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MIN_TEXT_CHARS", 120)
 EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS", 8_000)
+EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS", 24_000)
+EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS", 600)
 EXTERNAL_WEB_LOADER_USER_AGENT = os.getenv(
     "EXTERNAL_WEB_LOADER_USER_AGENT",
     "websearch-orch/1.1 (+https://github.com/open-webui/open-webui)",
@@ -95,6 +107,25 @@ FILTER_BLOCK_DOMAINS = {
     for d in os.getenv("FILTER_BLOCK_DOMAINS", "facebook.com,tiktok.com,quora.com").split(",")
     if d.strip()
 }
+TRUST_POLICY_ENABLED = _env_bool("TRUST_POLICY_ENABLED", True)
+TRUST_PRIORITY_DOMAINS = _env_csv_set(
+    "TRUST_PRIORITY_DOMAINS",
+    "nature.com,pnas.org,science.org,sciencedirect.com,nasa.gov,jpl.nasa.gov,isro.gov.in,esa.int,arxiv.org",
+)
+TRUST_DEPRIORITIZED_DOMAINS = _env_csv_set(
+    "TRUST_DEPRIORITIZED_DOMAINS",
+    "medium.com,wikipedia.org,sciencedaily.com,sci.news,universetoday.com",
+)
+TRUST_DROP_BELOW_SCORE = _env_int("TRUST_DROP_BELOW_SCORE", -1)
+QUERY_GUARD_ENABLED = _env_bool("QUERY_GUARD_ENABLED", True)
+QUERY_ENTITY_CONFLICT_ACTION = os.getenv("QUERY_ENTITY_CONFLICT_ACTION", "sanitize").strip().lower()
+QUERY_ENTITY_CONFLICTS: dict[str, tuple[str, ...]] = {
+    "nasa": ("chang'e", "chandrayaan", "kaguya", "selene"),
+    "cnsa": ("apollo", "artemis"),
+    "isro": ("apollo", "artemis"),
+    "jaxa": ("apollo", "artemis", "chang'e"),
+    "esa": ("chang'e",),
+}
 COMPILED_BLOCK_PATTERNS = [re.compile(pat, re.IGNORECASE) for pat in FILTER_BLOCK_PATTERNS]
 LXML_DROP_XPATH = (
     "//script|//style|//noscript|//header|//footer|//nav|//aside|//form|"
@@ -102,6 +133,7 @@ LXML_DROP_XPATH = (
     "//*[@role='banner']|//*[@role='navigation']|//*[@role='contentinfo']"
 )
 WHITESPACE_RE = re.compile(r"\s+")
+NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 log = logging.getLogger("websearch-orch")
@@ -119,8 +151,101 @@ def _domain(url: str) -> str:
     return parse.urlparse(url).netloc.lower()
 
 
+def _is_placeholder_url(url: str) -> bool:
+    host = _domain(url)
+    if not host:
+        return True
+    if host in {"example.com", "example.org", "example.net"}:
+        return True
+    if "placeholder" in host:
+        return True
+    if "/example" in url.lower():
+        return True
+    return False
+
+
 def _blocked_domain(host: str) -> bool:
     return any(host == domain or host.endswith(f".{domain}") for domain in FILTER_BLOCK_DOMAINS)
+
+
+def _domain_matches(host: str, domains: set[str]) -> bool:
+    return any(host == domain or host.endswith(f".{domain}") for domain in domains)
+
+
+def _trust_score_for_domain(host: str) -> int:
+    if _domain_matches(host, TRUST_PRIORITY_DOMAINS):
+        return 2
+    if _domain_matches(host, TRUST_DEPRIORITIZED_DOMAINS):
+        return -1
+    return 0
+
+
+def _trust_tier_for_domain(host: str) -> str:
+    score = _trust_score_for_domain(host)
+    if score >= 2:
+        return "priority"
+    if score < 0:
+        return "deprioritized"
+    return "neutral"
+
+
+def _normalize_query_for_checks(query: str) -> str:
+    normalized = query.lower().replace("’", "'")
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def _query_conflicts(query: str) -> list[tuple[str, str]]:
+    normalized = _normalize_query_for_checks(query)
+    conflicts: list[tuple[str, str]] = []
+    for agency, foreign_tokens in QUERY_ENTITY_CONFLICTS.items():
+        if re.search(rf"\b{re.escape(agency)}\b", normalized) is None:
+            continue
+        for token in foreign_tokens:
+            if token in normalized:
+                conflicts.append((agency, token))
+    return conflicts
+
+
+def _apply_query_guard(query: str) -> tuple[str, dict[str, Any]]:
+    meta: dict[str, Any] = {
+        "enabled": QUERY_GUARD_ENABLED,
+        "raw_query": query,
+        "effective_query": query,
+        "action": "pass",
+        "conflicts": [],
+    }
+    if not QUERY_GUARD_ENABLED:
+        return query, meta
+
+    conflicts = _query_conflicts(query)
+    if not conflicts:
+        return query, meta
+
+    meta["conflicts"] = [{"agency": agency, "token": token} for agency, token in conflicts]
+    action = QUERY_ENTITY_CONFLICT_ACTION
+    if action not in {"sanitize", "reject", "pass"}:
+        action = "sanitize"
+
+    if action == "pass":
+        meta["action"] = "pass_with_conflicts"
+        return query, meta
+
+    if action == "reject":
+        meta["action"] = "reject"
+        return "", meta
+
+    sanitized = query
+    for agency, _token in conflicts:
+        sanitized = re.sub(rf"\b{re.escape(agency)}\b", "", sanitized, flags=re.IGNORECASE)
+    sanitized = _normalize_whitespace(sanitized)
+    if not sanitized:
+        meta["action"] = "sanitize_fallback_raw"
+        return query, meta
+
+    meta["action"] = "sanitize"
+    meta["effective_query"] = sanitized
+    return sanitized, meta
 
 
 def _matches_block_pattern(text: str) -> bool:
@@ -142,6 +267,11 @@ def _normalize_whitespace(text: str) -> str:
 def _valid_http_url(url: str) -> bool:
     parsed = parse.urlparse(url.strip())
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _normalized_title_key(text: str) -> str:
+    base = NON_ALNUM_RE.sub(" ", text.lower())
+    return _normalize_whitespace(base)
 
 
 def _decode_html(raw: bytes, content_type: str) -> str:
@@ -215,7 +345,7 @@ def _extract_clean_page_text(url: str, html_text: str) -> tuple[str, str]:
             best_method = method_name
             break
 
-    return _truncate(best_text, EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS), best_method
+    return best_text, best_method
 
 
 def _fetch_and_extract_url(url: str) -> dict[str, Any]:
@@ -236,7 +366,10 @@ def _fetch_and_extract_url(url: str) -> dict[str, Any]:
         raw = raw[:EXTERNAL_WEB_LOADER_MAX_PAGE_BYTES]
 
     html_text = _decode_html(raw, content_type)
-    page_text, extraction_method = _extract_clean_page_text(url, html_text)
+    page_text_raw, extraction_method = _extract_clean_page_text(url, html_text)
+    raw_char_count = len(page_text_raw)
+    page_text = _truncate(page_text_raw, EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS)
+    doc_char_truncated = len(page_text) < raw_char_count
     elapsed_ms = round((time.monotonic() - start) * 1000, 1)
 
     return {
@@ -247,6 +380,8 @@ def _fetch_and_extract_url(url: str) -> dict[str, Any]:
             "content_type": content_type,
             "extraction_method": extraction_method,
             "char_count": len(page_text),
+            "raw_char_count": raw_char_count,
+            "doc_char_truncated": doc_char_truncated,
             "byte_truncated": byte_truncated,
             "elapsed_ms": elapsed_ms,
         },
@@ -333,6 +468,7 @@ def _init_reranker() -> None:
 def _keep_result(
     result: dict[str, Any],
     seen_urls: set[str],
+    seen_title_keys: set[str],
     per_domain: dict[str, int],
 ) -> tuple[bool, str]:
     url = str(result.get("url", "")).strip()
@@ -354,6 +490,9 @@ def _keep_result(
     if not title and not content:
         return False, "empty_text"
 
+    if len(content) < MIN_RESULT_CONTENT_CHARS and len(title) < max(20, MIN_RESULT_CONTENT_CHARS // 2):
+        return False, "thin_content"
+
     if _matches_block_pattern(text):
         return False, "blocked_pattern"
 
@@ -361,12 +500,103 @@ def _keep_result(
     if canon in seen_urls:
         return False, "duplicate_url"
 
+    if _is_placeholder_url(url):
+        return False, "placeholder_url"
+
+    if SOURCE_TITLE_DEDUP_ENABLED and title:
+        title_key = _normalized_title_key(title)
+        if title_key and title_key in seen_title_keys:
+            return False, "duplicate_title"
+
     if per_domain[host] >= MAX_RESULTS_PER_DOMAIN:
         return False, "domain_cap"
 
+    if per_domain[host] >= MAX_SOURCES_PER_DOMAIN:
+        return False, "source_domain_cap"
+
     seen_urls.add(canon)
+    if SOURCE_TITLE_DEDUP_ENABLED and title:
+        title_key = _normalized_title_key(title)
+        if title_key:
+            seen_title_keys.add(title_key)
     per_domain[host] += 1
     return True, "kept"
+
+
+def _apply_trust_policy(results: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    if not TRUST_POLICY_ENABLED:
+        return results, {"kept": len(results), "trust_drops": 0}
+
+    scored_results: list[tuple[tuple[int, int], dict[str, Any]]] = []
+    trust_drops = 0
+    placeholder_drops = 0
+    tier_counts = {"priority": 0, "neutral": 0, "deprioritized": 0}
+
+    for idx, result in enumerate(results):
+        url = str(result.get("url", "")).strip()
+        if _is_placeholder_url(url):
+            placeholder_drops += 1
+            continue
+        host = _domain(url)
+        trust_score = _trust_score_for_domain(host)
+        trust_tier = _trust_tier_for_domain(host)
+        if trust_score < TRUST_DROP_BELOW_SCORE:
+            trust_drops += 1
+            continue
+
+        enriched = dict(result)
+        enriched["orch_trust_tier"] = trust_tier
+        tier_counts[trust_tier] += 1
+        # Preserve rank order inside each trust tier.
+        scored_results.append(((trust_score, -idx), enriched))
+
+    scored_results.sort(key=lambda item: item[0], reverse=True)
+    final_results = [item[1] for item in scored_results]
+    for source_id, item in enumerate(final_results, start=1):
+        item["orch_source_id"] = source_id
+        item["orch_source_url"] = str(item.get("url", ""))
+    summary = {
+        "kept": len(final_results),
+        "trust_drops": trust_drops,
+        "placeholder_drops": placeholder_drops,
+        "priority_kept": tier_counts["priority"],
+        "neutral_kept": tier_counts["neutral"],
+        "deprioritized_kept": tier_counts["deprioritized"],
+    }
+    return final_results, summary
+
+
+def _build_citation_contract(results: list[dict[str, Any]]) -> dict[str, Any]:
+    mapped: list[dict[str, Any]] = []
+    for source in results:
+        url = str(source.get("url", "")).strip()
+        if not _valid_http_url(url) or _is_placeholder_url(url):
+            continue
+        mapped.append(
+            {
+                "source_id": int(source.get("orch_source_id", 0) or 0),
+                "title": str(source.get("title", "")).strip(),
+                "url": url,
+                "domain": _domain(url),
+                "trust_tier": str(source.get("orch_trust_tier", "unknown")),
+            }
+        )
+
+    citation_total = len(mapped)
+    citation_status = "disabled"
+    if CITATION_CONTRACT_ENABLED:
+        citation_status = "ready" if citation_total >= max(1, MIN_GROUNDED_SOURCES) else "insufficient_sources"
+
+    return {
+        "enabled": CITATION_CONTRACT_ENABLED,
+        "citation_map_status": citation_status,
+        "citation_total": citation_total,
+        "citation_mapped": citation_total,
+        "citation_unmapped": 0,
+        "min_grounded_sources": max(1, MIN_GROUNDED_SOURCES),
+        "allowed_urls": [item["url"] for item in mapped],
+        "sources": mapped,
+    }
 
 
 def _fetch_searx_json(query: str, language: str | None = None) -> dict[str, Any]:
@@ -439,17 +669,30 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": "missing_query"}, status=HTTPStatus.BAD_REQUEST)
             return
 
+        guarded_q, query_guard_meta = _apply_query_guard(q)
+        if query_guard_meta.get("action") == "reject":
+            self._json(
+                {
+                    "error": "query_rejected_by_guard",
+                    "detail": "query failed entity conflict guard",
+                    "query_guard": query_guard_meta,
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+
         language = query_args.get("language", [None])[0]
 
         try:
-            upstream = _fetch_searx_json(q, language=language)
+            upstream = _fetch_searx_json(guarded_q, language=language)
         except Exception as exc:  # noqa: BLE001
-            log.exception("upstream_fetch_error query=%s", q)
+            log.exception("upstream_fetch_error query=%s guarded_query=%s", q, guarded_q)
             self._json({"error": "upstream_fetch_failed", "detail": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
             return
 
         raw_results = list(upstream.get("results", []))
         seen_urls: set[str] = set()
+        seen_title_keys: set[str] = set()
         per_domain: dict[str, int] = defaultdict(int)
         kept: list[dict[str, Any]] = []
         reason_counts: dict[str, int] = defaultdict(int)
@@ -461,7 +704,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(item, dict):
                 reason_counts["non_dict_result"] += 1
                 continue
-            keep, reason = _keep_result(item, seen_urls, per_domain)
+            keep, reason = _keep_result(item, seen_urls, seen_title_keys, per_domain)
             reason_counts[reason] += 1
             if keep:
                 kept.append(item)
@@ -476,23 +719,50 @@ class Handler(BaseHTTPRequestHandler):
         if _RERANKER and kept:
             try:
                 candidates = kept[: max(1, RERANK_TOP_N)]
-                reranked, rerank_scores = _RERANKER.rerank(q, candidates)
+                reranked, rerank_scores = _RERANKER.rerank(guarded_q, candidates)
                 final_results = reranked[: max(1, RERANK_KEEP_K)]
                 rerank_applied = True
             except Exception as exc:  # noqa: BLE001
                 # Fail-open: preserve filtered baseline output.
-                log.exception("rerank failed query=%r (falling back to filtered rank): %s", q, exc)
+                log.exception("rerank failed query=%r guarded_query=%r (falling back to filtered rank): %s", q, guarded_q, exc)
                 final_results = kept[:SEARCH_KEEP_K]
 
+        final_results, trust_summary = _apply_trust_policy(final_results)
+        citation_contract = _build_citation_contract(final_results)
         out["results"] = final_results
+        out["query_guard"] = query_guard_meta
+        out["grounding"] = {
+            "source_count": len(final_results),
+            "source_urls": [str(item.get("url", "")) for item in final_results],
+            "status": "grounded" if final_results else "ungrounded_fallback",
+        }
+        out["trust_summary"] = trust_summary
+        out["citation_contract"] = citation_contract
+        out["quality_signals"] = {
+            "dedupe_drops": reason_counts.get("duplicate_url", 0) + reason_counts.get("duplicate_title", 0),
+            "domain_cap_drops": reason_counts.get("domain_cap", 0) + reason_counts.get("source_domain_cap", 0),
+            "thin_content_drops": reason_counts.get("thin_content", 0),
+            "placeholder_drops": reason_counts.get("placeholder_url", 0) + trust_summary.get("placeholder_drops", 0),
+            "unsupported_claim_count": 0,
+        }
 
         log.info(
-            "query=%r fetched=%d kept=%d rerank=%s reasons=%s top_scores=%s",
+            "query=%r guarded_query=%r query_action=%s conflicts=%d fetched=%d kept=%d rerank=%s reasons=%s trust=%s citation_map_status=%s citation_mapped=%d citation_unmapped=%d dedupe_drops=%d domain_cap_drops=%d unsupported_claim_count=%d top_scores=%s",
             q,
+            guarded_q,
+            query_guard_meta.get("action"),
+            len(query_guard_meta.get("conflicts", [])),
             len(raw_results),
             len(final_results),
             rerank_applied,
             dict(reason_counts),
+            trust_summary,
+            citation_contract.get("citation_map_status"),
+            int(citation_contract.get("citation_mapped", 0)),
+            int(citation_contract.get("citation_unmapped", 0)),
+            int(out["quality_signals"]["dedupe_drops"]),
+            int(out["quality_signals"]["domain_cap_drops"]),
+            int(out["quality_signals"]["unsupported_claim_count"]),
             [(url, round(score, 4)) for url, score in rerank_scores],
         )
         self._json(out)
@@ -525,28 +795,80 @@ class Handler(BaseHTTPRequestHandler):
         output_docs: list[dict[str, Any]] = []
         method_counts: dict[str, int] = defaultdict(int)
         errors: dict[str, str] = {}
+        input_urls = urls[: max(1, EXTERNAL_WEB_LOADER_MAX_URLS)]
+        max_total_chars = (
+            EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS
+            if EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS > 0
+            else None
+        )
+        remaining_budget = max_total_chars
+        total_chars = 0
+        total_raw_chars = 0
+        doc_char_truncations = 0
+        budget_char_truncations = 0
+        budget_drops = 0
 
-        for raw_url in urls[: max(1, EXTERNAL_WEB_LOADER_MAX_URLS)]:
+        for idx, raw_url in enumerate(input_urls):
             url = str(raw_url).strip()
             if not _valid_http_url(url):
                 errors[url] = "invalid_url"
                 continue
             try:
                 doc = _fetch_and_extract_url(url)
+                metadata = dict(doc.get("metadata", {}))
+                method = str(metadata.get("extraction_method", "unknown"))
+                content = str(doc.get("page_content", ""))
+                total_raw_chars += int(metadata.get("raw_char_count", len(content)))
+                if bool(metadata.get("doc_char_truncated", False)):
+                    doc_char_truncations += 1
+
+                budget_char_truncated = False
+                if remaining_budget is not None:
+                    if remaining_budget <= 0:
+                        errors[url] = "text_budget_exhausted"
+                        budget_drops += 1
+                        continue
+
+                    # Fair-share budget so later sources keep at least a small text slice.
+                    pre_budget_chars = len(content)
+                    remaining_urls = len(input_urls) - idx - 1
+                    reserve_for_tail = max(0, EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS) * max(0, remaining_urls)
+                    doc_budget = remaining_budget - reserve_for_tail
+                    if doc_budget <= 0:
+                        doc_budget = min(remaining_budget, max(0, EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS))
+                    doc_budget = max(0, doc_budget)
+
+                    if pre_budget_chars > doc_budget:
+                        content = _truncate(content, doc_budget)
+                        budget_char_truncated = len(content) < pre_budget_chars
+                        if budget_char_truncated:
+                            budget_char_truncations += 1
+                    remaining_budget -= len(content)
+                    metadata["budget_char_limit"] = max_total_chars
+                    metadata["budget_remaining_after"] = remaining_budget
+
+                metadata["budget_char_truncated"] = budget_char_truncated
+                metadata["char_count"] = len(content)
+                doc["page_content"] = content
+                doc["metadata"] = metadata
                 output_docs.append(doc)
-                method = str(doc.get("metadata", {}).get("extraction_method", "unknown"))
                 method_counts[method] += 1
+                total_chars += len(content)
             except Exception as exc:  # noqa: BLE001
                 errors[url] = str(exc)
                 log.warning("web_loader_fetch_error url=%s err=%s", url, exc)
 
-        total_chars = sum(int(doc.get("metadata", {}).get("char_count", 0)) for doc in output_docs)
         log.info(
-            "web_loader urls=%d ok=%d errors=%d chars=%d methods=%s",
+            "web_loader urls=%d ok=%d errors=%d chars=%d raw_chars=%d doc_caps=%d budget_caps=%d budget_drops=%d remaining_budget=%s methods=%s",
             len(urls),
             len(output_docs),
             len(errors),
             total_chars,
+            total_raw_chars,
+            doc_char_truncations,
+            budget_char_truncations,
+            budget_drops,
+            remaining_budget if remaining_budget is not None else "disabled",
             dict(method_counts),
         )
         if errors:

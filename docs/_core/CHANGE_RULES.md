@@ -42,6 +42,14 @@ If drift is discovered:
   - `docs/foundation/tool-contracts.md`
   - Example: adding a new tool transport requires updating the registry template and tool contract notes.
 
+## Studio Scheduling and Launchd Policy
+- If Studio launchd managed labels, lane classifications, or scheduling policy behavior changes, update:
+  - `docs/foundation/studio-scheduling-policy.md`
+  - `docs/foundation/topology.md`
+  - `docs/PLATFORM_DOSSIER.md`
+  - Affected service `layer-*/<service>/SERVICE_SPEC.md` and `layer-*/<service>/RUNBOOK.md`
+  - Example: adding a new owned Studio label under `com.bebop.*` requires policy-manifest, topology, dossier, and service-contract updates.
+
 ## Scripts and Validation
 - If a validation script changes its inputs or assumptions, update:
   - `docs/foundation/testing.md`

@@ -7,6 +7,7 @@ Current, canonical statements of the system, its contracts, and its integration 
 - Platform-level canon:
     - `docs/PLATFORM_DOSSIER.md`
     - `docs/foundation/topology.md`
+    - `docs/foundation/studio-scheduling-policy.md`
     - `docs/foundation/constraints-and-decisions.md`
     - `docs/foundation/overview.md`
     - `docs/INTEGRATIONS.md`

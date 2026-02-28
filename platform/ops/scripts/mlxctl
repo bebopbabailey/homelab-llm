@@ -53,6 +53,7 @@ DEFAULT_MLX_LAUNCHD_PLIST = f"/Library/LaunchDaemons/{DEFAULT_MLX_LAUNCHD_LABEL}
 DEFAULT_MLX_LAUNCH_START_PATH = "/opt/mlx-launch/bin/start.sh"
 DEFAULT_VLLM_BIN = "/Users/thestudio/.venv-vllm-metal/bin/vllm"
 DEFAULT_VLLM_MEMORY_FRACTION = "0.60"
+DEFAULT_STUDIO_UTILITY_WRAPPER = str(Path(__file__).resolve().parent / "studio_run_utility.sh")
 
 
 def _run(cmd, *, input_bytes=None, check=True):
@@ -69,6 +70,16 @@ def _run(cmd, *, input_bytes=None, check=True):
     return result
 
 
+def _studio_utility_wrapper():
+    if os.environ.get("STUDIO_UTILITY_WRAPPER_DISABLE", "").strip().lower() in {"1", "true", "yes"}:
+        return None
+    configured = os.environ.get("STUDIO_UTILITY_WRAPPER", DEFAULT_STUDIO_UTILITY_WRAPPER)
+    candidate = Path(configured)
+    if candidate.exists() and candidate.is_file():
+        return str(candidate)
+    return None
+
+
 def _ssh_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
     # IMPORTANT: `ssh host cmd arg...` is re-serialized into a single command line on
     # the remote side, so argument boundaries are not preserved. Always send a single
@@ -77,6 +88,13 @@ def _ssh_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
         remote = argv
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
+    wrapper = _studio_utility_wrapper()
+    if wrapper:
+        return _run(
+            [wrapper, "--host", studio_ssh, "--", "bash -lc " + shlex.quote(remote)],
+            input_bytes=input_bytes,
+            check=check,
+        )
     cmd = "bash -lc " + shlex.quote(remote)
     return _run(["ssh", studio_ssh, cmd], input_bytes=input_bytes, check=check)
 
@@ -87,6 +105,13 @@ def _studio_sudo_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
         remote = argv
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
+    wrapper = _studio_utility_wrapper()
+    if wrapper:
+        return _run(
+            [wrapper, "--host", studio_ssh, "--sudo", "--", "bash -lc " + shlex.quote(remote)],
+            input_bytes=input_bytes,
+            check=check,
+        )
     cmd = "sudo -n bash -lc " + shlex.quote(remote)
     return _run(["ssh", studio_ssh, cmd], input_bytes=input_bytes, check=check)
 

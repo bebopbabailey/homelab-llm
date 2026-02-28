@@ -12,10 +12,8 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - **Ollama**: `0.0.0.0:11434` (do not modify)
 
 ## Studio (macOS, MLX)
-- **MLX per-port lanes** (`vllm-metal` under `com.bebop.mlx-launch`):
-  - `8100` deep (`mlx-gpt-oss-120b-mxfp4-q4`)
-  - `8101` main (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
-  - `8102` fast (`mlx-gpt-oss-20b-mxfp4-q4`)
+- **MLX launcher**: `com.bebop.mlx-launch` (canonical launchd backend on Studio)
+- **Active inference listener**: `:8100` served by `vllm serve` under `com.bebop.mlx-launch`
 - Team ports: `8100–8119` (`mlxctl`-managed); experimental: `8120–8139` (no `mlxctl` requirement)
 - **OptiLLM proxy**: `0.0.0.0:4020` (active LiteLLM `boost` path)
 
@@ -25,3 +23,4 @@ This is the current runtime layout (Mini + Studio). Update when ports or binding
 - MLX team ports (`8100–8119`) are managed via `platform/ops/scripts/mlxctl`.
 - LiteLLM `boost` routes to Studio OptiLLM proxy on `192.168.1.72:4020`.
 - Studio OptiLLM upstream currently reaches Mini LiteLLM via tailnet TCP forward `100.69.99.60:4443`.
+- Studio scheduling is strict two-lane (inference vs utility); see `docs/foundation/studio-scheduling-policy.md`.

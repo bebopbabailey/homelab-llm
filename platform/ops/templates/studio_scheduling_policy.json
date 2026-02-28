@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "owned_namespaces": [
+    "com.bebop.",
+    "com.deploy."
+  ],
+  "unmanaged_policy": "quarantine",
+  "quarantine_dir": "/Library/LaunchDaemons/.quarantine",
+  "utility_lane": {
+    "taskpolicy_args": [
+      "-c",
+      "utility",
+      "-d",
+      "throttle",
+      "-g",
+      "throttle",
+      "-b"
+    ],
+    "default_nice": 10
+  },
+  "lane_defaults": {
+    "inference": {
+      "required_keys": {
+        "ProcessType": "Interactive"
+      },
+      "forbidden_keys": [
+        "Nice",
+        "LowPriorityIO",
+        "LowPriorityBackgroundIO"
+      ]
+    },
+    "background": {
+      "required_keys": {
+        "ProcessType": "Background",
+        "Nice": 10,
+        "LowPriorityIO": true,
+        "LowPriorityBackgroundIO": true
+      },
+      "forbidden_keys": []
+    },
+    "retired": {
+      "required_disabled": true
+    }
+  },
+  "managed_labels": {
+    "com.bebop.mlx-launch": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-launch.plist"
+    },
+    "com.bebop.optillm-proxy": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
+    }
+  },
+  "retired_labels": {
+    "com.bebop.mlx-omni.8100": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8100.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.mlx-omni.8120": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8120.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.llama-router.8100": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.llama-router.8100.plist",
+      "action": "quarantine"
+    },
+    "com.deploy.mlx.server": {
+      "plist_path": "/Library/LaunchDaemons/com.deploy.mlx.server.plist",
+      "plist_candidates": [
+        "/Library/LaunchDaemons/com.deploy.mlx.server.plist.disabled"
+      ],
+      "action": "quarantine"
+    },
+    "com.bebop.optillm-proxy-deep": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.optillm-proxy-deep.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.optillm-local-balanced": {
+      "action": "quarantine"
+    },
+    "com.bebop.optillm-local-high": {
+      "action": "quarantine"
+    }
+  }
+}

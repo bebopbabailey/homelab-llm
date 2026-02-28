@@ -18,6 +18,15 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - **Do not store secrets in the repo.** Use env files under `/etc`.
 - **No system driver installs** unless explicitly requested.
 
+## Studio scheduling policy
+- Studio is a power inference node; persistent Studio processes we own must be launchd services.
+- Only `com.bebop.mlx-launch` and `com.bebop.optillm-proxy` are inference-lane labels.
+- Non-inference transient Studio work from repo automation must run via
+  `platform/ops/scripts/studio_run_utility.sh` (taskpolicy utility clamp).
+- Owned Studio launchd labels (`com.bebop.*`, `com.deploy.*`) are fail-closed by
+  policy allowlist; unmanaged owned labels are violations.
+- Policy source of truth: `docs/foundation/studio-scheduling-policy.md`.
+
 ## Submodules
 - Commit changes inside submodules first, then update the monorepo pointer.
 

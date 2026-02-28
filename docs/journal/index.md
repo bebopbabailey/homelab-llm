@@ -1,4 +1,9 @@
 # Journal Index
+- [2026-02-28 — Studio contract discoverability hardening](2026-02-28-studio-contract-discoverability-hardening.md)
+- [2026-02-27 — websearch-orch Phase 2 tightening (round 4)](2026-02-27-websearch-orch-phase2-tightening-round4.md)
+- [2026-02-27 — websearch-orch Phase 2 tightening (round 3)](2026-02-27-websearch-orch-phase2-tightening-round3.md)
+- [2026-02-27 — websearch-orch Phase 2 tightening (round 2)](2026-02-27-websearch-orch-phase2-tightening-round2.md)
+- [2026-02-27 — websearch-orch Phase 2 calibration gate implementation](2026-02-27-websearch-orch-phase2-calibration-gate.md)
 - [2026-02-27 — Runtime doc hardening for `vllm-metal` canonical reality](2026-02-27-doc-runtime-hardening-vllm-metal.md)
 - [2026-02-27 — Root docs consistency sweep + `implementation_plan.md` archive](2026-02-27-root-docs-consistency-sweep-and-plan-archive.md)
 - [2026-02-27 — GPT-OSS post-117 result reconciliation (chat + journal correction)](2026-02-27-gpt-oss-post117-reconciliation.md)

@@ -12,9 +12,13 @@ curl -fsS http://127.0.0.1:9000/health | jq .
 ## MLX lanes (Studio)
 Read-only checks on Studio:
 ```bash
+# Required active listener check (current default lane)
 ssh studio "curl -fsS http://127.0.0.1:8100/v1/models | jq ."
-ssh studio "curl -fsS http://127.0.0.1:8101/v1/models | jq ."
-ssh studio "curl -fsS http://127.0.0.1:8102/v1/models | jq ."
+
+# Optional checks (only if assigned for active experiments or cutovers)
+# ssh studio "curl -fsS http://127.0.0.1:8101/v1/models | jq ."
+# ssh studio "curl -fsS http://127.0.0.1:8102/v1/models | jq ."
+
 ssh studio "mlxctl status"
 ssh studio "mlxctl status --checks"
 ssh studio "mlxctl verify"

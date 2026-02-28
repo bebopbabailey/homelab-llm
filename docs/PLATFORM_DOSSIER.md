@@ -4,10 +4,10 @@
 - Mac Mini: LiteLLM :4000 (localhost-only), Open WebUI :3000 (localhost-only),
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
-  SearXNG :8888 (localhost-only), Ollama :11434
-- Mac Studio: MLX inference host using per-port `vllm-metal` (`vllm serve`) lanes:
-  `:8100` deep (gpt-oss-120b), `:8101` main (qwen3-next-80b),
-  `:8102` fast (gpt-oss-20b).
+  SearXNG :8888 (localhost-only), websearch-orch :8899 (localhost-only),
+  Ollama :11434
+- Mac Studio: MLX inference host using `com.bebop.mlx-launch` with `vllm-metal`
+  runtime listener on `:8100` (single active inference lane model).
   OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
 - Jetson Orin AGX: persistent offload mount `/mnt/seagate`
   (sshfs to Mini `/mnt/seagate/orin-offload`). No inference backends are currently deployed.
@@ -27,9 +27,8 @@
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, LiteLLM `boost`/`boost-deep` in `router.yaml` |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
-| MLX deep lane | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | launchd/per-port process, `mlxctl status`, runtime `ps` |
-| MLX main lane | Studio | 8101 | 0.0.0.0 | http://192.168.1.72:8101/v1 | /v1/models | launchd/per-port process, `mlxctl status`, runtime `ps` |
-| MLX fast lane | Studio | 8102 | 0.0.0.0 | http://192.168.1.72:8102/v1 | /v1/models | launchd/per-port process, `mlxctl status`, runtime `ps` |
+| websearch-orch | Mini | 8899 | 127.0.0.1 | http://127.0.0.1:8899 | /health | `/etc/systemd/system/websearch-orch.service`, `/etc/homelab-llm/websearch-orch.env` |
+| MLX inference lane (active) | Studio | 8100 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `com.bebop.mlx-launch`, runtime `vllm serve`, `mlxctl status` |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
 | Home Assistant | DietPi | 8123 | 0.0.0.0 (assumed) | http://192.168.1.70:8123 | not documented | `/home/christopherbailey/.ssh/config`, owner confirmation |
@@ -60,12 +59,24 @@
   Upstream: Mini LiteLLM via tailnet TCP forward (`100.69.99.60:4443 -> 127.0.0.1:4000`).
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
+- websearch-orch: systemd unit `/etc/systemd/system/websearch-orch.service`,
+  env `/etc/homelab-llm/websearch-orch.env`, localhost-only. Phase 2 size
+  controls use `EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS`,
+  `EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS`,
+  `EXTERNAL_WEB_LOADER_MAX_URLS`, and
+  `EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS`. Phase 2 tightening adds
+  `QUERY_GUARD_ENABLED` / `QUERY_ENTITY_CONFLICT_ACTION` and trust-tier
+  controls (`TRUST_POLICY_ENABLED`, `TRUST_PRIORITY_DOMAINS`,
+  `TRUST_DEPRIORITIZED_DOMAINS`, `TRUST_DROP_BELOW_SCORE`) to reduce
+  drifted query variants and weak-source over-selection.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.
-  Current active lane allocation: `8100/8101/8102`.
+  Current active inference listener: `8100` (`vllm serve` under `com.bebop.mlx-launch`).
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
   Current team-lane runtime command family is `vllm serve` (`vllm-metal`) under `com.bebop.mlx-launch`.
+  Scheduling policy contract (strict two-lane + fail-closed allowlist):
+  `docs/foundation/studio-scheduling-policy.md`.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
@@ -79,7 +90,7 @@
 - LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).
 - Local-only: LiteLLM 4000 (tailnet HTTPS), Open WebUI 3000 (tailnet HTTPS),
-  Prometheus 9090, Grafana 3001, SearXNG 8888.
+  Prometheus 9090, Grafana 3001, SearXNG 8888, websearch-orch 8899.
 - Tailnet HTTPS (Tailscale Serve on Mini):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)

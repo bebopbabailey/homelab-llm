@@ -45,14 +45,54 @@ mlxctl reconcile
 ```
 
 ## MLX lanes (Studio)
-After reboot or launchd restart, confirm ports 8100/8101/8102 are serving `/v1/models`.
+After reboot or launchd restart, confirm active `mlxctl` assignments are serving
+`/v1/models` (current default active inference listener is `8100`).
 Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
-as the model `id`. Use `mlxctl status` for the canonical `mlx-*` model IDs.
+as the model `id`. Use `mlxctl status` for canonical model/port mapping.
 ```bash
 curl -fsS http://127.0.0.1:8100/v1/models | jq .
-curl -fsS http://127.0.0.1:8101/v1/models | jq .
-curl -fsS http://127.0.0.1:8102/v1/models | jq .
+# Optional (if assigned): 8101/8102/etc.
+# curl -fsS http://127.0.0.1:8101/v1/models | jq .
+# curl -fsS http://127.0.0.1:8102/v1/models | jq .
 ```
+
+## Studio scheduling policy (Mini -> Studio)
+Policy source of truth:
+- `platform/ops/templates/studio_scheduling_policy.json`
+- `docs/foundation/studio-scheduling-policy.md`
+
+Deterministic local checks:
+```bash
+uv run python platform/ops/scripts/validate_studio_policy.py --json
+uv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json
+```
+
+Remote check-only:
+```bash
+uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json
+uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json
+```
+
+Robust plist key spot-check (no brittle exit-code presence test):
+```bash
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-launch.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.optillm-proxy.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+# Fallback if JSON conversion is unavailable:
+ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.mlx-launch.plist"
+ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
+```
+
+Staged apply order:
+1) `com.bebop.optillm-proxy` via:
+   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.optillm-proxy --json`
+2) validate
+3) `com.bebop.mlx-launch` via:
+   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-launch --json`
+4) full strict audit
+
+Runtime lineage check expectation:
+- port `8100` listener is `vllm serve`
+- process ancestry includes `com.bebop.mlx-launch` launcher lineage
 
 Verify GPT‑OSS content channel is present (requires adequate max_tokens):
 ```bash
@@ -276,6 +316,42 @@ Recent hygiene logs:
 ```bash
 journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager
 ```
+
+Phase 2 calibration checks:
+```bash
+curl -fsS -X POST http://127.0.0.1:8899/web_loader \
+  -H 'Content-Type: application/json' \
+  -d '{"urls":["https://en.wikipedia.org/wiki/Wok","https://www.seriouseats.com/wok-skills-5117305","https://www.thekitchn.com/how-to-stir-fry-22916393"]}' \
+  | jq '[.[].metadata | {source, char_count, raw_char_count, doc_char_truncated, budget_char_truncated}]'
+
+journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager \
+  | rg -n 'web_loader urls=|raw_chars=|doc_caps=|budget_caps=|budget_drops='
+```
+
+Calibration pass guidance:
+- `raw_chars` should be higher than `chars` when caps are active.
+- `budget_drops` should typically remain `0` for normal 3-6 source queries.
+- `budget_caps` may be `>0` on noisy pages; this is expected and indicates guardrails are active.
+- If `budget_drops` stays high, first reduce `EXTERNAL_WEB_LOADER_MAX_URLS` or
+  enable fair-share via `EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS` before
+  raising total budget further.
+
+Phase 2 tightening checks (query guard + trust policy):
+```bash
+curl -fsS "http://127.0.0.1:8899/search?q=Instrument+methods+used+in+NASA+Chang%E2%80%99e-6+to+detect+water&format=json" \
+  | jq '{query_guard, trust_summary, citation_contract, quality_signals, first_result:(.results[0] // {}) | {url, orch_trust_tier, orch_source_id}}'
+
+journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager \
+  | rg -n 'guarded_query=|query_action=|conflicts=|trust=|citation_map_status=|citation_mapped=|dedupe_drops=|domain_cap_drops='
+```
+
+Tightening pass guidance:
+- `query_action` should be `sanitize` when entity conflicts are detected.
+- `trust_summary.trust_drops` should remain small/non-zero only for weak domains.
+- Result entries should include `orch_trust_tier` and `orch_source_id`.
+- `citation_contract.citation_map_status` should be `ready` for grounded runs.
+- `citation_contract.allowed_urls` should contain only non-placeholder HTTP(S) URLs.
+- `quality_signals.dedupe_drops` and `quality_signals.domain_cap_drops` should be non-zero on noisy queries.
 
 ## LiteLLM Search Proxy (Mini)
 ```bash
