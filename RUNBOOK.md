@@ -130,7 +130,8 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 
 Overrides (all optional):
 - `OPTILLM_STUDIO_HOST` (default: `studio`)
-- `OPTILLM_LAUNCHD_LABEL` (default: `optillm.proxy.studio`)
+- `OPTILLM_LAUNCHD_LABEL` (default: `com.bebop.optillm-proxy`)
+- `OPTILLM_STUDIO_UTILITY_WRAPPER` (default: repo `platform/ops/scripts/studio_run_utility.sh`)
 - `OPTILLM_API_KEY_ENV` (default: `/etc/optillm-proxy/env`)
 - `OPTILLM_SMOKE_MODEL` (default: `mlx-gpt-oss-120b-mxfp4-q4`)
 - `OPTILLM_SMOKE_APPROACH` (default: `bon`)
@@ -139,3 +140,12 @@ Overrides (all optional):
 - `OPTILLM_BENCH_MODEL` (default: `p-plan-max`)
 - `OPTILLM_BENCH_PROMPT` (default prompt defined in script)
 - `OPTILLM_BENCH_MAX_TOKENS` (default: `1200`)
+
+## Studio scheduling policy
+- This label is inference lane and must not be background-throttled.
+- Required plist scheduling key: `ProcessType = Interactive`.
+- Forbidden inference keys: positive `Nice`, `LowPriorityIO`, `LowPriorityBackgroundIO`.
+- Policy and audit tooling:
+  - `docs/foundation/studio-scheduling-policy.md`
+  - `platform/ops/scripts/enforce_studio_launchd_policy.py`
+  - `platform/ops/scripts/audit_studio_scheduling.py`

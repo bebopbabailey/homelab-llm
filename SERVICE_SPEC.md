@@ -133,6 +133,18 @@ Loop protection:
 | Logging | STDOUT / journald |
 | Privileges | Non-root |
 
+Studio launchd identity:
+- Label: `com.bebop.optillm-proxy`
+- Domain: `system`
+- Plist path: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`
+
+Scheduling classification (Studio policy):
+- Lane: `inference`
+- Required plist key: `ProcessType = Interactive`
+- Must not set background throttles (`LowPriorityIO`,
+  `LowPriorityBackgroundIO`) or positive `Nice`.
+- Canonical policy reference: `docs/foundation/studio-scheduling-policy.md`
+
 ### Approach logging
 - OptiLLM logs the selected approaches at INFO level:
   - `Using approach(es) [...]`
