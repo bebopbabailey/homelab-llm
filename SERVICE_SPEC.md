@@ -80,6 +80,8 @@ local inference mode. Use the flag instead.
 - Clients should stay LiteLLM-only. This service is used via the LiteLLM `boost` handle.
 - Requests must include `optillm_approach` in the request body to select a technique.
 - Deprecated: routing all MLX handles through OptiLLM via `router-mlx-*` entries.
+- For OpenCode deterministic profiles, LiteLLM can select approach via model prefix
+  (`<approach>-openai/<alias>`), avoiding request-body coupling.
 
 ---
 
@@ -191,6 +193,12 @@ Example:
 ```json
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon"}
 ```
+
+Deterministic alias mapping (LiteLLM -> OptiLLM model prefix):
+- `boost-plan` -> `plansearch-openai/deep`
+- `boost-plan-verify` -> `self_consistency-openai/deep`
+- `boost-ideate` -> `moa-openai/deep`
+- `boost-fastdraft` -> `bon-openai/fast`
 
 ---
 

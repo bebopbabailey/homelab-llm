@@ -74,19 +74,17 @@ Goal: implement multi-model OptiLLM ensembles (no single-model configs) across
 - Optional OptiLLM smoke test (direct):
   - `curl -fsS http://127.0.0.1:4020/v1/chat/completions -H "Authorization: Bearer $OPTILLM_API_KEY" -H "Content-Type: application/json" -d '{"model":"mlx-<handle>","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}'`
 
-### Ensemble helpers
+### Controller helpers
 - OV utility ensembles (Mini):
   - `ovctl ensemble opt-route-fast-s`
   - `ovctl ensemble opt-extract-fast-s`
   - `ovctl ensemble opt-clean-fast-s`
   - `ovctl ensemble opt-summarize-fast-s`
   - `ovctl ensemble opt-privacy-fast-s`
-- MLX ensembles (Studio):
-  - `mlxctl ensemble opt-architect-high-xl`
-  - `mlxctl ensemble opt-research-high-xl`
-  - `mlxctl ensemble opt-architect-balanced-l`
-  - `mlxctl ensemble opt-code-balanced-l`
-  - `mlxctl ensemble opt-chat-balanced-m`
+- MLX lane assignment (Studio):
+  - `mlxctl assign-team --dry-run`
+  - `mlxctl assign-team`
+  - `mlxctl sync-gateway`
 
 ### Constraints
 - Registry values use kebab-case only (letters, digits, dashes).
