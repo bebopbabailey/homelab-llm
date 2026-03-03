@@ -13,6 +13,7 @@ REPO_DIR="/Users/thestudio/optillm-proxy"
 STUDIO_HOST="${OPTILLM_STUDIO_HOST:-studio}"
 LAUNCHD_LABEL="${OPTILLM_LAUNCHD_LABEL:-com.bebop.optillm-proxy}"
 OPTILLM_API_KEY_ENV="${OPTILLM_API_KEY_ENV:-/etc/optillm-proxy/env}"
+SMOKE_BEARER="${OPTILLM_SMOKE_BEARER:-dummy}"
 SMOKE_MODEL="${OPTILLM_SMOKE_MODEL:-mlx-gpt-oss-120b-mxfp4-q4}"
 SMOKE_APPROACH="${OPTILLM_SMOKE_APPROACH:-bon}"
 SMOKE_MAX_TOKENS="${OPTILLM_SMOKE_MAX_TOKENS:-32}"
@@ -74,7 +75,8 @@ remote_apply_patches() {
 }
 
 remote_smoke() {
-  studio_utility "OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\" \
+  studio_utility "OPTILLM_API_KEY=\"$SMOKE_BEARER\"; \
+    if [ -f '$OPTILLM_API_KEY_ENV' ]; then OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\"; fi; \
     curl -fsS http://127.0.0.1:4020/v1/chat/completions \
       -H 'Content-Type: application/json' \
       -H \"Authorization: Bearer \${OPTILLM_API_KEY}\" \

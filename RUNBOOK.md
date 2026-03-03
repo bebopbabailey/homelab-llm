@@ -149,6 +149,7 @@ Overrides (all optional):
 - `OPTILLM_LAUNCHD_LABEL` (default: `com.bebop.optillm-proxy`)
 - `OPTILLM_STUDIO_UTILITY_WRAPPER` (default: repo `platform/ops/scripts/studio_run_utility.sh`)
 - `OPTILLM_API_KEY_ENV` (default: `/etc/optillm-proxy/env`)
+- `OPTILLM_SMOKE_BEARER` (default: `dummy`; fallback smoke auth when env file is absent)
 - `OPTILLM_SMOKE_MODEL` (default: `mlx-gpt-oss-120b-mxfp4-q4`)
 - `OPTILLM_SMOKE_APPROACH` (default: `bon`)
 - `OPTILLM_SMOKE_MAX_TOKENS` (default: `32`)

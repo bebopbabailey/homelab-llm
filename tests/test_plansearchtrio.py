@@ -74,14 +74,14 @@ class PlanSearchTrioTests(unittest.TestCase):
 
     def test_pick_models_prefers_config(self):
         cfg = {
-            "plansearchtrio_fast_model": "openai/fast-custom",
-            "plansearchtrio_main_model": "openai/main-custom",
-            "plansearchtrio_deep_model": "openai/deep-custom",
+            "plansearchtrio_fast_model": "fast-custom",
+            "plansearchtrio_main_model": "main-custom",
+            "plansearchtrio_deep_model": "deep-custom",
         }
-        fast, main, deep = plansearchtrio_plugin._pick_models(cfg, "openai/deep")
-        self.assertEqual(fast, "openai/fast-custom")
-        self.assertEqual(main, "openai/main-custom")
-        self.assertEqual(deep, "openai/deep-custom")
+        fast, main, deep = plansearchtrio_plugin._pick_models(cfg, "deep")
+        self.assertEqual(fast, "fast-custom")
+        self.assertEqual(main, "main-custom")
+        self.assertEqual(deep, "deep-custom")
 
     def test_run_executes_repair_loop_and_returns_tokens(self):
         client = _FakeClient()
@@ -95,7 +95,7 @@ class PlanSearchTrioTests(unittest.TestCase):
             system_prompt="system",
             initial_query="build a migration plan",
             client=client,
-            model="openai/deep",
+            model="deep",
             request_config=cfg,
         )
         self.assertIn("rollback", content)

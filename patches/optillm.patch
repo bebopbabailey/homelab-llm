@@ -81,16 +81,6 @@ index 243c73c..f404a36 100644
      if optillm_approach != "auto":
          model = f"{optillm_approach}-{model}"
  
-@@ -991,7 +1009,7 @@ def parse_args():
-     # Define arguments and their corresponding environment variables
-     args_env = [
-         ("--optillm-api-key", "OPTILLM_API_KEY", str, "", "Optional API key for client authentication to optillm"),
--        ("--approach", "OPTILLM_APPROACH", str, "auto", "Inference approach to use", known_approaches + list(plugin_approaches.keys())),
-+        ("--approach", "OPTILLM_APPROACH", str, "auto", "Inference approach to use", sorted(set(known_approaches + list(plugin_approaches.keys()) + ["auto"]))),
-        ("--mcts-simulations", "OPTILLM_SIMULATIONS", int, 2, "Number of MCTS simulations"),
-        ("--mcts-exploration", "OPTILLM_EXPLORATION", float, 0.2, "Exploration weight for MCTS"),
-        ("--mcts-depth", "OPTILLM_DEPTH", int, 1, "Simulation depth for MCTS"),
-
 diff --git a/optillm/server.py b/optillm/server.py
 index 243c73c..c6b0c98 100644
 --- a/optillm/server.py

@@ -195,11 +195,11 @@ Example:
 ```
 
 Deterministic alias mapping (LiteLLM -> OptiLLM model prefix):
-- `boost-plan` -> `plansearch-openai/deep`
-- `boost-plan-trio` -> `plansearchtrio-openai/deep` (canary)
-- `boost-plan-verify` -> `self_consistency-openai/deep`
-- `boost-ideate` -> `moa-openai/deep`
-- `boost-fastdraft` -> `bon-openai/fast`
+- `boost-plan` -> `plansearch-deep`
+- `boost-plan-trio` -> `plansearchtrio-deep` (canary)
+- `boost-plan-verify` -> `self_consistency-deep`
+- `boost-ideate` -> `moa-deep`
+- `boost-fastdraft` -> `bon-fast`
 
 Plansearch semantics patch:
 - For `plansearch`, internal execution is pinned to `n=1` per outer pipeline run.

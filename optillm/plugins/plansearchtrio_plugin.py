@@ -6,9 +6,9 @@ SLUG = "plansearchtrio"
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FAST_MODEL = "openai/fast"
-DEFAULT_MAIN_MODEL = "openai/main"
-DEFAULT_DEEP_MODEL = "openai/deep"
+DEFAULT_FAST_MODEL = "fast"
+DEFAULT_MAIN_MODEL = "main"
+DEFAULT_DEEP_MODEL = "deep"
 
 
 def _int_param(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
