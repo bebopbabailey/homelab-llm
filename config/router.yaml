@@ -62,6 +62,16 @@ model_list:
   litellm_params:
     # plansearch + deep lane for high-quality coding plans
     model: plansearch-openai/deep
+    custom_llm_provider: openai
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
+
+- model_name: boost-plan-trio
+  litellm_params:
+    # canary trio planner plugin (fast/main/deep staged orchestration)
+    model: plansearchtrio-openai/deep
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
@@ -70,6 +80,7 @@ model_list:
   litellm_params:
     # self-consistency pass to verify/pressure-test plans
     model: self_consistency-openai/deep
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
@@ -78,6 +89,7 @@ model_list:
   litellm_params:
     # moa for divergent architecture exploration
     model: moa-openai/deep
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
@@ -86,6 +98,7 @@ model_list:
   litellm_params:
     # best-of-n for lower-cost drafting passes
     model: bon-openai/fast
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 8192
@@ -148,14 +161,14 @@ guardrails:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-verify,boost-ideate,boost-fastdraft"
+      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-trio,boost-plan-verify,boost-ideate,boost-fastdraft"
       coerce_stream_false: false
   - guardrail_name: "harmony-post"
     litellm_params:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "post_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-verify,boost-ideate,boost-fastdraft"
+      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-trio,boost-plan-verify,boost-ideate,boost-fastdraft"
       coerce_stream_false: false
   - guardrail_name: "transcribe-pre"
     litellm_params:
