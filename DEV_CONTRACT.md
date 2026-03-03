@@ -7,7 +7,8 @@
 * **Existing Services (must preserve):**
   * **OLLAMA** on port **11434** (do not modify).
   * **OpenVINO LLM server** (ov-llm-server) on port **9000** (`http://localhost:9000`, backend specialist, external to this repo).
-* **MLX Studio lanes** on Mac Studio (backend specialist) on ports **8100/8101/8102**.
+* **MLX Studio lanes** on Mac Studio (backend specialist) on ports **8100/8101/8102**
+  with per-lane launchd labels `com.bebop.mlx-lane.8100/.8101/.8102`.
 
 ## 2. Critical Constraints (Non-Negotiable)
 * **Do not touch/restart/remove** existing `ollama` service.

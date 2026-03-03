@@ -14,9 +14,11 @@ journalctl -u litellm-orch.service -f
 
 ## Health
 ```bash
-curl http://127.0.0.1:4000/health
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/health
 curl http://127.0.0.1:4000/health/readiness
 curl http://127.0.0.1:4000/health/liveliness
+curl http://127.0.0.1:4000/metrics/
 ```
 
 ## Port policy

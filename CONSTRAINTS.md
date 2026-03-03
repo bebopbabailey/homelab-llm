@@ -6,8 +6,8 @@ This service inherits global + layer constraints:
 
 ## Hard constraints
 - Remain a gateway/routing service only. No inference runtime changes in this service.
-- Keep LiteLLM on `127.0.0.1:4000` unless an approved migration plan updates canon docs.
-- Preserve auth requirements for API/health/metrics surfaces.
+- Current deployment bind is `0.0.0.0:4000`; any bind/port changes require an approved migration plan and canon doc updates.
+- Preserve auth requirements for API and health surfaces as documented in canonical docs.
 - Keep client contract as LiteLLM-first; do not introduce direct client -> backend paths.
 - For Studio team lanes (`8100-8119`), keep `mlxctl` as source of truth (`sync-gateway` flow).
 

@@ -57,6 +57,39 @@ model_list:
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
 
+# 2b) OptiLLM coding-quality profiles (deterministic aliases)
+- model_name: boost-plan
+  litellm_params:
+    # plansearch + deep lane for high-quality coding plans
+    model: plansearch-openai/deep
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
+
+- model_name: boost-plan-verify
+  litellm_params:
+    # self-consistency pass to verify/pressure-test plans
+    model: self_consistency-openai/deep
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
+
+- model_name: boost-ideate
+  litellm_params:
+    # moa for divergent architecture exploration
+    model: moa-openai/deep
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 16384
+
+- model_name: boost-fastdraft
+  litellm_params:
+    # best-of-n for lower-cost drafting passes
+    model: bon-openai/fast
+    api_base: os.environ/OPTILLM_API_BASE
+    api_key: os.environ/OPTILLM_API_KEY
+    max_tokens: 8192
+
 # 3) Task aliases: task-transcribe, task-transcribe-vivid
 - model_name: task-transcribe
   litellm_params:
@@ -115,14 +148,14 @@ guardrails:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep"
+      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-verify,boost-ideate,boost-fastdraft"
       coerce_stream_false: false
   - guardrail_name: "harmony-post"
     litellm_params:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "post_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep"
+      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-verify,boost-ideate,boost-fastdraft"
       coerce_stream_false: false
   - guardrail_name: "transcribe-pre"
     litellm_params:

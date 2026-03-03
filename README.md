@@ -41,6 +41,12 @@ provides routing only and does not implement inference.
 - `GET /health/readiness` is the default health signal (fast, no deep probes).
 - `GET /health` is a deep probe and can show unhealthy when backends are offline.
 
+## OptiLLM coding aliases
+- `boost-plan`: deterministic `plansearch` profile over deep lane.
+- `boost-plan-verify`: deterministic `self_consistency` verifier over deep lane.
+- `boost-ideate`: deterministic `moa` profile over deep lane.
+- `boost-fastdraft`: deterministic `bon` profile over fast lane.
+
 ## Health Check Script
 - `scripts/health-check.sh` outputs compact, pretty-printed JSON from LiteLLM `/health`.
 - Set `VERBOSE=1` to print the raw LiteLLM health payload.
