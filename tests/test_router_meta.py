@@ -1,6 +1,15 @@
 import unittest
+import importlib.util
+import pathlib
 
-from optillm.plugins import router_meta_plugin
+try:
+    from optillm.plugins import router_meta_plugin  # type: ignore
+except ImportError:
+    plugin_path = pathlib.Path(__file__).resolve().parents[1] / "optillm" / "plugins" / "router_meta_plugin.py"
+    spec = importlib.util.spec_from_file_location("router_meta_plugin", plugin_path)
+    assert spec and spec.loader
+    router_meta_plugin = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(router_meta_plugin)
 
 
 class RouterMetaPayloadTests(unittest.TestCase):

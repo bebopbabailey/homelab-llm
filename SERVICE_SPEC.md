@@ -196,9 +196,17 @@ Example:
 
 Deterministic alias mapping (LiteLLM -> OptiLLM model prefix):
 - `boost-plan` -> `plansearch-openai/deep`
+- `boost-plan-trio` -> `plansearchtrio-openai/deep` (canary)
 - `boost-plan-verify` -> `self_consistency-openai/deep`
 - `boost-ideate` -> `moa-openai/deep`
 - `boost-fastdraft` -> `bon-openai/fast`
+
+Plansearch semantics patch:
+- For `plansearch`, internal execution is pinned to `n=1` per outer pipeline run.
+  Final choice count is controlled by outer request `n` only, preventing
+  multiplicative fanout.
+- For `plansearchtrio`, stage budget defaults are constrained by request token
+  cap (`max_completion_tokens` / `max_tokens`) to keep latency bounded in small calls.
 
 ---
 

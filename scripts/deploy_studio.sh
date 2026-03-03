@@ -5,6 +5,7 @@ set -Eeuo pipefail
 # - Pushes local changes in this repo's submodule (expects you already committed)
 # - Pulls on Studio
 # - Runs uv sync (if uv.lock exists)
+# - Applies local OptiLLM patchset into site-packages (idempotent)
 # - Restarts launchd service
 # - Runs smoke + optional benchmark on Studio
 
@@ -60,6 +61,18 @@ remote_uv_sync() {
   studio_utility "cd '$REPO_DIR' && if [ -f uv.lock ]; then uv sync; fi"
 }
 
+remote_preflight_repo() {
+  if ! studio_utility "test -d '$REPO_DIR/.git'"; then
+    log "ERROR: Studio repo is not initialized at $REPO_DIR (.git missing)."
+    log "       Bootstrap the Studio working tree before running deploy_studio.sh."
+    return 2
+  fi
+}
+
+remote_apply_patches() {
+  studio_utility "cd '$REPO_DIR' && uv run scripts/apply_optillm_patches.sh"
+}
+
 remote_smoke() {
   studio_utility "OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\" \
     curl -fsS http://127.0.0.1:4020/v1/chat/completions \
@@ -82,11 +95,17 @@ log "Deploying optillm-proxy to $STUDIO_HOST"
 log "Repo: $REPO_DIR"
 log "Utility wrapper: $UTILITY_WRAPPER"
 
+log "Preflight: verifying Studio working tree"
+remote_preflight_repo
+
 log "Pulling latest on Studio"
 studio_utility "cd '$REPO_DIR' && git pull --ff-only"
 
 log "Syncing deps (uv sync if uv.lock exists)"
 remote_uv_sync
+
+log "Applying OptiLLM patchset in Studio venv"
+remote_apply_patches
 
 log "Restarting launchd service: $LAUNCHD_LABEL"
 remote_launchd_restart "$LAUNCHD_LABEL"

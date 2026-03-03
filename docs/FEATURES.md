@@ -46,6 +46,7 @@ Plugins are chained with `&` and can be combined with approaches. Descriptions a
 - `web_search` — **SearXNG** search when `SEARXNG_API_BASE` is set; otherwise uses the Selenium/Google fallback. citeturn3view1
 - `deep_research` — Test-Time Diffusion deep research with iterative refinement. citeturn3view1
 - `proxy` — Load balancing + failover across LLM providers. citeturn3view1
+- `plansearchtrio` — Local staged planner plugin using fast/main/deep orchestration (canary).
 
 ## Router model (internal)
 - The router plugin uses a ModernBERT-based classifier: `codelion/optillm-modernbert-large`. citeturn3view1turn0search2

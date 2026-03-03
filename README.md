@@ -181,6 +181,7 @@ OptiLLM chooses strategies based on `optillm_approach`:
 - `moa`: Mixture-of-Agents (strong reasoning, higher latency)
 - `bon`: best-of-n sampling (faster than MoA, moderate gains)
 - `plansearch`: planning/search (slower, good for multi-step tasks)
+- `plansearchtrio`: canary staged fast/main/deep planner plugin (parallel candidate generation)
 - `self_consistency`: consistency voting (slower, robust)
 - `web_search`: run SearXNG search first (requires `SEARXNG_API_BASE`)
 

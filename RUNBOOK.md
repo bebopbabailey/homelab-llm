@@ -91,6 +91,15 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   | jq -r '.choices[0].message.content'
 ```
 
+Canary trio planner check:
+```bash
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"boost-plan-trio","messages":[{"role":"user","content":"Return exactly: trio-ok"}],"max_tokens":64}' \
+  | jq -r '.choices[0].message.content'
+```
+
 ### Streaming benchmark (TTFT + total time)
 
 ```bash
@@ -127,6 +136,13 @@ Use the deploy helper from the Mini (source of truth):
 cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 ./scripts/deploy_studio.sh
 ```
+
+Deploy behavior:
+- Pulls latest on Studio, runs `uv sync`, then runs
+  `uv run scripts/apply_optillm_patches.sh` before restart.
+- This keeps local `optillm.patch` semantics active after dependency refresh.
+- Requires Studio working tree at `/Users/thestudio/optillm-proxy` to be an
+  initialized git repo (`.git` present); deploy preflight now fails fast if missing.
 
 Overrides (all optional):
 - `OPTILLM_STUDIO_HOST` (default: `studio`)
