@@ -17,6 +17,7 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - **Do not touch or modify `ollama`** (port 11434).
 - **Do not store secrets in the repo.** Use env files under `/etc`.
 - **No system driver installs** unless explicitly requested.
+- Node/global CLI policy: use Volta for managed CLIs; avoid `sudo npm -g` (see `docs/foundation/node-toolchain.md`).
 
 ## Studio scheduling policy
 - Studio is a power inference node; persistent Studio processes we own must be launchd services.

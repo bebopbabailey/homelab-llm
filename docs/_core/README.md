@@ -14,6 +14,7 @@
 8. `docs/foundation/topology.md`
 9. `docs/INTEGRATIONS.md`
 10. `docs/foundation/testing.md`
+11. `docs/foundation/node-toolchain.md`
 
 ## Read Order (agents)
 1. `docs/_core/README.md`
@@ -26,11 +27,13 @@
 8. `docs/foundation/testing.md`
 9. `docs/_core/OPERATING_MODEL.md`
 10. `docs/_core/CHANGE_RULES.md`
+11. `docs/foundation/node-toolchain.md`
 
 ## Canonical Links
 - `docs/foundation/overview.md`
 - `docs/foundation/topology.md`
 - `docs/foundation/testing.md`
+- `docs/foundation/node-toolchain.md`
 - `docs/PLATFORM_DOSSIER.md`
 - `docs/INTEGRATIONS.md`
 - `docs/_core/CONSISTENCY_DOD.md`

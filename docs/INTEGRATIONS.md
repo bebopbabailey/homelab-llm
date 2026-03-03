@@ -36,7 +36,7 @@
 
 ### LiteLLM Prometheus metrics (enabled)
 - `/metrics/` endpoint is exposed by the LiteLLM proxy on the same port (4000).
-- **Auth is required** (same bearer auth as `/v1/*` endpoints).
+- Endpoint is currently reachable without bearer auth in this deployment.
 - Hitting `/metrics` (no trailing slash) returns **307** → use `/metrics/`.
 - Enable via `litellm_settings.callbacks: ["prometheus"]` in `router.yaml`.
 - Metric names vary by version; verify in `/metrics/` before building dashboards.
@@ -103,7 +103,9 @@ if a param is rejected by the backend.
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
 - Health: `/health` on port 3000.
- - Web search (via LiteLLM): `/v1/search/searxng-search`.
+- Web search (active path): `SEARXNG_QUERY_URL=http://127.0.0.1:8899/search?q=<query>` via `websearch-orch`.
+- External page extraction (active path): `WEB_LOADER_ENGINE=external` with `EXTERNAL_WEB_LOADER_URL=http://127.0.0.1:8899/web_loader`.
+- LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
 
 ## Tailscale Services (tailnet HTTPS)
 - Services are exposed via `tailscale serve --service=svc:<name>` on the Mini.
@@ -136,15 +138,21 @@ if a param is rejected by the backend.
   trimmed HTML or clean text for best extraction.
 
 ## OpenCode (client)
-- Config: `~/.config/opencode/opencode.json` (MacBook).
+- Config: `~/.config/opencode/opencode.json`.
+- Key file: `~/.config/opencode/litellm_api_key` (local-only secret).
 - Provider: LiteLLM OpenAI-compatible.
   - On Mini: `baseURL=http://127.0.0.1:4000/v1`
   - On tailnet devices: `baseURL=https://gateway.tailfd1400.ts.net/v1`
   - Internal infra fallback (not default for end-user clients): `http://100.69.99.60:4443/v1`
-- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `metal-test-fast` during this experiment).
-- Permissions: set `bash`/`edit` to `ask` for explicit approval before shell/network.
-- Web search uses MCP `web-fetch` (stdio) with `search.web` routed to
-  LiteLLM `/v1/search/searxng-search`.
+- Models: use LiteLLM handles (e.g., `deep`, `fast`, `main`, `boost`).
+- Recommended defaults for simple setup:
+  - `model=litellm/main`
+  - `small_model=litellm/main`
+  - `permission.bash=ask`, `permission.edit=ask`
+- Current lane note: `main` (`qwen3-next-80b`) is staged with
+  `tool_choice=auto` support under `mlxctl` vLLM arg compilation
+  (`qwen3` logical parser resolved to runtime parser enum on launch).
+- MCP parity is out of scope for this simple setup and can be added later.
 
 ## OptiLLM boost lane (opt-in)
 - `boost` routes to the Studio OptiLLM proxy (`http://192.168.1.72:4020/v1`) via `OPTILLM_API_BASE`.
@@ -153,6 +161,14 @@ if a param is rejected by the backend.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: `boost` appears in Studio `optillm-proxy` logs.
 - Requests must include bearer auth for the target backend key (`OPTILLM_API_KEY` for `boost`).
+
+Deterministic coding-quality aliases (current):
+- `boost-plan` -> `plansearch-openai/deep`
+- `boost-plan-verify` -> `self_consistency-openai/deep`
+- `boost-ideate` -> `moa-openai/deep`
+- `boost-fastdraft` -> `bon-openai/fast`
+
+These aliases avoid request-body coupling in OpenCode while keeping approach selection explicit.
 
 ### OptiLLM validation checklist (router + plugins)
 1) Router is active (log line: `Using approach(es) ['router']`).
@@ -191,9 +207,10 @@ and where this repo uses callbacks vs guardrails.
   LiteLLM to avoid cloud fallbacks.
 
 ### Boost handle routing (current)
-- LiteLLM `boost` and `boost-deep` route to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
-- This keeps clients LiteLLM-only while still allowing request-body technique
-  selection (e.g., `optillm_approach`).
+- LiteLLM `boost*` aliases route to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
+- `boost` / `boost-deep` keep request-body approach override support (`optillm_approach`).
+- `boost-plan` / `boost-plan-verify` / `boost-ideate` / `boost-fastdraft` use
+  model-prefix approach selection for deterministic OpenCode workflows.
 
 ### Technique selection (request body)
 Set `optillm_approach` in the request body:
@@ -209,6 +226,12 @@ Example:
 ```json
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
 ```
+
+### OpenCode recommended coding workflow
+1. Generate primary plan with `litellm/boost-plan`.
+2. Run critique/verification pass with `litellm/boost-plan-verify`.
+3. Use `litellm/boost-ideate` only for architecture exploration where diverse candidate paths are needed.
+4. Use `litellm/boost-fastdraft` for quick implementation drafts.
 
 ## Tiny Agents hook (plan)
 - Add `TINYAGENTS_API_BASE` and `TINYAGENTS_MODEL` to env.

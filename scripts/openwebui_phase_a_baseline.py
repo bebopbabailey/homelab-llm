@@ -65,9 +65,21 @@ def _iter_run_cases(run_id: str) -> Iterable[str]:
         yield f"{run_id}:{q.case_id}"
 
 
+def _sum_int_matches(pattern: str, text: str) -> int:
+    values = re.findall(pattern, text, flags=re.IGNORECASE)
+    total = 0
+    for value in values:
+        try:
+            total += int(value)
+        except ValueError:
+            continue
+    return total
+
+
 def score(run_id: str, since: str) -> int:
     owui = _journal("open-webui.service", since)
     searx = _journal("searxng.service", since)
+    orch = _journal("websearch-orch.service", since)
 
     # Per-run markers in Open WebUI logs.
     run_hits: dict[str, int] = {}
@@ -88,6 +100,19 @@ def score(run_id: str, since: str) -> int:
     extraction_markers = len(re.findall(r"<source id=", owui))
     searx_json_markers = len(re.findall(r"OWUI_SEARXNG_RAW_JSON", owui))
 
+    citation_total = len(re.findall(r"citation_map_status=", orch, flags=re.IGNORECASE))
+    citation_ready = len(re.findall(r"citation_map_status=ready", orch, flags=re.IGNORECASE))
+    grounding_total = len(re.findall(r"grounding_status=", orch, flags=re.IGNORECASE))
+    grounding_warn = len(re.findall(r"grounding_status=warn", orch, flags=re.IGNORECASE))
+    budget_drop_events = len(re.findall(r"budget_drops=[1-9]\d*", orch, flags=re.IGNORECASE))
+    dedupe_drop_events = len(re.findall(r"dedupe_drops=[1-9]\d*", orch, flags=re.IGNORECASE))
+    domain_cap_drop_events = len(re.findall(r"domain_cap_drops=[1-9]\d*", orch, flags=re.IGNORECASE))
+    placeholder_drop_events = len(re.findall(r"placeholder_drops': [1-9]\d*", orch, flags=re.IGNORECASE))
+    unsupported_claim_count_total = _sum_int_matches(r"unsupported_claim_count=(\d+)", orch)
+
+    citation_ready_rate = round(citation_ready / citation_total, 4) if citation_total else None
+    grounding_warn_rate = round(grounding_warn / grounding_total, 4) if grounding_total else None
+
     prompted = sum(1 for _, c in run_hits.items() if c > 0)
     with_sources = sum(1 for _, c in source_hits.items() if c > 0)
 
@@ -100,6 +125,19 @@ def score(run_id: str, since: str) -> int:
         "openwebui_source_block_count": extraction_markers,
         "openwebui_raw_searx_markers": searx_json_markers,
         "searx_rate_limit_or_429_errors": retrieval_errors,
+        "phase2_quality": {
+            "citation_map_total": citation_total,
+            "citation_map_ready": citation_ready,
+            "citation_map_ready_rate": citation_ready_rate,
+            "grounding_gate_total": grounding_total,
+            "grounding_gate_warn": grounding_warn,
+            "grounding_warn_rate": grounding_warn_rate,
+            "placeholder_drop_events": placeholder_drop_events,
+            "unsupported_claim_count_total": unsupported_claim_count_total,
+            "budget_drop_events": budget_drop_events,
+            "dedupe_drop_events": dedupe_drop_events,
+            "domain_cap_drop_events": domain_cap_drop_events,
+        },
         "per_case_markers": run_hits,
         "per_case_sources": source_hits,
         "pass_fail": {

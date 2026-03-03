@@ -44,6 +44,12 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 
 References:
 - `docs/foundation/studio-scheduling-policy.md`
+- `docs/foundation/testing.md` (Studio scheduling policy section)
+
+## MLXCTL parity (Mini -> Studio)
+```bash
+./platform/ops/scripts/mlxctl studio-cli-sha
+```
 
 ## Submodules
 ```bash

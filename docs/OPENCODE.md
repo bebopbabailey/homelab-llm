@@ -1,67 +1,95 @@
 # OpenCode
 
 ## Purpose
-OpenCode is the primary coding client for this repo. It uses LiteLLM aliases
-(`main`/`deep`/`fast` handles, plus temporary experiment aliases when present) and can invoke tools with explicit permission prompts.
- 
+OpenCode is the primary coding client for this repo. It uses LiteLLM aliases and
+keeps clients on the gateway contract.
+
 ## Install (MacBook)
-Opencode installs into `~/.opencode/bin/opencode`. Ensure it is on PATH:
+OpenCode installs into `~/.opencode/bin/opencode`. Ensure it is on PATH:
 ```bash
 mkdir -p ~/.local/bin
 ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
 ```
 
-## Config
+## Bootstrap (recommended)
+Use the repo bootstrap script on each machine:
+```bash
+bash /home/christopherbailey/homelab-llm/platform/ops/scripts/setup-opencode.sh
+```
+
+Default behavior:
+- auto-select first reachable base URL in this order:
+  1) `https://gateway.tailfd1400.ts.net/v1`
+  2) `http://100.69.99.60:4443/v1`
+  3) `http://127.0.0.1:4000/v1`
+- `model=litellm/boost-plan`
+- `small_model=litellm/boost-fastdraft`
+
+Optional override:
+```bash
+OPENCODE_LITELLM_BASE_URL=http://127.0.0.1:4000/v1 \
+  bash /home/christopherbailey/homelab-llm/platform/ops/scripts/setup-opencode.sh
+```
+
+## Manual config
 Config file:
 - `~/.config/opencode/opencode.json`
 
-Provider setup (LiteLLM OpenAI-compatible):
-- If OpenCode runs on the Mini: `http://127.0.0.1:4000/v1`
-- If OpenCode runs on any other tailnet device: `https://gateway.tailfd1400.ts.net/v1`
-- Infra fallback (if service-hostname path is unstable): `http://100.69.99.60:4443/v1`
-- Models: use LiteLLM handles (e.g., `main`, `deep`, `fast`, `metal-test-fast` during this experiment)
+Key file:
+- `~/.config/opencode/litellm_api_key`
+- Keep this local-only and never commit keys.
 
-Permissions:
-- Use `permission` rules to require approval (e.g., `bash: "ask"`, `edit: "ask"`).
-- The legacy `tools` config still works, but `permission` is the supported control plane.
-  (Legacy `tools` booleans are deprecated upstream.)
+Base URL:
+- Mini: `http://127.0.0.1:4000/v1`
+- Tailnet devices (MacBook): `https://gateway.tailfd1400.ts.net/v1`
 
-Auth:
-- LiteLLM requires a bearer token for `/v1/*`.
-- Prefer `opencode.json` indirection rather than storing keys inline, e.g.:
-  - `"{env:LITELLM_API_KEY}"`
-  - `"{file:~/.config/opencode/litellm_api_key}"`
-
-## Web Search (SearXNG via LiteLLM)
-OpenCode uses MCP for tools. The recommended MCP server is the local `web-fetch`
-stdlib tool, which exposes:
-- `search.web` (calls LiteLLM `/v1/search/searxng-search`)
-- `web.fetch` (clean URL extraction)
-
-MCP server config (in `opencode.json`):
-```json
-"mcp": {
-  "web-fetch": {
-    "type": "local",
-    "command": ["/Users/christopherbailey/.local/share/mcp/web-fetch/.venv/bin/web-fetch-mcp"],
-    "enabled": true,
-    "environment": {
-      "LITELLM_SEARCH_API_BASE": "https://gateway.tailfd1400.ts.net/v1/search/searxng-search",
-      "LITELLM_SEARCH_API_KEY": "{file:~/.config/opencode/litellm_api_key}"
+Minimal config example:
+```bash
+cat > ~/.config/opencode/opencode.json <<'JSON'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "https://gateway.tailfd1400.ts.net/v1",
+        "apiKey": "{file:~/.config/opencode/litellm_api_key}"
+      },
+      "models": {
+        "deep": { "name": "Deep" },
+        "fast": { "name": "Fast" },
+        "main": { "name": "Main" },
+        "boost": { "name": "Boost" },
+        "boost-plan": { "name": "Boost Plan" },
+        "boost-plan-verify": { "name": "Boost Plan Verify" },
+        "boost-ideate": { "name": "Boost Ideate" },
+        "boost-fastdraft": { "name": "Boost Fastdraft" }
+      }
     }
+  },
+  "model": "litellm/boost-plan",
+  "small_model": "litellm/boost-fastdraft",
+  "permission": {
+    "bash": "ask",
+    "edit": "ask"
   }
 }
+JSON
 ```
 
-## Quick commands
+Lane note:
+- `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed
+  vLLM parser resolution (logical `qwen3` -> runtime `qwen3_xml` on current build).
+
+## Quick checks
 List models:
 ```bash
 opencode models litellm
 ```
 
-List MCP servers:
+One-shot run:
 ```bash
-opencode mcp list
+opencode run -m litellm/boost-plan "Reply with exactly: plan-ok"
 ```
 
 Start (TUI):
@@ -69,32 +97,16 @@ Start (TUI):
 opencode
 ```
 
-One-shot run:
-```bash
-opencode run -m litellm/main "ping"
-```
+## MCP tools
+MCP parity is out of scope for this simple setup and can be added later.
 
-## Recommended aliases
-- Default: `main`
-- Fast: `fast`
-- Deep: `deep`
+## Coding-quality profiles (OptiLLM on Studio)
+Use these aliases when high-quality coding plans are the priority:
+- `litellm/boost-plan`: `plansearch` over `deep` lane (default).
+- `litellm/boost-plan-verify`: `self_consistency` over `deep` lane for critique pass.
+- `litellm/boost-ideate`: `moa` over `deep` lane for divergent architecture exploration.
+- `litellm/boost-fastdraft`: `bon` over `fast` lane for lower-cost drafting.
 
-## How I Use OpenCode (docs-first workflow)
-This matches the repo’s docs-first + validation-heavy style and keeps churn low.
-
-1) **Plan first (default)**
-   - Start with `main` for architecture, constraints, and phased plans.
-   - Keep changes minimal; ask before touching multiple services.
-
-2) **Draft + build (fast)**
-   - Switch to `fast` when you begin edits.
-   - Focus on concrete diffs and clear, reversible steps.
-
-3) **Quick checks (fast)**
-   - Use `fast` for quick spot checks, command ideas, and short questions.
-
-4) **Deep refactor**
-   - Use `deep` only when a task needs heavy reasoning or multi-stage plans.
-
-5) **Always gate tools**
-  - Keep `bash`/`edit` on `ask` to preserve the “approval gate” workflow.
+Recommended two-pass workflow:
+1. `opencode run -m litellm/boost-plan "<task>"`
+2. `opencode run -m litellm/boost-plan-verify "Critique and harden this plan: <paste output>"`

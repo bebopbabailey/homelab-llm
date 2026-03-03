@@ -4,13 +4,16 @@
 Keep Studio MLX inference stable and repeatable with registry-driven model mapping,
 Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM alias wiring.
 
-## Runtime Reality (2026-02-27)
+## Runtime Reality (2026-03-01)
 - Active Studio inference listeners:
   - `8100` -> `mlx-gpt-oss-120b-mxfp4-q4` (deep)
   - `8101` -> `mlx-qwen3-next-80b-mxfp4-a3b-instruct` (main)
   - `8102` -> `mlx-gpt-oss-20b-mxfp4-q4` (fast)
 - Team-lane runtime command family is `vllm serve` (`vllm-metal`) under
-  `com.bebop.mlx-launch` (`8100-8119`).
+  per-lane launchd labels:
+  - `com.bebop.mlx-lane.8100`
+  - `com.bebop.mlx-lane.8101`
+  - `com.bebop.mlx-lane.8102`
 - `mlxctl` remains the supported control plane for model/port lifecycle + gateway sync.
 
 ## Registry
@@ -48,16 +51,25 @@ Key fields:
 `mlxctl` is the supported command for MLX lifecycle:
 - `init`, `list`, `status`, `verify`
 - `ensure`, `load`, `unload`, `unload-all`, `assign-team`
+- `vllm-capabilities`, `vllm-render`, `vllm-set`
+- `repair-lanes`
 - `sync-gateway`
 - `offload-og`
+- `studio-cli-sha`, `sync-studio-cli`
 
 Backend behavior:
 - Default launch backend is `vllm-metal` (`vllm serve`).
+- Team-lane restart model is per-port launchd `KeepAlive` (lane-local restart).
 - `mlx_lm.server` and `mlx-openai-server` are legacy fallback references only and are not part of the active runtime contract.
 
 Source of truth contract:
 - Runtime and gateway wiring are derived from registry state.
 - Avoid ad-hoc edits to launch scripts for model assignment.
+- Mutating commands are parity-gated against the Studio binary.
+  Run `mlxctl studio-cli-sha` and, when needed, `mlxctl sync-studio-cli`.
+- `mlxctl reconcile` is dry-run by default; mutation requires `--apply`.
+  Stale assignment candidates are only entries with no listener, no runtime
+  process, and no successful local `/v1/models` probe.
 
 ## Harmony / Parser Contract
 For GPT-OSS entries, registry must keep:
@@ -70,12 +82,37 @@ For Qwen3 entries, registry must keep:
 - `reasoning_parser: qwen3`
 - optional discovered `chat_template`
 
-`mlxctl verify` is expected to catch parser/template drift.
+For `vllm-metal` launch behavior, registry now supports a nested `vllm` block:
+- `vllm.profile` (`qwen3_main|gpt_oss_lane|generic`)
+- `vllm.tool_choice_mode` (`none|auto`)
+- `vllm.tool_call_parser`, `vllm.reasoning_parser`
+- `vllm.max_model_len`, `vllm.memory_fraction`, `vllm.async_scheduling`
+
+Runtime compatibility is resolved at launch time:
+- Registry keeps logical parser values (`qwen3`).
+- `mlxctl` resolves runtime parser enums from current vLLM capabilities
+  (for example `qwen3` -> `qwen3_xml` when required by the installed build).
+- `tool_choice_mode=auto` is fail-closed: launch is blocked if the current vLLM
+  binary lacks `--enable-auto-tool-choice` or a compatible tool parser.
+
+Current staged default:
+- `main` (`8101`, qwen3-next-80b) uses `tool_choice_mode=auto`.
+- `deep`/`fast` remain on `tool_choice_mode=none` until explicitly changed.
+
+`mlxctl verify` is read-only by default and catches parser/template drift.
+Use `mlxctl verify --fix-defaults` only when you intentionally want defaults
+persisted into registry entries.
+For assigned team lanes, `verify` also fails if the lane launchd label is
+disabled or unloaded.
 
 ## Gateway Sync Contract
 `mlxctl sync-gateway` updates:
 - `layer-gateway/litellm-orch/config/router.yaml`
 - `layer-gateway/litellm-orch/config/env.local`
+
+Served-set source of truth:
+- Handle inclusion is curated in `layer-gateway/registry/handles.jsonl`.
+- Registry data enriches metadata for those served handles.
 
 Current alias intent:
 - `main` -> qwen3-next-80b (`8101`)
@@ -87,6 +124,10 @@ Current alias intent:
 - Team ports: `8100-8119`
 - Experimental ports: `8120-8139`
 - Active set currently uses only `8100/8101/8102`.
+- Conservative lane defaults when registry fields are missing:
+  - `8100` (`gpt-oss-120b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=0.55`, `vllm_async_scheduling=false`
+  - `8101` (`qwen3-next-80b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=0.50`, `vllm_async_scheduling=false`
+  - `8102` (`gpt-oss-20b`): `vllm_max_model_len=32768`, `vllm_memory_fraction=0.45`, `vllm_async_scheduling=false`
 
 ## Offload Policy
 - Offload original artifacts only when `og_path` exists and differs from `cache_path`.
@@ -95,8 +136,21 @@ Current alias intent:
 ## Notes
 - Studio `/v1/models` may report snapshot-path IDs.
 - Use registry + `mlxctl status` as canonical identity mapping.
+- `mlxctl status --json` is JSON-only; add `--table` for mixed human+JSON output.
+- `status=running` can be valid even when `listener_visible=false` (process is
+  present; listener visibility may be delayed or restricted).
 - `mlxctl status --checks` reports runtime family and runtime model path for drift triage.
-- `mlxctl mlx-launch-configure-vllm` rewrites `/opt/mlx-launch/bin/start.sh`
-  to a registry-driven team-lane launcher for `vllm-metal`.
+- For team lanes, `status --checks` also reports `launchd_label`,
+  `launchd_loaded`, `launchd_disabled`, and `http_models_ok`.
+- `http_models_ok=true` is the serving-truth signal when listener visibility is
+  delayed or hidden under root-owned launchd process ownership.
+- `mlxctl mlx-launch-start` materializes and (re)starts per-lane launchd jobs from registry assignments.
+- `mlxctl mlx-launch-start --ports` rejects partial assigned-team-lane scope unless
+  `--allow-partial` is provided.
+- `mlxctl mlx-launch-stop` stops per-lane launchd jobs and clears managed listeners.
+- `mlxctl repair-lanes` is dry-run by default; `--apply` enables/bootstrap assigned
+  team lane labels that are disabled, unloaded, or down.
+- `repair-lanes` supports Mini orchestration by reading Studio registry/status
+  remotely and applying launchctl steps on Studio through the sudo wrapper path.
 - Output-quality gate: run `platform/ops/scripts/mlx_quality_gate.py` after
   reboot/model changes to catch protocol leakage or hangs on `fast/main/deep`.

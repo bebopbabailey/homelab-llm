@@ -65,7 +65,7 @@ sudo systemctl cat litellm-orch.service | sed -n '1,200p'
 sudo systemctl cat open-webui.service | sed -n '1,200p'
 
 # liveness
-curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | head
+curl -fsS http://127.0.0.1:4000/v1/models -H "Authorization: Bearer $LITELLM_API_KEY" | jq -r '.data[].id' | head
 curl -fsS http://127.0.0.1:3000/health | jq .
 ```
 
@@ -83,6 +83,9 @@ Checks:
 ```bash
 # confirm auth-gated endpoints behave as documented
 curl -fsS http://127.0.0.1:4000/v1/models -H "Authorization: Bearer $LITELLM_API_KEY" | jq -r '.data[0].id'
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4000/health
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4000/health/readiness
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4000/metrics/
 ```
 
 Expected signals:

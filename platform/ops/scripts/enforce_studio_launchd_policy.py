@@ -273,9 +273,24 @@ def evaluate_policy(
         use_utility_wrapper=use_utility_wrapper,
     )
 
-    discovered_owned = set(installed_paths.keys()) | {
-        label for label in launchctl_disabled if any(label.startswith(p) for p in owned_prefixes)
+    disabled_owned_candidates = {
+        label
+        for label in launchctl_disabled
+        if any(label.startswith(p) for p in owned_prefixes) and label not in installed_paths
     }
+    discovered_disabled_owned: set[str] = set()
+    for label in sorted(disabled_owned_candidates):
+        loaded_proc = _remote_cmd(
+            studio_host,
+            f"launchctl print system/{shlex.quote(label)} >/dev/null 2>&1",
+            sudo=True,
+            check=False,
+            use_utility_wrapper=use_utility_wrapper,
+        )
+        if loaded_proc.returncode == 0:
+            discovered_disabled_owned.add(label)
+
+    discovered_owned = set(installed_paths.keys()) | discovered_disabled_owned
 
     allowlisted = set(managed.keys()) | set(retired.keys())
     unmanaged = sorted(label for label in discovered_owned if label not in allowlisted)

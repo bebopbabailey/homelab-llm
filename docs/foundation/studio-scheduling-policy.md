@@ -9,14 +9,16 @@ triggered by this repo's automation.
 
 ### Inference lane (non-background)
 Only these labels are inference lane:
-- `com.bebop.mlx-launch`
+- `com.bebop.mlx-lane.8100`
+- `com.bebop.mlx-lane.8101`
+- `com.bebop.mlx-lane.8102`
 - `com.bebop.optillm-proxy`
 
 Required launchd contract:
 - `ProcessType = Interactive`
 - `Nice` must be absent
-- `LowPriorityIO` must be absent or false
-- `LowPriorityBackgroundIO` must be absent or false
+- `LowPriorityIO` must be absent
+- `LowPriorityBackgroundIO` must be absent
 
 Why: `ProcessType=Interactive` is used intentionally because launchd documents
 interactive jobs as having no resource limits; inference must not be
@@ -57,6 +59,9 @@ Rules:
 
 ## Operations
 
+Canonical operator sequence for Studio scheduling checks is maintained in
+`docs/foundation/testing.md` under the Studio scheduling section.
+
 ### Local deterministic checks (Mini)
 ```bash
 uv run python platform/ops/scripts/validate_studio_policy.py --json
@@ -73,8 +78,10 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 1. Apply/check `com.bebop.optillm-proxy` first:
    `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.optillm-proxy --json`
 2. Validate health and policy status.
-3. Apply/check `com.bebop.mlx-launch` second:
-   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-launch --json`
+3. Apply/check MLX lane labels second:
+   - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8100 --json`
+   - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8101 --json`
+   - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8102 --json`
 4. Run full strict audit and archive output.
 5. Optional: enforce retired-label quarantine in apply mode with `--include-retired`.
 
@@ -107,7 +114,7 @@ For quarantined unmanaged labels:
   - `sudo plutil -convert json -o - /Library/LaunchDaemons/<label>.plist`
   - fallback: `sudo /usr/libexec/PlistBuddy -c "Print :<Key>" /Library/LaunchDaemons/<label>.plist`
   - quick human spot-check: `sudo plutil -p /Library/LaunchDaemons/<label>.plist | rg 'ProcessType|Nice|LowPriorityIO|LowPriorityBackgroundIO'`
-- `lsof -nP -iTCP:8100 -sTCP:LISTEN` + `ps` ancestry for listener ownership.
+- `lsof -nP -iTCP:8100-8102 -sTCP:LISTEN` + `ps` ancestry for listener ownership.
 - `top` and `powermetrics` spot checks for utility-vs-inference behavior.
 
 ## References

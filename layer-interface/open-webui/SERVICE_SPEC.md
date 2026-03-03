@@ -4,7 +4,7 @@
 Human-facing UI for LLM interactions routed through LiteLLM.
 
 ## Interface
-- HTTP UI: `127.0.0.1:3000` (localhost; access via Tailscale Serve)
+- HTTP UI: `0.0.0.0:3000` (LAN + tailnet exposure in current deployment)
 - Health: `GET /health`
 
 ## Dependencies

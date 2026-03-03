@@ -12,19 +12,39 @@ mlxctl ensure <hf_repo_id> --convert auto
 mlxctl list
 mlxctl status
 mlxctl verify
+mlxctl studio-cli-sha
 ```
 
 Notes:
 - `mlxctl ensure` takes a Hugging Face repo id (example: `mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4`).
   Use `mlxctl list` to discover canonical `mlx-*` model ids.
-- `mlxctl verify` checks registry defaults and also validates (on gateway hosts) that
+- `mlxctl verify` is read-only by default and also validates (on gateway hosts) that
   served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
+- Use `mlxctl verify --fix-defaults` only when explicitly persisting inferred defaults.
 
 Expanded runtime inspection:
 ```bash
 mlxctl status --checks
 mlxctl status --checks --json
+mlxctl status --json
 ```
+
+`status --checks` includes `http_models_ok` so lanes can be considered healthy
+even when `listener_visible=false` under root-owned launchd runtime.
+
+Lane drift recovery (disabled/unloaded launchd labels):
+```bash
+mlxctl repair-lanes --json
+mlxctl repair-lanes --apply --json
+mlxctl status --checks --json
+mlxctl verify
+```
+
+`repair-lanes` is safe to run from Mini; it fetches Studio registry/status and
+applies launchctl actions on Studio only when `--apply` is used.
+
+`mlx-launch-start --ports` now refuses partial assigned-team-lane scope by
+default. Use `--allow-partial` only for intentional scoped restarts.
 
 Lane load/unload:
 ```bash
@@ -41,25 +61,40 @@ mlxctl unload-all
 
 Reconcile after reboot:
 ```bash
-mlxctl reconcile
+mlxctl reconcile --json
+mlxctl reconcile --apply --json
 ```
 
 ## MLX lanes (Studio)
-After reboot or launchd restart, confirm active `mlxctl` assignments are serving
-`/v1/models` (current default active inference listener is `8100`).
+After reboot or launchd restart, confirm all active `mlxctl` assignments are serving
+`/v1/models`.
 Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
 as the model `id`. Use `mlxctl status` for canonical model/port mapping.
+
+As of `2026-03-01`, expected production active lanes are `8100`, `8101`, and `8102`.
+Any deviation should be treated as drift and triaged with `mlxctl status --checks`
+and `mlxctl verify`.
+
 ```bash
-curl -fsS http://127.0.0.1:8100/v1/models | jq .
-# Optional (if assigned): 8101/8102/etc.
-# curl -fsS http://127.0.0.1:8101/v1/models | jq .
-# curl -fsS http://127.0.0.1:8102/v1/models | jq .
+ACTIVE_PORTS=$(ssh studio "mlxctl status --json | jq -r '.ports[] | select(.status==\"listening\" or .status==\"running\") | .port'")
+for p in $ACTIVE_PORTS; do
+  ssh studio "curl -fsS http://127.0.0.1:${p}/v1/models | jq ."
+done
 ```
 
 ## Studio scheduling policy (Mini -> Studio)
+This section is authoritative for Studio scheduling verification workflow.
+
 Policy source of truth:
 - `platform/ops/templates/studio_scheduling_policy.json`
 - `docs/foundation/studio-scheduling-policy.md`
+
+Quick path (recommended order):
+1) `uv run python platform/ops/scripts/validate_studio_policy.py --json`
+2) `uv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json`
+3) `uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json`
+4) optional read-only check: `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json`
+5) apply only when needed, in staged order (`optillm-proxy` then `mlx-lane.*`), then rerun strict audit
 
 Deterministic local checks:
 ```bash
@@ -75,10 +110,14 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 
 Robust plist key spot-check (no brittle exit-code presence test):
 ```bash
-ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-launch.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lane.8100.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lane.8101.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lane.8102.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
 ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.optillm-proxy.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
 # Fallback if JSON conversion is unavailable:
-ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.mlx-launch.plist"
+ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.mlx-lane.8100.plist"
+ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.mlx-lane.8101.plist"
+ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.mlx-lane.8102.plist"
 ssh studio "sudo -n /usr/libexec/PlistBuddy -c 'Print :ProcessType' /Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
 ```
 
@@ -86,17 +125,19 @@ Staged apply order:
 1) `com.bebop.optillm-proxy` via:
    `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.optillm-proxy --json`
 2) validate
-3) `com.bebop.mlx-launch` via:
-   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-launch --json`
+3) MLX lane labels via:
+   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8100 --json`
+   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8101 --json`
+   `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8102 --json`
 4) full strict audit
 
 Runtime lineage check expectation:
-- port `8100` listener is `vllm serve`
-- process ancestry includes `com.bebop.mlx-launch` launcher lineage
+- ports `8100/8101/8102` listeners are `vllm serve`
+- process ancestry includes `com.bebop.mlx-lane.<port>` lineage
 
 Verify GPT‑OSS content channel is present (requires adequate max_tokens):
 ```bash
-curl -fsS http://127.0.0.1:8100/v1/chat/completions \
+curl -fsS http://127.0.0.1:8102/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"mlx-gpt-oss-20b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":256}' \
   | jq -r '.choices[0].message | {content, reasoning_content}'
@@ -136,6 +177,48 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 
 Note: in the current deployment, unauthenticated `GET /health` may return `401`.
 Prefer `/health/readiness` as the default probe when validating service liveness.
+
+## OpenCode basic smoke (per host)
+Use your local `~/.config/opencode/opencode.json` and run:
+```bash
+opencode models litellm
+opencode run -m litellm/main "Reply with exactly: main-ok"
+opencode run -m litellm/deep "Reply with exactly: deep-ok"
+opencode run -m litellm/fast "Reply with exactly: fast-ok"
+```
+
+Backend preflight for `main` tool-calling:
+```bash
+./platform/ops/scripts/mlxctl vllm-capabilities --json
+./platform/ops/scripts/mlxctl vllm-render --ports 8101 --validate --json
+```
+
+If `main` still fails with a parser/auto-tool error, verify lane args directly:
+```bash
+ssh studio "ps -eo pid,command | rg -- '--port 8101|enable-auto-tool-choice|tool-call-parser'"
+```
+
+Direct lane smoke for `tool_choice:\"auto\"`:
+```bash
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+payload={
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
+  'messages':[{'role':'user','content':'Reply with exactly: main-tool-ok'}],
+  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
+  'tool_choice':'auto',
+  'max_tokens':32
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST',
+)
+with urllib.request.urlopen(req, timeout=30) as r:
+  print(r.status)
+PY"
+```
 
 ## LiteLLM Prometheus (Mini)
 ```bash
@@ -342,7 +425,7 @@ curl -fsS "http://127.0.0.1:8899/search?q=Instrument+methods+used+in+NASA+Chang%
   | jq '{query_guard, trust_summary, citation_contract, quality_signals, first_result:(.results[0] // {}) | {url, orch_trust_tier, orch_source_id}}'
 
 journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager \
-  | rg -n 'guarded_query=|query_action=|conflicts=|trust=|citation_map_status=|citation_mapped=|dedupe_drops=|domain_cap_drops='
+  | rg -n 'guarded_query=|query_action=|conflicts=|trust=|citation_map_status=|citation_mapped=|grounding_status=|grounding_allowed_urls=|dedupe_drops=|domain_cap_drops='
 ```
 
 Tightening pass guidance:
@@ -351,7 +434,60 @@ Tightening pass guidance:
 - Result entries should include `orch_trust_tier` and `orch_source_id`.
 - `citation_contract.citation_map_status` should be `ready` for grounded runs.
 - `citation_contract.allowed_urls` should contain only non-placeholder HTTP(S) URLs.
+- `grounding_gate.status` should be `pass` for well-grounded runs and only `warn`
+  when valid grounded sources are below `min_required`.
 - `quality_signals.dedupe_drops` and `quality_signals.domain_cap_drops` should be non-zero on noisy queries.
+
+## DSPy citation-fidelity pilot (Mini, offline optimization)
+Goal: tune citation fidelity with measurable eval loops before runtime integration.
+
+Contract and sample dataset checks:
+```bash
+cd /home/christopherbailey/homelab-llm
+uv run python scripts/dspy_citation_fidelity.py print-contract
+uv run python scripts/dspy_citation_fidelity.py validate-dataset \
+  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl
+```
+
+Deterministic metric smoke:
+```bash
+uv run python scripts/dspy_citation_fidelity.py eval \
+  --backend mock \
+  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
+  --report-out /tmp/dspy_citation_mock_report.json
+```
+
+Real-model eval:
+```bash
+export LITELLM_MASTER_KEY='<your-key>'
+uv run python scripts/dspy_citation_fidelity.py eval \
+  --backend dspy \
+  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
+  --model openai/fast \
+  --api-base http://127.0.0.1:4000/v1 \
+  --api-key-env LITELLM_MASTER_KEY \
+  --report-out /tmp/dspy_citation_dspy_report.json
+```
+
+Compile and evaluate:
+```bash
+export LITELLM_MASTER_KEY='<your-key>'
+uv run python scripts/dspy_citation_fidelity.py compile \
+  --backend dspy \
+  --train-dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
+  --dev-dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
+  --model openai/fast \
+  --api-base http://127.0.0.1:4000/v1 \
+  --api-key-env LITELLM_MASTER_KEY \
+  --optimizer bootstrap \
+  --num-trials 8 \
+  --artifact-dir /tmp/dspy-citation-artifacts
+```
+
+Pilot pass guidance:
+- `summary.pass_rate` should improve or remain stable between baseline and compiled runs.
+- Placeholder URL citations should remain zero (`placeholder_hits=0`).
+- Compiled artifact and report should be reproducible with the same dataset.
 
 ## LiteLLM Search Proxy (Mini)
 ```bash

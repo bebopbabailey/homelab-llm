@@ -14,7 +14,7 @@ Metrics backend for LiteLLM and related services.
 - Metrics auth token file (not in git): `/etc/homelab-llm/prometheus/litellm_bearer_token`
 
 ## Scrape Targets
-- LiteLLM proxy on `127.0.0.1:4000` (`/metrics/`, auth required)
+- LiteLLM proxy on `127.0.0.1:4000` (`/metrics/`; bearer header configured in scrape job though endpoint currently responds without auth)
 
 ## Health
 - `/-/ready`

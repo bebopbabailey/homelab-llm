@@ -64,12 +64,12 @@ SEARCH_KEEP_K = _env_int("SEARCH_KEEP_K", 8)
 REQUEST_TIMEOUT_SECONDS = _env_int("REQUEST_TIMEOUT_SECONDS", 12)
 MAX_RESULTS_PER_DOMAIN = _env_int("MAX_RESULTS_PER_DOMAIN", 2)
 MAX_SOURCES_PER_DOMAIN = _env_int("MAX_SOURCES_PER_DOMAIN", 2)
-MIN_RESULT_CONTENT_CHARS = _env_int("MIN_RESULT_CONTENT_CHARS", 120)
+MIN_RESULT_CONTENT_CHARS = _env_int("MIN_RESULT_CONTENT_CHARS", 160)
 CITATION_CONTRACT_ENABLED = _env_bool("CITATION_CONTRACT_ENABLED", True)
 MIN_GROUNDED_SOURCES = _env_int("MIN_GROUNDED_SOURCES", 2)
 SOURCE_TITLE_DEDUP_ENABLED = _env_bool("SOURCE_TITLE_DEDUP_ENABLED", True)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-RERANK_ENABLED = _env_bool("RERANK_ENABLED", False)
+RERANK_ENABLED = _env_bool("RERANK_ENABLED", True)
 RERANK_MODEL = os.getenv("RERANK_MODEL", "ms-marco-TinyBERT-L-2-v2")
 RERANK_CACHE_DIR = os.getenv("RERANK_CACHE_DIR", "/tmp/websearch-orch-rerank")
 RERANK_MAX_DOC_CHARS = _env_int("RERANK_MAX_DOC_CHARS", 1400)
@@ -81,14 +81,14 @@ RERANK_LOG_TOP = _env_int("RERANK_LOG_TOP", 5)
 EXTERNAL_WEB_LOADER_ENABLED = _env_bool("EXTERNAL_WEB_LOADER_ENABLED", True)
 EXTERNAL_WEB_LOADER_PATH = os.getenv("EXTERNAL_WEB_LOADER_PATH", "/web_loader")
 EXTERNAL_WEB_LOADER_API_KEY = os.getenv("EXTERNAL_WEB_LOADER_API_KEY", "")
-EXTERNAL_WEB_LOADER_MAX_URLS = _env_int("EXTERNAL_WEB_LOADER_MAX_URLS", 20)
+EXTERNAL_WEB_LOADER_MAX_URLS = _env_int("EXTERNAL_WEB_LOADER_MAX_URLS", 10)
 EXTERNAL_WEB_LOADER_MAX_BODY_BYTES = _env_int("EXTERNAL_WEB_LOADER_MAX_BODY_BYTES", 200_000)
 EXTERNAL_WEB_LOADER_FETCH_TIMEOUT_SECONDS = _env_int("EXTERNAL_WEB_LOADER_FETCH_TIMEOUT_SECONDS", 20)
 EXTERNAL_WEB_LOADER_MAX_PAGE_BYTES = _env_int("EXTERNAL_WEB_LOADER_MAX_PAGE_BYTES", 1_500_000)
 EXTERNAL_WEB_LOADER_MIN_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MIN_TEXT_CHARS", 120)
-EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS", 8_000)
-EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS", 24_000)
-EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS", 600)
+EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS", 2_800)
+EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS", 18_000)
+EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS = _env_int("EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS", 700)
 EXTERNAL_WEB_LOADER_USER_AGENT = os.getenv(
     "EXTERNAL_WEB_LOADER_USER_AGENT",
     "websearch-orch/1.1 (+https://github.com/open-webui/open-webui)",
@@ -116,7 +116,7 @@ TRUST_DEPRIORITIZED_DOMAINS = _env_csv_set(
     "TRUST_DEPRIORITIZED_DOMAINS",
     "medium.com,wikipedia.org,sciencedaily.com,sci.news,universetoday.com",
 )
-TRUST_DROP_BELOW_SCORE = _env_int("TRUST_DROP_BELOW_SCORE", -1)
+TRUST_DROP_BELOW_SCORE = _env_int("TRUST_DROP_BELOW_SCORE", 0)
 QUERY_GUARD_ENABLED = _env_bool("QUERY_GUARD_ENABLED", True)
 QUERY_ENTITY_CONFLICT_ACTION = os.getenv("QUERY_ENTITY_CONFLICT_ACTION", "sanitize").strip().lower()
 QUERY_ENTITY_CONFLICTS: dict[str, tuple[str, ...]] = {
@@ -599,6 +599,19 @@ def _build_citation_contract(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _build_grounding_gate(citation_contract: dict[str, Any]) -> dict[str, Any]:
+    min_required = int(citation_contract.get("min_grounded_sources", max(1, MIN_GROUNDED_SOURCES)))
+    allowed_url_count = len(list(citation_contract.get("allowed_urls", [])))
+    grounded_sources = int(citation_contract.get("citation_mapped", 0))
+    status = "pass" if allowed_url_count >= min_required else "warn"
+    return {
+        "status": status,
+        "grounded_sources": grounded_sources,
+        "min_required": min_required,
+        "allowed_url_count": allowed_url_count,
+    }
+
+
 def _fetch_searx_json(query: str, language: str | None = None) -> dict[str, Any]:
     parsed = parse.urlparse(UPSTREAM_SEARXNG_URL)
     params = dict(parse.parse_qsl(parsed.query, keep_blank_values=True))
@@ -729,6 +742,7 @@ class Handler(BaseHTTPRequestHandler):
 
         final_results, trust_summary = _apply_trust_policy(final_results)
         citation_contract = _build_citation_contract(final_results)
+        grounding_gate = _build_grounding_gate(citation_contract)
         out["results"] = final_results
         out["query_guard"] = query_guard_meta
         out["grounding"] = {
@@ -736,6 +750,7 @@ class Handler(BaseHTTPRequestHandler):
             "source_urls": [str(item.get("url", "")) for item in final_results],
             "status": "grounded" if final_results else "ungrounded_fallback",
         }
+        out["grounding_gate"] = grounding_gate
         out["trust_summary"] = trust_summary
         out["citation_contract"] = citation_contract
         out["quality_signals"] = {
@@ -747,7 +762,7 @@ class Handler(BaseHTTPRequestHandler):
         }
 
         log.info(
-            "query=%r guarded_query=%r query_action=%s conflicts=%d fetched=%d kept=%d rerank=%s reasons=%s trust=%s citation_map_status=%s citation_mapped=%d citation_unmapped=%d dedupe_drops=%d domain_cap_drops=%d unsupported_claim_count=%d top_scores=%s",
+            "query=%r guarded_query=%r query_action=%s conflicts=%d fetched=%d kept=%d rerank=%s reasons=%s trust=%s citation_map_status=%s citation_mapped=%d citation_unmapped=%d grounding_status=%s grounding_sources=%d grounding_required=%d grounding_allowed_urls=%d dedupe_drops=%d domain_cap_drops=%d unsupported_claim_count=%d top_scores=%s",
             q,
             guarded_q,
             query_guard_meta.get("action"),
@@ -760,6 +775,10 @@ class Handler(BaseHTTPRequestHandler):
             citation_contract.get("citation_map_status"),
             int(citation_contract.get("citation_mapped", 0)),
             int(citation_contract.get("citation_unmapped", 0)),
+            grounding_gate.get("status"),
+            int(grounding_gate.get("grounded_sources", 0)),
+            int(grounding_gate.get("min_required", 0)),
+            int(grounding_gate.get("allowed_url_count", 0)),
             int(out["quality_signals"]["dedupe_drops"]),
             int(out["quality_signals"]["domain_cap_drops"]),
             int(out["quality_signals"]["unsupported_claim_count"]),

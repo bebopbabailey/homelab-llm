@@ -14,6 +14,8 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - **MLX control:** Ports `8100-8119` are `mlxctl`-managed and MUST use `mlxctl`
   (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
   require `mlxctl`.
+  Mutating `mlxctl` commands require local/Studio CLI parity:
+  `mlxctl studio-cli-sha` then `mlxctl sync-studio-cli` when mismatched.
   Never start/stop `mlx-openai-server` directly on the Studio.
 - **Studio launchd governance:** Owned Studio labels (`com.bebop.*`, `com.deploy.*`)
   must be allowlisted and policy-audited via the Studio scheduling contract.

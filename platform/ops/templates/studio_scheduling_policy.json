@@ -43,9 +43,17 @@
     }
   },
   "managed_labels": {
-    "com.bebop.mlx-launch": {
+    "com.bebop.mlx-lane.8100": {
       "lane": "inference",
-      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-launch.plist"
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-lane.8100.plist"
+    },
+    "com.bebop.mlx-lane.8101": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-lane.8101.plist"
+    },
+    "com.bebop.mlx-lane.8102": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-lane.8102.plist"
     },
     "com.bebop.optillm-proxy": {
       "lane": "inference",
@@ -53,6 +61,10 @@
     }
   },
   "retired_labels": {
+    "com.bebop.mlx-launch": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-launch.plist",
+      "action": "quarantine"
+    },
     "com.bebop.mlx-omni.8100": {
       "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8100.plist",
       "action": "quarantine"

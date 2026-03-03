@@ -17,3 +17,6 @@ SCRATCH_PAD.md
 homelab-llm-agent-snapshot.zip
 homelab-llm-agent-snapshot/
 CREDENTIALS.md
+
+.gemini/
+gha-creds-*.json

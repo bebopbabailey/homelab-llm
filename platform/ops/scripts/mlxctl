@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -50,6 +51,7 @@ DEFAULT_OMNI_DIR = "/opt/mlx-omni-launch"
 DEFAULT_OMNI_LABEL_PREFIX = "com.bebop.mlx-omni"
 DEFAULT_MLX_LAUNCHD_LABEL = "com.bebop.mlx-launch"
 DEFAULT_MLX_LAUNCHD_PLIST = f"/Library/LaunchDaemons/{DEFAULT_MLX_LAUNCHD_LABEL}.plist"
+DEFAULT_MLX_LANE_LABEL_PREFIX = "com.bebop.mlx-lane"
 DEFAULT_MLX_LAUNCH_START_PATH = "/opt/mlx-launch/bin/start.sh"
 DEFAULT_VLLM_BIN = "/Users/thestudio/.venv-vllm-metal/bin/vllm"
 DEFAULT_VLLM_MEMORY_FRACTION = "0.60"
@@ -70,6 +72,22 @@ def _run(cmd, *, input_bytes=None, check=True):
     return result
 
 
+def _sha256_path(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _studio_ssh_target() -> str:
+    return os.environ.get("STUDIO_SSH") or os.environ.get("STUDIO_HOST", "studio")
+
+
+def _studio_host_label() -> str:
+    return _studio_ssh_target().split("@", 1)[-1]
+
+
 def _studio_utility_wrapper():
     if os.environ.get("STUDIO_UTILITY_WRAPPER_DISABLE", "").strip().lower() in {"1", "true", "yes"}:
         return None
@@ -88,6 +106,9 @@ def _ssh_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
         remote = argv
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
+    host = studio_ssh.split("@", 1)[-1].strip().lower()
+    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72"}:
+        return _run(["bash", "-lc", remote], input_bytes=input_bytes, check=check)
     wrapper = _studio_utility_wrapper()
     if wrapper:
         return _run(
@@ -105,6 +126,9 @@ def _studio_sudo_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
         remote = argv
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
+    host = studio_ssh.split("@", 1)[-1].strip().lower()
+    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72"}:
+        return _run(["sudo", "-n", "bash", "-lc", remote], input_bytes=input_bytes, check=check)
     wrapper = _studio_utility_wrapper()
     if wrapper:
         return _run(
@@ -122,6 +146,46 @@ def _read_patch_bytes(path: Path) -> bytes:
     return path.read_bytes()
 
 
+def _loads_json_or_die(raw: str, *, context: str, default: str = "{}"):
+    text = raw if raw is not None else default
+    if not str(text).strip():
+        text = default
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(
+            f"{context}: invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}"
+        )
+
+
+def _parse_int_arg(value, *, arg_name: str) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        raise SystemExit(f"{arg_name} must be an integer (got {value!r})")
+
+
+def _parse_port_arg(value, *, arg_name: str, valid_range=PORT_RANGE, range_label: str = "8100-8139") -> int:
+    port = _parse_int_arg(value, arg_name=arg_name)
+    if valid_range is not None and port not in valid_range:
+        raise SystemExit(f"{arg_name} must be in {range_label} (got {port})")
+    return port
+
+
+def _parse_port_csv(raw_ports: Optional[str], *, arg_name: str, valid_range=TEAM_RANGE, range_label: str = "8100-8119"):
+    ports = []
+    if not raw_ports:
+        return ports
+    for raw in str(raw_ports).split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        ports.append(
+            _parse_port_arg(token, arg_name=arg_name, valid_range=valid_range, range_label=range_label)
+        )
+    return sorted(set(ports))
+
+
 def _is_local_host():
     host = socket.gethostname().split(".")[0].lower()
     return host in {"studio", "thestudio"}
@@ -134,6 +198,8 @@ def _maybe_forward_to_studio(args):
         return
     if getattr(args, "command", None) == "sync-gateway":
         return
+    if getattr(args, "command", None) in {"studio-cli-sha", "sync-studio-cli"}:
+        return
     # Omni + cutover ops orchestrate Studio actions from the caller host.
     if getattr(args, "command", None) in {
         "omni-install",
@@ -141,6 +207,7 @@ def _maybe_forward_to_studio(args):
         "omni-status",
         "mlx-launch-stop",
         "mlx-launch-start",
+        "repair-lanes",
         "mlx-launch-configure-vllm",
     }:
         return
@@ -148,10 +215,105 @@ def _maybe_forward_to_studio(args):
         return
     if _is_local_host():
         return
-    studio_host = os.environ.get("STUDIO_HOST", "studio")
+    studio_host = _studio_ssh_target()
     studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
     cmd = ["ssh", studio_host, studio_cmd, "--local"] + sys.argv[1:]
     raise SystemExit(subprocess.call(cmd))
+
+
+def _studio_cli_sha(studio_host: str, studio_cmd: str) -> Optional[str]:
+    script = f"""
+import hashlib
+from pathlib import Path
+
+path = Path({studio_cmd!r})
+if not path.exists():
+    raise SystemExit(2)
+h = hashlib.sha256()
+with path.open("rb") as handle:
+    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+        h.update(chunk)
+print(h.hexdigest())
+"""
+    result = subprocess.run(
+        ["ssh", studio_host, "python3", "-"],
+        input=script.encode("utf-8"),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    value = result.stdout.decode("utf-8", errors="replace").strip()
+    return value or None
+
+
+def _is_mutating_command(args) -> bool:
+    cmd = getattr(args, "command", "")
+    if cmd in {
+        "sync-studio-cli",
+        "studio-cli-sha",
+        "status",
+        "list",
+        "vllm-capabilities",
+        "vllm-render",
+        "omni-status",
+        "omni-warm",
+    }:
+        return False
+    if cmd == "verify":
+        return bool(getattr(args, "fix_defaults", False))
+    if cmd == "reconcile":
+        return bool(getattr(args, "apply", False))
+    if cmd == "repair-lanes":
+        return bool(getattr(args, "apply", False))
+    return cmd in {
+        "init",
+        "omni-install",
+        "omni-stop",
+        "mlx-launch-configure-vllm",
+        "mlx-launch-stop",
+        "mlx-launch-start",
+        "load",
+        "unload",
+        "unload-all",
+        "ensure",
+        "offload-og",
+        "sync-gateway",
+        "assign-team",
+        "ensemble",
+        "vllm-set",
+    }
+
+
+def _enforce_studio_cli_parity(args):
+    if os.environ.get("MLXCTL_ENFORCE_REMOTE_PARITY", "1").strip().lower() in {"0", "false", "no"}:
+        return
+    if args.local:
+        return
+    if not _is_mutating_command(args):
+        return
+    if _is_local_host():
+        return
+
+    local_path = Path(__file__).resolve()
+    local_sha = _sha256_path(local_path)
+    studio_host = _studio_ssh_target()
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    remote_sha = _studio_cli_sha(studio_host, studio_cmd)
+    if not remote_sha:
+        raise SystemExit(
+            "unable to read remote mlxctl hash; run:\n"
+            "  ./platform/ops/scripts/mlxctl studio-cli-sha\n"
+            "or disable parity gate temporarily with MLXCTL_ENFORCE_REMOTE_PARITY=0"
+        )
+    if local_sha != remote_sha:
+        raise SystemExit(
+            "mlxctl parity mismatch (local vs Studio). Refusing mutating command.\n"
+            f"local:  {local_sha}  ({local_path})\n"
+            f"studio: {remote_sha}  ({studio_cmd} on {studio_host})\n"
+            "sync first:\n"
+            "  ./platform/ops/scripts/mlxctl sync-studio-cli"
+        )
 
 
 def _registry_path():
@@ -179,7 +341,7 @@ def _load_registry(path: Path):
     if not path.exists():
         path.write_text(json.dumps({"version": 1, "models": {}}, indent=2))
     with _registry_lock(path):
-        data = json.loads(path.read_text() or "{}")
+        data = _loads_json_or_die(path.read_text(), context=f"registry file {path}", default="{}")
     data.setdefault("version", 1)
     data.setdefault("models", {})
     return data
@@ -485,6 +647,55 @@ def _launchd_loaded(label: str):
     return result.returncode == 0
 
 
+def _parse_launchctl_print_disabled(text: str) -> dict:
+    states = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if "=>" not in line:
+            continue
+        left, right = line.split("=>", 1)
+        label = left.strip().strip(",").strip('"')
+        if not label:
+            continue
+        value = right.strip().strip(",").lower()
+        if value in {"true", "1", "yes", "disabled"}:
+            states[label] = True
+        elif value in {"false", "0", "no", "enabled"}:
+            states[label] = False
+    return states
+
+
+def _launchctl_disabled_map() -> dict:
+    if sys.platform != "darwin":
+        return {}
+    result = subprocess.run(
+        ["launchctl", "print-disabled", "system"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return {}
+    return _parse_launchctl_print_disabled(result.stdout or "")
+
+
+def _lane_label(port: int) -> str:
+    return f"{os.environ.get('MLX_LANE_LABEL_PREFIX', DEFAULT_MLX_LANE_LABEL_PREFIX)}.{int(port)}"
+
+
+def _lane_launchd_state(port: int, disabled_map: Optional[dict] = None) -> dict:
+    label = _lane_label(port)
+    if sys.platform != "darwin":
+        return {"label": label, "loaded": None, "disabled": None}
+    if disabled_map is None:
+        disabled_map = _launchctl_disabled_map()
+    return {
+        "label": label,
+        "loaded": _launchd_loaded(label),
+        "disabled": disabled_map.get(label),
+    }
+
+
 def _maybe_stop_launchd(label: str):
     if not _launchd_loaded(label):
         return
@@ -510,10 +721,20 @@ def _model_on_port(data, port: int):
 def _wait_for_port(port: int, timeout: int = 60):
     start = time.time()
     while time.time() - start < timeout:
-        if _port_listening(port):
+        if _port_listening(port) or _mlx_pids_for_port(port):
             return True
         time.sleep(1)
     return False
+
+
+def _models_endpoint_ok(port: int, timeout: int = 2) -> bool:
+    try:
+        req = urlrequest.Request(f"http://127.0.0.1:{port}/v1/models", method="GET")
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            code = getattr(resp, "status", 200)
+            return 200 <= int(code) < 300
+    except Exception:
+        return False
 
 
 def _available_port(data, preferred_range):
@@ -575,12 +796,14 @@ def cmd_list(_args):
 def cmd_status(_args):
     data = _load_registry(_registry_path())
     port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
+    disabled_map = _launchctl_disabled_map() if getattr(_args, "checks", False) else {}
     rows = []
     for port in PORT_RANGE:
         pids = _port_listening(port)
         proc_pids = _mlx_pids_for_port(port)
         slug = port_map.get(port)
-        status = "listening" if pids else ("starting" if proc_pids else "idle")
+        listener_visible = bool(pids)
+        status = "listening" if listener_visible else ("running" if proc_pids else "idle")
         pid_str = ",".join(pids if pids else [str(pid) for pid in proc_pids]) if (pids or proc_pids) else "-"
         model_str = slug if slug else "-"
         runtime_cmd = _mlx_runtime_command_for_port(port)
@@ -596,26 +819,41 @@ def cmd_status(_args):
             "registry_model": model_str,
             "runtime_family": runtime_family,
             "runtime_model_path": runtime_model,
+            "listener_visible": listener_visible,
         }
+        if getattr(_args, "checks", False):
+            row["http_models_ok"] = _models_endpoint_ok(port) if status != "idle" else None
+        if getattr(_args, "checks", False) and port in TEAM_RANGE:
+            lane_state = _lane_launchd_state(port, disabled_map=disabled_map)
+            row["launchd_label"] = lane_state["label"]
+            row["launchd_loaded"] = lane_state["loaded"]
+            row["launchd_disabled"] = lane_state["disabled"]
         rows.append(row)
-        print(f"{port}\t{status}\t{pid_str}\t{model_str}")
+        if not getattr(_args, "json", False) or getattr(_args, "table", False):
+            print(f"{port}\t{status}\t{pid_str}\t{model_str}")
 
     if getattr(_args, "checks", False):
-        print("")
-        print("# runtime checks")
-        for row in rows:
-            if row["status"] == "idle":
-                continue
-            mismatch = ""
-            if row["registry_model"] != "-" and row["runtime_model_path"] == "-":
-                mismatch = "missing-runtime-model"
-            print(
-                f"{row['port']}\tfamily={row['runtime_family']}\truntime_model={row['runtime_model_path']}"
-                + (f"\t{mismatch}" if mismatch else "")
-            )
+        if not getattr(_args, "json", False) or getattr(_args, "table", False):
+            print("")
+            print("# runtime checks")
+            for row in rows:
+                if row["status"] == "idle":
+                    continue
+                mismatch = ""
+                if row["registry_model"] != "-" and row["runtime_model_path"] == "-":
+                    mismatch = "missing-runtime-model"
+                print(
+                    f"{row['port']}\tfamily={row['runtime_family']}\truntime_model={row['runtime_model_path']}"
+                    + (f"\thttp_models_ok={row.get('http_models_ok')}" if "http_models_ok" in row else "")
+                    + (f"\t{mismatch}" if mismatch else "")
+                    + (
+                        f"\tlaunchd_loaded={row.get('launchd_loaded')}\tlaunchd_disabled={row.get('launchd_disabled')}"
+                        if row["port"] in TEAM_RANGE
+                        else ""
+                    )
+                )
 
     if getattr(_args, "json", False):
-        print("")
         print(json.dumps({"ports": rows}, indent=2))
 
 
@@ -735,6 +973,34 @@ def _ensure_defaults(entry: dict):
             if local_template:
                 entry["chat_template"] = local_template
                 changed = True
+
+    vllm = _entry_vllm_config(entry)
+    if not vllm:
+        vllm = {}
+        entry["vllm"] = vllm
+        changed = True
+    if not vllm.get("profile"):
+        vllm["profile"] = _default_vllm_profile(entry)
+        changed = True
+    if not vllm.get("tool_choice_mode"):
+        vllm["tool_choice_mode"] = _default_vllm_tool_choice_mode(entry)
+        changed = True
+    if not vllm.get("max_model_len"):
+        vllm["max_model_len"] = _default_vllm_max_model_len(entry)
+        changed = True
+    if not vllm.get("memory_fraction"):
+        vllm["memory_fraction"] = _default_vllm_memory_fraction(entry)
+        changed = True
+    if "async_scheduling" not in vllm:
+        vllm["async_scheduling"] = _default_vllm_async_scheduling(entry)
+        changed = True
+    if _default_vllm_profile(entry) == "qwen3_main":
+        if not vllm.get("tool_call_parser"):
+            vllm["tool_call_parser"] = "qwen3"
+            changed = True
+        if not vllm.get("reasoning_parser"):
+            vllm["reasoning_parser"] = "qwen3"
+            changed = True
     return changed
 
 
@@ -817,8 +1083,66 @@ def _coerce_bool(value, default: bool = False) -> bool:
     return default
 
 
+def _entry_vllm_config(entry: dict) -> dict:
+    cfg = entry.get("vllm")
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _entry_vllm_value(entry: dict, key: str, legacy_key: Optional[str] = None):
+    cfg = _entry_vllm_config(entry)
+    if key in cfg:
+        return cfg.get(key)
+    if legacy_key and legacy_key in entry:
+        return entry.get(legacy_key)
+    return None
+
+
+def _default_vllm_profile(entry: dict) -> str:
+    explicit = _entry_vllm_value(entry, "profile")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    text = _entry_identity_text(entry)
+    if "qwen3-next-80b" in text:
+        return "qwen3_main"
+    if "gpt-oss" in text:
+        return "gpt_oss_lane"
+    return "generic"
+
+
+def _default_vllm_tool_choice_mode(entry: dict) -> str:
+    explicit = _entry_vllm_value(entry, "tool_choice_mode")
+    if isinstance(explicit, str):
+        lowered = explicit.strip().lower()
+        if lowered in {"none", "auto"}:
+            return lowered
+    profile = _default_vllm_profile(entry)
+    if profile == "qwen3_main":
+        return "auto"
+    return "none"
+
+
+def _default_vllm_tool_parser(entry: dict) -> Optional[str]:
+    explicit = _entry_vllm_value(entry, "tool_call_parser", "tool_call_parser")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    if _default_vllm_profile(entry) == "qwen3_main":
+        return "qwen3"
+    return None
+
+
+def _default_vllm_reasoning_parser(entry: dict) -> Optional[str]:
+    explicit = _entry_vllm_value(entry, "reasoning_parser", "reasoning_parser")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    if _default_vllm_profile(entry) == "qwen3_main":
+        return "qwen3"
+    return None
+
+
 def _default_vllm_max_model_len(entry: dict) -> int:
-    explicit = entry.get("vllm_max_model_len")
+    explicit = _entry_vllm_value(entry, "max_model_len", "vllm_max_model_len")
+    if isinstance(explicit, str) and explicit.strip().isdigit():
+        explicit = int(explicit.strip())
     if isinstance(explicit, int) and explicit > 0:
         return explicit
     text = _entry_identity_text(entry)
@@ -835,15 +1159,153 @@ def _default_vllm_max_model_len(entry: dict) -> int:
 
 
 def _default_vllm_memory_fraction(entry: dict) -> str:
-    explicit = entry.get("vllm_memory_fraction")
+    explicit = _entry_vllm_value(entry, "memory_fraction", "vllm_memory_fraction")
     if explicit is not None:
         return str(explicit)
+    text = _entry_identity_text(entry)
+    # Conservative ensemble defaults for 8100-8102 stability.
+    if "gpt-oss-120b" in text:
+        return "0.55"
+    if "qwen3-next-80b" in text:
+        return "0.50"
+    if "gpt-oss-20b" in text:
+        return "0.45"
     return os.environ.get("VLLM_METAL_MEMORY_FRACTION", DEFAULT_VLLM_MEMORY_FRACTION)
 
 
 def _default_vllm_async_scheduling(entry: dict) -> bool:
-    explicit = entry.get("vllm_async_scheduling")
+    explicit = _entry_vllm_value(entry, "async_scheduling", "vllm_async_scheduling")
     return _coerce_bool(explicit, default=False)
+
+
+def _detect_vllm_capabilities(vllm_bin: Optional[str] = None) -> dict:
+    selected_bin = vllm_bin or os.environ.get("MLX_VLLM_BIN", DEFAULT_VLLM_BIN)
+    if not selected_bin:
+        selected_bin = DEFAULT_VLLM_BIN
+    argv = [selected_bin]
+    if not Path(selected_bin).exists():
+        fallback = shutil.which("vllm")
+        if not fallback:
+            raise SystemExit("vllm not found; set MLX_VLLM_BIN or install vllm.")
+        argv = [fallback]
+    timeout_seconds = _parse_int_arg(
+        os.environ.get("MLX_VLLM_HELP_TIMEOUT_SECONDS", "20"),
+        arg_name="MLX_VLLM_HELP_TIMEOUT_SECONDS",
+    )
+    if timeout_seconds <= 0:
+        timeout_seconds = 20
+    try:
+        result = subprocess.run(
+            argv + ["serve", "--help=all"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        raise SystemExit(
+            f"vllm capability probe timed out after {timeout_seconds}s; "
+            "increase MLX_VLLM_HELP_TIMEOUT_SECONDS if needed"
+        )
+    text = (result.stdout or "") + "\n" + (result.stderr or "")
+    if not any(flag in text for flag in ("--host", "--port", "--served-model-name", "--model")):
+        raise SystemExit(
+            "vllm capability probe returned unusable help output; "
+            "verify MLX_VLLM_BIN points to a working `vllm` binary"
+        )
+    parser_choices = []
+    match = re.search(r"--tool-call-parser\s+\{([^}]*)\}", text)
+    if match:
+        parser_choices = [item.strip() for item in match.group(1).split(",") if item.strip()]
+    return {
+        "vllm_bin": argv[0],
+        "supports_auto_tool_choice": "--enable-auto-tool-choice" in text,
+        "supports_tool_call_parser": "--tool-call-parser" in text,
+        "supports_reasoning_parser": "--reasoning-parser" in text,
+        "tool_call_parsers": parser_choices,
+    }
+
+
+def _resolve_tool_call_parser(logical: str, capabilities: dict) -> Optional[str]:
+    if logical != "qwen3":
+        return logical
+    parser_choices = set(capabilities.get("tool_call_parsers") or [])
+    for candidate in ("qwen3_xml", "qwen3_coder", "qwen3"):
+        if candidate in parser_choices:
+            return candidate
+    return None
+
+
+def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, *, validate: bool = True) -> dict:
+    model_path = entry.get("cache_path")
+    if not model_path:
+        raise SystemExit("registry entry missing cache_path for vllm launch")
+    served_model_name = entry.get("served_model_name") or entry.get("model_id")
+    if not served_model_name:
+        raise SystemExit("registry entry missing model_id/served_model_name for vllm launch")
+
+    tool_choice_mode = _default_vllm_tool_choice_mode(entry)
+    if tool_choice_mode not in {"none", "auto"}:
+        raise SystemExit(f"unsupported vllm tool_choice_mode={tool_choice_mode!r} for {served_model_name}")
+
+    argv = [
+        capabilities["vllm_bin"],
+        "serve",
+        model_path,
+        "--served-model-name",
+        served_model_name,
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--max-model-len",
+        str(_default_vllm_max_model_len(entry)),
+    ]
+    if _default_vllm_async_scheduling(entry):
+        argv += ["--async-scheduling"]
+    else:
+        argv += ["--no-async-scheduling"]
+
+    parser_choices = set(capabilities.get("tool_call_parsers") or [])
+    parser_logical = _default_vllm_tool_parser(entry)
+    parser_resolved = None
+    if tool_choice_mode == "auto":
+        if validate and not capabilities.get("supports_auto_tool_choice"):
+            raise SystemExit(
+                f"{served_model_name} requires tool_choice_mode=auto, but vLLM does not support --enable-auto-tool-choice"
+            )
+        argv += ["--enable-auto-tool-choice"]
+        if validate and not capabilities.get("supports_tool_call_parser"):
+            raise SystemExit(f"{served_model_name} requires tool_choice_mode=auto, but vLLM lacks --tool-call-parser")
+        if not parser_logical:
+            raise SystemExit(f"{served_model_name} requires tool_choice_mode=auto but tool_call_parser is unset")
+        parser_resolved = _resolve_tool_call_parser(parser_logical, capabilities)
+        if not parser_resolved:
+            choices = ", ".join(sorted(parser_choices)) if parser_choices else "(none reported)"
+            raise SystemExit(
+                f"{served_model_name} tool_call_parser={parser_logical!r} unsupported by current vLLM parser set: {choices}"
+            )
+        argv += ["--tool-call-parser", parser_resolved]
+
+    reasoning_parser = _default_vllm_reasoning_parser(entry)
+    explicit_reasoning = "reasoning_parser" in _entry_vllm_config(entry)
+    if reasoning_parser and capabilities.get("supports_reasoning_parser") and (tool_choice_mode == "auto" or explicit_reasoning):
+        argv += ["--reasoning-parser", reasoning_parser]
+
+    env = {
+        "VLLM_METAL_MEMORY_FRACTION": _default_vllm_memory_fraction(entry).strip(),
+    }
+    return {
+        "argv": argv,
+        "env": env,
+        "tool_choice_mode": tool_choice_mode,
+        "tool_call_parser_logical": parser_logical,
+        "tool_call_parser_resolved": parser_resolved,
+        "reasoning_parser": reasoning_parser,
+        "profile": _default_vllm_profile(entry),
+        "max_model_len": _default_vllm_max_model_len(entry),
+        "async_scheduling": _default_vllm_async_scheduling(entry),
+    }
 
 
 def _default_startup_timeout(entry: dict) -> int:
@@ -919,6 +1381,19 @@ def default_max_model_len(entry, slug):
         return min(context, 65536)
     return 65536
 
+def default_memory_fraction(entry, slug):
+    explicit = entry.get("vllm_memory_fraction")
+    if explicit is not None:
+        return str(explicit)
+    text = identity(entry, slug)
+    if "gpt-oss-120b" in text:
+        return "0.55"
+    if "qwen3-next-80b" in text:
+        return "0.50"
+    if "gpt-oss-20b" in text:
+        return "0.45"
+    return "0.60"
+
 def as_bool(value, default=False):
     if value is None:
         return default
@@ -953,7 +1428,7 @@ for slug, entry in (data.get("models") or {}).items():
 
     served_model_name = entry.get("model_id") or slug
     max_model_len = default_max_model_len(entry, slug)
-    memory_fraction = str(entry.get("vllm_memory_fraction", "0.60"))
+    memory_fraction = default_memory_fraction(entry, slug)
     async_enabled = as_bool(entry.get("vllm_async_scheduling"), default=False)
 
     rows.append((served_model_name, str(port), str(model_path_obj), str(max_model_len), memory_fraction, "1" if async_enabled else "0"))
@@ -1085,37 +1560,11 @@ def _launch_server(entry, port: int):
         argv = cmd.split()
         proc_env = None
     elif backend in {"vllm-metal", "vllm", "vllm_metal"}:
-        vllm_bin = os.environ.get("MLX_VLLM_BIN", DEFAULT_VLLM_BIN)
-        if Path(vllm_bin).exists():
-            argv = [vllm_bin]
-        elif shutil.which("vllm"):
-            argv = ["vllm"]
-        else:
-            raise SystemExit("vllm not found; set MLX_VLLM_BIN or MLX_LAUNCH_CMD.")
-
-        served_model_name = entry.get("served_model_name") or entry.get("model_id")
-        if not served_model_name:
-            raise SystemExit("registry entry missing model_id/served_model_name for vllm launch")
-
-        argv += [
-            "serve",
-            model_path,
-            "--served-model-name",
-            served_model_name,
-            "--host",
-            "0.0.0.0",
-            "--port",
-            str(port),
-            "--max-model-len",
-            str(_default_vllm_max_model_len(entry)),
-        ]
-        if _default_vllm_async_scheduling(entry):
-            argv += ["--async-scheduling"]
-        else:
-            argv += ["--no-async-scheduling"]
-
+        capabilities = _detect_vllm_capabilities()
+        compiled = _compile_vllm_launch(entry, port, "0.0.0.0", capabilities, validate=True)
+        argv = compiled["argv"]
         proc_env = os.environ.copy()
-        mem_fraction = _default_vllm_memory_fraction(entry).strip()
+        mem_fraction = (compiled.get("env", {}) or {}).get("VLLM_METAL_MEMORY_FRACTION", "").strip()
         if mem_fraction:
             proc_env["VLLM_METAL_MEMORY_FRACTION"] = mem_fraction
     elif backend == "mlx-openai-server":
@@ -1202,6 +1651,14 @@ def _launch_server(entry, port: int):
         subprocess.Popen(argv, stdout=handle, stderr=handle, env=proc_env, start_new_session=True)
 
 
+def _restart_team_lane(port: int):
+    cmd_mlx_launch_start(argparse.Namespace(ports=str(port)))
+
+
+def _stop_team_lane(port: int):
+    cmd_mlx_launch_stop(argparse.Namespace(ports=str(port)))
+
+
 def cmd_load(args):
     if args.port == "auto":
         registry_path = _registry_path()
@@ -1210,9 +1667,7 @@ def cmd_load(args):
         if port is None:
             raise SystemExit("no free ports available in experimental range (8120-8139)")
         args.port = str(port)
-    port = int(args.port)
-    if port not in PORT_RANGE:
-        raise SystemExit("port must be between 8100 and 8139")
+    port = _parse_port_arg(args.port, arg_name="port", valid_range=PORT_RANGE, range_label="8100-8139")
 
     registry_path = _registry_path()
     data = _load_registry(registry_path)
@@ -1243,7 +1698,16 @@ def cmd_load(args):
     if entry.get("port") and entry.get("port") != port:
         raise SystemExit(f"model already assigned to port {entry['port']}; unload first")
 
-    _launch_server(entry, port)
+    team_port = port in TEAM_RANGE
+
+    entry["port"] = port
+    _write_registry(registry_path, data)
+
+    if team_port:
+        _restart_team_lane(port)
+    else:
+        _launch_server(entry, port)
+
     startup_timeout = _default_startup_timeout(entry)
     if not _wait_for_port(port, timeout=startup_timeout):
         raise SystemExit(
@@ -1266,8 +1730,6 @@ def cmd_load(args):
                 "check qwen3 parser/template settings."
             )
 
-    entry["port"] = port
-    _write_registry(registry_path, data)
     if converted and args.offload_og:
         cmd_offload_og(argparse.Namespace(dry_run=False))
     if args.sync:
@@ -1276,11 +1738,12 @@ def cmd_load(args):
 
 
 def cmd_unload(args):
-    port = int(args.port)
-    if port not in PORT_RANGE:
-        raise SystemExit("port must be between 8100 and 8139")
+    port = _parse_port_arg(args.port, arg_name="port", valid_range=PORT_RANGE, range_label="8100-8139")
 
-    _stop_mlx_for_port(port)
+    if port in TEAM_RANGE:
+        _stop_team_lane(port)
+    else:
+        _stop_mlx_for_port(port)
 
     registry_path = _registry_path()
     data = _load_registry(registry_path)
@@ -1313,7 +1776,10 @@ def cmd_unload_all(args):
         print("unload-all cancelled")
         return
     for port in PORT_RANGE:
-        _stop_mlx_for_port(port)
+        if port in TEAM_RANGE:
+            _stop_team_lane(port)
+        else:
+            _stop_mlx_for_port(port)
         for entry in data["models"].values():
             if entry.get("port") == port:
                 entry["port"] = None
@@ -1323,19 +1789,62 @@ def cmd_unload_all(args):
     print("unloaded all ports")
 
 
-def cmd_reconcile(_args):
+def cmd_reconcile(args):
     registry_path = _registry_path()
     data = _load_registry(registry_path)
+    candidates = []
     changed = 0
-    for entry in data["models"].values():
+    for slug, entry in data["models"].items():
         port = entry.get("port")
         if not port:
             continue
-        if not _port_listening(int(port)):
+        port = int(port)
+        listener_visible = bool(_port_listening(port))
+        process_visible = bool(_mlx_pids_for_port(port))
+        http_ok = _models_endpoint_ok(port)
+        stale = not (listener_visible or process_visible or http_ok)
+        if not stale:
+            continue
+        candidate = {
+            "model_id": entry.get("model_id") or slug,
+            "slug": slug,
+            "port": port,
+            "listener_visible": listener_visible,
+            "process_visible": process_visible,
+            "http_models_ok": http_ok,
+        }
+        candidates.append(candidate)
+        if args.apply:
             entry["port"] = None
             changed += 1
-    _write_registry(registry_path, data)
-    print(f"reconciled registry (cleared {changed} stale ports)")
+
+    if args.apply and changed:
+        _write_registry(registry_path, data)
+
+    payload = {
+        "mode": "apply" if args.apply else "dry-run",
+        "candidates": candidates,
+        "candidate_count": len(candidates),
+        "cleared_count": changed if args.apply else 0,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return
+
+    if not candidates:
+        print(f"reconcile ({payload['mode']}): no stale assignments found")
+        return
+
+    print(f"reconcile ({payload['mode']}): {len(candidates)} stale assignment candidate(s)")
+    for row in candidates:
+        print(
+            f"- {row['model_id']} @ {row['port']} "
+            f"(listener={row['listener_visible']} process={row['process_visible']} http={row['http_models_ok']})"
+        )
+    if args.apply:
+        print(f"cleared {changed} stale assignment(s)")
+    else:
+        print("no changes written (use --apply to clear stale assignments)")
 
 
 def cmd_verify(_args):
@@ -1343,31 +1852,44 @@ def cmd_verify(_args):
     data = _load_registry(registry_path)
     missing = []
     port_to_models = {}
+    changed = False
+    capabilities = None
+    disabled_map = _launchctl_disabled_map()
     for slug, entry in data["models"].items():
-        _ensure_defaults(entry)
-        if not entry.get("context_length"):
+        if getattr(_args, "fix_defaults", False):
+            if _ensure_defaults(entry):
+                changed = True
+            check_entry = entry
+        else:
+            check_entry = dict(entry)
+            _ensure_defaults(check_entry)
+        if not check_entry.get("context_length"):
             missing.append(f"{slug}: missing context_length")
-        if not entry.get("max_output_tokens"):
+        if not check_entry.get("max_output_tokens"):
             missing.append(f"{slug}: missing max_output_tokens")
-        if _is_gpt_oss_entry(entry):
-            if entry.get("tool_call_parser") != "harmony":
+        if _is_gpt_oss_entry(check_entry):
+            if check_entry.get("tool_call_parser") != "harmony":
                 missing.append(f"{slug}: tool_call_parser must be 'harmony'")
-            if entry.get("reasoning_parser") != "harmony":
+            if check_entry.get("reasoning_parser") != "harmony":
                 missing.append(f"{slug}: reasoning_parser must be 'harmony'")
-            template = entry.get("chat_template")
+            template = check_entry.get("chat_template")
             if not template:
                 missing.append(f"{slug}: missing chat_template")
             elif not Path(template).exists():
                 missing.append(f"{slug}: chat_template path missing: {template}")
-        if _is_qwen3_entry(entry):
-            if entry.get("tool_call_parser") != "qwen3":
+        if _is_qwen3_entry(check_entry):
+            if check_entry.get("tool_call_parser") != "qwen3":
                 missing.append(f"{slug}: tool_call_parser must be 'qwen3'")
-            if entry.get("reasoning_parser") != "qwen3":
+            if check_entry.get("reasoning_parser") != "qwen3":
                 missing.append(f"{slug}: reasoning_parser must be 'qwen3'")
-            template = entry.get("chat_template")
+            template = check_entry.get("chat_template")
             if template and not Path(template).exists():
                 missing.append(f"{slug}: chat_template path missing: {template}")
-        port = entry.get("port")
+        vllm_cfg = _entry_vllm_config(check_entry)
+        mode = vllm_cfg.get("tool_choice_mode")
+        if mode and mode not in {"none", "auto"}:
+            missing.append(f"{slug}: vllm.tool_choice_mode must be 'none' or 'auto'")
+        port = check_entry.get("port")
         if port:
             port_to_models.setdefault(int(port), []).append(slug)
             cmd = _mlx_runtime_command_for_port(int(port))
@@ -1375,11 +1897,27 @@ def cmd_verify(_args):
                 missing.append(f"{slug}: registry port {port} set but no MLX process listening")
             else:
                 model_path = _runtime_model_path_from_command(cmd)
-                if model_path and entry.get("cache_path") and model_path != entry.get("cache_path"):
+                if model_path and check_entry.get("cache_path") and model_path != check_entry.get("cache_path"):
                     missing.append(
                         f"{slug}: runtime path mismatch on {port} "
-                        f"(registry={entry.get('cache_path')} runtime={model_path})"
+                        f"(registry={check_entry.get('cache_path')} runtime={model_path})"
                     )
+            if int(port) in TEAM_RANGE:
+                lane_state = _lane_launchd_state(int(port), disabled_map=disabled_map)
+                if lane_state["disabled"] is True:
+                    missing.append(
+                        f"{slug}: team lane {port} launchd label disabled ({lane_state['label']})"
+                    )
+                if lane_state["loaded"] is False:
+                    missing.append(
+                        f"{slug}: team lane {port} launchd label not loaded ({lane_state['label']})"
+                    )
+                try:
+                    if capabilities is None:
+                        capabilities = _detect_vllm_capabilities()
+                    _compile_vllm_launch(check_entry, int(port), "0.0.0.0", capabilities, validate=True)
+                except SystemExit as exc:
+                    missing.append(f"{slug}: invalid vllm launch config: {exc}")
     for port, slugs in sorted(port_to_models.items()):
         if len(slugs) > 1:
             missing.append(f"port {port}: multiple registry assignments ({', '.join(sorted(slugs))})")
@@ -1398,7 +1936,8 @@ def cmd_verify(_args):
                     )
         except Exception as exc:
             missing.append(f"handles.jsonl: failed to validate served handles: {exc}")
-    _write_registry(registry_path, data)
+    if getattr(_args, "fix_defaults", False) and changed:
+        _write_registry(registry_path, data)
     if missing:
         raise SystemExit("mlxctl verify failed:\n  - " + "\n  - ".join(missing))
     print("mlxctl verify ok: registry defaults and routing state are consistent")
@@ -1451,7 +1990,11 @@ print(path.read_text())
     )
     if result.returncode != 0:
         raise SystemExit("failed to read MLX registry from studio")
-    return json.loads(result.stdout.decode("utf-8") or "{}")
+    return _loads_json_or_die(
+        result.stdout.decode("utf-8", errors="replace"),
+        context="studio registry fetch",
+        default="{}",
+    )
 
 
 def _fetch_registry_sizes(studio_ssh: str, registry_path: str):
@@ -1515,7 +2058,11 @@ print(json.dumps(rows))
     )
     if result.returncode != 0:
         raise SystemExit("failed to read MLX registry sizes from studio")
-    return json.loads(result.stdout.decode("utf-8") or "[]")
+    return _loads_json_or_die(
+        result.stdout.decode("utf-8", errors="replace"),
+        context="studio registry-size fetch",
+        default="[]",
+    )
 
 
 def _optillm_models_from_handles(path: Path):
@@ -1543,6 +2090,7 @@ def _optillm_models_from_handles(path: Path):
 
 def _apply_port_map(assignments, studio_ssh: str, sync: bool):
     studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    failures = []
     for handle, port in assignments:
         cmd = [
             "ssh",
@@ -1556,7 +2104,12 @@ def _apply_port_map(assignments, studio_ssh: str, sync: bool):
             "--ignore-launchd",
             "--no-sync",
         ]
-        subprocess.run(cmd, check=False)
+        result = subprocess.run(cmd, check=False)
+        if result.returncode != 0:
+            failures.append((handle, port, result.returncode))
+    if failures:
+        details = ", ".join([f"{h}@{p} (exit {rc})" for h, p, rc in failures])
+        raise SystemExit(f"assign-team failed while applying loads: {details}")
     if sync:
         cmd_sync_gateway(argparse.Namespace(dry_run=False))
 
@@ -1566,8 +2119,12 @@ def cmd_assign_team(args):
     handles_path = Path(os.environ.get("HANDLES_PATH", DEFAULT_HANDLES_PATH))
     registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
 
-    # ensure registry includes all cached models
-    subprocess.run(["ssh", studio_ssh, os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl"), "--local", "init"], check=False)
+    # Ensure registry includes all cached models on actual apply.
+    if not args.dry_run:
+        subprocess.run(
+            ["ssh", studio_ssh, os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl"), "--local", "init"],
+            check=True,
+        )
 
     optillm_models = _optillm_models_from_handles(handles_path)
     rows = _fetch_registry_sizes(studio_ssh, registry_path)
@@ -1600,6 +2157,61 @@ def cmd_assign_team(args):
         return
 
     _apply_port_map(assignments, studio_ssh, sync=args.sync)
+
+
+def cmd_studio_cli_sha(_args):
+    local_path = Path(__file__).resolve()
+    local_sha = _sha256_path(local_path)
+    studio_host = _studio_ssh_target()
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    remote_sha = _studio_cli_sha(studio_host, studio_cmd)
+    payload = {
+        "local_path": str(local_path),
+        "local_sha256": local_sha,
+        "studio_host": _studio_host_label(),
+        "studio_ssh_target": studio_host,
+        "studio_path": studio_cmd,
+        "studio_sha256": remote_sha,
+        "match": bool(remote_sha and remote_sha == local_sha),
+    }
+    print(json.dumps(payload, indent=2))
+    if not payload["match"]:
+        raise SystemExit(1)
+
+
+def cmd_sync_studio_cli(_args):
+    local_path = Path(__file__).resolve()
+    studio_host = _studio_ssh_target()
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    stamp = int(time.time())
+    backup = f"{studio_cmd}.bak-{stamp}"
+    tmp = f"/tmp/mlxctl.sync.{stamp}"
+    payload = local_path.read_bytes()
+    remote = (
+        "set -euo pipefail; "
+        f"cat > {shlex.quote(tmp)}; "
+        f"if [ -f {shlex.quote(studio_cmd)} ]; then cp {shlex.quote(studio_cmd)} {shlex.quote(backup)}; fi; "
+        f"install -m 0755 {shlex.quote(tmp)} {shlex.quote(studio_cmd)}; "
+        f"rm -f {shlex.quote(tmp)}"
+    )
+    _ssh_cmd(studio_host, remote, input_bytes=payload, check=True)
+    local_sha = _sha256_path(local_path)
+    remote_sha = _studio_cli_sha(studio_host, studio_cmd)
+    if remote_sha != local_sha:
+        raise SystemExit("sync-studio-cli: hash mismatch after copy")
+    print(
+        json.dumps(
+            {
+                "synced": True,
+                "studio_host": _studio_host_label(),
+                "studio_ssh_target": studio_host,
+                "studio_path": studio_cmd,
+                "backup": backup,
+                "sha256": local_sha,
+            },
+            indent=2,
+        )
+    )
 
 
 def _env_key(handle: str, suffix: str):
@@ -1929,7 +2541,7 @@ def cmd_omni_install(args):
     repo = os.environ.get("MLX_OMNI_REPO", DEFAULT_OMNI_REPO)
     ref = os.environ.get("MLX_OMNI_REF", DEFAULT_OMNI_REF)
     install_dir = os.environ.get("MLX_OMNI_DIR", DEFAULT_OMNI_DIR)
-    port = int(args.port)
+    port = _parse_port_arg(args.port, arg_name="--port", valid_range=PORT_RANGE, range_label="8100-8139")
     bind_host = args.host
 
     label_prefix = os.environ.get("MLX_OMNI_LABEL_PREFIX", DEFAULT_OMNI_LABEL_PREFIX)
@@ -2059,7 +2671,7 @@ launchctl kickstart -k system/{shlex.quote(label)}
 
 def cmd_omni_stop(args):
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    port = int(args.port)
+    port = _parse_port_arg(args.port, arg_name="--port", valid_range=PORT_RANGE, range_label="8100-8139")
     label_prefix = os.environ.get("MLX_OMNI_LABEL_PREFIX", DEFAULT_OMNI_LABEL_PREFIX)
     label = f"{label_prefix}.{port}"
     plist_path = f"/Library/LaunchDaemons/{label}.plist"
@@ -2074,7 +2686,7 @@ rm -f {shlex.quote(plist_path)}
 
 def cmd_omni_status(args):
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    port = int(args.port)
+    port = _parse_port_arg(args.port, arg_name="--port", valid_range=PORT_RANGE, range_label="8100-8139")
     _studio_sudo_cmd(studio_ssh, f"lsof -nP -iTCP:{port} -sTCP:LISTEN || true", check=False)
     _ssh_cmd(
         studio_ssh,
@@ -2089,9 +2701,9 @@ def cmd_omni_warm(args):
     Omni loads models lazily on first request; warming makes the first "real" request fast.
     """
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    port = int(args.port)
-    timeout = int(args.timeout)
-    max_tokens = int(args.max_tokens)
+    port = _parse_port_arg(args.port, arg_name="--port", valid_range=PORT_RANGE, range_label="8100-8139")
+    timeout = _parse_int_arg(args.timeout, arg_name="--timeout")
+    max_tokens = _parse_int_arg(args.max_tokens, arg_name="--max-tokens")
 
     for model in args.models:
         payload = {
@@ -2118,8 +2730,121 @@ print("warmed", payload.get("model"))
         _ssh_cmd(studio_ssh, "python3 -", input_bytes=script.encode("utf-8"), check=True)
 
 
+def _resolve_team_target_ports(raw_ports: Optional[str]) -> list[int]:
+    return _parse_port_csv(raw_ports, arg_name="--ports", valid_range=TEAM_RANGE, range_label="8100-8119")
+
+
+def _render_vllm_rows_for_ports(target_ports: list[int], *, host: str, validate: bool) -> dict:
+    data = _load_registry(_registry_path())
+    capabilities = _detect_vllm_capabilities()
+    rows = []
+    for slug, entry in (data.get("models") or {}).items():
+        port = entry.get("port")
+        try:
+            port = int(port)
+        except Exception:
+            continue
+        if port not in TEAM_RANGE:
+            continue
+        if target_ports and port not in target_ports:
+            continue
+        model_path = entry.get("cache_path")
+        if not model_path or not Path(model_path).exists():
+            continue
+        compiled = _compile_vllm_launch(entry, port, host, capabilities, validate=validate)
+        rows.append(
+            {
+                "slug": slug,
+                "model": entry.get("model_id") or slug,
+                "port": port,
+                "path": model_path,
+                "argv": compiled["argv"],
+                "env": compiled["env"],
+                "profile": compiled["profile"],
+                "tool_choice_mode": compiled["tool_choice_mode"],
+                "tool_call_parser_logical": compiled["tool_call_parser_logical"],
+                "tool_call_parser_resolved": compiled["tool_call_parser_resolved"],
+                "reasoning_parser": compiled["reasoning_parser"],
+            }
+        )
+    rows.sort(key=lambda row: row["port"])
+    return {"rows": rows, "capabilities": capabilities}
+
+
+def cmd_vllm_capabilities(args):
+    caps = _detect_vllm_capabilities()
+    if getattr(args, "json", False):
+        print(json.dumps(caps, indent=2))
+        return
+    print(f"vllm_bin={caps.get('vllm_bin')}")
+    print(f"supports_auto_tool_choice={caps.get('supports_auto_tool_choice')}")
+    print(f"supports_tool_call_parser={caps.get('supports_tool_call_parser')}")
+    print(f"supports_reasoning_parser={caps.get('supports_reasoning_parser')}")
+    parsers = caps.get("tool_call_parsers") or []
+    print("tool_call_parsers=" + (",".join(parsers) if parsers else "(none)"))
+
+
+def cmd_vllm_render(args):
+    target_ports = _resolve_team_target_ports(getattr(args, "ports", ""))
+    host = os.environ.get("MLX_BIND_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    payload = _render_vllm_rows_for_ports(target_ports, host=host, validate=bool(getattr(args, "validate", False)))
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2))
+        return
+    rows = payload["rows"]
+    if not rows:
+        print("no assigned team-lane models in registry")
+        return
+    for row in rows:
+        print(
+            f"{row['port']}\t{row['model']}\tprofile={row['profile']}\t"
+            f"tool_choice={row['tool_choice_mode']}\tparser={row['tool_call_parser_resolved'] or '-'}"
+        )
+        print("  " + " ".join(shlex.quote(token) for token in row["argv"]))
+
+
+def cmd_vllm_set(args):
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
+    slug, entry = _find_entry(data, args.model)
+    if not entry:
+        raise SystemExit(f"model not found in registry: {args.model}")
+    _ensure_defaults(entry)
+    vllm = _entry_vllm_config(entry)
+    if args.clear_vllm:
+        entry["vllm"] = {}
+        _write_registry(registry_path, data)
+        print(f"updated {slug}: cleared vllm block")
+        return
+    if args.profile:
+        vllm["profile"] = args.profile
+    if args.max_model_len is not None:
+        vllm["max_model_len"] = int(args.max_model_len)
+        entry["vllm_max_model_len"] = int(args.max_model_len)
+    if args.memory_fraction is not None:
+        vllm["memory_fraction"] = str(args.memory_fraction)
+        entry["vllm_memory_fraction"] = str(args.memory_fraction)
+    if args.async_scheduling is not None:
+        vllm["async_scheduling"] = bool(args.async_scheduling)
+        entry["vllm_async_scheduling"] = bool(args.async_scheduling)
+    if args.tool_choice_mode:
+        vllm["tool_choice_mode"] = args.tool_choice_mode
+    if args.tool_call_parser:
+        vllm["tool_call_parser"] = args.tool_call_parser
+        entry["tool_call_parser"] = args.tool_call_parser
+    if args.reasoning_parser:
+        vllm["reasoning_parser"] = args.reasoning_parser
+        entry["reasoning_parser"] = args.reasoning_parser
+    _write_registry(registry_path, data)
+    print(f"updated {slug}: vllm settings applied")
+
+
 def cmd_mlx_launch_configure_vllm(args):
-    """Write a registry-driven vLLM-metal start script for com.bebop.mlx-launch."""
+    """Write a registry-driven legacy start script for com.bebop.mlx-launch."""
+    if os.environ.get("MLX_ALLOW_LEGACY", "0").strip().lower() not in {"1", "true", "yes"}:
+        raise SystemExit(
+            "mlx-launch-configure-vllm is legacy. Set MLX_ALLOW_LEGACY=1 to run."
+        )
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
     start_path = os.environ.get("MLX_LAUNCH_START_PATH", DEFAULT_MLX_LAUNCH_START_PATH)
     backup_path = f"{start_path}.bak-{int(time.time())}-pre-vllm-metal"
@@ -2136,36 +2861,37 @@ def cmd_mlx_launch_configure_vllm(args):
 
 
 def cmd_mlx_launch_stop(args):
-    """Stop the team-lane supervisor launchd job (non-interactive).
+    """Stop managed team-lane launchd jobs (non-interactive).
 
     This does NOT mutate registry port assignments; it only stops the running services so
     we can safely reconfigure or restart managed team lanes.
     """
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
-    ports = (args.ports or "8100,8101,8102,8103").strip()
+    lane_label_prefix = os.environ.get("MLX_LANE_LABEL_PREFIX", DEFAULT_MLX_LANE_LABEL_PREFIX)
+    legacy_label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
+    ports = _parse_port_csv(
+        args.ports or "8100,8101,8102",
+        arg_name="--ports",
+        valid_range=TEAM_RANGE,
+        range_label="8100-8119",
+    )
 
-    # Stop the supervisor first (prevents immediate respawn).
-    _studio_sudo_cmd(
-        studio_ssh,
-        f"launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true",
-        check=False,
-    )
-    # Prevent it from re-loading on reboot (can be re-enabled via mlx-launch-start).
-    _studio_sudo_cmd(
-        studio_ssh,
-        f"launchctl disable system/{shlex.quote(label)} >/dev/null 2>&1 || true",
-        check=False,
-    )
+    # Stop/disable per-lane jobs first.
+    for port in ports:
+        label = f"{lane_label_prefix}.{port}"
+        plist = f"/Library/LaunchDaemons/{label}.plist"
+        _studio_sudo_cmd(studio_ssh, f"launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true", check=False)
+        _studio_sudo_cmd(studio_ssh, f"launchctl bootout system {shlex.quote(plist)} >/dev/null 2>&1 || true", check=False)
+        _studio_sudo_cmd(studio_ssh, f"launchctl disable system/{shlex.quote(label)} >/dev/null 2>&1 || true", check=False)
+
+    # Stop/disable legacy supervisor so it does not respawn children.
+    _studio_sudo_cmd(studio_ssh, f"launchctl bootout system/{shlex.quote(legacy_label)} >/dev/null 2>&1 || true", check=False)
+    _studio_sudo_cmd(studio_ssh, f"launchctl disable system/{shlex.quote(legacy_label)} >/dev/null 2>&1 || true", check=False)
 
     # Ensure team-lane listeners are gone (they can outlive the supervisor).
     # Be conservative: only kill MLX/vLLM families used for team lanes.
     remote = ["set -euo pipefail"]
-    for raw in ports.split(","):
-        raw = raw.strip()
-        if not raw:
-            continue
-        port = int(raw)
+    for port in ports:
         remote.append(f"pids=$(lsof -tiTCP:{port} -sTCP:LISTEN 2>/dev/null || true)")
         remote.append('for pid in ${pids}; do')
         remote.append('  cmd=$(ps -p ${pid} -o command= 2>/dev/null || true)')
@@ -2173,30 +2899,272 @@ def cmd_mlx_launch_stop(args):
         remote.append('  kill ${pid} >/dev/null 2>&1 || true; sleep 0.2; kill -9 ${pid} >/dev/null 2>&1 || true')
         remote.append('done')
     _studio_sudo_cmd(studio_ssh, "\n".join(remote), check=False)
-    print(f"stopped supervisor {label} and cleared managed listeners for ports: {ports}")
+    port_text = ",".join(str(port) for port in ports)
+    print(
+        f"stopped per-lane launchd jobs ({lane_label_prefix}.*), disabled legacy {legacy_label}, "
+        f"and cleared listeners for ports: {port_text}"
+    )
 
 
 def cmd_mlx_launch_start(args):
-    """Start com.bebop.mlx-launch supervisor after script/config changes."""
+    """Start per-lane launchd jobs for assigned team lanes (8100-8119)."""
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
-    plist = os.environ.get(
-        "MLX_LAUNCHD_PLIST",
-        os.environ.get("MLX_OPENAI_LAUNCHD_PLIST", DEFAULT_MLX_LAUNCHD_PLIST),
+    host = os.environ.get("MLX_BIND_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    log_dir = os.environ.get("MLX_VLLM_LOG_DIR", "/Users/thestudio")
+    lane_label_prefix = os.environ.get("MLX_LANE_LABEL_PREFIX", DEFAULT_MLX_LANE_LABEL_PREFIX)
+    legacy_label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
+    legacy_plist = os.environ.get("MLX_LAUNCHD_PLIST", os.environ.get("MLX_OPENAI_LAUNCHD_PLIST", DEFAULT_MLX_LAUNCHD_PLIST))
+    target_ports = _parse_port_csv(
+        args.ports,
+        arg_name="--ports",
+        valid_range=TEAM_RANGE,
+        range_label="8100-8119",
     )
-    remote = f"""
-set -euo pipefail
-if [ ! -f {shlex.quote(plist)} ]; then
-  echo "missing launchd plist: {plist}" >&2
-  exit 2
-fi
-launchctl enable system/{shlex.quote(label)} >/dev/null 2>&1 || true
-launchctl bootout system/{shlex.quote(label)} >/dev/null 2>&1 || true
-launchctl bootstrap system {shlex.quote(plist)}
-launchctl kickstart -k system/{shlex.quote(label)}
+    allow_partial = bool(getattr(args, "allow_partial", False))
+
+    studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    render_argv = [studio_cmd, "--local", "vllm-render", "--validate", "--json"]
+    if target_ports:
+        render_argv += ["--ports", ",".join(str(p) for p in sorted(set(target_ports)))]
+    render_result = _ssh_cmd(studio_ssh, render_argv, check=True)
+    payload = json.loads((render_result.stdout or b"{}").decode("utf-8", errors="replace"))
+    rows = payload.get("rows") or []
+    if not rows:
+        raise SystemExit("no assigned team-lane models in registry")
+    if target_ports and not allow_partial:
+        all_result = _ssh_cmd(studio_ssh, [studio_cmd, "--local", "vllm-render", "--validate", "--json"], check=True)
+        all_payload = json.loads((all_result.stdout or b"{}").decode("utf-8", errors="replace"))
+        assigned_ports = sorted({int(row["port"]) for row in (all_payload.get("rows") or [])})
+        scoped_ports = sorted(set(target_ports))
+        if assigned_ports and scoped_ports != assigned_ports:
+            raise SystemExit(
+                "refusing partial mlx-launch-start scope; assigned team lanes are "
+                f"{','.join(str(p) for p in assigned_ports)} but --ports requested "
+                f"{','.join(str(p) for p in scoped_ports)}. Use --allow-partial to override."
+            )
+
+    script = f"""
+import json
+import os
+import plistlib
+import subprocess
+from pathlib import Path
+
+HOST = {host!r}
+LOG_DIR = Path({log_dir!r})
+LANE_LABEL_PREFIX = {lane_label_prefix!r}
+LEGACY_LABEL = {legacy_label!r}
+LEGACY_PLIST = {legacy_plist!r}
+TARGET_PORTS = {json.dumps(sorted(set(target_ports)))}
+ROWS = {json.dumps(rows)}
+TEAM_MIN = 8100
+TEAM_MAX = 8119
+
+def _launchctl(*argv):
+    return subprocess.run(["launchctl", *argv], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# Disable legacy supervisor path.
+_launchctl("bootout", f"system/{{LEGACY_LABEL}}")
+_launchctl("bootout", "system", LEGACY_PLIST)
+_launchctl("disable", f"system/{{LEGACY_LABEL}}")
+
+wanted_ports = {{int(row["port"]) for row in ROWS}}
+ports_to_consider = TARGET_PORTS if TARGET_PORTS else list(range(TEAM_MIN, TEAM_MAX + 1))
+for port in ports_to_consider:
+    label = f"{{LANE_LABEL_PREFIX}}.{{port}}"
+    plist = f"/Library/LaunchDaemons/{{label}}.plist"
+    if int(port) not in wanted_ports:
+        _launchctl("bootout", f"system/{{label}}")
+        _launchctl("bootout", "system", plist)
+        _launchctl("disable", f"system/{{label}}")
+
+started = []
+for row in sorted(ROWS, key=lambda r: int(r["port"])):
+    label = f"{{LANE_LABEL_PREFIX}}.{{row['port']}}"
+    plist = Path(f"/Library/LaunchDaemons/{{label}}.plist")
+    env = dict(row.get("env") or {{}})
+    env["PATH"] = "/opt/homebrew/bin:/Users/thestudio/.local/bin:/Users/thestudio/.venv-vllm-metal/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    plist_payload = {{
+        "Label": label,
+        "ProgramArguments": list(row.get("argv") or []),
+        "EnvironmentVariables": env,
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "ThrottleInterval": 30,
+        "ProcessType": "Interactive",
+        "WorkingDirectory": "/opt/mlx-launch",
+        "StandardOutPath": str(LOG_DIR / f"vllm-{{row['port']}}.log"),
+        "StandardErrorPath": str(LOG_DIR / f"vllm-{{row['port']}}.err.log"),
+    }}
+    with plist.open("wb") as handle:
+        plistlib.dump(plist_payload, handle, fmt=plistlib.FMT_XML, sort_keys=False)
+    os.chmod(plist, 0o644)
+    _launchctl("enable", f"system/{{label}}")
+    _launchctl("bootout", f"system/{{label}}")
+    _launchctl("bootout", "system", str(plist))
+    out = subprocess.run(["launchctl", "bootstrap", "system", str(plist)], text=True, capture_output=True, check=False)
+    if out.returncode != 0:
+        raise SystemExit(f"failed to bootstrap {{label}}: {{out.stderr.strip() or out.stdout.strip()}}")
+    _launchctl("kickstart", "-k", f"system/{{label}}")
+    started.append({{
+        "label": label,
+        "port": row["port"],
+        "model": row["model"],
+        "profile": row.get("profile"),
+        "tool_choice_mode": row.get("tool_choice_mode"),
+        "tool_call_parser_resolved": row.get("tool_call_parser_resolved"),
+    }})
+
+print(json.dumps({{"started": started}}, indent=2))
 """
-    _studio_sudo_cmd(studio_ssh, remote, check=True)
-    print(f"started supervisor {label}")
+    _studio_sudo_cmd(studio_ssh, ["python3", "-"], input_bytes=script.encode("utf-8"), check=True)
+    scope = ",".join(str(p) for p in sorted(set(target_ports))) if target_ports else "all assigned team lanes"
+    print(f"started per-lane supervisor labels ({lane_label_prefix}.*) for {scope}")
+
+
+def cmd_repair_lanes(args):
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
+    if _is_local_host():
+        data = _load_registry(_registry_path())
+    else:
+        data = _fetch_registry_from_studio(studio_ssh, os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY))
+    remote_status_by_port = {}
+    if not _is_local_host():
+        studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+        status_result = _ssh_cmd(studio_ssh, [studio_cmd, "--local", "status", "--checks", "--json"], check=True)
+        status_payload = _loads_json_or_die(
+            (status_result.stdout or b"").decode("utf-8", errors="replace"),
+            context="repair-lanes remote status payload",
+            default="{}",
+        )
+        for row in status_payload.get("ports") or []:
+            try:
+                remote_status_by_port[int(row.get("port"))] = row
+            except Exception:
+                continue
+    requested_ports = set(
+        _parse_port_csv(
+            getattr(args, "ports", ""),
+            arg_name="--ports",
+            valid_range=TEAM_RANGE,
+            range_label="8100-8119",
+        )
+    )
+    assigned_ports = sorted(
+        int(entry.get("port"))
+        for entry in data["models"].values()
+        if entry.get("port") and int(entry.get("port")) in TEAM_RANGE
+    )
+    if requested_ports:
+        assigned_ports = [port for port in assigned_ports if port in requested_ports]
+    disabled_map = _launchctl_disabled_map()
+    repairs = []
+    for port in assigned_ports:
+        if _is_local_host():
+            lane_state = _lane_launchd_state(port, disabled_map=disabled_map)
+            listener_visible = bool(_port_listening(port))
+            process_visible = bool(_mlx_pids_for_port(port))
+            http_models_ok = _models_endpoint_ok(port)
+        else:
+            status_row = remote_status_by_port.get(port) or {}
+            lane_state = {
+                "label": status_row.get("launchd_label") or _lane_label(port),
+                "loaded": status_row.get("launchd_loaded"),
+                "disabled": status_row.get("launchd_disabled"),
+            }
+            listener_visible = bool(status_row.get("listener_visible"))
+            status_text = str(status_row.get("status") or "").strip().lower()
+            process_visible = status_text in {"running", "listening"}
+            http_models_ok = bool(status_row.get("http_models_ok"))
+        needs_repair = bool(
+            lane_state["disabled"] is True
+            or lane_state["loaded"] is False
+            or not (listener_visible or process_visible or http_models_ok)
+        )
+        if not needs_repair:
+            continue
+        reasons = []
+        if lane_state["disabled"] is True:
+            reasons.append("launchd-disabled")
+        if lane_state["loaded"] is False:
+            reasons.append("launchd-unloaded")
+        if not (listener_visible or process_visible or http_models_ok):
+            reasons.append("lane-down")
+        repairs.append(
+            {
+                "port": port,
+                "label": lane_state["label"],
+                "launchd_loaded": lane_state["loaded"],
+                "launchd_disabled": lane_state["disabled"],
+                "listener_visible": listener_visible,
+                "process_visible": process_visible,
+                "http_models_ok": http_models_ok,
+                "reasons": reasons,
+            }
+        )
+
+    if args.apply:
+        failures = []
+        for row in repairs:
+            label = row["label"]
+            plist = f"/Library/LaunchDaemons/{label}.plist"
+            step_results = []
+            commands = [
+                ("enable", f"launchctl enable system/{shlex.quote(label)}"),
+                ("bootout_label", f"launchctl bootout system/{shlex.quote(label)}"),
+                ("bootout_plist", f"launchctl bootout system {shlex.quote(plist)}"),
+                ("bootstrap", f"launchctl bootstrap system {shlex.quote(plist)}"),
+                ("kickstart", f"launchctl kickstart -k system/{shlex.quote(label)}"),
+            ]
+            for step_name, command in commands:
+                result = _studio_sudo_cmd(studio_ssh, command, check=False)
+                stderr = (result.stderr or b"").decode("utf-8", errors="replace").strip()
+                stdout = (result.stdout or b"").decode("utf-8", errors="replace").strip()
+                step_results.append(
+                    {
+                        "step": step_name,
+                        "returncode": result.returncode,
+                        "stderr": stderr,
+                        "stdout": stdout,
+                    }
+                )
+                if step_name == "bootstrap" and result.returncode != 0:
+                    break
+            bootstrap_step = next((item for item in step_results if item["step"] == "bootstrap"), None)
+            apply_ok = bool(bootstrap_step and bootstrap_step["returncode"] == 0)
+            row["apply_result"] = {"success": apply_ok, "steps": step_results}
+            if not apply_ok:
+                err_msg = ""
+                if bootstrap_step:
+                    err_msg = bootstrap_step.get("stderr") or bootstrap_step.get("stdout") or "bootstrap failed"
+                failures.append(f"{label}: {err_msg}")
+        if failures:
+            raise SystemExit("repair-lanes apply failed:\n  - " + "\n  - ".join(failures))
+
+    payload = {
+        "mode": "apply" if args.apply else "dry-run",
+        "scoped_assigned_ports": assigned_ports,
+        "repair_count": len(repairs),
+        "repairs": repairs,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2))
+        return
+    if not repairs:
+        print(f"repair-lanes ({payload['mode']}): no lane repair actions needed")
+        return
+    print(f"repair-lanes ({payload['mode']}): {len(repairs)} lane(s) need repair")
+    for row in repairs:
+        print(
+            f"- {row['label']} @ {row['port']} "
+            f"(loaded={row['launchd_loaded']} disabled={row['launchd_disabled']} "
+            f"listener={row['listener_visible']} process={row['process_visible']} "
+            f"reasons={','.join(row['reasons'])})"
+        )
+    if not args.apply:
+        print("no changes written (use --apply to repair lane labels)")
 
 def _collect_offload_candidates(studio_ssh: str):
     script = """
@@ -2293,9 +3261,13 @@ def main():
             "Naming (default): model_id becomes 'mlx-<family>-<params>-<quant>-<variant>'.\n"
             "Order matters: family → parameter count → quant → other identifiers (e.g., instruct).\n"
             "Repo org is stripped; dash-only; use --name only for exceptions.\n\n"
+            "Mutating commands require local/Studio mlxctl parity.\n"
+            "Use `mlxctl studio-cli-sha` and `mlxctl sync-studio-cli`.\n\n"
             "Common commands:\n"
             "  mlxctl list\n"
             "  mlxctl status\n"
+            "  mlxctl studio-cli-sha\n"
+            "  mlxctl sync-studio-cli\n"
             "  mlxctl load <repo_id> 8101\n"
             "  mlxctl unload 8101\n"
             "  mlxctl sync-gateway\n\n"
@@ -2311,23 +3283,53 @@ def main():
     sub.add_parser("list", help="List registered MLX models (model_id, repo_id, port, ctx, max_out)")
     status = sub.add_parser("status", help="Show MLX port status and routing mode")
     status.add_argument("--checks", action="store_true", help="Include runtime family/model-path checks")
-    status.add_argument("--json", action="store_true", help="Include JSON status payload")
+    status.add_argument("--json", action="store_true", help="Emit JSON payload only (unless --table is also set)")
+    status.add_argument("--table", action="store_true", help="Print table output even when --json is set")
     omni_install = sub.add_parser("omni-install", help="Install + run mlx-omni-server on the Studio (canary)")
-    omni_install.add_argument("--port", default="8120", help="Port to run omni on (default: 8120)")
+    omni_install.add_argument("--port", type=int, default=8120, help="Port to run omni on (default: 8120)")
     omni_install.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     omni_stop = sub.add_parser("omni-stop", help="Stop mlx-omni-server launchd job on the Studio")
-    omni_stop.add_argument("--port", default="8120", help="Port label to stop (default: 8120)")
+    omni_stop.add_argument("--port", type=int, default=8120, help="Port label to stop (default: 8120)")
     omni_status = sub.add_parser("omni-status", help="Check mlx-omni-server status on the Studio")
-    omni_status.add_argument("--port", default="8120", help="Port to check (default: 8120)")
+    omni_status.add_argument("--port", type=int, default=8120, help="Port to check (default: 8120)")
     omni_warm = sub.add_parser("omni-warm", help="Warm models into mlx-omni-server cache (Omni-first)")
     omni_warm.add_argument("models", nargs="+", help="Model IDs to warm (e.g. openai/mlx-..., mlx-..., etc.)")
-    omni_warm.add_argument("--port", default="8100", help="Omni port to warm against (default: 8100)")
-    omni_warm.add_argument("--timeout", default="60", help="Per-model request timeout seconds (default: 60)")
-    omni_warm.add_argument("--max-tokens", dest="max_tokens", default="8", help="Warmup max_tokens (default: 8)")
-    sub.add_parser("mlx-launch-configure-vllm", help="Install registry-driven vllm-metal start.sh for com.bebop.mlx-launch")
-    mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop com.bebop.mlx-launch and clear managed listeners")
-    mlx_launch_stop.add_argument("--ports", default="8100,8101,8102,8103", help="Comma-separated ports to clear listeners")
-    sub.add_parser("mlx-launch-start", help="Start com.bebop.mlx-launch")
+    omni_warm.add_argument("--port", type=int, default=8120, help="Omni port to warm against (default: 8120)")
+    omni_warm.add_argument("--timeout", type=int, default=60, help="Per-model request timeout seconds (default: 60)")
+    omni_warm.add_argument("--max-tokens", dest="max_tokens", type=int, default=8, help="Warmup max_tokens (default: 8)")
+    vllm_caps = sub.add_parser("vllm-capabilities", help="Show discovered vLLM feature support and parser enum")
+    vllm_caps.add_argument("--json", action="store_true", help="Emit JSON payload")
+    vllm_render = sub.add_parser("vllm-render", help="Render effective per-lane vLLM argv/env from registry")
+    vllm_render.add_argument("--ports", default="", help="Optional comma-separated team ports (8100-8119)")
+    vllm_render.add_argument("--validate", action="store_true", help="Fail on unsupported parser/auto-tool configuration")
+    vllm_render.add_argument("--json", action="store_true", help="Emit JSON payload")
+    vllm_set = sub.add_parser("vllm-set", help="Update typed vLLM settings for a registry model")
+    vllm_set.add_argument("model", help="Registry model_id slug or repo_id")
+    vllm_set.add_argument("--profile", choices=["qwen3_main", "gpt_oss_lane", "generic"])
+    vllm_set.add_argument("--max-model-len", type=int)
+    vllm_set.add_argument("--memory-fraction")
+    vllm_set.add_argument("--tool-choice-mode", choices=["none", "auto"])
+    vllm_set.add_argument("--tool-call-parser")
+    vllm_set.add_argument("--reasoning-parser")
+    vllm_set.add_argument("--clear-vllm", action="store_true", help="Reset nested vllm block to empty object")
+    async_group = vllm_set.add_mutually_exclusive_group()
+    async_group.add_argument("--async-scheduling", dest="async_scheduling", action="store_true")
+    async_group.add_argument("--no-async-scheduling", dest="async_scheduling", action="store_false")
+    vllm_set.set_defaults(async_scheduling=None)
+    sub.add_parser("mlx-launch-configure-vllm", help="LEGACY: install registry-driven vllm-metal start.sh for com.bebop.mlx-launch")
+    mlx_launch_stop = sub.add_parser("mlx-launch-stop", help="Stop managed per-lane launchd labels and clear listeners")
+    mlx_launch_stop.add_argument("--ports", default="8100,8101,8102", help="Comma-separated ports to clear listeners")
+    mlx_launch_start = sub.add_parser("mlx-launch-start", help="Start managed per-lane launchd labels from registry assignments")
+    mlx_launch_start.add_argument("--ports", default="", help="Optional comma-separated team ports (8100-8119) to apply")
+    mlx_launch_start.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow --ports scope that is a strict subset of assigned team lanes",
+    )
+    repair_lanes = sub.add_parser("repair-lanes", help="Detect/repair disabled or unloaded assigned team lane labels")
+    repair_lanes.add_argument("--ports", default="", help="Optional comma-separated team ports (8100-8119) to scope")
+    repair_lanes.add_argument("--apply", action="store_true", help="Enable/bootstrap scoped assigned team lanes")
+    repair_lanes.add_argument("--json", action="store_true", help="Emit JSON payload")
 
     load = sub.add_parser("load", help="Download/register a model and launch on a port")
     load.add_argument("model", help="HF repo_id or existing registry model_id")
@@ -2355,8 +3357,15 @@ def main():
     unload_all = sub.add_parser("unload-all", help="Stop all MLX servers and clear assignments")
     unload_all.add_argument("--no-sync", dest="sync", action="store_false", help="Skip gateway sync after unload-all")
     unload_all.set_defaults(sync=True)
-    sub.add_parser("reconcile", help="Clear registry entries for ports no longer listening")
-    sub.add_parser("verify", help="Validate registry vs gateway config")
+    reconcile = sub.add_parser("reconcile", help="Find stale registry assignments; mutation requires --apply")
+    reconcile.add_argument("--apply", action="store_true", help="Clear stale registry assignments")
+    reconcile.add_argument("--json", action="store_true", help="Emit JSON reconciliation payload")
+    verify = sub.add_parser("verify", help="Validate registry vs gateway config")
+    verify.add_argument(
+        "--fix-defaults",
+        action="store_true",
+        help="Persist inferred defaults (context/parser/template fields) before validation",
+    )
     # Deprecated: ensemble (kept for backward compatibility)
     ensemble = sub.add_parser("ensemble", help="DEPRECATED: use load/assign-team instead")
     ensemble.add_argument("name", help="Deprecated")
@@ -2386,8 +3395,11 @@ def main():
     assign.add_argument("--dry-run", action="store_true")
     assign.add_argument("--no-sync", dest="sync", action="store_false")
     assign.set_defaults(sync=True)
+    sub.add_parser("studio-cli-sha", help="Show local and Studio mlxctl SHA256 parity")
+    sub.add_parser("sync-studio-cli", help="Copy local mlxctl to Studio and verify SHA256 parity")
 
     args = parser.parse_args()
+    _enforce_studio_cli_parity(args)
     _maybe_forward_to_studio(args)
 
     commands = {
@@ -2398,9 +3410,13 @@ def main():
         "omni-stop": cmd_omni_stop,
         "omni-status": cmd_omni_status,
         "omni-warm": cmd_omni_warm,
+        "vllm-capabilities": cmd_vllm_capabilities,
+        "vllm-render": cmd_vllm_render,
+        "vllm-set": cmd_vllm_set,
         "mlx-launch-configure-vllm": cmd_mlx_launch_configure_vllm,
         "mlx-launch-stop": cmd_mlx_launch_stop,
         "mlx-launch-start": cmd_mlx_launch_start,
+        "repair-lanes": cmd_repair_lanes,
         "load": cmd_load,
         "unload": cmd_unload,
         "unload-all": cmd_unload_all,
@@ -2411,6 +3427,8 @@ def main():
         "offload-og": cmd_offload_og,
         "sync-gateway": cmd_sync_gateway,
         "assign-team": cmd_assign_team,
+        "studio-cli-sha": cmd_studio_cli_sha,
+        "sync-studio-cli": cmd_sync_studio_cli,
     }
     commands[args.command](args)
 

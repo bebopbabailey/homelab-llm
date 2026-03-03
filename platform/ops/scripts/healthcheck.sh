@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 LITELLM_ENV_LOCAL="${LITELLM_ENV_LOCAL:-$REPO_ROOT/layer-gateway/litellm-orch/config/env.local}"
 OPTILLM_ENV_FILE="${OPTILLM_ENV_FILE:-/etc/optillm-proxy/env}"
+MLXCTL_BIN="${MLXCTL_BIN:-$REPO_ROOT/platform/ops/scripts/mlxctl}"
 
 get_env_value() {
   local key="$1"
@@ -58,6 +59,19 @@ check_http_post() {
   fi
 }
 
+check_studio_mlx_lanes() {
+  local ports
+  ports="$("$MLXCTL_BIN" status --json | jq -r '.ports[] | select(.port >= 8100 and .port <= 8119) | select(.registry_model != "-") | .port')"
+  if [[ -z "${ports}" ]]; then
+    echo "no active team-lane MLX assignments detected via mlxctl status --json" >&2
+    return 1
+  fi
+  while IFS= read -r p; do
+    [[ -z "$p" ]] && continue
+    check_http "http://192.168.1.72:${p}/v1/models"
+  done <<< "$ports"
+}
+
 check_port 4000
 check_port 3000
 
@@ -77,6 +91,4 @@ fi
 
 check_http "http://127.0.0.1:8888/search?q=ping&format=json"
 check_http_post http://127.0.0.1:4000/v1/search/searxng-search '{"query":"ping","max_results":1}' -H "Authorization: Bearer ${LITELLM_API_KEY}"
-check_http http://192.168.1.72:8100/v1/models
-# Legacy per-port MLX servers (8101/8102/8103) were cut over to Omni-on-8100.
-# If we ever restore additional ports, add explicit checks back here.
+check_studio_mlx_lanes

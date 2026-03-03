@@ -28,7 +28,19 @@ Examples (request-body techniques via gateway):
 - Plugins (pipeline-based) add request/response transforms (e.g., `readurls`, `memory`).
 - Plugins can be chained with `&` (sequential) or `|` (parallel) when supported.
 - Current enabled plugins are documented in `layer-gateway/optillm-proxy/docs/FEATURES.md`.
-- Default OptiLLM proxy handles for general use: _none currently registered_.
+- Deterministic coding-quality aliases are available through LiteLLM:
+  `boost-plan`, `boost-plan-verify`, `boost-ideate`, `boost-fastdraft`.
+
+## Coding north-star defaults (OpenCode + MLX/vLLM-metal)
+- `boost-plan` (`plansearch-openai/deep`) is the default for high-quality coding plans.
+- `boost-plan-verify` (`self_consistency-openai/deep`) is the verifier pass.
+- `boost-ideate` (`moa-openai/deep`) is for divergent architecture exploration.
+- `boost-fastdraft` (`bon-openai/fast`) is the lower-cost drafting lane.
+
+Recommended workflow:
+1. Draft plan with `boost-plan`.
+2. Critique and harden with `boost-plan-verify`.
+3. Use `boost-ideate` only when multiple architecture paths are plausible.
 
 ## Small-model roles (when they help)
 - **Router**: classify intent and select which ensemble to call.

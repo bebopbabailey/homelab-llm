@@ -17,6 +17,7 @@ use-case. Hopes of branching into enterprise-land later.
 - Active delivery plan: `NOW.md`
 - Submodule workflow: `docs/foundation/git-submodules.md`
 - System architecture: `docs/ARCHITECTURE.md`
+- Node toolchain policy: `docs/foundation/node-toolchain.md`
 
 ## How to Read This Repo
 - Read `docs/foundation/README.md` first; it points to the canonical sources of truth.

@@ -15,5 +15,5 @@ Operational deployment assets for the active platform.
 ## Notes
 - This directory is operational support, not architecture canon.
 - Keep script behavior aligned with active services and localhost/LAN constraints.
-- `platform/ops/scripts/mlxctl` default runtime backend is `mlx_lm.server`
-  (legacy `mlx-openai-server` is fallback-only via env override).
+- `platform/ops/scripts/mlxctl` default runtime backend is `vllm-metal` (`vllm serve`);
+  `mlx_lm.server` and `mlx-openai-server` are legacy fallback paths via explicit env override.

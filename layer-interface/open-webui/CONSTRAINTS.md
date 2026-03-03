@@ -7,7 +7,7 @@ This service inherits global + layer constraints:
 ## Hard constraints
 - Keep Open WebUI as UI/orchestration only; do not make it call inference backends directly.
 - Preserve LiteLLM as the single LLM gateway path.
-- Keep bind/port on `127.0.0.1:3000` unless an approved migration updates canon docs.
+- Current deployment bind is `0.0.0.0:3000`; any bind/port changes require an approved migration plan and canon doc updates.
 - Keep secrets in `/etc/open-webui/env`; never commit credentials or tokens.
 
 ## Allowed operations
