@@ -45,14 +45,16 @@ model_list:
 # 2) OptiLLM boost lane (opt-in)
 - model_name: boost
   litellm_params:
-    model: openai/main
+    model: main
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
 
 - model_name: boost-deep
   litellm_params:
-    model: openai/deep
+    model: deep
+    custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
     max_tokens: 16384
@@ -61,7 +63,7 @@ model_list:
 - model_name: boost-plan
   litellm_params:
     # plansearch + deep lane for high-quality coding plans
-    model: plansearch-openai/deep
+    model: plansearch-deep
     custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
@@ -70,7 +72,7 @@ model_list:
 - model_name: boost-plan-trio
   litellm_params:
     # canary trio planner plugin (fast/main/deep staged orchestration)
-    model: plansearchtrio-openai/deep
+    model: plansearchtrio-deep
     custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
@@ -79,7 +81,7 @@ model_list:
 - model_name: boost-plan-verify
   litellm_params:
     # self-consistency pass to verify/pressure-test plans
-    model: self_consistency-openai/deep
+    model: self_consistency-deep
     custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
@@ -88,7 +90,7 @@ model_list:
 - model_name: boost-ideate
   litellm_params:
     # moa for divergent architecture exploration
-    model: moa-openai/deep
+    model: moa-deep
     custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
@@ -97,7 +99,7 @@ model_list:
 - model_name: boost-fastdraft
   litellm_params:
     # best-of-n for lower-cost drafting passes
-    model: bon-openai/fast
+    model: bon-fast
     custom_llm_provider: openai
     api_base: os.environ/OPTILLM_API_BASE
     api_key: os.environ/OPTILLM_API_KEY
