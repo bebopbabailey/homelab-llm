@@ -1,6 +1,7 @@
 import unittest
 import importlib.util
 import pathlib
+import time
 
 try:
     from optillm.plugins import plansearchtrio_plugin  # type: ignore
@@ -36,9 +37,11 @@ class _FakeResponse:
 class _FakeCompletions:
     def __init__(self):
         self.verifier_calls = 0
+        self.synthesis_attempts = 0
 
     def create(self, **kwargs):
         prompt = kwargs["messages"][1]["content"]
+        model = kwargs["model"]
         if prompt.startswith("Summarize this task"):
             return _FakeResponse("requirements: complete task; constraints: keep scope")
         if "Candidate ID" in prompt:
@@ -47,6 +50,9 @@ class _FakeCompletions:
         if prompt.startswith("Evaluate candidates"):
             return _FakeResponse("top: candidate 1 then candidate 2")
         if prompt.startswith("Produce the final response"):
+            self.synthesis_attempts += 1
+            if model == "deep" and self.synthesis_attempts == 1:
+                return _FakeResponse("")
             return _FakeResponse("final-response-v1")
         if prompt.startswith("Check whether the final response"):
             self.verifier_calls += 1
@@ -63,6 +69,16 @@ class _FakeCompletions:
 class _FakeClient:
     def __init__(self):
         self.chat = type("Chat", (), {"completions": _FakeCompletions()})()
+
+
+class _FakeCompletionsAllEmpty:
+    def create(self, **kwargs):
+        return _FakeResponse("")
+
+
+class _FakeClientAllEmpty:
+    def __init__(self):
+        self.chat = type("Chat", (), {"completions": _FakeCompletionsAllEmpty()})()
 
 
 class PlanSearchTrioTests(unittest.TestCase):
@@ -83,6 +99,25 @@ class PlanSearchTrioTests(unittest.TestCase):
         self.assertEqual(main, "main-custom")
         self.assertEqual(deep, "deep-custom")
 
+    def test_extract_text_handles_structured_content(self):
+        class _Msg:
+            def __init__(self):
+                self.content = [
+                    {"type": "output_text", "text": "hello"},
+                    {"type": "output_text", "text": " world"},
+                ]
+
+        class _Choice:
+            def __init__(self):
+                self.message = _Msg()
+
+        class _Resp:
+            def __init__(self):
+                self.choices = [_Choice()]
+                self.usage = _FakeUsage()
+
+        self.assertEqual(plansearchtrio_plugin._extract_text(_Resp()), "hello world")
+
     def test_run_executes_repair_loop_and_returns_tokens(self):
         client = _FakeClient()
         cfg = {
@@ -90,6 +125,8 @@ class PlanSearchTrioTests(unittest.TestCase):
             "plansearchtrio_candidates_main": 1,
             "plansearchtrio_repair_rounds": 1,
             "plansearchtrio_max_workers": 2,
+            "plansearchtrio_stage_retries": 0,
+            "plansearchtrio_fallback_on_empty": True,
         }
         content, completion_tokens = plansearchtrio_plugin.run(
             system_prompt="system",
@@ -100,6 +137,59 @@ class PlanSearchTrioTests(unittest.TestCase):
         )
         self.assertIn("rollback", content)
         self.assertGreater(completion_tokens, 0)
+
+    def test_run_returns_explicit_error_when_all_stages_empty(self):
+        client = _FakeClientAllEmpty()
+        content, completion_tokens = plansearchtrio_plugin.run(
+            system_prompt="system",
+            initial_query="build a migration plan",
+            client=client,
+            model="deep",
+            request_config={
+                "plansearchtrio_stage_retries": 1,
+                "plansearchtrio_fallback_on_empty": True,
+            },
+        )
+        self.assertTrue(content.startswith("PLANSEARCHTRIO_ERROR:"))
+        self.assertGreaterEqual(completion_tokens, 0)
+
+    def test_parallel_candidates_preserve_job_order(self):
+        original = plansearchtrio_plugin._chat_resilient
+
+        def _fake_chat_resilient(*args, **kwargs):
+            stage = kwargs.get("stage_name")
+            if stage is None and len(args) >= 7:
+                stage = args[6]
+            if stage == "candidate-0":
+                time.sleep(0.02)
+            return f"text-{stage}", 1
+
+        plansearchtrio_plugin._chat_resilient = _fake_chat_resilient
+        try:
+            candidates, token_total = plansearchtrio_plugin._parallel_candidates(
+                client=object(),
+                request_config={},
+                system_prompt="sys",
+                query="q",
+                triage="t",
+                fast_model="fast",
+                main_model="main",
+                candidate_budget=64,
+                c_fast=2,
+                c_main=1,
+                max_workers=3,
+                retries=0,
+                min_chars=1,
+                debug=False,
+            )
+        finally:
+            plansearchtrio_plugin._chat_resilient = original
+
+        self.assertEqual(
+            candidates,
+            ["text-candidate-0", "text-candidate-1", "text-candidate-2"],
+        )
+        self.assertEqual(token_total, 3)
 
 
 if __name__ == "__main__":

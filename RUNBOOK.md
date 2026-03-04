@@ -100,6 +100,23 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   | jq -r '.choices[0].message.content'
 ```
 
+### Trio canary A/B gate (`boost-plan` vs `boost-plan-trio`)
+Run from Mini:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/canary_plansearch_profiles.py \
+  --url http://127.0.0.1:4000/v1/chat/completions \
+  --bearer "$LITELLM_API_KEY" \
+  --model-a boost-plan \
+  --model-b boost-plan-trio \
+  --max-tokens 160 \
+  --out-json /tmp/plansearchtrio_canary.json
+```
+Gate policy (current):
+- Candidate empty outputs must be zero.
+- Candidate p95 latency must be `<= 1.75x` baseline (`boost-plan`) on the same prompt fixture.
+- Script exits non-zero when the gate fails.
+
 ### Streaming benchmark (TTFT + total time)
 
 ```bash

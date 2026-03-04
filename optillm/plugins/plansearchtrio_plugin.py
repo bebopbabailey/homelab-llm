@@ -1,5 +1,6 @@
 import concurrent.futures
 import logging
+import time
 from typing import Any
 
 SLUG = "plansearchtrio"
@@ -23,6 +24,7 @@ def _int_param(config: dict[str, Any], key: str, default: int, minimum: int, max
 def _stage_budget(config: dict[str, Any], key: str, fallback: int) -> int:
     return _int_param(config, key, fallback, 32, 32768)
 
+
 def _requested_token_budget(config: dict[str, Any]) -> int:
     raw = config.get("max_completion_tokens", config.get("max_tokens", 512))
     try:
@@ -39,15 +41,47 @@ def _pick_models(config: dict[str, Any], requested_model: str | None) -> tuple[s
     return fast, main, deep
 
 
+def _bool_param(config: dict[str, Any], key: str, default: bool) -> bool:
+    value = config.get(key, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
+def _content_to_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = [_content_to_text(item) for item in value]
+        return "".join(part for part in parts if part)
+    if isinstance(value, dict):
+        for key in ("text", "output_text", "content"):
+            if key in value:
+                return _content_to_text(value.get(key))
+        return ""
+    return ""
+
+
 def _extract_text(response: Any) -> str:
     choices = getattr(response, "choices", None) or []
     if not choices:
         return ""
-    message = getattr(choices[0], "message", None)
+    first = choices[0]
+    message = getattr(first, "message", None)
     if message is None:
-        return ""
+        return _content_to_text(getattr(first, "text", ""))
     content = getattr(message, "content", None)
-    return content if isinstance(content, str) else ""
+    return _content_to_text(content)
 
 
 def _extract_completion_tokens(response: Any) -> int:
@@ -68,7 +102,17 @@ def _build_call_config(config: dict[str, Any], max_tokens: int) -> dict[str, Any
     return payload
 
 
-def _chat(client: Any, model: str, system_prompt: str, user_prompt: str, request_config: dict[str, Any], max_tokens: int) -> tuple[str, int]:
+def _chat(
+    client: Any,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    request_config: dict[str, Any],
+    max_tokens: int,
+    stage_name: str,
+    debug: bool = False,
+) -> tuple[str, int]:
+    start = time.perf_counter()
     payload = {
         "model": model,
         "messages": [
@@ -78,7 +122,58 @@ def _chat(client: Any, model: str, system_prompt: str, user_prompt: str, request
     }
     payload.update(_build_call_config(request_config, max_tokens))
     response = client.chat.completions.create(**payload)
-    return _extract_text(response).strip(), _extract_completion_tokens(response)
+    text = _extract_text(response).strip()
+    tokens = _extract_completion_tokens(response)
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    if debug:
+        logger.info(
+            "plansearchtrio stage=%s model=%s chars=%s completion_tokens=%s latency_ms=%s",
+            stage_name,
+            model,
+            len(text),
+            tokens,
+            elapsed_ms,
+        )
+    return text, tokens
+
+
+def _chat_resilient(
+    client: Any,
+    models: list[str],
+    system_prompt: str,
+    user_prompt: str,
+    request_config: dict[str, Any],
+    max_tokens: int,
+    stage_name: str,
+    retries: int,
+    min_chars: int,
+    debug: bool = False,
+) -> tuple[str, int]:
+    token_total = 0
+    for model in models:
+        for attempt in range(1, retries + 2):
+            text, tokens = _chat(
+                client=client,
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                request_config=request_config,
+                max_tokens=max_tokens,
+                stage_name=stage_name,
+                debug=debug,
+            )
+            token_total += tokens
+            if len(text.strip()) >= min_chars:
+                return text, token_total
+            logger.warning(
+                "plansearchtrio empty stage output stage=%s model=%s attempt=%s min_chars=%s chars=%s",
+                stage_name,
+                model,
+                attempt,
+                min_chars,
+                len(text.strip()),
+            )
+    return "", token_total
 
 
 def _parallel_candidates(
@@ -93,6 +188,9 @@ def _parallel_candidates(
     c_fast: int,
     c_main: int,
     max_workers: int,
+    retries: int,
+    min_chars: int,
+    debug: bool,
 ) -> tuple[list[str], int]:
     prompt_template = (
         "Task context:\n{query}\n\n"
@@ -101,33 +199,54 @@ def _parallel_candidates(
         " assumptions, steps, risks, verification, and rollback."
     )
 
-    jobs: list[tuple[str, str]] = []
+    jobs: list[tuple[int, str, str]] = []
     for idx in range(c_fast):
-        jobs.append((fast_model, prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: fast-{idx + 1}"))
+        jobs.append(
+            (
+                len(jobs),
+                fast_model,
+                prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: fast-{idx + 1}",
+            )
+        )
     for idx in range(c_main):
-        jobs.append((main_model, prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: main-{idx + 1}"))
+        jobs.append(
+            (
+                len(jobs),
+                main_model,
+                prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: main-{idx + 1}",
+            )
+        )
 
     candidates: list[str] = []
     token_total = 0
+    ordered: dict[int, str] = {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
+        futures = {
             executor.submit(
-                _chat,
+                _chat_resilient,
                 client,
-                model_name,
+                [model_name],
                 system_prompt,
                 prompt,
                 request_config,
                 candidate_budget,
-            )
-            for model_name, prompt in jobs
-        ]
+                f"candidate-{job_index}",
+                retries,
+                min_chars,
+                debug,
+            ): job_index
+            for job_index, model_name, prompt in jobs
+        }
         for future in concurrent.futures.as_completed(futures):
+            job_index = futures[future]
             text, tokens = future.result()
             if text:
-                candidates.append(text)
+                ordered[job_index] = text
             token_total += tokens
+
+    for job_index in sorted(ordered):
+        candidates.append(ordered[job_index])
 
     return candidates, token_total
 
@@ -144,6 +263,10 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     k_keep = _int_param(config, "plansearchtrio_keep", 2, 1, 6)
     repair_rounds = _int_param(config, "plansearchtrio_repair_rounds", 1, 0, 3)
     max_workers = _int_param(config, "plansearchtrio_max_workers", 3, 1, 8)
+    stage_retries = _int_param(config, "plansearchtrio_stage_retries", 1, 0, 3)
+    min_stage_chars = _int_param(config, "plansearchtrio_min_stage_chars", 8, 1, 512)
+    fallback_on_empty = _bool_param(config, "plansearchtrio_fallback_on_empty", True)
+    debug = _bool_param(config, "plansearchtrio_debug", False)
     requested_budget = _requested_token_budget(config)
 
     budget_triage = _stage_budget(config, "plansearchtrio_budget_triage", min(256, requested_budget))
@@ -159,7 +282,18 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         "Summarize this task into: requirements, constraints, acceptance checks, and unknowns.\n\n"
         f"Task:\n{initial_query}"
     )
-    triage, tokens = _chat(client, fast_model, system_prompt, triage_prompt, config, budget_triage)
+    triage, tokens = _chat_resilient(
+        client=client,
+        models=[fast_model],
+        system_prompt=system_prompt,
+        user_prompt=triage_prompt,
+        request_config=config,
+        max_tokens=budget_triage,
+        stage_name="triage",
+        retries=stage_retries,
+        min_chars=min_stage_chars,
+        debug=debug,
+    )
     total_tokens += tokens
 
     candidates, tokens = _parallel_candidates(
@@ -174,11 +308,14 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         c_fast=c_fast,
         c_main=c_main,
         max_workers=max_workers,
+        retries=stage_retries,
+        min_chars=min_stage_chars,
+        debug=debug,
     )
     total_tokens += tokens
 
     if not candidates:
-        return "", total_tokens
+        return "PLANSEARCHTRIO_ERROR: no non-empty candidates generated after retries.", total_tokens
 
     critique_prompt = (
         "Evaluate candidates against constraints. Return top candidates and short rationale.\n\n"
@@ -186,7 +323,18 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         "Candidates:\n"
         + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(candidates))
     )
-    critique, tokens = _chat(client, main_model, system_prompt, critique_prompt, config, budget_critique)
+    critique, tokens = _chat_resilient(
+        client=client,
+        models=[main_model],
+        system_prompt=system_prompt,
+        user_prompt=critique_prompt,
+        request_config=config,
+        max_tokens=budget_critique,
+        stage_name="critique",
+        retries=stage_retries,
+        min_chars=min_stage_chars,
+        debug=debug,
+    )
     total_tokens += tokens
 
     selected_candidates = candidates[:k_keep]
@@ -199,8 +347,24 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         "Top candidates:\n"
         + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(selected_candidates))
     )
-    final_text, tokens = _chat(client, deep_model, system_prompt, synthesis_prompt, config, budget_synthesis)
+    synthesis_models = [deep_model]
+    if fallback_on_empty and main_model not in synthesis_models:
+        synthesis_models.append(main_model)
+    final_text, tokens = _chat_resilient(
+        client=client,
+        models=synthesis_models,
+        system_prompt=system_prompt,
+        user_prompt=synthesis_prompt,
+        request_config=config,
+        max_tokens=budget_synthesis,
+        stage_name="synthesis",
+        retries=stage_retries,
+        min_chars=min_stage_chars,
+        debug=debug,
+    )
     total_tokens += tokens
+    if not final_text:
+        return "PLANSEARCHTRIO_ERROR: synthesis returned empty content after retries and fallback.", total_tokens
 
     def _make_verifier_prompt(current_final_text: str) -> str:
         return (
@@ -210,15 +374,21 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             f"Final response:\n{current_final_text}"
         )
 
-    verdict, tokens = _chat(
-        client,
-        fast_model,
-        system_prompt,
-        _make_verifier_prompt(final_text),
-        config,
-        budget_verify,
+    verdict, tokens = _chat_resilient(
+        client=client,
+        models=[fast_model],
+        system_prompt=system_prompt,
+        user_prompt=_make_verifier_prompt(final_text),
+        request_config=config,
+        max_tokens=budget_verify,
+        stage_name="verify",
+        retries=stage_retries,
+        min_chars=4,
+        debug=debug,
     )
     total_tokens += tokens
+    if not verdict:
+        verdict = "PASS: verifier returned empty verdict"
 
     round_index = 0
     while verdict.upper().startswith("REPAIR") and round_index < repair_rounds:
@@ -228,26 +398,58 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             f"Verifier feedback:\n{verdict}\n\n"
             f"Current response:\n{final_text}"
         )
-        repair_instructions, tokens = _chat(client, main_model, system_prompt, repair_prompt, config, budget_repair)
+        repair_instructions, tokens = _chat_resilient(
+            client=client,
+            models=[main_model],
+            system_prompt=system_prompt,
+            user_prompt=repair_prompt,
+            request_config=config,
+            max_tokens=budget_repair,
+            stage_name="repair-instructions",
+            retries=stage_retries,
+            min_chars=min_stage_chars,
+            debug=debug,
+        )
         total_tokens += tokens
+        if not repair_instructions:
+            break
 
         rewrite_prompt = (
             "Revise the response using these fix instructions. Keep it complete and consistent.\n\n"
             f"Fix instructions:\n{repair_instructions}\n\n"
             f"Current response:\n{final_text}"
         )
-        final_text, tokens = _chat(client, deep_model, system_prompt, rewrite_prompt, config, budget_synthesis)
-        total_tokens += tokens
-
-        verdict, tokens = _chat(
-            client,
-            fast_model,
-            system_prompt,
-            _make_verifier_prompt(final_text),
-            config,
-            budget_verify,
+        final_text, tokens = _chat_resilient(
+            client=client,
+            models=synthesis_models,
+            system_prompt=system_prompt,
+            user_prompt=rewrite_prompt,
+            request_config=config,
+            max_tokens=budget_synthesis,
+            stage_name="rewrite",
+            retries=stage_retries,
+            min_chars=min_stage_chars,
+            debug=debug,
         )
         total_tokens += tokens
+        if not final_text:
+            return "PLANSEARCHTRIO_ERROR: rewrite returned empty content after retries and fallback.", total_tokens
+
+        verdict, tokens = _chat_resilient(
+            client=client,
+            models=[fast_model],
+            system_prompt=system_prompt,
+            user_prompt=_make_verifier_prompt(final_text),
+            request_config=config,
+            max_tokens=budget_verify,
+            stage_name="verify",
+            retries=stage_retries,
+            min_chars=4,
+            debug=debug,
+        )
+        total_tokens += tokens
+        if not verdict:
+            verdict = "PASS: verifier returned empty verdict"
 
     logger.info(
         "plansearchtrio complete fast=%s main=%s deep=%s c_fast=%s c_main=%s keep=%s repair_rounds=%s",
