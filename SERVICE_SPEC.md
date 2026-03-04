@@ -139,6 +139,10 @@ Studio launchd identity:
 - Label: `com.bebop.optillm-proxy`
 - Domain: `system`
 - Plist path: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`
+- Working directory must be `/Users/thestudio/optillm-proxy` so local plugins
+  resolve from `optillm/plugins`.
+- Do not force `--approach` at launch for deterministic prefixed aliases; allow
+  request/model-prefix approach selection.
 
 Scheduling classification (Studio policy):
 - Lane: `inference`
