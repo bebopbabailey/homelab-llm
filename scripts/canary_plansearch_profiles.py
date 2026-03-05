@@ -15,6 +15,7 @@ from typing import Any
 
 
 TRUNCATION_MARKER = "Response was truncated due to token limit"
+ERROR_TEXT_MARKERS = ("PLANSEARCHTRIO_ERROR:",)
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -71,12 +72,32 @@ def _is_truncated(payload: dict[str, Any], content: str) -> bool:
     return finish_reason == "length"
 
 
+def _contains_error_text(content: str) -> bool:
+    return any(marker in content for marker in ERROR_TEXT_MARKERS)
+
+
+def _parse_extra_payload(raw: str | None) -> dict[str, Any]:
+    if not raw:
+        return {}
+    raw = raw.strip()
+    if not raw:
+        return {}
+    if raw.startswith("@"):
+        payload = json.loads(Path(raw[1:]).read_text(encoding="utf-8"))
+    else:
+        payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError("extra payload must decode to a JSON object")
+    return payload
+
+
 def _one_call(
     url: str,
     bearer: str | None,
     model: str,
     prompt: str,
     max_tokens: int,
+    extra_payload: dict[str, Any],
 ) -> tuple[dict[str, Any], float]:
     body = {
         "model": model,
@@ -84,6 +105,7 @@ def _one_call(
         "max_tokens": max_tokens,
         "stream": False,
     }
+    body.update(extra_payload)
     req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), method="POST")
     req.add_header("Content-Type", "application/json")
     if bearer:
@@ -103,16 +125,18 @@ def _run_profile(
     model: str,
     prompts: list[str],
     max_tokens: int,
+    extra_payload: dict[str, Any],
 ) -> dict[str, Any]:
     latencies: list[float] = []
     chars: list[int] = []
     empty = 0
     trunc = 0
+    error_text = 0
     errors = 0
 
     for idx, prompt in enumerate(prompts, start=1):
         try:
-            payload, elapsed = _one_call(url, bearer, model, prompt, max_tokens)
+            payload, elapsed = _one_call(url, bearer, model, prompt, max_tokens, extra_payload)
             content = _extract_content(payload).strip()
             latencies.append(elapsed)
             chars.append(len(content))
@@ -120,6 +144,8 @@ def _run_profile(
                 empty += 1
             if _is_truncated(payload, content):
                 trunc += 1
+            if _contains_error_text(content):
+                error_text += 1
             print(f"[{model}] {idx}/{len(prompts)} ok latency={elapsed:.3f}s chars={len(content)}")
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
             errors += 1
@@ -136,6 +162,7 @@ def _run_profile(
         "errors": errors,
         "empty": empty,
         "trunc": trunc,
+        "error_text": error_text,
         "p50_seconds": round(p50, 4),
         "p95_seconds": round(p95, 4),
         "avg_chars": round(avg_chars, 1),
@@ -152,20 +179,27 @@ def main() -> int:
     parser.add_argument("--bearer", default=os.environ.get("LITELLM_API_KEY") or os.environ.get("LITELLM_PROXY_KEY"))
     parser.add_argument("--model-a", default="boost-plan")
     parser.add_argument("--model-b", default="boost-plan-trio")
+    parser.add_argument("--model-a-extra-json", default="", help="JSON object or @path for extra request payload fields")
+    parser.add_argument("--model-b-extra-json", default="", help="JSON object or @path for extra request payload fields")
     parser.add_argument("--max-tokens", type=int, default=160)
     parser.add_argument("--prompts", type=Path, default=_default_prompt_file())
     parser.add_argument("--p95-ratio-max", type=float, default=1.75)
     parser.add_argument("--allow-empty", action="store_true", help="Do not fail gate on empty outputs")
+    parser.add_argument("--allow-error-text", action="store_true", help="Do not fail gate on sentinel error strings")
     parser.add_argument("--out-json", type=Path, default=None)
     args = parser.parse_args()
 
     prompts = _read_prompts(args.prompts)
+    model_a_extra = _parse_extra_payload(args.model_a_extra_json)
+    model_b_extra = _parse_extra_payload(args.model_b_extra_json)
+
     baseline = _run_profile(
         url=args.url,
         bearer=args.bearer,
         model=args.model_a,
         prompts=prompts,
         max_tokens=args.max_tokens,
+        extra_payload=model_a_extra,
     )
     candidate = _run_profile(
         url=args.url,
@@ -173,11 +207,13 @@ def main() -> int:
         model=args.model_b,
         prompts=prompts,
         max_tokens=args.max_tokens,
+        extra_payload=model_b_extra,
     )
 
     baseline_p95 = baseline["p95_seconds"] or 1e-9
     ratio = float(candidate["p95_seconds"]) / float(baseline_p95)
     gate_empty_pass = args.allow_empty or int(candidate["empty"]) == 0
+    gate_error_text_pass = args.allow_error_text or int(candidate["error_text"]) == 0
     gate_latency_pass = ratio <= args.p95_ratio_max
 
     summary = {
@@ -185,11 +221,13 @@ def main() -> int:
         "candidate": candidate,
         "gate": {
             "require_zero_empty": not args.allow_empty,
+            "require_zero_error_text": not args.allow_error_text,
             "empty_pass": gate_empty_pass,
+            "error_text_pass": gate_error_text_pass,
             "p95_ratio": round(ratio, 4),
             "p95_ratio_max": args.p95_ratio_max,
             "latency_pass": gate_latency_pass,
-            "pass": gate_empty_pass and gate_latency_pass,
+            "pass": gate_empty_pass and gate_error_text_pass and gate_latency_pass,
         },
     }
 

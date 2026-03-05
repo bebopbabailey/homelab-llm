@@ -114,8 +114,22 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 ```
 Gate policy (current):
 - Candidate empty outputs must be zero.
+- Candidate sentinel error text outputs must be zero.
 - Candidate p95 latency must be `<= 1.75x` baseline (`boost-plan`) on the same prompt fixture.
 - Script exits non-zero when the gate fails.
+
+Compact Trio gate run (recommended for current canary):
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/canary_plansearch_profiles.py \
+  --url http://127.0.0.1:4000/v1/chat/completions \
+  --bearer "$LITELLM_API_KEY" \
+  --model-a boost-plan \
+  --model-b boost-plan-trio \
+  --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_latency_budget_ms":17000}' \
+  --max-tokens 160 \
+  --out-json /tmp/plansearchtrio_canary_compact.json
+```
 
 ### Streaming benchmark (TTFT + total time)
 

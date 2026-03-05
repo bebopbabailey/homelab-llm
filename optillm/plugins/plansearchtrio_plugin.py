@@ -11,6 +11,10 @@ DEFAULT_FAST_MODEL = "fast"
 DEFAULT_MAIN_MODEL = "main"
 DEFAULT_DEEP_MODEL = "deep"
 
+MODE_AUTO = "auto"
+MODE_COMPACT = "compact"
+MODE_FULL = "full"
+
 
 def _int_param(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
     value = config.get(key, default)
@@ -39,6 +43,14 @@ def _pick_models(config: dict[str, Any], requested_model: str | None) -> tuple[s
     main = str(config.get("plansearchtrio_main_model") or DEFAULT_MAIN_MODEL)
     deep = str(config.get("plansearchtrio_deep_model") or requested_model or DEFAULT_DEEP_MODEL)
     return fast, main, deep
+
+
+def _str_param(config: dict[str, Any], key: str, default: str) -> str:
+    value = config.get(key, default)
+    if not isinstance(value, str):
+        return default
+    value = value.strip().lower()
+    return value if value else default
 
 
 def _bool_param(config: dict[str, Any], key: str, default: bool) -> bool:
@@ -251,12 +263,82 @@ def _parallel_candidates(
     return candidates, token_total
 
 
+def _elapsed_ms(start_time: float) -> int:
+    return int((time.perf_counter() - start_time) * 1000)
+
+
+def _within_budget(start_time: float, latency_budget_ms: int) -> bool:
+    return _elapsed_ms(start_time) <= latency_budget_ms
+
+
+def _fallback_final_response(
+    client: Any,
+    system_prompt: str,
+    initial_query: str,
+    config: dict[str, Any],
+    main_model: str,
+    deep_model: str,
+    stage_retries: int,
+    requested_budget: int,
+    debug: bool,
+) -> tuple[str, int]:
+    fallback_budget = _stage_budget(config, "plansearchtrio_budget_fallback", min(768, requested_budget))
+    fallback_prompt = (
+        "Produce a concise but complete implementation plan with risks and rollback.\n\n"
+        f"Task:\n{initial_query}"
+    )
+    text, tokens = _chat_resilient(
+        client=client,
+        models=[main_model, deep_model],
+        system_prompt=system_prompt,
+        user_prompt=fallback_prompt,
+        request_config=config,
+        max_tokens=fallback_budget,
+        stage_name="fallback",
+        retries=stage_retries,
+        min_chars=8,
+        debug=debug,
+    )
+    if text:
+        return text, tokens
+    return (
+        "I could not complete the full trio pipeline for this request. "
+        "Here is a compact fallback plan: clarify scope, define constraints, stage rollout, and include rollback checks.",
+        tokens,
+    )
+
+
 def run(system_prompt: str, initial_query: str, client=None, model=None, request_config=None):
     if client is None:
         raise ValueError("plansearchtrio requires a configured provider client")
 
+    start_time = time.perf_counter()
     config: dict[str, Any] = dict(request_config or {})
     fast_model, main_model, deep_model = _pick_models(config, model)
+
+    mode = _str_param(config, "plansearchtrio_mode", MODE_AUTO)
+    if mode not in {MODE_AUTO, MODE_COMPACT, MODE_FULL}:
+        mode = MODE_AUTO
+
+    requested_budget = _requested_token_budget(config)
+
+    # Compact defaults are used for auto unless explicitly overridden.
+    if mode in {MODE_AUTO, MODE_COMPACT}:
+        compact_defaults: dict[str, Any] = {
+            "plansearchtrio_candidates_fast": 1,
+            "plansearchtrio_candidates_main": 1,
+            "plansearchtrio_keep": 1,
+            "plansearchtrio_repair_rounds": 0,
+            "plansearchtrio_stage_retries": 0,
+            "plansearchtrio_budget_triage": min(96, requested_budget),
+            "plansearchtrio_budget_candidate": min(128, requested_budget),
+            "plansearchtrio_budget_critique": min(160, requested_budget),
+            "plansearchtrio_budget_synthesis": min(512, requested_budget),
+            "plansearchtrio_budget_verify": min(64, requested_budget),
+            "plansearchtrio_budget_repair": min(256, requested_budget),
+        }
+        for key, value in compact_defaults.items():
+            config.setdefault(key, value)
 
     c_fast = _int_param(config, "plansearchtrio_candidates_fast", 2, 1, 8)
     c_main = _int_param(config, "plansearchtrio_candidates_main", 1, 1, 8)
@@ -266,8 +348,14 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     stage_retries = _int_param(config, "plansearchtrio_stage_retries", 1, 0, 3)
     min_stage_chars = _int_param(config, "plansearchtrio_min_stage_chars", 8, 1, 512)
     fallback_on_empty = _bool_param(config, "plansearchtrio_fallback_on_empty", True)
+    latency_budget_ms = _int_param(config, "plansearchtrio_latency_budget_ms", 17000, 1000, 300000)
     debug = _bool_param(config, "plansearchtrio_debug", False)
-    requested_budget = _requested_token_budget(config)
+
+    default_enable_critique = mode == MODE_FULL
+    default_enable_repair = mode == MODE_FULL
+    enable_critique = _bool_param(config, "plansearchtrio_enable_critique", default_enable_critique)
+    enable_verify = _bool_param(config, "plansearchtrio_enable_verify", True)
+    enable_repair = _bool_param(config, "plansearchtrio_enable_repair", default_enable_repair)
 
     budget_triage = _stage_budget(config, "plansearchtrio_budget_triage", min(256, requested_budget))
     budget_candidate = _stage_budget(config, "plansearchtrio_budget_candidate", min(384, requested_budget))
@@ -315,27 +403,40 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     total_tokens += tokens
 
     if not candidates:
-        return "PLANSEARCHTRIO_ERROR: no non-empty candidates generated after retries.", total_tokens
+        fallback_text, fallback_tokens = _fallback_final_response(
+            client=client,
+            system_prompt=system_prompt,
+            initial_query=initial_query,
+            config=config,
+            main_model=main_model,
+            deep_model=deep_model,
+            stage_retries=stage_retries,
+            requested_budget=requested_budget,
+            debug=debug,
+        )
+        return fallback_text, total_tokens + fallback_tokens
 
-    critique_prompt = (
-        "Evaluate candidates against constraints. Return top candidates and short rationale.\n\n"
-        f"Constraints:\n{triage}\n\n"
-        "Candidates:\n"
-        + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(candidates))
-    )
-    critique, tokens = _chat_resilient(
-        client=client,
-        models=[main_model],
-        system_prompt=system_prompt,
-        user_prompt=critique_prompt,
-        request_config=config,
-        max_tokens=budget_critique,
-        stage_name="critique",
-        retries=stage_retries,
-        min_chars=min_stage_chars,
-        debug=debug,
-    )
-    total_tokens += tokens
+    critique = ""
+    if enable_critique and _within_budget(start_time, latency_budget_ms):
+        critique_prompt = (
+            "Evaluate candidates against constraints. Return top candidates and short rationale.\n\n"
+            f"Constraints:\n{triage}\n\n"
+            "Candidates:\n"
+            + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(candidates))
+        )
+        critique, tokens = _chat_resilient(
+            client=client,
+            models=[main_model],
+            system_prompt=system_prompt,
+            user_prompt=critique_prompt,
+            request_config=config,
+            max_tokens=budget_critique,
+            stage_name="critique",
+            retries=stage_retries,
+            min_chars=min_stage_chars,
+            debug=debug,
+        )
+        total_tokens += tokens
 
     selected_candidates = candidates[:k_keep]
     synthesis_prompt = (
@@ -343,10 +444,11 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         "Output: coherent plan, implementation details, risks, rollback.\n\n"
         f"Task:\n{initial_query}\n\n"
         f"Constraints:\n{triage}\n\n"
-        f"Critique:\n{critique}\n\n"
+        f"Critique:\n{critique or 'N/A'}\n\n"
         "Top candidates:\n"
         + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(selected_candidates))
     )
+
     synthesis_models = [deep_model]
     if fallback_on_empty and main_model not in synthesis_models:
         synthesis_models.append(main_model)
@@ -363,8 +465,20 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         debug=debug,
     )
     total_tokens += tokens
+
     if not final_text:
-        return "PLANSEARCHTRIO_ERROR: synthesis returned empty content after retries and fallback.", total_tokens
+        fallback_text, fallback_tokens = _fallback_final_response(
+            client=client,
+            system_prompt=system_prompt,
+            initial_query=initial_query,
+            config=config,
+            main_model=main_model,
+            deep_model=deep_model,
+            stage_retries=stage_retries,
+            requested_budget=requested_budget,
+            debug=debug,
+        )
+        return fallback_text, total_tokens + fallback_tokens
 
     def _make_verifier_prompt(current_final_text: str) -> str:
         return (
@@ -374,24 +488,31 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             f"Final response:\n{current_final_text}"
         )
 
-    verdict, tokens = _chat_resilient(
-        client=client,
-        models=[fast_model],
-        system_prompt=system_prompt,
-        user_prompt=_make_verifier_prompt(final_text),
-        request_config=config,
-        max_tokens=budget_verify,
-        stage_name="verify",
-        retries=stage_retries,
-        min_chars=4,
-        debug=debug,
-    )
-    total_tokens += tokens
-    if not verdict:
-        verdict = "PASS: verifier returned empty verdict"
+    verdict = "PASS"
+    if enable_verify and _within_budget(start_time, latency_budget_ms):
+        verdict, tokens = _chat_resilient(
+            client=client,
+            models=[fast_model],
+            system_prompt=system_prompt,
+            user_prompt=_make_verifier_prompt(final_text),
+            request_config=config,
+            max_tokens=budget_verify,
+            stage_name="verify",
+            retries=stage_retries,
+            min_chars=4,
+            debug=debug,
+        )
+        total_tokens += tokens
+        if not verdict:
+            verdict = "PASS: verifier returned empty verdict"
 
     round_index = 0
-    while verdict.upper().startswith("REPAIR") and round_index < repair_rounds:
+    while (
+        enable_repair
+        and _within_budget(start_time, latency_budget_ms)
+        and verdict.upper().startswith("REPAIR")
+        and round_index < repair_rounds
+    ):
         round_index += 1
         repair_prompt = (
             "Given the verifier feedback, produce precise fix instructions.\n\n"
@@ -433,26 +554,41 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         )
         total_tokens += tokens
         if not final_text:
-            return "PLANSEARCHTRIO_ERROR: rewrite returned empty content after retries and fallback.", total_tokens
+            fallback_text, fallback_tokens = _fallback_final_response(
+                client=client,
+                system_prompt=system_prompt,
+                initial_query=initial_query,
+                config=config,
+                main_model=main_model,
+                deep_model=deep_model,
+                stage_retries=stage_retries,
+                requested_budget=requested_budget,
+                debug=debug,
+            )
+            return fallback_text, total_tokens + fallback_tokens
 
-        verdict, tokens = _chat_resilient(
-            client=client,
-            models=[fast_model],
-            system_prompt=system_prompt,
-            user_prompt=_make_verifier_prompt(final_text),
-            request_config=config,
-            max_tokens=budget_verify,
-            stage_name="verify",
-            retries=stage_retries,
-            min_chars=4,
-            debug=debug,
-        )
-        total_tokens += tokens
-        if not verdict:
-            verdict = "PASS: verifier returned empty verdict"
+        if enable_verify and _within_budget(start_time, latency_budget_ms):
+            verdict, tokens = _chat_resilient(
+                client=client,
+                models=[fast_model],
+                system_prompt=system_prompt,
+                user_prompt=_make_verifier_prompt(final_text),
+                request_config=config,
+                max_tokens=budget_verify,
+                stage_name="verify",
+                retries=stage_retries,
+                min_chars=4,
+                debug=debug,
+            )
+            total_tokens += tokens
+            if not verdict:
+                verdict = "PASS: verifier returned empty verdict"
+        else:
+            verdict = "PASS"
 
     logger.info(
-        "plansearchtrio complete fast=%s main=%s deep=%s c_fast=%s c_main=%s keep=%s repair_rounds=%s",
+        "plansearchtrio complete mode=%s fast=%s main=%s deep=%s c_fast=%s c_main=%s keep=%s repair_rounds=%s elapsed_ms=%s",
+        mode,
         fast_model,
         main_model,
         deep_model,
@@ -460,5 +596,6 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         c_main,
         k_keep,
         repair_rounds,
+        _elapsed_ms(start_time),
     )
     return final_text, total_tokens

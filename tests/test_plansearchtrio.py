@@ -38,6 +38,8 @@ class _FakeCompletions:
     def __init__(self):
         self.verifier_calls = 0
         self.synthesis_attempts = 0
+        self.candidate_markers: list[str] = []
+        self.critique_calls = 0
 
     def create(self, **kwargs):
         prompt = kwargs["messages"][1]["content"]
@@ -46,8 +48,10 @@ class _FakeCompletions:
             return _FakeResponse("requirements: complete task; constraints: keep scope")
         if "Candidate ID" in prompt:
             marker = prompt.split("Candidate ID:", 1)[1].strip().splitlines()[0]
+            self.candidate_markers.append(marker)
             return _FakeResponse(f"candidate-plan-{marker}")
         if prompt.startswith("Evaluate candidates"):
+            self.critique_calls += 1
             return _FakeResponse("top: candidate 1 then candidate 2")
         if prompt.startswith("Produce the final response"):
             self.synthesis_attempts += 1
@@ -121,12 +125,14 @@ class PlanSearchTrioTests(unittest.TestCase):
     def test_run_executes_repair_loop_and_returns_tokens(self):
         client = _FakeClient()
         cfg = {
+            "plansearchtrio_mode": "full",
             "plansearchtrio_candidates_fast": 2,
             "plansearchtrio_candidates_main": 1,
             "plansearchtrio_repair_rounds": 1,
             "plansearchtrio_max_workers": 2,
             "plansearchtrio_stage_retries": 0,
             "plansearchtrio_fallback_on_empty": True,
+            "plansearchtrio_enable_repair": True,
         }
         content, completion_tokens = plansearchtrio_plugin.run(
             system_prompt="system",
@@ -138,7 +144,7 @@ class PlanSearchTrioTests(unittest.TestCase):
         self.assertIn("rollback", content)
         self.assertGreater(completion_tokens, 0)
 
-    def test_run_returns_explicit_error_when_all_stages_empty(self):
+    def test_run_uses_fallback_without_error_prefix_when_all_stages_empty(self):
         client = _FakeClientAllEmpty()
         content, completion_tokens = plansearchtrio_plugin.run(
             system_prompt="system",
@@ -150,8 +156,43 @@ class PlanSearchTrioTests(unittest.TestCase):
                 "plansearchtrio_fallback_on_empty": True,
             },
         )
-        self.assertTrue(content.startswith("PLANSEARCHTRIO_ERROR:"))
+        self.assertTrue(content)
+        self.assertFalse(content.startswith("PLANSEARCHTRIO_ERROR:"))
         self.assertGreaterEqual(completion_tokens, 0)
+
+    def test_auto_mode_uses_compact_candidate_counts(self):
+        client = _FakeClient()
+        content, _ = plansearchtrio_plugin.run(
+            system_prompt="system",
+            initial_query="build a migration plan",
+            client=client,
+            model="deep",
+            request_config={"plansearchtrio_mode": "auto", "plansearchtrio_stage_retries": 0},
+        )
+        self.assertTrue(content)
+        self.assertEqual(len(client.chat.completions.candidate_markers), 2)
+
+    def test_latency_budget_skips_critique(self):
+        client = _FakeClient()
+        original_within_budget = plansearchtrio_plugin._within_budget
+        plansearchtrio_plugin._within_budget = lambda *_args, **_kwargs: False
+        try:
+            content, _ = plansearchtrio_plugin.run(
+                system_prompt="system",
+                initial_query="build a migration plan",
+                client=client,
+                model="deep",
+                request_config={
+                    "plansearchtrio_mode": "full",
+                    "plansearchtrio_latency_budget_ms": 1,
+                    "plansearchtrio_enable_critique": True,
+                    "plansearchtrio_stage_retries": 0,
+                },
+            )
+        finally:
+            plansearchtrio_plugin._within_budget = original_within_budget
+        self.assertTrue(content)
+        self.assertEqual(client.chat.completions.critique_calls, 0)
 
     def test_parallel_candidates_preserve_job_order(self):
         original = plansearchtrio_plugin._chat_resilient
