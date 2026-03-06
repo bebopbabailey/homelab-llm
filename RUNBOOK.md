@@ -126,10 +126,14 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
   --bearer "$LITELLM_API_KEY" \
   --model-a boost-plan \
   --model-b boost-plan-trio \
-  --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_latency_budget_ms":17000}' \
+  --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_latency_budget_ms":17000,"plansearchtrio_reasoning_effort_synthesis":"high","plansearchtrio_reasoning_effort_rewrite":"high"}' \
   --max-tokens 160 \
   --out-json /tmp/plansearchtrio_canary_compact.json
 ```
+
+Reasoning-effort note:
+- Trio applies stage-scoped reasoning effort only for deep `synthesis`/`rewrite`.
+- If the backend rejects `reasoning_effort`, trio retries the stage once without it.
 
 ### Streaming benchmark (TTFT + total time)
 

@@ -14,6 +14,7 @@ DEFAULT_DEEP_MODEL = "deep"
 MODE_AUTO = "auto"
 MODE_COMPACT = "compact"
 MODE_FULL = "full"
+ALLOWED_REASONING_EFFORTS = {"low", "medium", "high"}
 
 
 def _int_param(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
@@ -114,6 +115,43 @@ def _build_call_config(config: dict[str, Any], max_tokens: int) -> dict[str, Any
     return payload
 
 
+def _normalize_reasoning_effort(value: Any, default: str) -> str:
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"off", "none", "false", "0"}:
+            return ""
+        if normalized in ALLOWED_REASONING_EFFORTS:
+            return normalized
+    return default
+
+
+def _reasoning_effort_for_stage(
+    config: dict[str, Any],
+    stage_name: str,
+    model: str,
+    deep_model: str,
+) -> str:
+    if model != deep_model:
+        return ""
+    if stage_name == "synthesis":
+        return _normalize_reasoning_effort(config.get("plansearchtrio_reasoning_effort_synthesis"), "high")
+    if stage_name == "rewrite":
+        return _normalize_reasoning_effort(config.get("plansearchtrio_reasoning_effort_rewrite"), "high")
+    return ""
+
+
+def _is_reasoning_effort_param_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    patterns = (
+        "reasoning_effort",
+        "extra inputs are not permitted",
+        "unrecognized request argument",
+        "unsupported parameter",
+        "unknown parameter",
+    )
+    return any(pattern in message for pattern in patterns)
+
+
 def _chat(
     client: Any,
     model: str,
@@ -122,6 +160,7 @@ def _chat(
     request_config: dict[str, Any],
     max_tokens: int,
     stage_name: str,
+    deep_model: str,
     debug: bool = False,
 ) -> tuple[str, int]:
     start = time.perf_counter()
@@ -133,15 +172,32 @@ def _chat(
         ],
     }
     payload.update(_build_call_config(request_config, max_tokens))
-    response = client.chat.completions.create(**payload)
+    reasoning_effort = _reasoning_effort_for_stage(request_config, stage_name, model, deep_model)
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
+    try:
+        response = client.chat.completions.create(**payload)
+    except Exception as exc:
+        if payload.get("reasoning_effort") and _is_reasoning_effort_param_error(exc):
+            logger.warning(
+                "plansearchtrio stage=%s model=%s rejected reasoning_effort=%s; retrying without it",
+                stage_name,
+                model,
+                payload.get("reasoning_effort"),
+            )
+            payload.pop("reasoning_effort", None)
+            response = client.chat.completions.create(**payload)
+        else:
+            raise
     text = _extract_text(response).strip()
     tokens = _extract_completion_tokens(response)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     if debug:
         logger.info(
-            "plansearchtrio stage=%s model=%s chars=%s completion_tokens=%s latency_ms=%s",
+            "plansearchtrio stage=%s model=%s reasoning_effort=%s chars=%s completion_tokens=%s latency_ms=%s",
             stage_name,
             model,
+            reasoning_effort or "none",
             len(text),
             tokens,
             elapsed_ms,
@@ -157,6 +213,7 @@ def _chat_resilient(
     request_config: dict[str, Any],
     max_tokens: int,
     stage_name: str,
+    deep_model: str,
     retries: int,
     min_chars: int,
     debug: bool = False,
@@ -172,6 +229,7 @@ def _chat_resilient(
                 request_config=request_config,
                 max_tokens=max_tokens,
                 stage_name=stage_name,
+                deep_model=deep_model,
                 debug=debug,
             )
             token_total += tokens
@@ -196,6 +254,7 @@ def _parallel_candidates(
     triage: str,
     fast_model: str,
     main_model: str,
+    deep_model: str,
     candidate_budget: int,
     c_fast: int,
     c_main: int,
@@ -244,6 +303,7 @@ def _parallel_candidates(
                 request_config,
                 candidate_budget,
                 f"candidate-{job_index}",
+                deep_model,
                 retries,
                 min_chars,
                 debug,
@@ -295,6 +355,7 @@ def _fallback_final_response(
         request_config=config,
         max_tokens=fallback_budget,
         stage_name="fallback",
+        deep_model=deep_model,
         retries=stage_retries,
         min_chars=8,
         debug=debug,
@@ -378,6 +439,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         request_config=config,
         max_tokens=budget_triage,
         stage_name="triage",
+        deep_model=deep_model,
         retries=stage_retries,
         min_chars=min_stage_chars,
         debug=debug,
@@ -392,6 +454,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         triage=triage,
         fast_model=fast_model,
         main_model=main_model,
+        deep_model=deep_model,
         candidate_budget=budget_candidate,
         c_fast=c_fast,
         c_main=c_main,
@@ -432,6 +495,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             request_config=config,
             max_tokens=budget_critique,
             stage_name="critique",
+            deep_model=deep_model,
             retries=stage_retries,
             min_chars=min_stage_chars,
             debug=debug,
@@ -460,6 +524,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         request_config=config,
         max_tokens=budget_synthesis,
         stage_name="synthesis",
+        deep_model=deep_model,
         retries=stage_retries,
         min_chars=min_stage_chars,
         debug=debug,
@@ -498,6 +563,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             request_config=config,
             max_tokens=budget_verify,
             stage_name="verify",
+            deep_model=deep_model,
             retries=stage_retries,
             min_chars=4,
             debug=debug,
@@ -527,6 +593,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             request_config=config,
             max_tokens=budget_repair,
             stage_name="repair-instructions",
+            deep_model=deep_model,
             retries=stage_retries,
             min_chars=min_stage_chars,
             debug=debug,
@@ -548,6 +615,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             request_config=config,
             max_tokens=budget_synthesis,
             stage_name="rewrite",
+            deep_model=deep_model,
             retries=stage_retries,
             min_chars=min_stage_chars,
             debug=debug,
@@ -576,6 +644,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
                 request_config=config,
                 max_tokens=budget_verify,
                 stage_name="verify",
+                deep_model=deep_model,
                 retries=stage_retries,
                 min_chars=4,
                 debug=debug,

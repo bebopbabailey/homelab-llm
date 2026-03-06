@@ -211,6 +211,12 @@ Plansearch semantics patch:
   multiplicative fanout.
 - For `plansearchtrio`, stage budget defaults are constrained by request token
   cap (`max_completion_tokens` / `max_tokens`) to keep latency bounded in small calls.
+- For `plansearchtrio`, deep synthesis stages can use stage-scoped reasoning effort:
+  - `plansearchtrio_reasoning_effort_synthesis` (default `high`)
+  - `plansearchtrio_reasoning_effort_rewrite` (default `high`)
+  - Allowed values: `low|medium|high` (or `off|none` to disable)
+  - Applied only when the call is on the configured `deep` model; earlier stages remain unchanged.
+  - If a backend rejects `reasoning_effort`, trio retries that stage once without it.
 
 ---
 

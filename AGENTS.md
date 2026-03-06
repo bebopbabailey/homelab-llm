@@ -1,93 +1,41 @@
-# Repository Guidelines
+# AGENTS — optillm-proxy
 
-## Project Structure & Module Organization
-- Service docs live in `README.md` and `SERVICE_SPEC.md`.
-- This service is a Studio-hosted proxy that sits behind LiteLLM.
-- Reference platform constraints in `docs/foundation/constraints-and-decisions.md`.
-- Reference topology in `docs/foundation/topology.md`.
+## Scope
+- Studio-hosted OptiLLM proxy used behind LiteLLM `boost*` aliases.
+- This service is an upstream optimization proxy, not a primary client entrypoint.
+- Source of truth: `SERVICE_SPEC.md`, `RUNBOOK.md`, `CONSTRAINTS.md`.
 
-## Build, Test, and Development Commands
-Use `uv` only. Do not use Docker.
-- `uv venv .venv`
-- `uv pip install optillm==0.3.12`
-- `OPENAI_API_KEY="<key>" OPTILLM_API_KEY="<key>" uv run optillm --host 127.0.0.1 --port 4020 --base-url http://127.0.0.1:4000/v1 --approach none --model <base-model>`
+## Runtime Reality
+- Runtime owner: launchd label `com.bebop.optillm-proxy` on Studio.
+- Bind/port: `0.0.0.0:4020` (current deployment contract).
+- Auth: proxy requires bearer token (`OPTILLM_API_KEY`) for API access.
+- Upstream: LiteLLM path as documented in service/canonical docs.
+- Deployment source of truth remains this repo; deployment helper is
+  `scripts/deploy_studio.sh`.
 
-## Coding Style & Naming Conventions
-- This service is a thin proxy; keep changes configuration-driven.
-- Use plain logical model names for LiteLLM aliases (e.g., `plan-architect`).
-- OptiLLM approach selection is passed in request body as `optillm_approach`.
+## Guardrails
+- Do not add extra OptiLLM daemons/ports without explicit design approval.
+- Do not relax auth or exposure constraints without approved security plan.
+- Avoid routing loops (proxy -> LiteLLM -> proxy).
+- No secrets in git-managed files.
 
-## Testing Guidelines
-- Minimal validation is via HTTP health and `/v1/models`.
-- Keep tests light; prefer curl-based smoke checks unless code is added.
+## Working Files
+- `README.md` (operational behavior)
+- `SERVICE_SPEC.md` (interface + placement contract)
+- `RUNBOOK.md` (launchd operations + smoke checks)
+- `CONSTRAINTS.md` (non-negotiables)
+- `scripts/` (deploy and canary helpers)
 
-## Operational Constraints
-- Current deployment is a Studio launchd service on `0.0.0.0:4020` (LAN-exposed, auth required).
-- Clients should not call this directly; use LiteLLM `boost`.
-- Current upstream path is Mini LiteLLM via tailnet TCP forward (`http://100.69.99.60:4443/v1`).
-- `boost` and `boost-deep` are routed through the same single OptiLLM instance.
-- Ports are immutable; this service uses port `4020`.
-- MCP or other plugins should be planned and documented before enabling.
-- Do not store secrets in the repo.
+## Verification Commands
+```bash
+curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer $OPTILLM_API_KEY" | jq .
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer $LITELLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' | jq .
+```
 
-## Integration Requirements
-When adding this service to the system:
-- Keep LiteLLM routing **direct** to MLX by default.
-- OptiLLM is called via LiteLLM `boost` (Studio `http://192.168.1.72:4020/v1`).
-- Prefer a single OptiLLM proxy instance; separate handles should be model-routing decisions in LiteLLM, not extra proxy daemons.
-- Update `platform/ops/scripts/healthcheck.sh` and `platform/ops/scripts/restart-all.sh`.
-- Add a systemd unit in `platform/ops/systemd/` and an env file outside the repo.
-
-## Systemd Expectations (planned)
-- Prefer a system-level unit: `/etc/systemd/system/optillm-proxy.service`.
-- Use `EnvironmentFile=/etc/optillm-proxy/env` for secrets.
-- ExecStart should pass explicit flags for host, port, base URL, approach, model.
-
-## Current Task: OptiLLM ensembles (2026-01)
-Goal: implement multi-model OptiLLM ensembles (no single-model configs) across
-`xl`, `l`, `m`, `s` tiers plus `high`, `balanced`, `fast`.
-
-### Required changes (in order)
-1) **Update LiteLLM routing**
-   - File: `layer-gateway/litellm-orch/config/router.yaml`
-   - Ensure `litellm_settings.drop_params: false` for param pass-through.
-   - Keep MLX handles routed directly to MLX ports.
-
-2) **Optional: handles registry**
-   - File: `layer-gateway/registry/handles.jsonl`
-   - Only add `opt-*` handles if we explicitly want separate OptiLLM entrypoints.
-   - Default is **no opt-* handles**; keep base handles and use `optillm_approach`.
-
-3) **Update OptiLLM proxy config**
-   - File: `~/.optillm/proxy_config.yaml`
-   - Ensure upstream points to LiteLLM only (`http://127.0.0.1:4000/v1`).
-   - Verify enabled plugins and approach expectations.
-
-4) **Docs**
-   - Update `docs/foundation/optillm-techniques.md` with tier guidance.
-   - Update `docs/INTEGRATIONS.md` if new handles are exposed.
-   - Update `docs/journal/*` with decision and rationale.
-
-### Validation checklist
-- `python3 scripts/validate_handles.py`
-- `curl -fsS http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | rg '^mlx-'`
-- Optional OptiLLM smoke test (direct):
-  - `curl -fsS http://127.0.0.1:4020/v1/chat/completions -H "Authorization: Bearer $OPTILLM_API_KEY" -H "Content-Type: application/json" -d '{"model":"mlx-<handle>","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}'`
-
-### Controller helpers
-- OV utility ensembles (Mini):
-  - `ovctl ensemble opt-route-fast-s`
-  - `ovctl ensemble opt-extract-fast-s`
-  - `ovctl ensemble opt-clean-fast-s`
-  - `ovctl ensemble opt-summarize-fast-s`
-  - `ovctl ensemble opt-privacy-fast-s`
-- MLX lane assignment (Studio):
-  - `mlxctl assign-team --dry-run`
-  - `mlxctl assign-team`
-  - `mlxctl sync-gateway`
-
-### Constraints
-- Registry values use kebab-case only (letters, digits, dashes).
-- OptiLLM approaches must match the OptiLLM approach registry (dash/underscore as provided).
-- Do not edit files under `docs/archive/`.
-- Do not create single-model OptiLLM configs for this phase.
+## Change Policy
+- Keep docs and runtime guidance synchronized with launchd/system topology.
+- If runtime args, bind/port, auth, or upstream wiring changes, update service
+  docs and canonical platform docs per `docs/_core/CHANGE_RULES.md`.
