@@ -1,8 +1,8 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, websearch-orch, Ollama.
-- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal`) and OptiLLM proxy (`:4020`).
+- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
+- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
 - Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.
@@ -22,6 +22,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Access: `ssh studio`.
 - Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.
 - Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8102/v1/models`.
+  Vector-store checks: `lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'`, `curl http://127.0.0.1:55440/health`.
 
 ### Orin AGX
 - Role: voice services (STT/TTS via Voice Gateway) + edge inference + performance experiments.
@@ -47,8 +48,9 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
+| Studio main vector DB (postgres+pgvector) | Studio | 55432 | http://127.0.0.1:55432 | n/a |
+| Studio main memory API | Studio | 55440 | http://127.0.0.1:55440 | /health |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
-| websearch-orch | Mini | 8899 | http://127.0.0.1:8899 | /health |
 | MLX inference lanes (active) | Studio | 8100/8101/8102 | http://192.168.1.72:8100/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
@@ -84,7 +86,8 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   LiteLLM 4000, Open WebUI 3000, MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, websearch-orch 8899.
+- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
+  Studio local-only: main vector DB 55432, memory API 55440.
 - Internal tailnet transport used by Studio OptiLLM upstream:
   - `100.69.99.60:4443` (Tailscale TCP forward on Mini -> `127.0.0.1:4000`)
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
@@ -93,3 +96,18 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   - Open WebUI: `/etc/open-webui/env`
   - OpenVINO: `/etc/homelab-llm/ov-server.env`
   - SearXNG: `/etc/searxng/env`
+
+## Web Search Contract
+- Open WebUI owns web-search UX plus provider/loader configuration.
+- Current Mini deployment uses documented native Open WebUI settings:
+  `WEB_SEARCH_ENGINE=searxng`,
+  `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`,
+  `WEB_SEARCH_RESULT_COUNT=6`,
+  `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
+  `WEB_LOADER_ENGINE=safe_web`,
+  `WEB_LOADER_TIMEOUT=15`,
+  `WEB_LOADER_CONCURRENT_REQUESTS=2`,
+  `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
+- LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
+- `websearch-orch` is not part of the supported runtime path.

@@ -103,9 +103,28 @@ if a param is rejected by the backend.
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
 - Health: `/health` on port 3000.
-- Web search (active path): `SEARXNG_QUERY_URL=http://127.0.0.1:8899/search?q=<query>` via `websearch-orch`.
-- External page extraction (active path): `WEB_LOADER_ENGINE=external` with `EXTERNAL_WEB_LOADER_URL=http://127.0.0.1:8899/web_loader`.
+- Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
+- Result and loader policy is explicit in documented Open WebUI env vars:
+  `WEB_SEARCH_RESULT_COUNT=6`, `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
+  `WEB_LOADER_ENGINE=safe_web`, `WEB_LOADER_TIMEOUT=15`,
+  `WEB_LOADER_CONCURRENT_REQUESTS=2`,
+  `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
 - LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
+- `ENABLE_PERSISTENT_CONFIG=False` is active in deployment, so systemd env/drop-ins
+  are authoritative and Admin UI changes to these settings do not persist across restart.
+
+## Web Search Ownership Boundary
+- Open WebUI owns web-search UX plus provider/loader configuration.
+- LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
+- vLLM owns inference and explicit structured decoding only when the caller requests it.
+- No custom web-search business logic lives in LiteLLM guardrails.
+- No custom business logic is coupled to Open WebUI prompt internals.
+- Any future external search/loader service must use documented Open WebUI external
+  endpoints with a clean service boundary.
+- Migration note: the old custom path was intentionally removed. There is no active
+  `websearch-orch` middle service, no legacy source-tag coupling, and no LiteLLM
+  schema injection/repair/render loop for web search.
 
 ## Tailscale Services (tailnet HTTPS)
 - Services are exposed via `tailscale serve --service=svc:<name>` on the Mini.
@@ -163,10 +182,11 @@ if a param is rejected by the backend.
 - Requests must include bearer auth for the target backend key (`OPTILLM_API_KEY` for `boost`).
 
 Deterministic coding-quality aliases (current):
-- `boost-plan` -> `plansearch-openai/deep`
-- `boost-plan-verify` -> `self_consistency-openai/deep`
-- `boost-ideate` -> `moa-openai/deep`
-- `boost-fastdraft` -> `bon-openai/fast`
+- `boost-plan` -> `plansearch-deep`
+- `boost-plan-trio` -> `plansearchtrio-deep` (canary)
+- `boost-plan-verify` -> `self_consistency-deep`
+- `boost-ideate` -> `moa-deep`
+- `boost-fastdraft` -> `bon-fast`
 
 These aliases avoid request-body coupling in OpenCode while keeping approach selection explicit.
 
@@ -209,6 +229,7 @@ and where this repo uses callbacks vs guardrails.
 ### Boost handle routing (current)
 - LiteLLM `boost*` aliases route to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
 - `boost` / `boost-deep` keep request-body approach override support (`optillm_approach`).
+- `boost-plan-trio` is available as a canary staged orchestrator plugin.
 - `boost-plan` / `boost-plan-verify` / `boost-ideate` / `boost-fastdraft` use
   model-prefix approach selection for deterministic OpenCode workflows.
 

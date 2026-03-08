@@ -131,6 +131,73 @@ Staged apply order:
    `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8102 --json`
 4) full strict audit
 
+### Studio main vector-store labels (background lane)
+Studio memory store labels included in policy checks:
+- `com.bebop.pgvector-main`
+- `com.bebop.memory-api-main`
+- `com.bebop.memory-ingest-nightly`
+- `com.bebop.memory-backup-nightly`
+
+Read-only audit checks:
+```bash
+uv run python platform/ops/scripts/validate_studio_policy.py --json
+uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.pgvector-main.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.memory-api-main.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+```
+
+Runtime smoke checks:
+```bash
+ssh studio "lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'"
+ssh studio "curl -fsS http://127.0.0.1:55440/health | jq ."
+```
+
+### Studio vector-store retrieval quality gate (QG1)
+Goal: tune retrieval defaults using a fixed judged query set before integration.
+
+Print fixed query pack:
+```bash
+cd /home/christopherbailey/homelab-llm
+uv run python layer-data/vector-db/scripts/eval_memory_quality.py print-pack \
+  --pack layer-data/vector-db/eval/query_pack.v1.jsonl
+```
+
+Baseline run on Studio (`R0`):
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py run-pack \
+     --pack layer-data/vector-db/eval/query_pack.v1.jsonl \
+     --api-base http://127.0.0.1:55440 \
+     --model-space qwen \
+     --top-k 10 \
+     --lexical-k 30 \
+     --vector-k 30 \
+     --run-id R0 \
+     --out /Users/thestudio/data/memory-main/eval/R0.run.json"
+scp studio:/Users/thestudio/data/memory-main/eval/R0.run.json \
+  /home/christopherbailey/homelab-data/memory-eval/R0.run.json
+cp /home/christopherbailey/homelab-llm/layer-data/vector-db/eval/judgment_template.v1.csv \
+  /home/christopherbailey/homelab-data/memory-eval/R0.judgments.csv
+```
+
+After manual top-10 labeling (`grade: 2 relevant / 1 partial / 0 irrelevant`):
+```bash
+cd /home/christopherbailey/homelab-llm
+uv run python layer-data/vector-db/scripts/eval_memory_quality.py score \
+  --run-json /home/christopherbailey/homelab-data/memory-eval/R0.run.json \
+  --judgments /home/christopherbailey/homelab-data/memory-eval/R0.judgments.csv \
+  --out /home/christopherbailey/homelab-data/memory-eval/R0.score.json
+```
+
+Gate thresholds:
+- `hit_at_5 >= 0.85`
+- `mrr_at_10 >= 0.65`
+- `ndcg_at_10 >= 0.70`
+- `bad_hit_rate_at_5 <= 0.30`
+- `p95_latency_ms <= 800`
+- every bucket `hit_at_5 >= 0.75`
+
 Runtime lineage check expectation:
 - ports `8100/8101/8102` listeners are `vllm serve`
 - process ancestry includes `com.bebop.mlx-lane.<port>` lineage
@@ -177,6 +244,19 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 
 Note: in the current deployment, unauthenticated `GET /health` may return `401`.
 Prefer `/health/readiness` as the default probe when validating service liveness.
+
+## Documentation predictability sweep (repo)
+Use this when running doc-consistency hardening work for coding-agent safety.
+
+```bash
+cd /home/christopherbailey/homelab-llm
+uv run python scripts/docs_contract_audit.py --strict --json
+uv run python scripts/validate_handles.py
+```
+
+Expected:
+- `docs_contract_audit.py` returns `ok: true` with `services_with_gaps: 0`.
+- `validate_handles.py` returns `ok`.
 
 ## OpenCode basic smoke (per host)
 Use your local `~/.config/opencode/opencode.json` and run:
@@ -278,6 +358,51 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   | jq .
 ```
 
+### PlanSearchTrio blind quality gate (`boost-plan` vs `boost-plan-trio`)
+Use this flow when validating quality impact (not just latency/sentinel health):
+
+1) Capture paired outputs:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/ab_capture_plansearch.py \
+  --url http://127.0.0.1:4000/v1/chat/completions \
+  --bearer "$LITELLM_API_KEY" \
+  --model-a boost-plan \
+  --model-b boost-plan-trio \
+  --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_latency_budget_ms":17000,"plansearchtrio_reasoning_effort_synthesis":"high","plansearchtrio_reasoning_effort_rewrite":"high"}' \
+  --max-tokens 220 \
+  --prompts ./scripts/canary_prompts_plansearch.txt \
+  --out-jsonl /tmp/plansearchtrio_ab_capture.jsonl \
+  --summary-json /tmp/plansearchtrio_ab_capture_summary.json
+```
+
+2) Build a blinded human-scoring packet:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/ab_blind_packet.py \
+  --capture-jsonl /tmp/plansearchtrio_ab_capture.jsonl \
+  --out-csv /tmp/plansearchtrio_blind_score.csv \
+  --out-key-json /tmp/plansearchtrio_blind_key.json \
+  --seed 42
+```
+
+3) Score each row in `/tmp/plansearchtrio_blind_score.csv`:
+- `winner` must be `A`, `B`, or `TIE`.
+
+4) Compute model-level summary:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+./scripts/ab_score_blind.py \
+  --scored-csv /tmp/plansearchtrio_blind_score.csv \
+  --key-json /tmp/plansearchtrio_blind_key.json \
+  --baseline-model boost-plan \
+  --candidate-model boost-plan-trio \
+  --out-json /tmp/plansearchtrio_blind_score_summary.json
+```
+
+Suggested quality gate:
+- `candidate_win_rate_decisive >= 0.55`
+
 ## OptiLLM proxy (Studio)
 ```bash
 curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
@@ -352,18 +477,25 @@ cd /home/christopherbailey/homelab-llm
 python3 scripts/openwebui_phase_a_baseline.py print-pack --run-id PHASEA-001
 ```
 
-2) End-user test in Open WebUI:
+2) Programmatic run (recommended for speed/repeatability):
+```bash
+cd /home/christopherbailey/homelab-llm
+export OWUI_API_KEY=<your_openwebui_api_key>
+python3 scripts/openwebui_phase_a_baseline.py run-pack --run-id PHASEA-001 --model fast
+```
+
+3) End-user test in Open WebUI (manual alternative):
 - Open the UI normally.
 - Ensure web search is enabled for the chat.
 - Send each printed prompt as a separate message (keep `[PHASEA-001:Qxx]` prefix intact).
 
-3) Score from logs:
+4) Score from logs:
 ```bash
 cd /home/christopherbailey/homelab-llm
 python3 scripts/openwebui_phase_a_baseline.py score --run-id PHASEA-001 --since "45 minutes ago"
 ```
 
-4) Fresh proof check (most recent activity only):
+5) Fresh proof check (most recent activity only):
 ```bash
 sudo journalctl -u open-webui.service --since "2 minutes ago" --no-pager \
   | rg -n 'OWUI_SEARXNG_RAW_JSON|source id=|web search|loader|fetch'
@@ -371,123 +503,93 @@ sudo journalctl -u open-webui.service --since "2 minutes ago" --no-pager \
 
 Pass guidance:
 - `searx_rate_limit_or_429_errors == 0`
-- `cases_seen_in_openwebui_logs == cases_total`
-- `cases_with_source_blocks == cases_total`
+- `phase2_quality.poisoned_query_events == 0`
+- `phase2_quality.grounding_warn_rate <= 0.10` (when present)
+- `phase2_quality.citation_map_ready_rate >= 0.90` (when present)
 
 If pass criteria fail, fix retrieval/extraction baseline first and re-run Phase A.
 
-## websearch-orch hygiene proxy (Mini)
-Service checks:
+## Open WebUI Native Web Search (Mini)
+Config authority checks:
 ```bash
+systemctl show -p Environment open-webui.service --no-pager | rg -n \
+  'ENABLE_PERSISTENT_CONFIG=False|ENABLE_WEB_SEARCH=True|WEB_SEARCH_ENGINE=searxng|SEARXNG_QUERY_URL=http://127.0.0.1:8888/search\\?q=<query>&format=json|WEB_SEARCH_RESULT_COUNT=6|WEB_SEARCH_CONCURRENT_REQUESTS=1|WEB_LOADER_ENGINE=safe_web|WEB_LOADER_TIMEOUT=15|WEB_LOADER_CONCURRENT_REQUESTS=2|WEB_FETCH_FILTER_LIST=|WEB_SEARCH_DOMAIN_FILTER_LIST='
+
+systemctl show -p Environment open-webui.service --no-pager | rg -n \
+  'EXTERNAL_WEB_LOADER_URL|SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>|WEB_LOADER_ENGINE=external'
+```
+
+SearXNG JSON smoke:
+```bash
+curl -fsS "http://127.0.0.1:8888/search?q=openwebui+searxng&format=json" \
+  | jq '{count:(.results|length), first:(.results[0] // {}) | {title, url}}'
+```
+
+Open WebUI end-to-end smoke:
+```bash
+export OWUI_API_KEY='<open-webui-api-key>'
+curl -N -fsS http://127.0.0.1:3000/api/chat/completions \
+  -H "Authorization: Bearer ${OWUI_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"fast",
+    "stream":true,
+    "messages":[{"role":"user","content":"Search the web for two recent Open WebUI and SearXNG references and summarize them in two bullets."}],
+    "features":{"web_search":true}
+  }' | tee /tmp/owui-websearch-smoke.ndjson
+
+rg -n '"type": "web_search"|"type":"web_search"|"sources": \\[' /tmp/owui-websearch-smoke.ndjson
+rg -n '"content"|"delta"' /tmp/owui-websearch-smoke.ndjson | tail -n 40
+```
+
+Pass guidance:
+- `ENABLE_PERSISTENT_CONFIG=False` is present so env/drop-ins are authoritative.
+- `WEB_SEARCH_ENGINE=searxng` and `WEB_LOADER_ENGINE=safe_web` are present.
+- Result count, concurrency, and filter-list controls are visible in the service environment.
+- No `EXTERNAL_WEB_LOADER_URL`, `WEB_LOADER_ENGINE=external`, or `:8899/search` reference remains.
+- The SearXNG smoke returns at least one result.
+- The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.
+
+## LiteLLM Web Search Reset Checks (Mini)
+Readiness and model checks:
+```bash
+curl -fsS http://127.0.0.1:4000/health/readiness | jq .
+curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]' | rg 'WebsearchSchemaGuardrail'
+
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
+```
+
+Generic search-tool smoke:
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  http://127.0.0.1:4000/v1/search/searxng-search \
+  -d '{"query":"openwebui searxng","max_results":2}' | jq .
+```
+
+Pass guidance:
+- `WebsearchSchemaGuardrail` is absent from readiness callbacks.
+- `/v1/models` does not include `fast-research`.
+- `/v1/search/searxng-search` still works for direct callers and MCP tools.
+
+## Legacy Path Removal Checks (Mini)
+Service removal and active-surface grep:
+```bash
+systemctl is-active open-webui.service litellm-orch.service searxng.service
+systemctl is-enabled websearch-orch.service
 systemctl status websearch-orch.service --no-pager
-curl -fsS "http://127.0.0.1:8899/health" | jq .
+
+rg -n --hidden --glob '!.git' --glob '!.venv/**' --glob '!docs/journal/**' --glob '!docs/archive/**' --glob '!docs/_core/consistency_audit_2026-03.md' \
+  'websearch_schema_guardrail|<source id=|web_answer(\\.schema\\.json)?|EXTERNAL_WEB_LOADER_URL|SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>|WEB_LOADER_ENGINE=external|QUERY_GUARD_ENABLED|TRUST_POLICY_ENABLED|RERANK_ENABLED|CITATION_CONTRACT_ENABLED|fast-research' \
+  /home/christopherbailey/homelab-llm
 ```
 
-Search checks:
-```bash
-curl -fsS "http://127.0.0.1:8899/search?q=evidence-based+wok+tips&format=json" \
-  | jq '{count:(.results|length), unresponsive_engines}'
-```
-
-Open WebUI wiring check:
-```bash
-systemctl show open-webui.service -p Environment --no-pager \
-  | rg 'SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>'
-```
-
-Recent hygiene logs:
-```bash
-journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager
-```
-
-Phase 2 calibration checks:
-```bash
-curl -fsS -X POST http://127.0.0.1:8899/web_loader \
-  -H 'Content-Type: application/json' \
-  -d '{"urls":["https://en.wikipedia.org/wiki/Wok","https://www.seriouseats.com/wok-skills-5117305","https://www.thekitchn.com/how-to-stir-fry-22916393"]}' \
-  | jq '[.[].metadata | {source, char_count, raw_char_count, doc_char_truncated, budget_char_truncated}]'
-
-journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager \
-  | rg -n 'web_loader urls=|raw_chars=|doc_caps=|budget_caps=|budget_drops='
-```
-
-Calibration pass guidance:
-- `raw_chars` should be higher than `chars` when caps are active.
-- `budget_drops` should typically remain `0` for normal 3-6 source queries.
-- `budget_caps` may be `>0` on noisy pages; this is expected and indicates guardrails are active.
-- If `budget_drops` stays high, first reduce `EXTERNAL_WEB_LOADER_MAX_URLS` or
-  enable fair-share via `EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS` before
-  raising total budget further.
-
-Phase 2 tightening checks (query guard + trust policy):
-```bash
-curl -fsS "http://127.0.0.1:8899/search?q=Instrument+methods+used+in+NASA+Chang%E2%80%99e-6+to+detect+water&format=json" \
-  | jq '{query_guard, trust_summary, citation_contract, quality_signals, first_result:(.results[0] // {}) | {url, orch_trust_tier, orch_source_id}}'
-
-journalctl -u websearch-orch.service --since "10 minutes ago" --no-pager \
-  | rg -n 'guarded_query=|query_action=|conflicts=|trust=|citation_map_status=|citation_mapped=|grounding_status=|grounding_allowed_urls=|dedupe_drops=|domain_cap_drops='
-```
-
-Tightening pass guidance:
-- `query_action` should be `sanitize` when entity conflicts are detected.
-- `trust_summary.trust_drops` should remain small/non-zero only for weak domains.
-- Result entries should include `orch_trust_tier` and `orch_source_id`.
-- `citation_contract.citation_map_status` should be `ready` for grounded runs.
-- `citation_contract.allowed_urls` should contain only non-placeholder HTTP(S) URLs.
-- `grounding_gate.status` should be `pass` for well-grounded runs and only `warn`
-  when valid grounded sources are below `min_required`.
-- `quality_signals.dedupe_drops` and `quality_signals.domain_cap_drops` should be non-zero on noisy queries.
-
-## DSPy citation-fidelity pilot (Mini, offline optimization)
-Goal: tune citation fidelity with measurable eval loops before runtime integration.
-
-Contract and sample dataset checks:
-```bash
-cd /home/christopherbailey/homelab-llm
-uv run python scripts/dspy_citation_fidelity.py print-contract
-uv run python scripts/dspy_citation_fidelity.py validate-dataset \
-  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl
-```
-
-Deterministic metric smoke:
-```bash
-uv run python scripts/dspy_citation_fidelity.py eval \
-  --backend mock \
-  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
-  --report-out /tmp/dspy_citation_mock_report.json
-```
-
-Real-model eval:
-```bash
-export LITELLM_MASTER_KEY='<your-key>'
-uv run python scripts/dspy_citation_fidelity.py eval \
-  --backend dspy \
-  --dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
-  --model openai/fast \
-  --api-base http://127.0.0.1:4000/v1 \
-  --api-key-env LITELLM_MASTER_KEY \
-  --report-out /tmp/dspy_citation_dspy_report.json
-```
-
-Compile and evaluate:
-```bash
-export LITELLM_MASTER_KEY='<your-key>'
-uv run python scripts/dspy_citation_fidelity.py compile \
-  --backend dspy \
-  --train-dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
-  --dev-dataset layer-tools/websearch-orch/dspy_pilot/data/citation_fidelity.sample.jsonl \
-  --model openai/fast \
-  --api-base http://127.0.0.1:4000/v1 \
-  --api-key-env LITELLM_MASTER_KEY \
-  --optimizer bootstrap \
-  --num-trials 8 \
-  --artifact-dir /tmp/dspy-citation-artifacts
-```
-
-Pilot pass guidance:
-- `summary.pass_rate` should improve or remain stable between baseline and compiled runs.
-- Placeholder URL citations should remain zero (`placeholder_hits=0`).
-- Compiled artifact and report should be reproducible with the same dataset.
+Pass guidance:
+- `websearch-orch.service` is disabled or not found.
+- Active repo surfaces do not depend on the removed custom middleware or legacy path markers.
 
 ## LiteLLM Search Proxy (Mini)
 ```bash

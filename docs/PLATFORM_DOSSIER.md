@@ -4,12 +4,13 @@
 - Mac Mini: LiteLLM :4000 (LAN + tailnet), Open WebUI :3000 (LAN + tailnet),
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
-  SearXNG :8888 (localhost-only), websearch-orch :8899 (localhost-only),
-  Ollama :11434
+  SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX inference host using per-lane launchd labels
   (`com.bebop.mlx-lane.8100/.8101/.8102`) with `vllm-metal`
   runtime listeners on `:8100/:8101/:8102`.
   OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
+  Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
+  memory API `:55440`, nightly ingest/backup jobs.
 - Jetson Orin AGX: persistent offload mount `/mnt/seagate`
   (sshfs to Mini `/mnt/seagate/orin-offload`). No inference backends are currently deployed.
   Voice Gateway (Interface-layer STT/TTS) is planned to run here.
@@ -27,8 +28,9 @@
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, LiteLLM `boost`/`boost-deep` in `router.yaml` |
+| Studio main vector DB | Studio | 55432 | 127.0.0.1 | http://127.0.0.1:55432 | n/a | `com.bebop.pgvector-main`, policy-managed launchd |
+| Studio main memory API | Studio | 55440 | 127.0.0.1 | http://127.0.0.1:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
-| websearch-orch | Mini | 8899 | 127.0.0.1 | http://127.0.0.1:8899 | /health | `/etc/systemd/system/websearch-orch.service`, `/etc/homelab-llm/websearch-orch.env` |
 | MLX inference lanes (active) | Studio | 8100/8101/8102 | 0.0.0.0 | http://192.168.1.72:8100/v1 | /v1/models | `com.bebop.mlx-lane.8100/.8101/.8102`, runtime `vllm serve`, `mlxctl status` |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
@@ -51,6 +53,17 @@
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
   Working dir: `/home/christopherbailey/homelab-llm/layer-interface/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
+  Current web-search contract is the documented native path:
+  `WEB_SEARCH_ENGINE=searxng`,
+  `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`,
+  `WEB_SEARCH_RESULT_COUNT=6`,
+  `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
+  `WEB_LOADER_ENGINE=safe_web`,
+  `WEB_LOADER_TIMEOUT=15`,
+  `WEB_LOADER_CONCURRENT_REQUESTS=2`,
+  `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
+  `ENABLE_PERSISTENT_CONFIG=False` makes env/drop-ins authoritative; Admin UI changes are non-persistent after restart.
 - OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env`.
   OpenVINO is currently available as a standalone backend and is not wired as active LiteLLM handles.
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
@@ -61,17 +74,10 @@
   Runtime args include: `--host 0.0.0.0 --port 4020 --approach router --model main --base-url http://100.69.99.60:4443/v1`.
   Upstream: Mini LiteLLM via tailnet TCP forward (`100.69.99.60:4443 -> 127.0.0.1:4000`).
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
+  Trio canary (`boost-plan-trio`) uses stage-scoped reasoning effort on deep final
+  synthesis/rewrite (`high` default), with automatic per-stage retry without
+  `reasoning_effort` if provider validation rejects the parameter.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
-- websearch-orch: systemd unit `/etc/systemd/system/websearch-orch.service`,
-  env `/etc/homelab-llm/websearch-orch.env`, localhost-only. Phase 2 size
-  controls use `EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS`,
-  `EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS`,
-  `EXTERNAL_WEB_LOADER_MAX_URLS`, and
-  `EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS`. Phase 2 tightening adds
-  `QUERY_GUARD_ENABLED` / `QUERY_ENTITY_CONFLICT_ACTION` and trust-tier
-  controls (`TRUST_POLICY_ENABLED`, `TRUST_PRIORITY_DOMAINS`,
-  `TRUST_DEPRIORITIZED_DOMAINS`, `TRUST_DROP_BELOW_SCORE`) to reduce
-  drifted query variants and weak-source over-selection.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.
   Current active inference listeners: `8100/8101/8102` (`vllm serve` under `com.bebop.mlx-lane.8100/.8101/.8102`).
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
@@ -88,6 +94,10 @@
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
   `search.web` are implemented, registry/systemd still pending.
 - AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
+- Studio main vector store: Postgres+pgvector backend for general/personal memory.
+  Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
+  while preserving the same API contract (`/v1/memory/*`). Service remains
+  Studio-local (no LAN exposure) with tool-mediated retrieval boundary.
 
 ## Data registries (authoritative)
 - Lexicon registry (term correction): `layer-data/registry/lexicon.jsonl`
@@ -95,7 +105,8 @@
 ## Exposure and secrets (short)
 - LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
   LiteLLM 4000, Open WebUI 3000, MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, websearch-orch 8899.
+- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
+- Local-only (Studio): main vector DB 55432, memory API 55440.
 - Tailnet HTTPS (Tailscale Serve on Mini):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)
