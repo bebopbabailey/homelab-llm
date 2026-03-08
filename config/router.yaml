@@ -140,6 +140,8 @@ search_tools:
 router_settings:
   allowed_fails: 2
   cooldown_time: 15
+  fallbacks:
+    - {"fast": ["main"]}
   retry_policy:
     Timeout: 1
     APIConnectionError: 1

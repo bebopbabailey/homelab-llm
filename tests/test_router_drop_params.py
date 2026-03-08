@@ -17,6 +17,16 @@ class TestRouterDropParams(unittest.TestCase):
             "litellm_settings.drop_params must remain true",
         )
 
+    def test_fast_falls_back_to_main(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        router_settings = config.get("router_settings", {})
+        fallbacks = router_settings.get("fallbacks", [])
+        self.assertIn(
+            {"fast": ["main"]},
+            fallbacks,
+            "router_settings.fallbacks must preserve fast -> main",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
