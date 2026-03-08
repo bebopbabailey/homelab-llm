@@ -34,26 +34,65 @@ rg -n "metal-test-fast|metal-test-main|metal-test-deep" \
 
 ## Harmony normalization checks (GPT lanes)
 ```bash
-# Verify request mutation is allowed
-rg -n "modify_params" /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml
-
-# Verify GPT-lane target aliases are configured and stream coercion is disabled
-rg -n "target_models|coerce_stream_false" /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml
+rg -n "modify_params|target_models|coerce_stream_false" \
+  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml
 ```
+
+Expected:
+- Harmony guardrails still target GPT lanes.
+- No web-search-specific pre-call or post-call guardrails remain.
 
 ## GPT streaming checks (pass-through)
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
 
-# Stream should pass through for GPT lanes (deep/fast/boost) when stream=true.
 curl -N -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   http://127.0.0.1:4000/v1/chat/completions \
   -d '{"model":"fast","stream":true,"messages":[{"role":"user","content":"Reply with exactly: stream-ok"}],"max_tokens":32}'
 
-# Non-stream remains available per call when explicitly requested.
 curl -sS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   http://127.0.0.1:4000/v1/chat/completions \
   -d '{"model":"fast","stream":false,"messages":[{"role":"user","content":"Reply with exactly: nonstream-ok"}],"max_tokens":32}' | jq .
 ```
+
+## Active alias checks
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
+
+rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
+  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml \
+  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/SERVICE_SPEC.md \
+  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/docs/openwebui.md
+```
+
+Expected:
+- `fast`, `main`, `deep`, and `boost*` aliases appear in `/v1/models`.
+- `fast-research` is absent.
+- No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
+
+## Readiness callback check
+```bash
+curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]'
+```
+
+Expected:
+- `PromptGuardrail`, `HarmonyGuardrail`, and `TranscribeGuardrail` remain.
+- `WebsearchSchemaGuardrail` is absent.
+
+## Search tool checks
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+curl -fsS http://127.0.0.1:4000/v1/search/searxng-search \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"openvino llm","max_results":3}' | jq .
+```
+
+Note:
+- `/v1/search/searxng-search` remains for direct callers and MCP tools.
+- Open WebUI web search is configured in Open WebUI itself and does not depend on LiteLLM prompt-shape or schema middleware.

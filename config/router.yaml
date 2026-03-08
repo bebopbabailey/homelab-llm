@@ -128,7 +128,6 @@ model_list:
     presence_penalty: 0.0
     frequency_penalty: 0.2
 
-
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
