@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import re
@@ -20,6 +21,18 @@ _TRACE_PATH = "/tmp/transcribe_guardrail_trace.jsonl"
 _PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
 _PROMPT_MANAGER = PromptManager(prompt_directory=str(_PROMPT_DIR))
 _DOTPROMPT = DotpromptManager(prompt_directory=str(_PROMPT_DIR))
+
+try:
+    from config.transcribe_utils import strip_punct_outside_words, strip_wrappers
+except ModuleNotFoundError:
+    _UTILS_PATH = Path(__file__).with_name("transcribe_utils.py")
+    _UTILS_SPEC = importlib.util.spec_from_file_location("transcribe_utils", _UTILS_PATH)
+    if _UTILS_SPEC is None or _UTILS_SPEC.loader is None:
+        raise ImportError(f"Unable to load transcribe_utils from {_UTILS_PATH}")
+    _UTILS_MODULE = importlib.util.module_from_spec(_UTILS_SPEC)
+    _UTILS_SPEC.loader.exec_module(_UTILS_MODULE)
+    strip_punct_outside_words = _UTILS_MODULE.strip_punct_outside_words
+    strip_wrappers = _UTILS_MODULE.strip_wrappers
 
 # Per your spec:
 # model_ids:  task-transcribe, task-transcribe-vivid
@@ -70,55 +83,8 @@ def _extract_user_text(messages: Any) -> str:
     return "\n\n".join(parts).strip()
 
 
-_CODE_FENCE_RE = re.compile(r"^\s*```[a-zA-Z0-9_-]*\s*\n(.*)\n```\s*$", re.DOTALL)
-
-# Strip common preambles WITHOUT being too aggressive
-_PREAMBLE_RE = re.compile(
-    r"^\s*(?:#+\s*)?(?:\*\*)?\s*(?:cleaned transcript|transcript)\s*(?:\*\*)?\s*[:\-]\s*",
-    re.IGNORECASE,
-)
-
-
-def _strip_wrappers(text: str) -> str:
-    if not isinstance(text, str):
-        return text
-    original = text
-    t = text.strip()
-
-    # Remove a single outer fenced code block safely
-    m = _CODE_FENCE_RE.match(t)
-    if m:
-        t = m.group(1).strip()
-
-    # Remove common headings like "Cleaned transcript:"
-    t2 = _PREAMBLE_RE.sub("", t).lstrip()
-
-    # Remove lightweight "here is..." one-liners
-    lower = t2.lower()
-    for pre in (
-            "here is the cleaned transcript:",
-            "here's the cleaned transcript:",
-            "here is the transcript:",
-            "here's the transcript:",
-    ):
-        if lower.startswith(pre):
-            t2 = t2[len(pre):].lstrip()
-            break
-
-    return t2 if t2 else original
-
-
-def _preprocess_transcript(text: str) -> str:
-    """Strip punctuation outside words; preserve apostrophes/hyphens inside words; normalize dashes."""
-    if not isinstance(text, str):
-        return text
-    t = text.replace("\u2014", "-").replace("\u2013", "-")
-    t = re.sub(r"(?<=\w)[’'](?=\w)", "APOSTTOKEN", t)
-    t = re.sub(r"(?<=\w)-(?=\w)", "HYPHTOKEN", t)
-    t = re.sub(r"[^\w\s]", " ", t)
-    t = t.replace("APOSTTOKEN", "'").replace("HYPHTOKEN", "-")
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
+_strip_wrappers = strip_wrappers
+_preprocess_transcript = strip_punct_outside_words
 
 
 def _normalize_text(text: str) -> str:
