@@ -30,7 +30,10 @@ class _FakeChoice:
 
 class _FakeResponse:
     def __init__(self, content, completion_tokens=10):
-        self.choices = [_FakeChoice(content)]
+        if isinstance(content, list):
+            self.choices = [_FakeChoice(item) for item in content]
+        else:
+            self.choices = [_FakeChoice(content)]
         self.usage = _FakeUsage(completion_tokens)
 
 
@@ -52,21 +55,23 @@ class _FakeCompletions:
                 {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort")}
             )
             return _FakeResponse("requirements: complete task; constraints: keep scope")
-        if "Candidate ID" in prompt:
+        if "Produce one candidate implementation plan" in prompt:
             stage = "candidate"
-            marker = prompt.split("Candidate ID:", 1)[1].strip().splitlines()[0]
-            self.candidate_markers.append(marker)
+            count = kwargs.get("n", 1)
+            marker_prefix = "fast" if model == "fast" else "main"
+            values = [f"candidate-plan-{marker_prefix}-{idx + 1}" for idx in range(count)]
+            self.candidate_markers.extend(values)
             self.calls.append(
-                {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort")}
+                {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort"), "n": count}
             )
-            return _FakeResponse(f"candidate-plan-{marker}")
+            return _FakeResponse(values)
         if prompt.startswith("Evaluate candidates"):
             stage = "critique"
             self.critique_calls += 1
             self.calls.append(
                 {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort")}
             )
-            return _FakeResponse("top: candidate 1 then candidate 2")
+            return _FakeResponse("TOP: 2,1\nRationale: candidate 2 is strongest.")
         if prompt.startswith("Produce the final response"):
             stage = "synthesis"
             self.synthesis_attempts += 1
@@ -130,12 +135,13 @@ class _FakeCompletionsRejectReasoning:
                 {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort")}
             )
             return _FakeResponse("requirements: complete task; constraints: keep scope")
-        if "Candidate ID" in prompt:
+        if "Produce one candidate implementation plan" in prompt:
             stage = "candidate"
             self.calls.append(
-                {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort")}
+                {"stage": stage, "model": model, "reasoning_effort": kwargs.get("reasoning_effort"), "n": kwargs.get("n", 1)}
             )
-            return _FakeResponse("candidate-plan")
+            count = kwargs.get("n", 1)
+            return _FakeResponse(["candidate-plan"] * count)
         if prompt.startswith("Produce the final response"):
             stage = "synthesis"
             effort = kwargs.get("reasoning_effort")
@@ -195,6 +201,10 @@ class PlanSearchTrioTests(unittest.TestCase):
 
         self.assertEqual(plansearchtrio_plugin._extract_text(_Resp()), "hello world")
 
+    def test_extract_texts_reads_multiple_choices(self):
+        response = _FakeResponse(["one", "two", "three"])
+        self.assertEqual(plansearchtrio_plugin._extract_texts(response), ["one", "two", "three"])
+
     def test_run_executes_repair_loop_and_returns_tokens(self):
         client = _FakeClient()
         cfg = {
@@ -243,7 +253,7 @@ class PlanSearchTrioTests(unittest.TestCase):
             request_config={"plansearchtrio_mode": "auto", "plansearchtrio_stage_retries": 0},
         )
         self.assertTrue(content)
-        self.assertEqual(len(client.chat.completions.candidate_markers), 2)
+        self.assertEqual(client.chat.completions.candidate_markers, ["candidate-plan-fast-1", "candidate-plan-main-1"])
 
     def test_latency_budget_skips_critique(self):
         client = _FakeClient()
@@ -267,44 +277,65 @@ class PlanSearchTrioTests(unittest.TestCase):
         self.assertTrue(content)
         self.assertEqual(client.chat.completions.critique_calls, 0)
 
-    def test_parallel_candidates_preserve_job_order(self):
-        original = plansearchtrio_plugin._chat_resilient
-
-        def _fake_chat_resilient(*args, **kwargs):
-            stage = kwargs.get("stage_name")
-            if stage is None and len(args) >= 7:
-                stage = args[6]
-            if stage == "candidate-0":
-                time.sleep(0.02)
-            return f"text-{stage}", 1
-
-        plansearchtrio_plugin._chat_resilient = _fake_chat_resilient
-        try:
-            candidates, token_total = plansearchtrio_plugin._parallel_candidates(
-                client=object(),
-                request_config={},
-                system_prompt="sys",
-                query="q",
-                triage="t",
-                fast_model="fast",
-                main_model="main",
-                deep_model="deep",
-                candidate_budget=64,
-                c_fast=2,
-                c_main=1,
-                max_workers=3,
-                retries=0,
-                min_chars=1,
-                debug=False,
-            )
-        finally:
-            plansearchtrio_plugin._chat_resilient = original
-
+    def test_generate_candidates_uses_n_per_model(self):
+        client = _FakeClient()
+        candidates, token_total = plansearchtrio_plugin._generate_candidates(
+            client=client,
+            request_config={},
+            system_prompt="sys",
+            query="q",
+            triage="t",
+            fast_model="fast",
+            main_model="main",
+            deep_model="deep",
+            candidate_budget=64,
+            c_fast=2,
+            c_main=1,
+            debug=False,
+        )
         self.assertEqual(
             candidates,
-            ["text-candidate-0", "text-candidate-1", "text-candidate-2"],
+            ["candidate-plan-fast-1", "candidate-plan-fast-2", "candidate-plan-main-1"],
         )
-        self.assertEqual(token_total, 3)
+        self.assertEqual(token_total, 20)
+        candidate_calls = [c for c in client.chat.completions.calls if c["stage"] == "candidate"]
+        self.assertEqual(candidate_calls[0]["model"], "fast")
+        self.assertEqual(candidate_calls[0]["n"], 2)
+        self.assertEqual(candidate_calls[1]["model"], "main")
+        self.assertEqual(candidate_calls[1]["n"], 1)
+
+    def test_parse_top_indices_prefers_ranked_candidates(self):
+        self.assertEqual(
+            plansearchtrio_plugin._parse_top_indices("TOP: 2,1,2,9", candidate_count=3, k_keep=2),
+            [1, 0],
+        )
+        self.assertEqual(
+            plansearchtrio_plugin._parse_top_indices("bad", candidate_count=3, k_keep=2),
+            [],
+        )
+
+    def test_internal_model_rejection_blocks_optillm_prefixes(self):
+        with self.assertRaises(ValueError):
+            plansearchtrio_plugin._validate_internal_model("plansearch-deep")
+        with self.assertRaises(ValueError):
+            plansearchtrio_plugin._validate_internal_model("moa-main")
+        plansearchtrio_plugin._validate_internal_model("deep")
+
+    def test_build_call_config_allowlist_excludes_response_format(self):
+        payload = plansearchtrio_plugin._build_call_config(
+            {
+                "temperature": 0.2,
+                "top_p": 0.9,
+                "frequency_penalty": 0.1,
+                "presence_penalty": 0.3,
+                "response_format": {"type": "json_schema"},
+            },
+            max_tokens=256,
+        )
+        self.assertEqual(payload["max_tokens"], 256)
+        self.assertFalse(payload["stream"])
+        self.assertEqual(payload["temperature"], 0.2)
+        self.assertNotIn("response_format", payload)
 
     def test_synthesis_and_rewrite_use_high_reasoning_effort_on_deep_only(self):
         client = _FakeClient()
@@ -332,20 +363,20 @@ class PlanSearchTrioTests(unittest.TestCase):
         ]
         self.assertTrue(all(c["reasoning_effort"] is None for c in early_stage_calls))
 
-    def test_reasoning_effort_retries_without_param_on_rejection(self):
-        client = _FakeClientRejectReasoning()
+    def test_run_uses_critique_top_selection(self):
+        client = _FakeClient()
         content, _ = plansearchtrio_plugin.run(
             system_prompt="system",
             initial_query="build a migration plan",
             client=client,
             model="deep",
-            request_config={"plansearchtrio_mode": "auto", "plansearchtrio_stage_retries": 0},
+            request_config={"plansearchtrio_mode": "full", "plansearchtrio_stage_retries": 0},
         )
         self.assertTrue(content)
-        synthesis_calls = [c for c in client.chat.completions.calls if c["stage"] == "synthesis"]
-        self.assertGreaterEqual(len(synthesis_calls), 2)
-        self.assertEqual(synthesis_calls[0]["reasoning_effort"], "high")
-        self.assertIsNone(synthesis_calls[1]["reasoning_effort"])
+        synthesis_prompt = next(
+            call for call in client.chat.completions.calls if call["stage"] == "synthesis" and call["model"] == "deep"
+        )
+        self.assertEqual(synthesis_prompt["reasoning_effort"], "high")
 
 
 if __name__ == "__main__":

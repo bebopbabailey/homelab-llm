@@ -1,5 +1,5 @@
-import concurrent.futures
 import logging
+import re
 import time
 from typing import Any
 
@@ -15,6 +15,25 @@ MODE_AUTO = "auto"
 MODE_COMPACT = "compact"
 MODE_FULL = "full"
 ALLOWED_REASONING_EFFORTS = {"low", "medium", "high"}
+BLOCKED_MODEL_PREFIXES = (
+    "plansearchtrio-",
+    "plansearch-",
+    "moa-",
+    "bon-",
+    "router-",
+    "self_consistency-",
+    "mcts-",
+    "pvg-",
+    "cot_reflection-",
+    "cot_decoding-",
+    "re2-",
+    "wim-",
+    "z3-",
+    "rstar-",
+    "autothink-",
+    "thinkdeeper-",
+    "genselect-",
+)
 
 
 def _int_param(config: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
@@ -86,15 +105,23 @@ def _content_to_text(value: Any) -> str:
 
 
 def _extract_text(response: Any) -> str:
+    texts = _extract_texts(response)
+    return texts[0] if texts else ""
+
+
+def _extract_texts(response: Any) -> list[str]:
     choices = getattr(response, "choices", None) or []
-    if not choices:
-        return ""
-    first = choices[0]
-    message = getattr(first, "message", None)
-    if message is None:
-        return _content_to_text(getattr(first, "text", ""))
-    content = getattr(message, "content", None)
-    return _content_to_text(content)
+    texts: list[str] = []
+    for choice in choices:
+        message = getattr(choice, "message", None)
+        if message is None:
+            text = _content_to_text(getattr(choice, "text", ""))
+        else:
+            text = _content_to_text(getattr(message, "content", None))
+        text = text.strip()
+        if text:
+            texts.append(text)
+    return texts
 
 
 def _extract_completion_tokens(response: Any) -> int:
@@ -110,8 +137,6 @@ def _build_call_config(config: dict[str, Any], max_tokens: int) -> dict[str, Any
     for key in ("temperature", "top_p", "frequency_penalty", "presence_penalty"):
         if key in config:
             payload[key] = config[key]
-    if "response_format" in config:
-        payload["response_format"] = config["response_format"]
     return payload
 
 
@@ -140,16 +165,10 @@ def _reasoning_effort_for_stage(
     return ""
 
 
-def _is_reasoning_effort_param_error(exc: Exception) -> bool:
-    message = str(exc).lower()
-    patterns = (
-        "reasoning_effort",
-        "extra inputs are not permitted",
-        "unrecognized request argument",
-        "unsupported parameter",
-        "unknown parameter",
-    )
-    return any(pattern in message for pattern in patterns)
+def _validate_internal_model(model: str) -> None:
+    normalized = (model or "").strip().lower()
+    if any(normalized.startswith(prefix) for prefix in BLOCKED_MODEL_PREFIXES):
+        raise ValueError(f"plansearchtrio internal model must not be an optillm-prefixed route: {model}")
 
 
 def _chat(
@@ -164,6 +183,7 @@ def _chat(
     debug: bool = False,
 ) -> tuple[str, int]:
     start = time.perf_counter()
+    _validate_internal_model(model)
     payload = {
         "model": model,
         "messages": [
@@ -175,20 +195,7 @@ def _chat(
     reasoning_effort = _reasoning_effort_for_stage(request_config, stage_name, model, deep_model)
     if reasoning_effort:
         payload["reasoning_effort"] = reasoning_effort
-    try:
-        response = client.chat.completions.create(**payload)
-    except Exception as exc:
-        if payload.get("reasoning_effort") and _is_reasoning_effort_param_error(exc):
-            logger.warning(
-                "plansearchtrio stage=%s model=%s rejected reasoning_effort=%s; retrying without it",
-                stage_name,
-                model,
-                payload.get("reasoning_effort"),
-            )
-            payload.pop("reasoning_effort", None)
-            response = client.chat.completions.create(**payload)
-        else:
-            raise
+    response = client.chat.completions.create(**payload)
     text = _extract_text(response).strip()
     tokens = _extract_completion_tokens(response)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -246,7 +253,71 @@ def _chat_resilient(
     return "", token_total
 
 
-def _parallel_candidates(
+def _chat_many(
+    client: Any,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    request_config: dict[str, Any],
+    max_tokens: int,
+    stage_name: str,
+    deep_model: str,
+    count: int,
+    debug: bool = False,
+) -> tuple[list[str], int]:
+    _validate_internal_model(model)
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "n": count,
+    }
+    payload.update(_build_call_config(request_config, max_tokens))
+    start = time.perf_counter()
+    response = client.chat.completions.create(**payload)
+    texts = _extract_texts(response)
+    tokens = _extract_completion_tokens(response)
+    elapsed_ms = int((time.perf_counter() - start) * 1000)
+    if debug:
+        logger.info(
+            "plansearchtrio stage=%s model=%s n=%s choices=%s completion_tokens=%s latency_ms=%s",
+            stage_name,
+            model,
+            count,
+            len(texts),
+            tokens,
+            elapsed_ms,
+        )
+    return texts, tokens
+
+
+def _parse_top_indices(critique: str, candidate_count: int, k_keep: int) -> list[int]:
+    match = re.search(r"(?im)^\s*top\s*:\s*([0-9,\s]+)\s*$", critique or "")
+    if not match:
+        return []
+    seen: set[int] = set()
+    indices: list[int] = []
+    for raw in match.group(1).split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            parsed = int(raw)
+        except ValueError:
+            continue
+        zero_based = parsed - 1
+        if zero_based < 0 or zero_based >= candidate_count or zero_based in seen:
+            continue
+        seen.add(zero_based)
+        indices.append(zero_based)
+        if len(indices) >= k_keep:
+            break
+    return indices
+
+
+def _generate_candidates(
     client: Any,
     request_config: dict[str, Any],
     system_prompt: str,
@@ -258,9 +329,6 @@ def _parallel_candidates(
     candidate_budget: int,
     c_fast: int,
     c_main: int,
-    max_workers: int,
-    retries: int,
-    min_chars: int,
     debug: bool,
 ) -> tuple[list[str], int]:
     prompt_template = (
@@ -268,58 +336,41 @@ def _parallel_candidates(
         "Constraints and success criteria:\n{triage}\n\n"
         "Produce one candidate implementation plan with:"
         " assumptions, steps, risks, verification, and rollback."
+        " Return exactly one candidate per completion."
     )
-
-    jobs: list[tuple[int, str, str]] = []
-    for idx in range(c_fast):
-        jobs.append(
-            (
-                len(jobs),
-                fast_model,
-                prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: fast-{idx + 1}",
-            )
-        )
-    for idx in range(c_main):
-        jobs.append(
-            (
-                len(jobs),
-                main_model,
-                prompt_template.format(query=query, triage=triage) + f"\n\nCandidate ID: main-{idx + 1}",
-            )
-        )
-
-    candidates: list[str] = []
+    prompt = prompt_template.format(query=query, triage=triage)
     token_total = 0
-    ordered: dict[int, str] = {}
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(
-                _chat_resilient,
-                client,
-                [model_name],
-                system_prompt,
-                prompt,
-                request_config,
-                candidate_budget,
-                f"candidate-{job_index}",
-                deep_model,
-                retries,
-                min_chars,
-                debug,
-            ): job_index
-            for job_index, model_name, prompt in jobs
-        }
-        for future in concurrent.futures.as_completed(futures):
-            job_index = futures[future]
-            text, tokens = future.result()
-            if text:
-                ordered[job_index] = text
-            token_total += tokens
-
-    for job_index in sorted(ordered):
-        candidates.append(ordered[job_index])
-
+    candidates: list[str] = []
+    if c_fast > 0:
+        fast_candidates, tokens = _chat_many(
+            client=client,
+            model=fast_model,
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            request_config=request_config,
+            max_tokens=candidate_budget,
+            stage_name="candidate-fast",
+            deep_model=deep_model,
+            count=c_fast,
+            debug=debug,
+        )
+        candidates.extend(fast_candidates[:c_fast])
+        token_total += tokens
+    if c_main > 0:
+        main_candidates, tokens = _chat_many(
+            client=client,
+            model=main_model,
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            request_config=request_config,
+            max_tokens=candidate_budget,
+            stage_name="candidate-main",
+            deep_model=deep_model,
+            count=c_main,
+            debug=debug,
+        )
+        candidates.extend(main_candidates[:c_main])
+        token_total += tokens
     return candidates, token_total
 
 
@@ -405,7 +456,6 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     c_main = _int_param(config, "plansearchtrio_candidates_main", 1, 1, 8)
     k_keep = _int_param(config, "plansearchtrio_keep", 2, 1, 6)
     repair_rounds = _int_param(config, "plansearchtrio_repair_rounds", 1, 0, 3)
-    max_workers = _int_param(config, "plansearchtrio_max_workers", 3, 1, 8)
     stage_retries = _int_param(config, "plansearchtrio_stage_retries", 1, 0, 3)
     min_stage_chars = _int_param(config, "plansearchtrio_min_stage_chars", 8, 1, 512)
     fallback_on_empty = _bool_param(config, "plansearchtrio_fallback_on_empty", True)
@@ -446,7 +496,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     )
     total_tokens += tokens
 
-    candidates, tokens = _parallel_candidates(
+    candidates, tokens = _generate_candidates(
         client=client,
         request_config=config,
         system_prompt=system_prompt,
@@ -458,9 +508,6 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         candidate_budget=budget_candidate,
         c_fast=c_fast,
         c_main=c_main,
-        max_workers=max_workers,
-        retries=stage_retries,
-        min_chars=min_stage_chars,
         debug=debug,
     )
     total_tokens += tokens
@@ -482,7 +529,8 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     critique = ""
     if enable_critique and _within_budget(start_time, latency_budget_ms):
         critique_prompt = (
-            "Evaluate candidates against constraints. Return top candidates and short rationale.\n\n"
+            "Evaluate candidates against constraints. Return a line formatted exactly as 'TOP: i,j,k' "
+            "using 1-based candidate indices, followed by a short rationale.\n\n"
             f"Constraints:\n{triage}\n\n"
             "Candidates:\n"
             + "\n\n".join(f"Candidate {idx + 1}:\n{text}" for idx, text in enumerate(candidates))
@@ -502,7 +550,11 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         )
         total_tokens += tokens
 
-    selected_candidates = candidates[:k_keep]
+    top_indices = _parse_top_indices(critique, len(candidates), k_keep)
+    if top_indices:
+        selected_candidates = [candidates[index] for index in top_indices]
+    else:
+        selected_candidates = candidates[:k_keep]
     synthesis_prompt = (
         "Produce the final response using the best candidates and critique.\n"
         "Output: coherent plan, implementation details, risks, rollback.\n\n"
