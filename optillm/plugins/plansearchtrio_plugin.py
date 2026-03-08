@@ -265,6 +265,20 @@ def _chat_many(
     count: int,
     debug: bool = False,
 ) -> tuple[list[str], int]:
+    if count <= 1:
+        text, tokens = _chat(
+            client=client,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            request_config=request_config,
+            max_tokens=max_tokens,
+            stage_name=stage_name,
+            deep_model=deep_model,
+            debug=debug,
+        )
+        return ([text] if text else []), tokens
+
     _validate_internal_model(model)
     payload = {
         "model": model,
@@ -276,7 +290,34 @@ def _chat_many(
     }
     payload.update(_build_call_config(request_config, max_tokens))
     start = time.perf_counter()
-    response = client.chat.completions.create(**payload)
+    try:
+        response = client.chat.completions.create(**payload)
+    except Exception as exc:
+        logger.warning(
+            "plansearchtrio stage=%s model=%s n=%s rejected batched generation; retrying sequentially: %s",
+            stage_name,
+            model,
+            count,
+            exc,
+        )
+        texts: list[str] = []
+        token_total = 0
+        for _ in range(count):
+            text, tokens = _chat(
+                client=client,
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                request_config=request_config,
+                max_tokens=max_tokens,
+                stage_name=stage_name,
+                deep_model=deep_model,
+                debug=debug,
+            )
+            token_total += tokens
+            if text:
+                texts.append(text)
+        return texts, token_total
     texts = _extract_texts(response)
     tokens = _extract_completion_tokens(response)
     elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -390,10 +431,12 @@ def _fallback_final_response(
     main_model: str,
     deep_model: str,
     stage_retries: int,
-    requested_budget: int,
+    final_budget: int,
+    min_stage_chars: int,
     debug: bool,
 ) -> tuple[str, int]:
-    fallback_budget = _stage_budget(config, "plansearchtrio_budget_fallback", min(768, requested_budget))
+    fallback_budget = _stage_budget(config, "plansearchtrio_budget_fallback", 768)
+    visible_fallback_budget = min(fallback_budget, final_budget)
     fallback_prompt = (
         "Produce a concise but complete implementation plan with risks and rollback.\n\n"
         f"Task:\n{initial_query}"
@@ -404,11 +447,11 @@ def _fallback_final_response(
         system_prompt=system_prompt,
         user_prompt=fallback_prompt,
         request_config=config,
-        max_tokens=fallback_budget,
+        max_tokens=visible_fallback_budget,
         stage_name="fallback",
         deep_model=deep_model,
         retries=stage_retries,
-        min_chars=8,
+        min_chars=min_stage_chars,
         debug=debug,
     )
     if text:
@@ -432,7 +475,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     if mode not in {MODE_AUTO, MODE_COMPACT, MODE_FULL}:
         mode = MODE_AUTO
 
-    requested_budget = _requested_token_budget(config)
+    final_budget = _requested_token_budget(config)
 
     # Compact defaults are used for auto unless explicitly overridden.
     if mode in {MODE_AUTO, MODE_COMPACT}:
@@ -442,12 +485,12 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             "plansearchtrio_keep": 1,
             "plansearchtrio_repair_rounds": 0,
             "plansearchtrio_stage_retries": 0,
-            "plansearchtrio_budget_triage": min(96, requested_budget),
-            "plansearchtrio_budget_candidate": min(128, requested_budget),
-            "plansearchtrio_budget_critique": min(160, requested_budget),
-            "plansearchtrio_budget_synthesis": min(512, requested_budget),
-            "plansearchtrio_budget_verify": min(64, requested_budget),
-            "plansearchtrio_budget_repair": min(256, requested_budget),
+            "plansearchtrio_budget_triage": 96,
+            "plansearchtrio_budget_candidate": 128,
+            "plansearchtrio_budget_critique": 160,
+            "plansearchtrio_budget_synthesis": 384,
+            "plansearchtrio_budget_verify": 64,
+            "plansearchtrio_budget_repair": 256,
         }
         for key, value in compact_defaults.items():
             config.setdefault(key, value)
@@ -457,7 +500,8 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     k_keep = _int_param(config, "plansearchtrio_keep", 2, 1, 6)
     repair_rounds = _int_param(config, "plansearchtrio_repair_rounds", 1, 0, 3)
     stage_retries = _int_param(config, "plansearchtrio_stage_retries", 1, 0, 3)
-    min_stage_chars = _int_param(config, "plansearchtrio_min_stage_chars", 8, 1, 512)
+    default_min_chars = 1 if mode in {MODE_AUTO, MODE_COMPACT} else 8
+    min_stage_chars = _int_param(config, "plansearchtrio_min_stage_chars", default_min_chars, 1, 512)
     fallback_on_empty = _bool_param(config, "plansearchtrio_fallback_on_empty", True)
     latency_budget_ms = _int_param(config, "plansearchtrio_latency_budget_ms", 17000, 1000, 300000)
     debug = _bool_param(config, "plansearchtrio_debug", False)
@@ -468,12 +512,14 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
     enable_verify = _bool_param(config, "plansearchtrio_enable_verify", True)
     enable_repair = _bool_param(config, "plansearchtrio_enable_repair", default_enable_repair)
 
-    budget_triage = _stage_budget(config, "plansearchtrio_budget_triage", min(256, requested_budget))
-    budget_candidate = _stage_budget(config, "plansearchtrio_budget_candidate", min(384, requested_budget))
-    budget_critique = _stage_budget(config, "plansearchtrio_budget_critique", min(512, requested_budget))
-    budget_synthesis = _stage_budget(config, "plansearchtrio_budget_synthesis", min(1024, requested_budget))
-    budget_verify = _stage_budget(config, "plansearchtrio_budget_verify", min(192, requested_budget))
-    budget_repair = _stage_budget(config, "plansearchtrio_budget_repair", min(512, requested_budget))
+    budget_triage = _stage_budget(config, "plansearchtrio_budget_triage", 256)
+    budget_candidate = _stage_budget(config, "plansearchtrio_budget_candidate", 384)
+    budget_critique = _stage_budget(config, "plansearchtrio_budget_critique", 512)
+    budget_synthesis = _stage_budget(config, "plansearchtrio_budget_synthesis", 1024)
+    budget_verify = _stage_budget(config, "plansearchtrio_budget_verify", 192)
+    budget_repair = _stage_budget(config, "plansearchtrio_budget_repair", 512)
+    visible_synthesis_budget = min(budget_synthesis, final_budget)
+    visible_rewrite_budget = min(budget_repair, final_budget)
 
     total_tokens = 0
 
@@ -521,7 +567,8 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             main_model=main_model,
             deep_model=deep_model,
             stage_retries=stage_retries,
-            requested_budget=requested_budget,
+            final_budget=final_budget,
+            min_stage_chars=min_stage_chars,
             debug=debug,
         )
         return fallback_text, total_tokens + fallback_tokens
@@ -574,7 +621,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
         system_prompt=system_prompt,
         user_prompt=synthesis_prompt,
         request_config=config,
-        max_tokens=budget_synthesis,
+        max_tokens=visible_synthesis_budget,
         stage_name="synthesis",
         deep_model=deep_model,
         retries=stage_retries,
@@ -592,7 +639,8 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             main_model=main_model,
             deep_model=deep_model,
             stage_retries=stage_retries,
-            requested_budget=requested_budget,
+            final_budget=final_budget,
+            min_stage_chars=min_stage_chars,
             debug=debug,
         )
         return fallback_text, total_tokens + fallback_tokens
@@ -665,7 +713,7 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
             system_prompt=system_prompt,
             user_prompt=rewrite_prompt,
             request_config=config,
-            max_tokens=budget_synthesis,
+            max_tokens=visible_rewrite_budget,
             stage_name="rewrite",
             deep_model=deep_model,
             retries=stage_retries,
@@ -682,7 +730,8 @@ def run(system_prompt: str, initial_query: str, client=None, model=None, request
                 main_model=main_model,
                 deep_model=deep_model,
                 stage_retries=stage_retries,
-                requested_budget=requested_budget,
+                final_budget=final_budget,
+                min_stage_chars=min_stage_chars,
                 debug=debug,
             )
             return fallback_text, total_tokens + fallback_tokens
