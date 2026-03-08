@@ -147,7 +147,7 @@ router_settings:
     ServiceUnavailableError: 1
 litellm_settings:
   json_logs: false
-  drop_params: false
+  drop_params: true
   modify_params: true
   set_verbose: true
   callbacks: ["prometheus"]
