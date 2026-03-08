@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "mlxctl"
@@ -105,6 +106,84 @@ class MlxctlRuntimeHealthTests(unittest.TestCase):
         self.assertTrue(repair["apply_result"]["success"])
         self.assertGreaterEqual(len(repair["apply_result"]["steps"]), 4)
         self.assertTrue(any("launchctl bootstrap" in cmd for cmd in calls))
+
+    def test_vllm_render_validate_rejects_dummy_lane_auth(self):
+        data = {
+            "models": {
+                "mlx-gpt-oss-120b-mxfp4-q4": {
+                    "model_id": "mlx-gpt-oss-120b-mxfp4-q4",
+                    "cache_path": __file__,
+                    "port": 8100,
+                }
+            }
+        }
+        caps = {
+            "vllm_bin": "/usr/bin/vllm",
+            "supports_auto_tool_choice": True,
+            "supports_tool_call_parser": True,
+            "supports_reasoning_parser": True,
+            "tool_call_parsers": ["qwen3_xml"],
+        }
+        self._patch("_registry_path", lambda: Path("/tmp/registry.json"))
+        self._patch("_load_registry", lambda _path: data)
+        self._patch("_detect_vllm_capabilities", lambda: caps)
+        self._patch("_read_env_assignments", lambda _path: {"MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY": "dummy"})
+        with self.assertRaises(SystemExit):
+            mlxctl._render_vllm_rows_for_ports([8100], host="0.0.0.0", validate=True)
+
+    def test_vllm_render_validate_rejects_empty_lane_auth(self):
+        data = {
+            "models": {
+                "mlx-gpt-oss-120b-mxfp4-q4": {
+                    "model_id": "mlx-gpt-oss-120b-mxfp4-q4",
+                    "cache_path": __file__,
+                    "port": 8100,
+                }
+            }
+        }
+        caps = {
+            "vllm_bin": "/usr/bin/vllm",
+            "supports_auto_tool_choice": True,
+            "supports_tool_call_parser": True,
+            "supports_reasoning_parser": True,
+            "tool_call_parsers": ["qwen3_xml"],
+        }
+        self._patch("_registry_path", lambda: Path("/tmp/registry.json"))
+        self._patch("_load_registry", lambda _path: data)
+        self._patch("_detect_vllm_capabilities", lambda: caps)
+        self._patch("_read_env_assignments", lambda _path: {"MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY": ""})
+        with self.assertRaises(SystemExit):
+            mlxctl._render_vllm_rows_for_ports([8100], host="0.0.0.0", validate=True)
+
+    def test_vllm_render_validate_reports_auto_memory_fraction_and_api_key(self):
+        data = {
+            "models": {
+                "mlx-gpt-oss-120b-mxfp4-q4": {
+                    "model_id": "mlx-gpt-oss-120b-mxfp4-q4",
+                    "cache_path": __file__,
+                    "port": 8100,
+                }
+            }
+        }
+        caps = {
+            "vllm_bin": "/usr/bin/vllm",
+            "supports_auto_tool_choice": True,
+            "supports_tool_call_parser": True,
+            "supports_reasoning_parser": True,
+            "tool_call_parsers": ["qwen3_xml"],
+        }
+        self._patch("_registry_path", lambda: Path("/tmp/registry.json"))
+        self._patch("_load_registry", lambda _path: data)
+        self._patch("_detect_vllm_capabilities", lambda: caps)
+        self._patch("_read_env_assignments", lambda _path: {"MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_KEY": "real-key"})
+
+        payload = mlxctl._render_vllm_rows_for_ports([8100], host="0.0.0.0", validate=True)
+        self.assertEqual(len(payload["rows"]), 1)
+        row = payload["rows"][0]
+        self.assertEqual(row["env"]["VLLM_METAL_MEMORY_FRACTION"], "auto")
+        self.assertIn("--api-key", row["argv"])
+        self.assertIn("real-key", row["argv"])
+        self.assertIn("--no-async-scheduling", row["argv"])
 
 
 if __name__ == "__main__":

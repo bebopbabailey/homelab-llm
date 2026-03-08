@@ -188,7 +188,9 @@ def _parse_port_csv(raw_ports: Optional[str], *, arg_name: str, valid_range=TEAM
 
 def _is_local_host():
     host = socket.gethostname().split(".")[0].lower()
-    return host in {"studio", "thestudio"}
+    if host in {"studio", "thestudio"}:
+        return True
+    return Path(DEFAULT_HF_HOME).exists() and Path(DEFAULT_VLLM_BIN).exists()
 
 
 def _maybe_forward_to_studio(args):
@@ -1160,17 +1162,29 @@ def _default_vllm_max_model_len(entry: dict) -> int:
 
 def _default_vllm_memory_fraction(entry: dict) -> str:
     explicit = _entry_vllm_value(entry, "memory_fraction", "vllm_memory_fraction")
-    if explicit is not None:
-        return str(explicit)
-    text = _entry_identity_text(entry)
-    # Conservative ensemble defaults for 8100-8102 stability.
-    if "gpt-oss-120b" in text:
-        return "0.55"
-    if "qwen3-next-80b" in text:
-        return "0.50"
-    if "gpt-oss-20b" in text:
-        return "0.45"
-    return os.environ.get("VLLM_METAL_MEMORY_FRACTION", DEFAULT_VLLM_MEMORY_FRACTION)
+    if explicit is None:
+        return "auto"
+    value = str(explicit).strip().lower()
+    if not value:
+        return "auto"
+    return value
+
+
+def _validated_vllm_memory_fraction(entry: dict) -> str:
+    value = _default_vllm_memory_fraction(entry).strip().lower()
+    if value == "auto":
+        return value
+    try:
+        float(value)
+    except ValueError:
+        raise SystemExit(
+            f"{_lane_handle_for_entry(entry)} memory_fraction={value!r} unsupported for the "
+            "MLX-managed vllm-metal path in this commit; use 'auto'"
+        )
+    raise SystemExit(
+        f"{_lane_handle_for_entry(entry)} memory_fraction={value!r} is invalid while paged "
+        "attention remains disabled; use 'auto'"
+    )
 
 
 def _default_vllm_async_scheduling(entry: dict) -> bool:
@@ -1243,6 +1257,15 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
     served_model_name = entry.get("served_model_name") or entry.get("model_id")
     if not served_model_name:
         raise SystemExit("registry entry missing model_id/served_model_name for vllm launch")
+    entry = dict(entry)
+    entry.setdefault("served_model_name", served_model_name)
+    entry.setdefault("port", port)
+    lane_api_key = ""
+    if validate:
+        _, lane_api_key = _validated_lane_api_key(entry)
+    else:
+        _, lane_api_key = _resolve_lane_api_key(entry)
+    memory_fraction = _validated_vllm_memory_fraction(entry) if validate else _default_vllm_memory_fraction(entry).strip().lower()
 
     tool_choice_mode = _default_vllm_tool_choice_mode(entry)
     if tool_choice_mode not in {"none", "auto"}:
@@ -1261,6 +1284,8 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         "--max-model-len",
         str(_default_vllm_max_model_len(entry)),
     ]
+    if lane_api_key:
+        argv += ["--api-key", lane_api_key]
     if _default_vllm_async_scheduling(entry):
         argv += ["--async-scheduling"]
     else:
@@ -1293,7 +1318,7 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         argv += ["--reasoning-parser", reasoning_parser]
 
     env = {
-        "VLLM_METAL_MEMORY_FRACTION": _default_vllm_memory_fraction(entry).strip(),
+        "VLLM_METAL_MEMORY_FRACTION": memory_fraction,
     }
     return {
         "argv": argv,
@@ -1384,15 +1409,9 @@ def default_max_model_len(entry, slug):
 def default_memory_fraction(entry, slug):
     explicit = entry.get("vllm_memory_fraction")
     if explicit is not None:
-        return str(explicit)
-    text = identity(entry, slug)
-    if "gpt-oss-120b" in text:
-        return "0.55"
-    if "qwen3-next-80b" in text:
-        return "0.50"
-    if "gpt-oss-20b" in text:
-        return "0.45"
-    return "0.60"
+        value = str(explicit).strip().lower()
+        return value or "auto"
+    return "auto"
 
 def as_bool(value, default=False):
     if value is None:
@@ -2218,6 +2237,71 @@ def _env_key(handle: str, suffix: str):
     key = handle.upper().replace("-", "_")
     return f"MLX_{key}_{suffix}"
 
+
+def _gateway_env_local_path() -> Path:
+    gateway_root = Path(os.environ.get("GATEWAY_ROOT", DEFAULT_GATEWAY_ROOT))
+    return gateway_root / "layer-gateway/litellm-orch/config/env.local"
+
+
+def _read_env_assignments_from_lines(lines) -> dict[str, str]:
+    env = {}
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        env[key] = value
+    return env
+
+
+def _read_env_assignments(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    return _read_env_assignments_from_lines(path.read_text().splitlines())
+
+
+def _lane_handle_for_entry(entry: dict) -> str:
+    handle = str(entry.get("model_id") or entry.get("served_model_name") or "").strip()
+    if not handle:
+        raise SystemExit("registry entry missing model_id/served_model_name for lane auth")
+    return handle
+
+
+def _resolve_lane_api_key(entry: dict, env_assignments: Optional[dict[str, str]] = None) -> tuple[str, str]:
+    env_name = _env_key(_lane_handle_for_entry(entry), "API_KEY")
+    value = os.environ.get(env_name)
+    if value is None:
+        if env_assignments is None:
+            env_assignments = _read_env_assignments(_gateway_env_local_path())
+        value = env_assignments.get(env_name, "")
+    return env_name, str(value).strip()
+
+
+def _is_blank_or_dummy_auth(value: Optional[str]) -> bool:
+    normalized = str(value or "").strip()
+    return not normalized or normalized.lower() == "dummy"
+
+
+def _validated_lane_api_key(entry: dict, env_assignments: Optional[dict[str, str]] = None) -> tuple[str, str]:
+    env_name, value = _resolve_lane_api_key(entry, env_assignments=env_assignments)
+    if _is_blank_or_dummy_auth(value):
+        handle = _lane_handle_for_entry(entry)
+        port = entry.get("port")
+        lane_text = f"{handle} on {port}" if port else handle
+        raise SystemExit(
+            f"{lane_text} requires non-dummy {env_name} in "
+            "layer-gateway/litellm-orch/config/env.local or the current environment"
+        )
+    return env_name, value
+
 _EP_PORT_RE = re.compile(r"^ep_mlx_(?:omni|slot)_(\d+)$")
 
 
@@ -2370,6 +2454,7 @@ def _update_env_local(path: Path, mlx_entries, host: str):
     begin = "# BEGIN MLXCTL AUTO"
     end = "# END MLXCTL AUTO"
     lines = path.read_text().splitlines()
+    existing = _read_env_assignments_from_lines(lines)
     output = []
     skip = False
     for line in lines:
@@ -2406,10 +2491,14 @@ def _update_env_local(path: Path, mlx_entries, host: str):
         handle = item["handle"]
         block.append(f"{_env_key(handle, 'MODEL')}=openai/{handle}")
     block.append("")
-    block.append("# API keys (set to \"dummy\" if the backend does not enforce auth)")
+    block.append("# API keys for active MLX team lanes (required when backend auth is enforced)")
     for item in mlx_entries:
         handle = item["handle"]
-        block.append(f"{_env_key(handle, 'API_KEY')}=dummy")
+        key_name = _env_key(handle, "API_KEY")
+        key_value = os.environ.get(key_name, existing.get(key_name, "")).strip()
+        if key_value.lower() == "dummy":
+            key_value = ""
+        block.append(f"{key_name}={key_value}")
     block.append("")
     block.append("# Swap endpoint defaults (kept aligned with the MLX backend)")
     swap_api_base = single_api_base or f"http://{host}:{default_omni_port}/v1"
@@ -2417,7 +2506,10 @@ def _update_env_local(path: Path, mlx_entries, host: str):
     # swap remains a model id passed to the backend; keep it compatible with existing behavior.
     # (The backend should strip the 'openai/' prefix if it does not use OpenAI provider routing.)
     block.append("SWAP_MODEL=openai/mlx-gpt-oss-20b-mxfp4-q4")
-    block.append("SWAP_API_KEY=dummy")
+    swap_api_key = os.environ.get("SWAP_API_KEY", existing.get("SWAP_API_KEY", "")).strip()
+    if swap_api_key.lower() == "dummy":
+        swap_api_key = ""
+    block.append(f"SWAP_API_KEY={swap_api_key}")
     # OptiLLM routing block removed (deprecated).
     block.append(end)
 
@@ -2955,8 +3047,8 @@ LOG_DIR = Path({log_dir!r})
 LANE_LABEL_PREFIX = {lane_label_prefix!r}
 LEGACY_LABEL = {legacy_label!r}
 LEGACY_PLIST = {legacy_plist!r}
-TARGET_PORTS = {json.dumps(sorted(set(target_ports)))}
-ROWS = {json.dumps(rows)}
+TARGET_PORTS = {repr(sorted(set(target_ports)))}
+ROWS = {repr(rows)}
 TEAM_MIN = 8100
 TEAM_MAX = 8119
 
