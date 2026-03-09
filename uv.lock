@@ -2860,7 +2860,7 @@ wheels = [
 [[package]]
 name = "optillm"
 version = "0.3.12"
-source = { git = "https://github.com/algorithmicsuperintelligence/optillm.git?rev=5211f50454a666e98a63d9203e1e6adb977a76fa#5211f50454a666e98a63d9203e1e6adb977a76fa" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "adaptive-classifier" },
     { name = "aiohttp" },
@@ -2899,6 +2899,10 @@ dependencies = [
     { name = "webdriver-manager" },
     { name = "z3-solver" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/e2/7192a7c13ca2acb60aa5fbdbd60b2eaf6e65c8bf7573faa911d2858c9f85/optillm-0.3.12.tar.gz", hash = "sha256:70308fbc81df3a97995cd29da30de5688506ad3f308b240e77a148a368d3979d", size = 338502, upload-time = "2025-12-25T04:43:17.527Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/8e/836f4ea34b238a753abad3c87bf81477a11711703a659834b5eca90fca34/optillm-0.3.12-py3-none-any.whl", hash = "sha256:5fc8feeb26d03b2364f8b14e689213087642f392155916fcfc2b5b1c50ac2e52", size = 303524, upload-time = "2025-12-25T04:43:15.67Z" },
+]
 
 [[package]]
 name = "optillm-proxy"
@@ -2914,7 +2918,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "math-verify" },
-    { name = "optillm", git = "https://github.com/algorithmicsuperintelligence/optillm.git?rev=5211f50454a666e98a63d9203e1e6adb977a76fa" },
+    { name = "optillm", specifier = "==0.3.12" },
     { name = "tokenizers", specifier = "==0.21.0" },
     { name = "transformers", specifier = "==4.49.0" },
 ]
