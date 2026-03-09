@@ -13,6 +13,7 @@ implement inference or web-search business logic.
 
 ## Endpoints
 - `POST /v1/chat/completions` (OpenAI-compatible; forwards to upstream)
+- `POST /v1/responses` (OpenAI-compatible Responses API; supports LiteLLM MCP tool use)
 - `POST /v1/search/<tool_name>` (direct callers and MCP tools)
 - `GET /v1/models` (logical model names from router config)
 - `GET /health` (LiteLLM health check across configured deployments)
@@ -27,6 +28,8 @@ implement inference or web-search business logic.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them.
 - LiteLLM does not inject web-search schemas, repair loops, or citation rendering.
+- `drop_params=true` is part of the current runtime baseline.
+- Active router fallback baseline is `fast -> main`.
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
@@ -40,6 +43,10 @@ implement inference or web-search business logic.
 - `deep` -> MLX Studio lane `8100`
 - `fast` -> MLX Studio lane `8102`
 - `boost` -> Studio OptiLLM proxy on `:4020` (optimization lane)
+
+## Current runtime notes
+- Pushcut MCP integration is not active in the main LiteLLM runtime.
+- The validated planning-lane smoke is `boost-plan-trio` with a planning prompt, not an exact-echo check.
 
 ## Logging (Planned)
 - Request logging: JSONL via LiteLLM (`json_logs: true`) for ingestion (model, upstream, latency, status, error).

@@ -57,6 +57,19 @@ curl -sS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -d '{"model":"fast","stream":false,"messages":[{"role":"user","content":"Reply with exactly: nonstream-ok"}],"max_tokens":32}' | jq .
 ```
 
+## Fallback validation
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"fast","messages":[{"role":"user","content":"Reply with exactly one short sentence."}],"stream":false,"max_tokens":32,"mock_testing_fallbacks":true}' | jq .
+```
+Expected:
+- request succeeds
+- LiteLLM logs show `fast` falling back to `main`
+
 ## Active alias checks
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
@@ -74,6 +87,7 @@ Expected:
 - `fast`, `main`, `deep`, and `boost*` aliases appear in `/v1/models`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
+- Current resilience baseline keeps `fast -> main`.
 
 ## Readiness callback check
 ```bash
