@@ -82,24 +82,49 @@ remote_launchd_restart() {
   fail "launchd label '$label' not found under gui/ or system"
 }
 
-remote_models_smoke() {
+remote_optillm_api_key() {
   studio_utility "set -euo pipefail; \
-    test -f '$OPTILLM_API_KEY_ENV'; \
-    OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\"; \
-    test -n \"\$OPTILLM_API_KEY\"; \
-    curl -fsS http://127.0.0.1:4020/v1/models \
-      -H \"Authorization: Bearer \${OPTILLM_API_KEY}\" \
-      >/dev/null"
+    if [[ -f '$OPTILLM_API_KEY_ENV' ]]; then \
+      OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\"; \
+      test -n \"\$OPTILLM_API_KEY\"; \
+      printf '%s' \"\$OPTILLM_API_KEY\"; \
+      exit 0; \
+    fi; \
+    for domain in gui/\$(id -u) system; do \
+      if launchctl print \"\$domain/$LAUNCHD_LABEL\" >/dev/null 2>&1; then \
+        launchctl print \"\$domain/$LAUNCHD_LABEL\" | \
+          python3 -c \"import re,sys; data=sys.stdin.read(); m=re.search(r'\\\\n\\\\s+--optillm-api-key\\\\n\\\\s+([^\\\\n]+)', data); sys.stdout.write(m.group(1).strip() if m else ''); sys.exit(0 if m and m.group(1).strip() else 1)\" && exit 0; \
+      fi; \
+    done; \
+    exit 1" || fail "unable to resolve OPTILLM API key from $OPTILLM_API_KEY_ENV or launchd label $LAUNCHD_LABEL"
+}
+
+wait_for_http_ready() {
+  local api_key="$1"
+  local path="$2"
+  local attempts="${3:-20}"
+  local delay="${4:-1}"
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    if studio_utility "curl -fsS http://127.0.0.1:4020${path} -H \"Authorization: Bearer ${api_key}\" >/dev/null"; then
+      return 0
+    fi
+    sleep "$delay"
+  done
+  return 1
+}
+
+remote_models_smoke() {
+  local api_key="$1"
+  wait_for_http_ready "$api_key" "/v1/models" 20 1 || fail "/v1/models smoke failed after restart"
 }
 
 remote_chat_smoke() {
+  local api_key="$1"
   studio_utility "set -euo pipefail; \
-    test -f '$OPTILLM_API_KEY_ENV'; \
-    OPTILLM_API_KEY=\"\$(grep -E '^OPTILLM_API_KEY=' '$OPTILLM_API_KEY_ENV' | cut -d= -f2-)\"; \
-    test -n \"\$OPTILLM_API_KEY\"; \
     curl -fsS http://127.0.0.1:4020/v1/chat/completions \
       -H 'Content-Type: application/json' \
-      -H \"Authorization: Bearer \${OPTILLM_API_KEY}\" \
+      -H \"Authorization: Bearer ${api_key}\" \
       -d '{"model":"'$SMOKE_MODEL'","messages":[{"role":"user","content":"ping"}],"optillm_approach":"'$SMOKE_APPROACH'","max_tokens":'$SMOKE_MAX_TOKENS'}' \
       >/dev/null"
 }
@@ -134,11 +159,14 @@ remote_uv_sync
 log "Restarting launchd service: $LAUNCHD_LABEL"
 remote_launchd_restart "$LAUNCHD_LABEL"
 
+log "Resolving configured API key"
+OPTILLM_API_KEY="$(remote_optillm_api_key)"
+
 log "Running /v1/models smoke"
-remote_models_smoke
+remote_models_smoke "$OPTILLM_API_KEY"
 
 log "Running authenticated chat smoke"
-remote_chat_smoke
+remote_chat_smoke "$OPTILLM_API_KEY"
 
 if [[ "$RUN_BENCH" == "1" ]]; then
   log "Running benchmark on Studio"
