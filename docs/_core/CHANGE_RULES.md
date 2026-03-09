@@ -56,6 +56,15 @@ If drift is discovered:
   - `scripts/validate_handles.py` (implementation)
   - Example: adding a new handle validation rule should also add a corresponding test step in testing docs.
 
+## Runtime Lock
+- If locked Studio runtime args, LiteLLM resilience settings, MLX lane auth/memory defaults,
+  or pinned `optillm` provenance change, update:
+  - `docs/foundation/runtime-lock.md`
+  - `platform/ops/runtime-lock.json`
+  - `platform/ops/scripts/validate_runtime_lock.py`
+  - `docs/PLATFORM_DOSSIER.md`
+  - affected service `SERVICE_SPEC.md` / `RUNBOOK.md`
+
 ## Journal Integrity
 - Journal entries are **append-only**. Do not move or delete entries from `docs/journal/`.
 - If a correction is needed, add a **new** entry that references the original.

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "submodules": {
+    "layer-gateway/optillm-proxy": "b2553ccab8a96f3bc7f75b0ec395dfd201d81bb5",
+    "layer-gateway/litellm-orch": "56c7b723e2f76f6e593ffd05f508db5d3d3fad64"
+  },
+  "optillm_proxy": {
+    "package": {
+      "name": "optillm",
+      "version": "0.3.12",
+      "source": "pypi"
+    },
+    "deploy": {
+      "repo_path": "/Users/thestudio/optillm-proxy",
+      "label": "com.bebop.optillm-proxy",
+      "exact_sha_required": true,
+      "patching_allowed": false
+    }
+  },
+  "litellm": {
+    "router_yaml": "layer-gateway/litellm-orch/config/router.yaml",
+    "drop_params": true,
+    "fallbacks": {
+      "fast": [
+        "main"
+      ]
+    }
+  },
+  "mlx": {
+    "paged_attention": false,
+    "async_scheduling": false,
+    "memory_fraction": "auto",
+    "api_key_required": true,
+    "lanes": {
+      "8100": "com.bebop.mlx-lane.8100",
+      "8101": "com.bebop.mlx-lane.8101",
+      "8102": "com.bebop.mlx-lane.8102"
+    }
+  }
+}

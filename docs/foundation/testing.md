@@ -3,6 +3,21 @@
 This doc captures the recommended test steps for new changes. Run these on the
 appropriate host and confirm outputs before declaring a change complete.
 
+## Runtime Lock
+FAST validator:
+```bash
+python3 platform/ops/scripts/validate_runtime_lock.py --mode fast --json
+```
+
+FULL validator:
+```bash
+python3 platform/ops/scripts/validate_runtime_lock.py --mode full --host studio --json
+```
+
+Expected:
+- FAST passes in local CI/repo state with no patch artifacts or git-sourced OptiLLM.
+- FULL confirms Studio OptiLLM exact-SHA deploy plus MLX lane `auto`/`--api-key`/`--no-async-scheduling`.
+
 ## MLX Registry and Controller (Studio)
 
 Current runtime baseline (per-port MLX lanes):
@@ -153,50 +168,95 @@ ssh studio "curl -fsS http://127.0.0.1:55440/health | jq ."
 ```
 
 ### Studio vector-store retrieval quality gate (QG1)
-Goal: tune retrieval defaults using a fixed judged query set before integration.
+Goal: tune retrieval defaults using a fixed judged query set while minimizing manual grading.
 
-Print fixed query pack:
+Canonical evaluation engine:
+- `ir-measures` with pinned provider support via `pytrec-eval-terrier`
+
+Artifact semantics:
+- `run-pack` emits ranked retrieval output in `run.json`
+- judgments stay in CSV, but scoring keys them by `(query_id, chunk_id)`, not by rank
+- this keeps judgments portable across reranking as long as `chunk_id` identity is stable
+
+Canonical metric mappings:
+- `hit_at_5` -> `Success(rel=2, judged_only=False)@5`
+- `mrr_at_10` -> `RR(rel=2, judged_only=False)@10`
+- `ndcg_at_10` -> `nDCG(gains={0:0,1:1,2:3}, dcg='log2', judged_only=False)@10`
+- `bad_hit_rate_at_5` -> `1 - P(rel=1, judged_only=False)@5`
+- `p95_latency_ms` remains custom
+
+Docs-pack workflow:
 ```bash
 cd /home/christopherbailey/homelab-llm
-uv run python layer-data/vector-db/scripts/eval_memory_quality.py print-pack \
-  --pack layer-data/vector-db/eval/query_pack.v1.jsonl
-```
 
-Baseline run on Studio (`R0`):
-```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
    uv run python layer-data/vector-db/scripts/eval_memory_quality.py run-pack \
-     --pack layer-data/vector-db/eval/query_pack.v1.jsonl \
+     --pack layer-data/vector-db/eval/query_pack.docs.v1.jsonl \
      --api-base http://127.0.0.1:55440 \
      --model-space qwen \
      --top-k 10 \
      --lexical-k 30 \
      --vector-k 30 \
-     --run-id R0 \
-     --out /Users/thestudio/data/memory-main/eval/R0.run.json"
-scp studio:/Users/thestudio/data/memory-main/eval/R0.run.json \
-  /home/christopherbailey/homelab-data/memory-eval/R0.run.json
-cp /home/christopherbailey/homelab-llm/layer-data/vector-db/eval/judgment_template.v1.csv \
-  /home/christopherbailey/homelab-data/memory-eval/R0.judgments.csv
+     --run-id D1 \
+     --out /Users/thestudio/data/memory-main/eval/D1.run.json"
+
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py autolabel \
+     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
+     --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
+     --mode conservative_graded \
+     --labeler codex-auto \
+     --run-id D1"
+
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py triage \
+     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
+     --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
+     --out /Users/thestudio/data/memory-main/eval/D1.triage.json"
 ```
 
-After manual top-10 labeling (`grade: 2 relevant / 1 partial / 0 irrelevant`):
+Only if triage returns flagged query ids, review those cases interactively:
 ```bash
-cd /home/christopherbailey/homelab-llm
-uv run python layer-data/vector-db/scripts/eval_memory_quality.py score \
-  --run-json /home/christopherbailey/homelab-data/memory-eval/R0.run.json \
-  --judgments /home/christopherbailey/homelab-data/memory-eval/R0.judgments.csv \
-  --out /home/christopherbailey/homelab-data/memory-eval/R0.score.json
+ssh -t studio "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py label \
+     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
+     --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
+     --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
+     --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
+     --labeler chris \
+     --run-id D1"
+```
+
+If triage is empty, promote the auto labels directly:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cp /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
+      /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv"
+```
+
+Score on Studio:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py score \
+     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
+     --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
+     --out /Users/thestudio/data/memory-main/eval/D1.score.json && \
+   jq '{metrics_support,metrics_disconfirm,gates,diagnostics,bucket_hit_at_5_support}' \
+      /Users/thestudio/data/memory-main/eval/D1.score.json"
 ```
 
 Gate thresholds:
-- `hit_at_5 >= 0.85`
-- `mrr_at_10 >= 0.65`
-- `ndcg_at_10 >= 0.70`
-- `bad_hit_rate_at_5 <= 0.30`
+- support `hit_at_5 >= 0.85`
+- support `mrr_at_10 >= 0.65`
+- support `ndcg_at_10 >= 0.70`
+- support buckets each `hit_at_5 >= 0.75`
+- disconfirm `hit_at_5 >= 0.67`
 - `p95_latency_ms <= 800`
-- every bucket `hit_at_5 >= 0.75`
+- `bad_hit_rate_at_5` is diagnostic only
 
 Runtime lineage check expectation:
 - ports `8100/8101/8102` listeners are `vllm serve`
@@ -549,6 +609,168 @@ Pass guidance:
 - No `EXTERNAL_WEB_LOADER_URL`, `WEB_LOADER_ENGINE=external`, or `:8899/search` reference remains.
 - The SearXNG smoke returns at least one result.
 - The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.
+
+## Promptfoo Web Search Eval Baseline (Mini)
+Purpose:
+- measure the supported Open WebUI web-search path without adding middleware
+- compare the current lanes (`owui-fast`, `owui-research`) using repo-tracked data
+- lock the winning lane first, then tune only `WEB_SEARCH_DOMAIN_FILTER_LIST`
+- keep artifacts outside git under `evals/websearch/artifacts/`
+
+Tracked files:
+- config: `evals/websearch/promptfooconfig.yaml`
+- dataset: `evals/websearch/queries.jsonl`
+- assertions: `evals/websearch/assertions.py`
+- blocked-domain policy: `evals/websearch/blocked_domains.txt`
+- provider: `evals/websearch/providers/owui_websearch.py`
+- scoring template: `evals/websearch/scoring_template.csv`
+- tuning manifest: `evals/websearch/owui_tuning_matrix.yaml`
+
+Pinned promptfoo version:
+- use `npx promptfoo@0.120.27`
+- this version was validated on Mini and should stay pinned for reproducible runs
+- use JSON output as the canonical saved artifact on this version
+
+Node preflight:
+- promptfoo requires Node.js `20.20+` or `22.22+`
+
+```bash
+node -v
+npm -v
+npx promptfoo@0.120.27 --version
+```
+
+Required env:
+```bash
+export OWUI_API_KEY='<open-webui-api-key>'
+export OWUI_API_BASE='http://127.0.0.1:3000'
+export PROMPTFOO_PYTHON="$(command -v python3)"
+```
+
+Validate config before the first run:
+```bash
+cd /home/christopherbailey/homelab-llm
+export PROMPTFOO_PYTHON="$(command -v python3)"
+npx promptfoo@0.120.27 validate -c evals/websearch/promptfooconfig.yaml
+```
+
+Stage 0: lane lock from existing baseline artifacts
+1. score `20260308T193329Z-baseline-fast-smoke.json`
+2. score `20260308T193329Z-baseline-deep-smoke.json`
+3. score `20260308T193329Z-baseline-fast-freshness-high-extra.json`
+4. score `20260308T193329Z-baseline-deep-freshness-high-extra.json`
+5. roll up those scored CSVs before any runtime mutation
+
+Score rollup:
+```bash
+uv run python scripts/websearch_score_rollup.py   --input evals/websearch/artifacts/20260308T193329Z-lane-smoke-review.csv   --input evals/websearch/artifacts/20260308T193329Z-lane-freshness-high-extra-review.csv   --baseline baseline:owui-fast   --output evals/websearch/artifacts/20260308T193329Z-lane-rollup.md
+```
+
+If the lane decision is ambiguous, keep `owui-fast`.
+
+Stage 1: supported domain-filter tuning on the winning lane only
+- mutate only `WEB_SEARCH_DOMAIN_FILTER_LIST`
+- keep `WEB_FETCH_FILTER_LIST` fixed
+- keep `WEB_LOADER_ENGINE=safe_web`
+- keep `WEB_SEARCH_CONCURRENT_REQUESTS=1`
+- do not change loader/concurrency/timeouts yet
+- do not start provider bakeoffs
+
+Conservative candidate profiles:
+- `df-zhihu`
+- `df-zhihu-explicit`
+- `df-zhihu-explicit-spam`
+
+Required slices for every candidate on the winning lane:
+1. `smoke`
+2. `freshness-high-extra`
+3. `adversarial-junk`
+4. `technical-docs`
+
+Preflight before writing `25-websearch-tuning.conf`:
+```bash
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?WEB_SEARCH_DOMAIN_FILTER_LIST='
+curl -fsS http://127.0.0.1:3000/health | jq .
+```
+
+Reason:
+- `WEB_SEARCH_DOMAIN_FILTER_LIST` is a PersistentConfig-backed variable
+- if `ENABLE_PERSISTENT_CONFIG=False` is not active, the systemd drop-in may not control the effective value
+
+Temporary tuning override for one variable at a time:
+```bash
+sudo tee /etc/systemd/system/open-webui.service.d/25-websearch-tuning.conf >/dev/null <<'EOF'
+[Service]
+Environment="WEB_SEARCH_DOMAIN_FILTER_LIST=<candidate_value>"
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart open-webui.service
+```
+
+Post-restart env verification:
+```bash
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?WEB_SEARCH_DOMAIN_FILTER_LIST='
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?WEB_FETCH_FILTER_LIST='
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?WEB_SEARCH_ENGINE=searxng$|^"?WEB_LOADER_ENGINE=safe_web$|^"?WEB_SEARCH_CONCURRENT_REQUESTS=1$'
+curl -fsS http://127.0.0.1:3000/health | jq .
+```
+
+If the preflight or post-restart env check fails:
+- stop the candidate
+- remove `25-websearch-tuning.conf`
+- restore baseline
+- do not treat the outcome as a valid experiment result
+
+Promptfoo run pattern for the winning lane:
+```bash
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+npx promptfoo@0.120.27 eval   -c evals/websearch/promptfooconfig.yaml   --filter-providers '^<winning-lane>$'   --filter-metadata enabled=true   --filter-metadata category=adversarial-junk   --no-cache   --output "evals/websearch/artifacts/${RUN_ID}-<profile>-<winning-lane>-adversarial-junk.json"
+```
+
+Summary per run:
+```bash
+uv run python scripts/websearch_eval_summary.py   --input "evals/websearch/artifacts/${RUN_ID}-<profile>-<winning-lane>-adversarial-junk.json"   --output "evals/websearch/artifacts/${RUN_ID}-<profile>-<winning-lane>-adversarial-junk-summary.md"
+```
+
+Manual scoring:
+- use `evals/websearch/scoring_template.csv`
+- keep one row per query with `profile_id`, `lane`, `run_id`, and the four 1-5 scores
+- keep the same reviewer across compared runs
+- score `adversarial-junk` to prove the filter helps where it should
+- score `technical-docs` to detect collateral damage
+
+Candidate promotion:
+- candidate must improve `adversarial-junk` materially
+- must not regress `technical-docs` beyond the documented threshold
+- must keep machine checks clean on assertions, blocked internal-domain hits, and zero-source behavior
+- if more than one candidate passes, choose the narrowest denylist
+- if no candidate passes, keep the current baseline unchanged
+
+Rollback:
+```bash
+sudo rm -f /etc/systemd/system/open-webui.service.d/25-websearch-tuning.conf
+sudo systemctl daemon-reload
+sudo systemctl restart open-webui.service
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
+' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$|^"?WEB_SEARCH_DOMAIN_FILTER_LIST=|^"?WEB_FETCH_FILTER_LIST='
+curl -fsS http://127.0.0.1:3000/health | jq .
+```
+
+Guardrails:
+- blocked-domain checks are eval-only and must not be treated as runtime config
+- `WEB_FETCH_FILTER_LIST` stays fixed; do not use it as a quality-tuning control
+- `smoke_latency` is diagnostic-only in reporting, not a product-quality gate
+- this harness is for measuring supported paths and tuning documented Open WebUI knobs only
+- it is not a license to add middleware, hidden search policy, or custom citation logic
+- provider bakeoffs remain out of scope for this phase
 
 ## LiteLLM Web Search Reset Checks (Mini)
 Readiness and model checks:

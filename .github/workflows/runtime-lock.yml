@@ -1,0 +1,21 @@
+name: runtime-lock
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  validate-runtime-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validator unit tests
+        run: python -m unittest discover -s platform/ops/scripts/tests -p 'test_validate_runtime_lock.py'
+      - name: Runtime lock fast validation
+        run: python platform/ops/scripts/validate_runtime_lock.py --mode fast --json

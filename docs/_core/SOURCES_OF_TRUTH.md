@@ -12,6 +12,7 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `docs/foundation/overview.md`
     - `docs/INTEGRATIONS.md`
     - `docs/foundation/mlx-registry.md`
+    - `docs/foundation/runtime-lock.md`
     - `docs/foundation/ov-llm-server.md`
     - `docs/foundation/orin-agx.md`
 - Registry/template data (prefer data over summaries):
@@ -19,6 +20,7 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `layer-inference/registry/models.jsonl`
     - `layer-data/registry/lexicon.jsonl`
     - `platform/ops/templates/mcp-registry.json`
+    - `platform/ops/runtime-lock.json`
 - Per-service canon (most specific truth for a service):
     - `layer-*/<service>/SERVICE_SPEC.md`
     - (supporting) `layer-*/<service>/ARCHITECTURE.md`, `RUNBOOK.md`, `AGENTS.md`, `CONSTRAINTS.md`
