@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- OptiLLM drift cleanup + runtime lock:
-  - Remove deploy-time patching and git-sourced OptiLLM from `layer-gateway/optillm-proxy`.
-  - Make Studio deploy exact-SHA and reproducible with `uv sync --frozen`.
-  - Add runtime lock, validator, and canon docs for the current LiteLLM + vLLM-metal baseline.
+- PlanSearchTrio final closeout:
+  - Fix stale `optillm-proxy` docs to match the locked runtime.
+  - Add the locked-runtime closeout canary artifact for `boost-plan` vs `boost-plan-trio`.
+  - Refresh runtime-lock SHA after exact-SHA Studio deploy parity.
 
 NEXT UP
-- Finish the runtime-lock/doc pass after the optillm-proxy drift cleanup validates on Studio.
+- Push and prepare a release/tag point after closeout validation passes.

@@ -19,6 +19,16 @@ contract for the active LiteLLM + OptiLLM + vLLM-metal stack.
 - Active MLX lanes keep `--no-async-scheduling`.
 - Paged attention remains off.
 
+## Planner policy
+- `boost-plan-trio` is the preferred deliberate planning lane.
+- `boost-plan` is the upstream baseline and fallback.
+- Trio is higher-latency and richer-output than baseline and is not the
+  universal low-latency default.
+- Locked-runtime closeout canary artifact:
+  `layer-gateway/optillm-proxy/docs/plansearchtrio_closeout_canary_locked_runtime_2026-03-09.json`
+- The closeout canary artifact is evidence for the locked runtime. It does not
+  replace the earlier blind human eval.
+
 ## Validation modes
 - FAST:
   - local repo and config checks only
