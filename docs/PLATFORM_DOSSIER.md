@@ -44,6 +44,7 @@
   Auth: API calls require `Authorization: Bearer <LITELLM_MASTER_KEY>` (even on localhost).
   Health/auth behavior: `/v1/*` and `/health` are auth-gated; `/health/readiness`,
   `/health/liveliness`, and `/metrics/` are currently open.
+  Runtime lock baseline: `drop_params=true`, `fast -> main`.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   Harmony normalization is canonical at this layer for GPT lanes (`deep`, `fast`,
   `boost`, `boost-deep`) with strict wire-tag detection.
@@ -62,7 +63,7 @@
   `WEB_LOADER_TIMEOUT=15`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
-  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
   `ENABLE_PERSISTENT_CONFIG=False` makes env/drop-ins authoritative; Admin UI changes are non-persistent after restart.
 - OpenVINO: systemd unit `/etc/systemd/system/ov-server.service`, env `/etc/homelab-llm/ov-server.env`.
   OpenVINO is currently available as a standalone backend and is not wired as active LiteLLM handles.
@@ -71,12 +72,12 @@
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
 - OptiLLM proxy (Studio): managed by launchd.
   Evidence: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`.
-  Runtime args include: `--host 0.0.0.0 --port 4020 --approach router --model main --base-url http://100.69.99.60:4443/v1`.
+  Runtime args include: `--host 0.0.0.0 --port 4020 --model main --base-url http://100.69.99.60:4443/v1`.
   Upstream: Mini LiteLLM via tailnet TCP forward (`100.69.99.60:4443 -> 127.0.0.1:4000`).
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
-  Trio canary (`boost-plan-trio`) uses stage-scoped reasoning effort on deep final
-  synthesis/rewrite (`high` default), with automatic per-stage retry without
-  `reasoning_effort` if provider validation rejects the parameter.
+  Deploy contract is exact-SHA from repo checkout with `uv sync --frozen`.
+  Current package baseline is `optillm==0.3.12` from PyPI with no deploy-time patching.
+  Trio canary (`boost-plan-trio`) uses the local `plansearchtrio` plugin.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.
   Current active inference listeners: `8100/8101/8102` (`vllm serve` under `com.bebop.mlx-lane.8100/.8101/.8102`).
@@ -84,6 +85,7 @@
   to `source_path`/`cache_path` for inference.
   Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).
   Current team-lane runtime command family is `vllm serve` (`vllm-metal`) under per-lane launchd labels.
+  Runtime lock baseline: `VLLM_METAL_MEMORY_FRACTION=auto`, `--api-key`, `--no-async-scheduling`, paged attention off.
   `mlxctl` now compiles per-lane vLLM args from registry (including strict parser
   capability validation for auto-tool lanes). Current staged default enables
   auto-tool for `main` (`8101`) only.
@@ -98,6 +100,8 @@
   Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
   while preserving the same API contract (`/v1/memory/*`). Service remains
   Studio-local (no LAN exposure) with tool-mediated retrieval boundary.
+  Canonical source lives in monorepo `layer-data/vector-db`; deploy sync keeps
+  the current Studio runtime target at `/Users/thestudio/optillm-proxy/layer-data/vector-db`.
 
 ## Data registries (authoritative)
 - Lexicon registry (term correction): `layer-data/registry/lexicon.jsonl`

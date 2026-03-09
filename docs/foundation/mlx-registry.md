@@ -98,6 +98,10 @@ Runtime compatibility is resolved at launch time:
 Current staged default:
 - `main` (`8101`, qwen3-next-80b) uses `tool_choice_mode=auto`.
 - `deep`/`fast` remain on `tool_choice_mode=none` until explicitly changed.
+- Team lanes render `VLLM_METAL_MEMORY_FRACTION=auto`.
+- Team lanes require `--api-key`.
+- Team lanes keep `--no-async-scheduling`.
+- Paged attention is off in the current runtime contract.
 
 `mlxctl verify` is read-only by default and catches parser/template drift.
 Use `mlxctl verify --fix-defaults` only when you intentionally want defaults

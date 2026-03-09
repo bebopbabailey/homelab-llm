@@ -12,8 +12,7 @@
   exploding model handles.
 - For OpenAI-compatible upstreams, keep model aliases as handles and set the backend `litellm_params.model` to `openai/<base-model>`.
 - Logs: JSON logs are currently disabled (`litellm_settings.json_logs: false`).
-- OptiLLM request fields are passed through by setting `litellm_settings.drop_params: false`
-  (only relevant when calling OptiLLM directly).
+- Unsupported OpenAI params are dropped at LiteLLM via `litellm_settings.drop_params: true`.
 - Auth: gateway requests currently require bearer auth (`LITELLM_MASTER_KEY` in deployment).
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
 - MLX alias set (current lane mapping):
@@ -31,6 +30,7 @@
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
 - Stable aliases: `main`, `deep`, `fast`.
+- Resilience baseline: `fast -> main`.
 - Current experiment aliases: `metal-test-fast`, `metal-test-main`, `metal-test-deep` (temporary).
 - LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
 
@@ -109,7 +109,7 @@ if a param is rejected by the backend.
   `WEB_LOADER_ENGINE=safe_web`, `WEB_LOADER_TIMEOUT=15`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
-  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
 - `ENABLE_PERSISTENT_CONFIG=False` is active in deployment, so systemd env/drop-ins
   are authoritative and Admin UI changes to these settings do not persist across restart.
@@ -118,6 +118,7 @@ if a param is rejected by the backend.
 - Open WebUI owns web-search UX plus provider/loader configuration.
 - LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
 - vLLM owns inference and explicit structured decoding only when the caller requests it.
+- Pushcut is not active in the current LiteLLM main runtime.
 - No custom web-search business logic lives in LiteLLM guardrails.
 - No custom business logic is coupled to Open WebUI prompt internals.
 - Any future external search/loader service must use documented Open WebUI external
