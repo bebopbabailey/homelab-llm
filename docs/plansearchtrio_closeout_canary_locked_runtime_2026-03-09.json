@@ -1,0 +1,36 @@
+{
+  "baseline": {
+    "avg_chars": 102.0,
+    "empty": 0,
+    "error_text": 0,
+    "errors": 0,
+    "model": "boost-plan",
+    "ok": 20,
+    "p50_seconds": 9.6867,
+    "p95_seconds": 9.8415,
+    "runs": 20,
+    "trunc": 20
+  },
+  "candidate": {
+    "avg_chars": 446.6,
+    "empty": 0,
+    "error_text": 0,
+    "errors": 0,
+    "model": "boost-plan-trio",
+    "ok": 20,
+    "p50_seconds": 8.7656,
+    "p95_seconds": 11.9338,
+    "runs": 20,
+    "trunc": 0
+  },
+  "gate": {
+    "empty_pass": true,
+    "error_text_pass": true,
+    "latency_pass": true,
+    "p95_ratio": 1.2126,
+    "p95_ratio_max": 1.75,
+    "pass": true,
+    "require_zero_empty": true,
+    "require_zero_error_text": true
+  }
+}

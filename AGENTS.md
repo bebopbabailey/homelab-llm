@@ -42,4 +42,12 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 - Keep docs and runtime guidance synchronized with launchd/system topology.
 - If runtime args, bind/port, auth, or upstream wiring changes, update service
   docs and canonical platform docs per `docs/_core/CHANGE_RULES.md`.
-- `optillm_base_model` is not part of the active service contract.
+- Request-body base-model overrides are not part of the active service contract.
+
+## Planner Policy
+- Prefer `boost-plan-trio` for deliberate planning and coding workflows where
+  completeness matters more than raw latency.
+- Use `boost-plan` as the upstream baseline and fallback comparator.
+- Do not treat `boost-plan-trio` as the universal low-latency default.
+- Do not reintroduce patch-era assumptions into docs, deploy flows, or service
+  contracts.

@@ -100,6 +100,11 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   | jq -r '.choices[0].message.content'
 ```
 
+Planner policy:
+- `boost-plan-trio` is the preferred deliberate planning lane.
+- `boost-plan` is the upstream baseline and fallback.
+- Trio is not the generic low-latency smoke/default lane.
+
 ### Trio canary A/B gate (`boost-plan` vs `boost-plan-trio`)
 Run from Mini:
 ```bash
@@ -129,6 +134,27 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
   --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_latency_budget_ms":17000,"plansearchtrio_reasoning_effort_synthesis":"high","plansearchtrio_reasoning_effort_rewrite":"high"}' \
   --max-tokens 160 \
   --out-json /tmp/plansearchtrio_canary_compact.json
+```
+
+Release closeout canary artifact:
+- Locked-runtime artifact path:
+  `layer-gateway/optillm-proxy/docs/plansearchtrio_closeout_canary_locked_runtime_2026-03-09.json`
+- This artifact records the current locked-runtime canary comparison.
+- It is not a replacement for the earlier blind human eval.
+
+Artifact generation command:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+uv run python scripts/canary_plansearch_profiles.py \
+  --url http://127.0.0.1:4000/v1/chat/completions \
+  --bearer "$LITELLM_MASTER_KEY" \
+  --model-a boost-plan \
+  --model-b boost-plan-trio \
+  --prompts scripts/canary_prompts_plansearch.txt \
+  --max-tokens 160 \
+  --model-b-extra-json '{"plansearchtrio_mode":"auto","plansearchtrio_reasoning_effort_synthesis":"high","plansearchtrio_reasoning_effort_rewrite":"high"}' \
+  --out-json docs/plansearchtrio_closeout_canary_locked_runtime_2026-03-09.json
 ```
 
 Reasoning-effort note:

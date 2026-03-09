@@ -73,7 +73,9 @@ local inference mode. Use the flag instead.
 - Supported request-body field: `optillm_approach`.
 - Usage reporting: `prompt_tokens` is estimated using `tiktoken` (cl100k_base) when available; falls back to a rough char-based estimate.
 - `boost-plan` follows upstream stock `optillm==0.3.12` `plansearch` behavior.
-- `boost-plan-trio` is provided by the local `plansearchtrio` plugin and is the current planning-lane canary.
+- `boost-plan-trio` is provided by the local `plansearchtrio` plugin and is the preferred deliberate planning lane.
+- `boost-plan` remains the upstream baseline and fallback comparator.
+- Trio is intentionally not the universal low-latency default.
 
 ---
 
@@ -211,13 +213,13 @@ Deterministic alias mapping (LiteLLM -> OptiLLM model prefix):
 - `boost-ideate` -> `moa-deep`
 - `boost-fastdraft` -> `bon-fast`
 
-Plansearch semantics patch:
-- For `plansearch`, internal execution is pinned to `n=1` per outer pipeline run.
-  Final choice count is controlled by outer request `n` only, preventing
-  multiplicative fanout.
-- For `plansearchtrio`, stage budget defaults are constrained by request token
-  cap (`max_completion_tokens` / `max_tokens`) to keep latency bounded in small calls.
-- For `plansearchtrio`, deep synthesis stages can use stage-scoped reasoning effort:
+Planner policy:
+- `boost-plan-trio` is preferred for deliberate planning and coding workflows
+  where completeness matters more than raw latency.
+- `boost-plan` remains the stock upstream baseline and fallback.
+- Trio is intentionally higher-latency and richer-output than baseline and
+  should not be treated as the universal low-latency default.
+- Trio deep synthesis/rewrite stages can use stage-scoped reasoning effort:
   - `plansearchtrio_reasoning_effort_synthesis` (default `high`)
   - `plansearchtrio_reasoning_effort_rewrite` (default `high`)
   - Allowed values: `low|medium|high` (or `off|none` to disable)
@@ -269,5 +271,5 @@ providers:
 
 ## Studio deployment (source of truth = Mini)
 - Development and commits happen on the Mini repo.
-- Studio deploy is a **git pull** into `/Users/thestudio/optillm-proxy` plus launchd restart.
+- Studio deploy is exact-SHA into `/Users/thestudio/optillm-proxy` plus launchd restart.
 - Use `scripts/deploy_studio.sh` from the Mini to deploy + smoke test.
