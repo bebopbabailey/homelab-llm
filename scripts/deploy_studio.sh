@@ -121,12 +121,20 @@ remote_models_smoke() {
 
 remote_chat_smoke() {
   local api_key="$1"
-  studio_utility "set -euo pipefail; \
-    curl -fsS http://127.0.0.1:4020/v1/chat/completions \
-      -H 'Content-Type: application/json' \
-      -H \"Authorization: Bearer ${api_key}\" \
-      -d '{"model":"'$SMOKE_MODEL'","messages":[{"role":"user","content":"ping"}],"optillm_approach":"'$SMOKE_APPROACH'","max_tokens":'$SMOKE_MAX_TOKENS'}' \
-      >/dev/null"
+  local attempts=10
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    if studio_utility "set -euo pipefail; \
+      curl -fsS http://127.0.0.1:4020/v1/chat/completions \
+        -H 'Content-Type: application/json' \
+        -H \"Authorization: Bearer ${api_key}\" \
+        -d '{\"model\":\"'$SMOKE_MODEL'\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"optillm_approach\":\"'$SMOKE_APPROACH'\",\"max_tokens\":'$SMOKE_MAX_TOKENS'}' \
+        >/dev/null"; then
+      return 0
+    fi
+    sleep 1
+  done
+  fail "authenticated chat smoke failed after restart"
 }
 
 remote_bench() {
