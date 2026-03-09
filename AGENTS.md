@@ -18,6 +18,9 @@
 - Do not relax auth or exposure constraints without approved security plan.
 - Avoid routing loops (proxy -> LiteLLM -> proxy).
 - No secrets in git-managed files.
+- Do not reintroduce deploy-time patching.
+- Do not pin OptiLLM from a git URL in this service.
+- Use exact-SHA deploys only (`scripts/deploy_studio.sh`).
 
 ## Working Files
 - `README.md` (operational behavior)
@@ -39,3 +42,4 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 - Keep docs and runtime guidance synchronized with launchd/system topology.
 - If runtime args, bind/port, auth, or upstream wiring changes, update service
   docs and canonical platform docs per `docs/_core/CHANGE_RULES.md`.
+- `optillm_base_model` is not part of the active service contract.

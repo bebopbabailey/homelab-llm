@@ -96,7 +96,7 @@ Canary trio planner check:
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"boost-plan-trio","messages":[{"role":"user","content":"Return exactly: trio-ok"}],"max_tokens":64}' \
+  -d '{"model":"boost-plan-trio","messages":[{"role":"user","content":"Draft a rollback-first deployment plan in 5 bullets."}],"max_tokens":256}' \
   | jq -r '.choices[0].message.content'
 ```
 
@@ -173,9 +173,9 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 ```
 
 Deploy behavior:
-- Pulls latest on Studio, runs `uv sync`, then runs
-  `uv run scripts/apply_optillm_patches.sh` before restart.
-- This keeps local `optillm.patch` semantics active after dependency refresh.
+- Checks out the exact local git SHA on Studio in detached HEAD mode.
+- Runs `uv sync --frozen` before restart.
+- Uses the configured OptiLLM API key for authenticated smokes.
 - Requires Studio working tree at `/Users/thestudio/optillm-proxy` to be an
   initialized git repo (`.git` present); deploy preflight now fails fast if missing.
 
@@ -184,7 +184,6 @@ Overrides (all optional):
 - `OPTILLM_LAUNCHD_LABEL` (default: `com.bebop.optillm-proxy`)
 - `OPTILLM_STUDIO_UTILITY_WRAPPER` (default: repo `platform/ops/scripts/studio_run_utility.sh`)
 - `OPTILLM_API_KEY_ENV` (default: `/etc/optillm-proxy/env`)
-- `OPTILLM_SMOKE_BEARER` (default: `dummy`; fallback smoke auth when env file is absent)
 - `OPTILLM_SMOKE_MODEL` (default: `mlx-gpt-oss-120b-mxfp4-q4`)
 - `OPTILLM_SMOKE_APPROACH` (default: `bon`)
 - `OPTILLM_SMOKE_MAX_TOKENS` (default: `32`)

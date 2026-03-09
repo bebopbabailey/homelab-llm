@@ -71,8 +71,9 @@ local inference mode. Use the flag instead.
 - Base models must be valid LiteLLM model names
 - Strategy selection uses request-body fields (primary) or prompt tags (secondary).
 - Supported request-body field: `optillm_approach`.
-- Optional request-body field: `optillm_base_model` (overrides the upstream model used by OptiLLM).
 - Usage reporting: `prompt_tokens` is estimated using `tiktoken` (cl100k_base) when available; falls back to a rough char-based estimate.
+- `boost-plan` follows upstream stock `optillm==0.3.12` `plansearch` behavior.
+- `boost-plan-trio` is provided by the local `plansearchtrio` plugin and is the current planning-lane canary.
 
 ---
 
@@ -107,6 +108,11 @@ Runtime flags (systemd `ExecStart` should pass explicitly):
 - `--model <base_model>` (example: `qwen3-235b-a22b-instruct-2507-6bit`)
 - `--plugins-dir <path>` (local plugin overrides)
 - `--optillm-api-key <key>` (proxy auth)
+
+Deployment contract:
+- Install path is `uv sync --frozen` from this repo checkout.
+- Studio deploy is exact-SHA only.
+- Deploy-time patching is not part of the runtime contract.
 
 Exact variable names depend on pinned OptiLLM version.
 
