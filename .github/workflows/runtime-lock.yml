@@ -7,11 +7,34 @@ on:
 
 jobs:
   validate-runtime-lock:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
+      - name: Mint identity token
+        id: mint_identity_token
+        if: ${{ vars.APP_ID }}
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: read
+
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+          fetch-depth: 1
+
+      - name: Configure git for private submodules
+        env:
+          GITHUB_APP_TOKEN: ${{ steps.mint_identity_token.outputs.token }}
+        run: |
+          test -n "$GITHUB_APP_TOKEN"
+          git config --global url."https://x-access-token:${GITHUB_APP_TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${GITHUB_APP_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git submodule sync --recursive
+          git submodule update --init --recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
