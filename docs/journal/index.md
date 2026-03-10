@@ -1,4 +1,6 @@
 # Journal Index
+- [2026-03-10 — Orin post-upgrade baseline snapshot](2026-03-10-orin-post-upgrade-baseline.md)
+- [2026-03-10 — Orin voice baseline snapshot](2026-03-10-orin-voice-baseline.md)
 - [2026-03-07 — websearch supported-path reset](2026-03-07-websearch-supported-path-reset.md)
 - [2026-03-06 — OpenCode soft-promotion to `boost-plan-trio` default](2026-03-06-opencode-soft-promotion-boost-plan-trio.md)
 - [2026-03-06 — websearch Phase 3 closeout (`fast-research` canary)](2026-03-06-websearch-phase3-closeout.md)

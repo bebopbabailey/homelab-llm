@@ -11,9 +11,9 @@
   OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
-- Jetson Orin AGX: persistent offload mount `/mnt/seagate`
-  (sshfs to Mini `/mnt/seagate/orin-offload`). No inference backends are currently deployed.
-  Voice Gateway (Interface-layer STT/TTS) is planned to run here.
+- Jetson Orin AGX: designated Voice Gateway host and future edge-experiment host.
+  Current host identity and runtime status are canonical in `docs/foundation/orin-agx.md`.
+  No inference backends are currently deployed.
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.

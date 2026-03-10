@@ -5,7 +5,7 @@
 - Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.
+- Jetson Orin AGX: designated Voice Gateway host and future edge inference / performance experiments. Current runtime status is canonical in `docs/foundation/orin-agx.md`.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
@@ -23,14 +23,15 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.
 - Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8102/v1/models`.
   Vector-store checks: `lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'`, `curl http://127.0.0.1:55440/health`.
+  Vector-store labels are background-lane managed labels:
+  `com.bebop.pgvector-main`, `com.bebop.memory-api-main`,
+  `com.bebop.memory-ingest-nightly`, `com.bebop.memory-backup-nightly`.
 
 ### Orin AGX
-- Role: voice services (STT/TTS via Voice Gateway) + edge inference + performance experiments.
-- Access: `ssh orin` (final name TBD).
+- Role: designated Voice Gateway host + future edge inference / performance experiments.
+- Access: `ssh orin` (SSH alias; see `docs/foundation/orin-agx.md` for host identity conventions).
 - Sources of truth: `docs/foundation/orin-agx.md`.
-- Storage offload mount: `/mnt/seagate` from Mini path
-  `christopherbailey@192.168.1.71:/mnt/seagate/orin-offload` (sshfs automount).
-- Safe checks: `findmnt /mnt/seagate -o TARGET,SOURCE,FSTYPE,OPTIONS`.
+- Safe checks: `findmnt /mnt/seagate -R -o TARGET,SOURCE,FSTYPE,OPTIONS`, `ss -ltnp`.
 
 ### OV LLM Server (Mini)
 - Role: OpenVINO server on Mini.
@@ -75,8 +76,9 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 
 ### OptiLLM local (status)
 - No inference backends are currently deployed on Orin.
-- Voice Gateway (Interface-layer STT/TTS) is planned to run on Orin.
-- Orin offload storage is available at `/mnt/seagate` and persists across reboot.
+- Voice Gateway is designated for Orin, but a live deployment is not documented yet.
+- Current Orin host state is canonical in `docs/foundation/orin-agx.md`; use the
+  latest dated journal snapshot when checking volatile host details.
 - Studio OptiLLM proxy serves LiteLLM `boost`.
 
 ## MCP Tools (stdio, no ports)
@@ -108,6 +110,6 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   `WEB_LOADER_TIMEOUT=15`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
-  `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`.
+  `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
 - `websearch-orch` is not part of the supported runtime path.

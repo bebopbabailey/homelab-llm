@@ -1,5 +1,9 @@
 # Voice Gateway — SERVICE SPEC
 
+## Status
+- This document defines the intended post-deploy contract for Voice Gateway.
+- It does not assert that Voice Gateway is already deployed on the Orin.
+
 ## Role
 Voice Gateway is an **internal interface service** that provides the v1 voice loop:
 
@@ -31,7 +35,7 @@ It is a **client of LiteLLM** (gateway) and must never call inference backends d
 ## Interfaces
 
 ### Primary Interface (v1)
-HTTP API (internal) + systemd service on the Orin:
+Intended post-deploy shape: HTTP API (internal) + systemd service on the Orin:
 - STT endpoint (audio -> text)
 - TTS endpoint (text -> audio)
 - Optional "one-shot" voice loop endpoint (PTT / automation)

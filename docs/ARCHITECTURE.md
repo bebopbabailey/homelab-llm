@@ -22,7 +22,8 @@ backends (local and remote) to evolve independently.
 - **Remote specialists**: Studio MLX per-port lanes on `:8100/:8101/:8102` (`vllm-metal` / `vllm serve` runtime).
 - **MLX registry**: canonical `model_id` links to inference artifacts via `source_path`/`cache_path`.
 - **Optimization proxy**: Studio OptiLLM proxy (`:4020`), used via LiteLLM `boost` for proxy-safe techniques
-- **OptiLLM local**: deferred until Orin AGX setup
+- **OptiLLM local**: not deployed on Orin. The Orin host is available, but any
+  future Orin-local inference work still requires a separate approved plan.
 
 ## Layer 4 — Tools
 - **Services**: MCP tools, web-fetch, search services (SearXNG)

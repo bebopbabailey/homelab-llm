@@ -469,10 +469,16 @@ curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq 
 ```
 Note: missing the `Authorization` header returns `Invalid Authorization header`.
 
-## Orin (mount + no inference listener)
+## Orin (identity + current baseline checks)
 ```bash
-ssh orin "findmnt /mnt/seagate -o TARGET,SOURCE,FSTYPE,OPTIONS"
-ssh orin "ss -ltn | rg -n ':4040\\b' || echo 'ok: 4040 not listening'"
+ssh orin 'hostnamectl --static; hostname -I | awk "{print $1}"'
+ssh orin 'cat /etc/os-release | sed -n "1,6p"; cat /etc/nv_tegra_release 2>/dev/null || true'
+ssh orin 'ss -ltnp'
+ssh orin 'findmnt /mnt/seagate -R -o TARGET,SOURCE,FSTYPE,OPTIONS || true'
+ssh orin 'arecord -l; aplay -l'
+ssh orin 'command -v python3; command -v uv || true; command -v ffmpeg || true'
+ssh orin 'sudo nvpmodel -q 2>/dev/null || true; sudo jetson_clocks --show 2>/dev/null || true'
+ssh orin 'sudo docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" || true'
 ```
 
 Verify OptiLLM directly (Mini): see “OptiLLM via LiteLLM `boost` (Mini)” above.
@@ -660,6 +666,23 @@ Stage 0: lane lock from existing baseline artifacts
 3. score `20260308T193329Z-baseline-fast-freshness-high-extra.json`
 4. score `20260308T193329Z-baseline-deep-freshness-high-extra.json`
 5. roll up those scored CSVs before any runtime mutation
+
+Build one reviewer-friendly directory first:
+```bash
+uv run python scripts/websearch_review_packet.py \
+  --input evals/websearch/artifacts/20260308T193329Z-baseline-fast-smoke.json \
+  --input evals/websearch/artifacts/20260308T193329Z-baseline-deep-smoke.json \
+  --input evals/websearch/artifacts/20260308T193329Z-baseline-fast-freshness-high-extra.json \
+  --input evals/websearch/artifacts/20260308T193329Z-baseline-deep-freshness-high-extra.json \
+  --output-dir evals/websearch/review/20260308T193329Z-lane-review
+```
+
+That directory includes:
+- `README.md` with the review order and rollup command
+- one markdown file per slice with the query, both lane answers, source domains,
+  source URLs, and latency in one place
+- copied aggregate summaries under `summaries/`
+- blank scoring CSVs beside the markdown files
 
 Score rollup:
 ```bash

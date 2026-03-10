@@ -56,5 +56,5 @@ while allowing backend models to evolve independently.
 - MLX registry maps canonical `model_id` to `source_path`/`cache_path` for inference.
 - OpenVINO server: local lightweight backend on the Mini (port 9000).
 - OptiLLM proxy (Studio): optimization proxy on port 4020; used primarily via LiteLLM `boost`.
-- OptiLLM local: deferred until Orin AGX setup.
+- OptiLLM local: not deployed on Orin. The host is available, but any Orin-local inference work still requires a separate approved plan.
 - TinyAgents: planned orchestration client that calls LiteLLM only.

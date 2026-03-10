@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- PlanSearchTrio final closeout:
-  - Fix stale `optillm-proxy` docs to match the locked runtime.
-  - Add the locked-runtime closeout canary artifact for `boost-plan` vs `boost-plan-trio`.
-  - Refresh runtime-lock SHA after exact-SHA Studio deploy parity.
+- Voice Gateway dev/deployment kickoff:
+  - Use the refreshed Orin baseline docs as the source of truth for implementation work.
+  - Prepare the concrete `layer-interface/voice-gateway` implementation and deployment plan for the Orin.
+  - Keep runtime changes gated behind explicit service-contract and deployment decisions.
 
 NEXT UP
-- Push and prepare a release/tag point after closeout validation passes.
+- Start the first implementation slice for `layer-interface/voice-gateway` once the deployment plan is locked.

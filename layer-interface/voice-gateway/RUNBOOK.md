@@ -1,10 +1,18 @@
 # Voice Gateway — RUNBOOK
 
-## Start / Stop
+## Current Status
+- Voice Gateway is not documented as deployed on the Orin yet.
+
+## Pre-Deploy Baseline Checks
+- Confirm Orin identity and current host status using `docs/foundation/orin-agx.md`.
+- Run the Orin verification commands in `docs/foundation/testing.md`.
+- Verify microphone and speaker devices are present before any deployment work.
+
+## Post-Deploy Start / Stop
 - Start via systemd on the Orin (preferred) or CLI in a tmux session.
 - Verify microphone device is present before starting.
 
-## Health Checks
+## Post-Deploy Health Checks
 If the service exposes HTTP health:
 - On Orin: `curl -s http://127.0.0.1:<port>/health`
 - From Mini (connectivity check): `curl -s http://192.168.1.93:<port>/health`

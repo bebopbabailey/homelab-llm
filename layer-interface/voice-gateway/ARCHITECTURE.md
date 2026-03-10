@@ -8,7 +8,11 @@ Voice Gateway adds a local voice loop while preserving platform constraints:
 - Clients do not call backends directly.
 - New capability is added via a thin Interface-layer service.
 
-## Topology (current plan)
+## Current Status
+- Orin is the designated Voice Gateway host.
+- A live Voice Gateway deployment is not documented yet.
+
+## Topology (post-deploy target)
 - **Orin** hosts Voice Gateway (STT/TTS): `192.168.1.93`
 - **Mini** hosts LiteLLM gateway and Open WebUI
 - Voice Gateway calls LiteLLM over the LAN (not localhost).

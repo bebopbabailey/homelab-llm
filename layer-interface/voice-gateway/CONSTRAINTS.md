@@ -1,0 +1,33 @@
+# Constraints: voice-gateway
+
+This service inherits global + layer constraints:
+- Global: `../../CONSTRAINTS.md`
+- Interface layer: `../CONSTRAINTS.md`
+
+## Hard constraints
+- Keep LiteLLM as the sole LLM gateway path for this service.
+- Do not call MLX, OpenVINO, OptiLLM, or other inference backends directly from this service.
+- Do not change public/LAN exposure or host binding without explicit approval.
+- Keep secrets out of git.
+
+## Allowed operations
+- Voice-gateway-local docs/config/code changes within this service boundary.
+- Validation of gateway integrations and service-local health checks.
+- Read-only diagnostics for downstream dependencies.
+
+## Forbidden operations
+- Backend bypass around LiteLLM.
+- New public/LAN exposure, port changes, or bind changes without approval.
+- Cross-layer runtime modifications outside interface scope.
+
+## Sandbox permissions
+- Read: `layer-interface/*`
+- Write: this service docs/config/code only
+- Execute: service-local diagnostics only
+
+## Validation pointers
+- `test -f layer-interface/voice-gateway/SERVICE_SPEC.md`
+- `test -f layer-interface/voice-gateway/RUNBOOK.md`
+
+## Change guardrail
+If voice routing, exposure, or backend pathing changes, update `SERVICE_SPEC.md`, `RUNBOOK.md`, and platform docs in the same change.
