@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Voice Gateway dev/deployment kickoff:
-  - Use the refreshed Orin baseline docs as the source of truth for implementation work.
-  - Prepare the concrete `layer-interface/voice-gateway` implementation and deployment plan for the Orin.
-  - Keep runtime changes gated behind explicit service-contract and deployment decisions.
+- Harden the local Voice Gateway TTS runtime path and document the minimum Open WebUI TTS integration path:
+  - digest-pin the NVIDIA runtime base image lineage used by the Orin XTTS proof stack.
+  - codify the canonical local smoke sequence, including `/v1/speakers` and the observed cold-path readiness behavior.
+  - document the Mini-local SSH forward path and the dedicated Open WebUI `AUDIO_TTS_*` settings for TTS-only proof use.
 
 NEXT UP
-- Start the first implementation slice for `layer-interface/voice-gateway` once the deployment plan is locked.
+- Open WebUI TTS-only proof on the Mini using the dedicated `AUDIO_TTS_*` settings and the Mini-local SSH forward to the Orin loopback wrapper.

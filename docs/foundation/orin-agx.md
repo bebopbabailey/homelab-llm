@@ -8,7 +8,7 @@ experiments.
 This file is the canonical Orin host doc for active documentation.
 
 ## Evidence Record
-- Latest dated evidence: `docs/journal/2026-03-10-orin-post-upgrade-baseline.md`
+- Latest dated evidence: `docs/journal/2026-03-10-orin-phase1-preflight-corrections.md`
 - Verification commands: `docs/foundation/testing.md`
 
 ## Host Identity Conventions
@@ -29,3 +29,6 @@ This file is the canonical Orin host doc for active documentation.
   treating them as timeless canonical truth.
 - The earlier `docs/journal/2026-03-10-orin-voice-baseline.md` entry remains as
   the pre-upgrade same-day snapshot.
+- The `docs/journal/2026-03-10-orin-post-upgrade-baseline.md` entry remains as
+  the broader post-upgrade baseline snapshot; the later same-day preflight note
+  clarifies Phase 1 tooling and packaging details.

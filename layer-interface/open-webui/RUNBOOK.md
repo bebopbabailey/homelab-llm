@@ -14,7 +14,50 @@ journalctl -u open-webui.service -f
 
 ## Config Authority Warning
 `ENABLE_PERSISTENT_CONFIG=False` makes systemd env/drop-ins authoritative.
-Admin UI changes to these values do not persist across restart.
+Admin UI edits to web-search settings are session-only and lost on restart.
+
+## TTS Proof Path
+- Current TTS proof target is Voice Gateway on the Orin, not a second LiteLLM path.
+- Keep the current global LiteLLM settings in `/etc/open-webui/env` unchanged.
+- Do not repoint `OPENAI_API_BASE_URL` or `OPENAI_API_KEY` for TTS.
+- Current proof reachability path on the Mini:
+```bash
+ssh -fN -o ExitOnForwardFailure=yes -L 127.0.0.1:18081:127.0.0.1:18080 orin
+```
+- Dedicated TTS config fields exposed by the installed Open WebUI build:
+  - `AUDIO_TTS_ENGINE`
+  - `AUDIO_TTS_OPENAI_API_BASE_URL`
+  - `AUDIO_TTS_OPENAI_API_KEY`
+  - `AUDIO_TTS_MODEL`
+  - `AUDIO_TTS_VOICE`
+  - `AUDIO_TTS_OPENAI_PARAMS`
+  - `AUDIO_TTS_SPLIT_ON`
+- Current proof target values:
+  - `AUDIO_TTS_ENGINE=openai`
+  - `AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:18081/v1`
+  - `AUDIO_TTS_OPENAI_API_KEY=voice-gateway-local-dev`
+  - `AUDIO_TTS_MODEL=xtts-v2`
+  - `AUDIO_TTS_VOICE=default`
+  - `AUDIO_TTS_OPENAI_PARAMS={}`
+- TTS-only in this phase. STT remains out of scope.
+
+Verify no dedicated TTS env is set yet:
+```bash
+rg -n '^AUDIO_TTS_' /etc/open-webui/env || true
+```
+
+Verify the forwarded backend:
+```bash
+curl -fsS http://127.0.0.1:18081/health
+curl -m 180 -fsS http://127.0.0.1:18081/health/readiness
+curl -m 180 -fsS http://127.0.0.1:18081/v1/speakers
+curl -fsS \
+  -H "Content-Type: application/json" \
+  -d '{"model":"xtts-v2","input":"Phase one voice gateway check.","voice":"default","response_format":"wav","language":"en"}' \
+  http://127.0.0.1:18081/v1/audio/speech \
+  --output /tmp/openwebui-tts-smoke.wav
+file /tmp/openwebui-tts-smoke.wav
+```
 
 ## Querygen hotfix verification
 ```bash

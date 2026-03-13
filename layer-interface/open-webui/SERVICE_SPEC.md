@@ -9,6 +9,11 @@ Human-facing UI for LLM interactions routed through LiteLLM.
 
 ## Dependencies
 - LiteLLM proxy at `http://127.0.0.1:4000/v1`
+- Current TTS integration target:
+  - Voice Gateway on the Orin via dedicated Open WebUI TTS config, not the global LiteLLM OpenAI config
+  - proof-only reachability path on the Mini:
+    - `127.0.0.1:18081 -> orin:127.0.0.1:18080`
+  - TTS-only in this phase; STT is out of scope
 - Local SearXNG JSON endpoint via documented Open WebUI config:
   - `WEB_SEARCH_ENGINE=searxng`
   - `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`
@@ -29,6 +34,14 @@ Human-facing UI for LLM interactions routed through LiteLLM.
 - Runtime patch helper:
   `/home/christopherbailey/homelab-llm/scripts/openwebui_querygen_hotfix.py`
 - Data stored in `/home/christopherbailey/.open-webui`
+- Dedicated TTS config surface in the installed build:
+  - `AUDIO_TTS_ENGINE`
+  - `AUDIO_TTS_OPENAI_API_BASE_URL`
+  - `AUDIO_TTS_OPENAI_API_KEY`
+  - `AUDIO_TTS_MODEL`
+  - `AUDIO_TTS_VOICE`
+  - `AUDIO_TTS_OPENAI_PARAMS`
+  - `AUDIO_TTS_SPLIT_ON`
 
 ## Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.

@@ -476,10 +476,445 @@ ssh orin 'cat /etc/os-release | sed -n "1,6p"; cat /etc/nv_tegra_release 2>/dev/
 ssh orin 'ss -ltnp'
 ssh orin 'findmnt /mnt/seagate -R -o TARGET,SOURCE,FSTYPE,OPTIONS || true'
 ssh orin 'arecord -l; aplay -l'
-ssh orin 'command -v python3; command -v uv || true; command -v ffmpeg || true'
+ssh orin 'command -v python3; python3 --version; command -v uv || test -x /home/christopherbailey/.local/bin/uv && echo /home/christopherbailey/.local/bin/uv; command -v ffmpeg || true'
 ssh orin 'sudo nvpmodel -q 2>/dev/null || true; sudo jetson_clocks --show 2>/dev/null || true'
 ssh orin 'sudo docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" || true'
 ```
+
+## Voice Gateway Phase 1 (Orin local XTTS)
+Current active gate: B3 import/CUDA proof only. The old host-native `uv sync`
+commands are superseded. Stop before first XTTS model download.
+```bash
+ssh orin 'test -x /home/christopherbailey/.local/bin/uv && /home/christopherbailey/.local/bin/uv --version'
+ssh orin 'python3 --version'
+ssh orin 'df -h'
+ssh orin 'sudo docker info --format "root={{.DockerRootDir}} server={{.ServerVersion}}"'
+```
+
+Do not run the superseded host-native XTTS bootstrap path from older notes.
+Rebuild the repo-tracked runtime-proof image if it is absent after the storage
+move:
+```bash
+tar -C /home/christopherbailey/homelab-llm/layer-interface/voice-gateway -cf - . \
+  | ssh orin 'rm -rf /tmp/voice-gateway-runtime-proof && mkdir -p /tmp/voice-gateway-runtime-proof && tar -C /tmp/voice-gateway-runtime-proof -xf -'
+
+ssh orin 'cd /tmp/voice-gateway-runtime-proof && sudo docker build -f Containerfile.runtime-proof -t voice-gateway-xtts-proof:local .'
+```
+
+Current proof image selection:
+- base image: `nvcr.io/nvidia/pytorch:25.06-py3-igpu`
+- required extra Python package: `coqui-tts==0.27.5`
+- explicit compatibility pin: `transformers==5.0.0`
+- required extra Python package: `soundfile>=0.12,<1.0`
+- required extra OS package: `libsndfile1`
+- required extra OS packages for torchaudio source build:
+  - `ffmpeg`
+  - `libavformat-dev`
+  - `libavcodec-dev`
+  - `libavutil-dev`
+  - `libavdevice-dev`
+  - `libavfilter-dev`
+- package/import note: the package name is `coqui-tts`, but the Python import
+  probe should use `from TTS.api import TTS`
+- pinned torchaudio source ref: `v2.8.0`
+- pinned torchaudio source commit:
+  `6e1c7fe9ff6d82b8665d0a46d859d3357d2ebaaa`
+- diagnostic note: `25.06-py3-igpu` is newer than the host JetPack 6.2 / CUDA
+  12.6 generation, so base-image / host compatibility is the first suspect if
+  the probe fails
+
+Current recovery gate:
+- do not use generic PyPI `pip install torchaudio`
+- keep the NVIDIA torch build untouched
+- source-build torchaudio from the pinned ref inside the proof image
+- install the built wheel with `--no-deps`
+- keep the NVIDIA torch/torchaudio state intact while reconciling
+  `coqui-tts==0.27.5` with a compatible `transformers` line
+- current upstream guidance is that `transformers>=5.1` is broken for
+  `coqui-tts` right now
+- the temporary compatibility line is `5.0.x`
+
+Inspect the current proof image first:
+```bash
+ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
+import json
+from importlib import metadata
+
+result = {}
+try:
+    import sys
+    result["python_version"] = sys.version
+except Exception as exc:
+    result["python_version_error"] = repr(exc)
+
+try:
+    import torch
+    result["torch_version"] = torch.__version__
+    result["torch_cuda_version"] = torch.version.cuda
+except Exception as exc:
+    result["torch_import_error"] = repr(exc)
+
+try:
+    import torchaudio
+    result["torchaudio_version"] = torchaudio.__version__
+except Exception as exc:
+    result["torchaudio_import_error"] = repr(exc)
+
+try:
+    result["coqui_tts_package_version"] = metadata.version("coqui-tts")
+except Exception as exc:
+    result["coqui_tts_version_error"] = repr(exc)
+
+print(json.dumps(result, indent=2, sort_keys=True))
+PY'\'''
+```
+
+Reconfirm the current `TTS.api` failure before patching:
+```bash
+ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
+try:
+    from TTS.api import TTS
+    print("TTS_IMPORT_OK")
+except Exception:
+    import traceback
+    traceback.print_exc()
+    raise
+PY'\'''
+```
+
+Inspect existing source-build tools and prerequisites:
+```bash
+ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 --version; echo "TOOLS"; for x in git cmake ninja gcc g++; do printf "%s=" "$x"; command -v "$x" || true; done; echo "PKGS"; dpkg -l | grep -E "ffmpeg|libavformat-dev|libavcodec-dev|libavutil-dev|libavdevice-dev|libavfilter-dev|libsndfile1|sox|libsox|pkg-config" || true'\'''
+```
+
+Then run the import/CUDA probe only:
+```bash
+ssh orin 'sudo docker run --rm --runtime nvidia --gpus all --network none voice-gateway-xtts-proof:local python3 - <<\"PY\"
+import json
+from importlib import metadata
+
+import soundfile
+import torch
+import torchaudio
+import transformers
+from TTS.api import TTS
+
+try:
+    cudnn_version = torch.backends.cudnn.version()
+except Exception:
+    cudnn_version = None
+
+payload = {
+    \"coqui_tts_package_version\": metadata.version(\"coqui-tts\"),
+    \"coqui_python_import\": \"from TTS.api import TTS\",
+    \"transformers_version\": transformers.__version__,
+    \"torch\": torch.__version__,
+    \"torchaudio\": torchaudio.__version__,
+    \"soundfile\": soundfile.__version__,
+    \"torch_cuda_version\": torch.version.cuda,
+    \"cudnn_version\": cudnn_version,
+    \"cuda_available\": torch.cuda.is_available(),
+    \"cuda_device_count\": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+    \"cuda_device_name\": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+}
+print(json.dumps(payload, indent=2, sort_keys=True))
+PY'
+```
+
+Before the full probe, run one quick package-sanity check:
+```bash
+ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 -m pip show transformers coqui-tts tokenizers huggingface-hub'\'''
+```
+
+Stop after the probe result. Do not instantiate XTTS, synthesize audio, start
+the wrapper, or run any XTTS model-loading step in this phase.
+
+## Voice Gateway Phase 1 (Orin B4 model-download gate)
+B4 is storage/cache inspection and command documentation only. Do not trigger
+the first XTTS model pull in this phase.
+
+Inspect current storage and cache facts:
+```bash
+ssh orin 'df -h /'
+ssh orin 'df -h /srv/ssd'
+ssh orin 'sudo docker info --format "root={{.DockerRootDir}} default={{.DefaultRuntime}} runtimes={{json .Runtimes}}"'
+ssh orin 'sudo sh -lc "grep -R \"^root =\\|^state =\" /etc/containerd/config.toml 2>/dev/null || true"'
+ssh orin 'sudo docker image inspect voice-gateway-xtts-proof:local --format "size={{.Size}} created={{.Created}}"'
+ssh orin 'for p in /srv/ssd/cache/huggingface /srv/ssd/cache/huggingface/hub /srv/ssd/models /home/christopherbailey/.cache/huggingface /home/christopherbailey/.local/share/tts /root/.cache/huggingface /root/.local/share/tts; do if [ -e "$p" ]; then echo "== $p =="; du -sh "$p" 2>/dev/null || true; find "$p" -maxdepth 2 -mindepth 1 -print 2>/dev/null | sed -n "1,40p"; fi; done'
+```
+
+Validate the approved SSD-backed cache/output directories:
+```bash
+ssh orin 'sudo sh -lc '\''
+for p in \
+  /srv/ssd/models/voice-gateway \
+  /srv/ssd/cache/huggingface \
+  /srv/ssd/outputs/voice-gateway; do
+    echo "== $p ==";
+    if [ -d "$p" ]; then echo exists=yes; else echo exists=no; fi;
+    if [ -w "$p" ]; then echo writable=yes; else echo writable=no; fi;
+    ls -ld "$p" 2>/dev/null || true;
+  done
+'\'''
+```
+
+Approved later model-init-only command for B5 approval only:
+```bash
+ssh orin 'sudo docker run --rm \
+  --runtime=nvidia \
+  --gpus all \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -e TTS_HOME=/model-cache \
+  -e HF_HOME=/hf-cache \
+  -e COQUI_TOS_AGREED=1 \
+  -v /srv/ssd/models/voice-gateway:/model-cache \
+  -v /srv/ssd/cache/huggingface:/hf-cache \
+  voice-gateway-xtts-proof:local python3 - <<\"PY\"
+from TTS.api import TTS
+tts = TTS(\"tts_models/multilingual/multi-dataset/xtts_v2\", progress_bar=True)
+PY'
+```
+
+Approved later first-synth output paths for B5 handoff:
+- host: `/srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav`
+- container: `/output/voice-gateway-phase1.wav`
+
+B4 is complete only when:
+- `/srv/ssd/models/voice-gateway` exists and is writable
+- `/srv/ssd/cache/huggingface` exists and is writable
+- `/srv/ssd/outputs/voice-gateway` exists and is writable
+- the later model-init-only command is documented
+- the later output path is documented
+- no model download occurs
+
+After B4 closes:
+- do not run the approved model-init-only command until explicit B5 approval is given
+- do not drift into synthesis or wrapper work
+
+## Voice Gateway Phase 1 (Orin B5 first materialization + first synth)
+Run the first XTTS materialization and preset-speaker inspection:
+```bash
+ssh orin 'sudo docker run --rm \
+  --runtime=nvidia \
+  --gpus all \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
+  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
+  -e TTS_HOME=/model-cache \
+  -e HF_HOME=/hf-cache \
+  -e COQUI_TOS_AGREED=1 \
+  voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
+import json
+from TTS.api import TTS
+model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
+tts = TTS(model_name=model_name, progress_bar=True)
+speakers = sorted({s for s in (tts.speakers or []) if isinstance(s, str) and s.strip()})
+languages = tts.languages or []
+print(json.dumps({
+    "model_name": model_name,
+    "selected_speaker": speakers[0] if speakers else None,
+    "speakers_count": len(speakers),
+    "speakers_preview": speakers[:10],
+    "languages": languages,
+    "en_available": ("en" in languages) if languages else True,
+}, indent=2, sort_keys=True))
+if languages and "en" not in languages:
+    raise SystemExit(43)
+if not speakers:
+    raise SystemExit(42)
+PY'\'''
+```
+
+Validate the materialized XTTS files:
+```bash
+ssh orin 'du -sh /srv/ssd/models/voice-gateway /srv/ssd/cache/huggingface 2>/dev/null'
+ssh orin 'for f in \
+  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/model.pth \
+  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/config.json \
+  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/vocab.json \
+  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/hash.md5 \
+  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/speakers_xtts.pth; do
+    if [ -s "$f" ]; then echo "ok $f"; else echo "missing $f"; exit 44; fi;
+  done'
+```
+
+Run exactly one cached one-shot synth:
+```bash
+ssh orin 'rm -f /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+ssh orin 'sudo docker run --rm \
+  --runtime=nvidia \
+  --gpus all \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  --network none \
+  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
+  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
+  --mount type=bind,src=/srv/ssd/outputs/voice-gateway,dst=/output \
+  -e TTS_HOME=/model-cache \
+  -e HF_HOME=/hf-cache \
+  -e COQUI_TOS_AGREED=1 \
+  voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
+import json
+from TTS.api import TTS
+model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
+tts = TTS(model_name=model_name, progress_bar=False).to("cuda")
+speakers = sorted({s for s in (tts.speakers or []) if isinstance(s, str) and s.strip()})
+languages = tts.languages or []
+if languages and "en" not in languages:
+    raise SystemExit(43)
+if not speakers:
+    raise SystemExit(42)
+speaker = speakers[0]
+output_path = "/output/voice-gateway-phase1.wav"
+tts.tts_to_file(
+    text="Phase one voice gateway check.",
+    speaker=speaker,
+    language="en",
+    file_path=output_path,
+)
+print(json.dumps({
+    "model_name": model_name,
+    "speaker": speaker,
+    "language": "en",
+    "output": output_path,
+}, indent=2, sort_keys=True))
+PY'\'''
+```
+
+## Voice Gateway Phase 1 (Orin canonical local TTS smoke)
+Build the thin wrapper-proof image from the proven runtime image:
+```bash
+tar -C /home/christopherbailey/homelab-llm/layer-interface/voice-gateway -cf - . \
+  | ssh orin 'rm -rf /tmp/voice-gateway-wrapper-proof && mkdir -p /tmp/voice-gateway-wrapper-proof && tar -C /tmp/voice-gateway-wrapper-proof -xf -'
+
+ssh orin 'cd /tmp/voice-gateway-wrapper-proof && sudo docker build -f Containerfile.wrapper-proof -t voice-gateway-wrapper-proof:local .'
+```
+
+Run the no-start import smoke:
+```bash
+ssh orin 'sudo docker run --rm \
+  --runtime=nvidia \
+  --gpus all \
+  --network none \
+  voice-gateway-wrapper-proof:local \
+  python3 - <<\"PY\"
+import voice_gateway.api
+import voice_gateway.service
+import voice_gateway.cli
+print("WRAPPER_IMPORT_OK")
+PY'
+```
+
+Start the wrapper on Orin with loopback-only host publish:
+```bash
+ssh orin 'sudo docker run --rm -d \
+  --name voice-gateway-wrapper-proof \
+  --runtime=nvidia \
+  --gpus all \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  -p 127.0.0.1:18080:18080 \
+  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
+  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
+  --mount type=bind,src=/srv/ssd/outputs/voice-gateway,dst=/output \
+  -e TTS_HOME=/model-cache \
+  -e HF_HOME=/hf-cache \
+  -e COQUI_TOS_AGREED=1 \
+  voice-gateway-wrapper-proof:local \
+  python3 -m voice_gateway.service --host 0.0.0.0 --port 18080'
+```
+
+Verify the canonical local contract:
+```bash
+ssh orin 'curl -fsS http://127.0.0.1:18080/health'
+ssh orin 'curl -m 180 -fsS http://127.0.0.1:18080/health/readiness'
+ssh orin 'curl -m 180 -fsS http://127.0.0.1:18080/v1/speakers'
+ssh orin 'rm -f /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+ssh orin 'curl -fsS \
+  -H "Content-Type: application/json" \
+  -d '\''{"model":"xtts-v2","input":"Phase one voice gateway check.","voice":"default","response_format":"wav","language":"en"}'\'' \
+  http://127.0.0.1:18080/v1/audio/speech \
+  --output /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+```
+
+Cold-path note:
+- `GET /health/readiness` and `GET /v1/speakers` can take about `60-90s` on a cold path.
+- Use longer timeouts instead of assuming warm-cache behavior.
+
+Validate the returned WAV:
+```bash
+ssh orin 'test -s /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav && ls -lh /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+ssh orin 'python3 - <<\"PY\"
+import json, os, wave
+path = "/srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav"
+size = os.path.getsize(path)
+with wave.open(path, "rb") as wav:
+    channels = wav.getnchannels()
+    sample_width = wav.getsampwidth()
+    frame_rate = wav.getframerate()
+    frames = wav.getnframes()
+payload = {
+    "path": path,
+    "size_bytes": size,
+    "channels": channels,
+    "sample_width": sample_width,
+    "frame_rate": frame_rate,
+    "frames": frames,
+    "duration_sec": round(frames / frame_rate, 3) if frame_rate else 0,
+}
+assert size > 44 and channels > 0 and sample_width > 0 and frame_rate > 0 and frames > 0
+print(json.dumps(payload, indent=2, sort_keys=True))
+PY'
+```
+
+Optional DAC playback smoke:
+```bash
+ssh orin 'paplay --device=alsa_output.usb-Kiwi_Ears_Kiwi_Ears-Allegro_Mini_2020-02-20-0000-0000-0000-00.analog-stereo /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+# fallback only if paplay fails:
+ssh orin 'aplay -D plughw:3,0 /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
+```
+
+Clean up:
+```bash
+ssh orin 'sudo docker stop voice-gateway-wrapper-proof'
+```
+
+## Voice Gateway Phase 1 (Mini-local Open WebUI TTS reachability)
+Use a Mini-local SSH forward instead of widening the Orin bind:
+```bash
+ssh -fN -o ExitOnForwardFailure=yes -L 127.0.0.1:18081:127.0.0.1:18080 orin
+```
+
+Verify the forwarded backend from the Mini:
+```bash
+curl -fsS http://127.0.0.1:18081/health
+curl -m 180 -fsS http://127.0.0.1:18081/health/readiness
+curl -m 180 -fsS http://127.0.0.1:18081/v1/speakers
+curl -fsS \
+  -H "Content-Type: application/json" \
+  -d '{"model":"xtts-v2","input":"Phase one voice gateway check.","voice":"default","response_format":"wav","language":"en"}' \
+  http://127.0.0.1:18081/v1/audio/speech \
+  --output /tmp/openwebui-tts-smoke.wav
+file /tmp/openwebui-tts-smoke.wav
+```
+
+Target Open WebUI TTS values for the current installed build:
+```bash
+AUDIO_TTS_ENGINE=openai
+AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:18081/v1
+AUDIO_TTS_OPENAI_API_KEY=voice-gateway-local-dev
+AUDIO_TTS_MODEL=xtts-v2
+AUDIO_TTS_VOICE=default
+AUDIO_TTS_OPENAI_PARAMS={}
+```
+
+Do not repoint the global LiteLLM/OpenAI settings just to prove TTS.
 
 Verify OptiLLM directly (Mini): see “OptiLLM via LiteLLM `boost` (Mini)” above.
 
