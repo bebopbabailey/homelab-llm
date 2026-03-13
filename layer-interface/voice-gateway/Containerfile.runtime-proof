@@ -1,0 +1,32 @@
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:25.06-py3-igpu@sha256:90f3c17838fde28d5c7ae2d5bfbc8a4c587d3797767ea96cdd48fe82e3613f3b
+ARG TORCHAUDIO_REF=6e1c7fe9ff6d82b8665d0a46d859d3357d2ebaaa
+FROM ${BASE_IMAGE}
+ARG TORCHAUDIO_REF
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libavcodec-dev \
+        libavdevice-dev \
+        libavfilter-dev \
+        libavformat-dev \
+        libavutil-dev \
+        libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir \
+    coqui-tts==0.27.5 \
+    transformers==5.0.0 \
+    'soundfile>=0.12,<1.0'
+
+RUN git clone https://github.com/pytorch/audio /tmp/torchaudio-src \
+    && cd /tmp/torchaudio-src \
+    && git checkout "${TORCHAUDIO_REF}" \
+    && USE_CUDA=1 python3 -m pip wheel --no-deps --no-build-isolation -w /tmp/torchaudio-wheel . \
+    && python3 -m pip install --no-cache-dir --no-deps /tmp/torchaudio-wheel/torchaudio-*.whl \
+    && rm -rf /tmp/torchaudio-src /tmp/torchaudio-wheel

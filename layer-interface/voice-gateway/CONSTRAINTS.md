@@ -5,8 +5,10 @@ This service inherits global + layer constraints:
 - Interface layer: `../CONSTRAINTS.md`
 
 ## Hard constraints
-- Keep LiteLLM as the sole LLM gateway path for this service.
-- Do not call MLX, OpenVINO, OptiLLM, or other inference backends directly from this service.
+- LiteLLM is the required path for future LLM calls from this service.
+- Local STT/TTS engines inside the Voice Gateway service boundary are allowed.
+- Do not call MLX, OpenVINO, OptiLLM, or other external inference backends
+  directly from this service.
 - Do not change public/LAN exposure or host binding without explicit approval.
 - Keep secrets out of git.
 

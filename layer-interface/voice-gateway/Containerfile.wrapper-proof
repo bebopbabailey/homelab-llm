@@ -1,0 +1,19 @@
+ARG BASE_IMAGE=voice-gateway-xtts-proof:local
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+COPY pyproject.toml /app/pyproject.toml
+RUN python3 - <<'PY' >/tmp/wrapper-requirements.txt
+from pathlib import Path
+import tomllib
+
+project = tomllib.loads(Path("/app/pyproject.toml").read_text(encoding="utf-8"))
+for dependency in project["project"]["dependencies"]:
+    print(dependency)
+PY
+RUN python3 -m pip install --no-cache-dir -r /tmp/wrapper-requirements.txt && rm -f /tmp/wrapper-requirements.txt
+
+COPY src /app/src
+
+ENV PYTHONPATH=/app/src

@@ -1,6 +1,7 @@
 # Interface Layer Dependencies
 
-This layer is client/UI only. It must not depend on inference backends directly.
+This layer is client/UI only. It must not depend on external inference backends
+directly.
 
 ## Primary upstream
 - LiteLLM (Mini):
@@ -10,6 +11,10 @@ This layer is client/UI only. It must not depend on inference backends directly.
 Note: some Interface services run on other hosts (e.g., Voice Gateway on Orin)
 and will call LiteLLM over the LAN. In those cases, do not assume localhost for
 `LITELLM_BASE_URL`.
+
+Voice Gateway exception boundary:
+- Voice Gateway may run local STT/TTS engines inside its own service boundary.
+- Future LLM calls from Voice Gateway must still go through LiteLLM.
 
 ## Allowed downstream services (read-only)
 - Open WebUI: `http://127.0.0.1:3000` (UI)

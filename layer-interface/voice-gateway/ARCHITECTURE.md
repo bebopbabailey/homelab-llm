@@ -1,53 +1,63 @@
 # Voice Gateway — ARCHITECTURE
 
 ## Why This Exists
-The platform already supports text interaction via Open WebUI routed through LiteLLM.
-Voice Gateway adds a local voice loop while preserving platform constraints:
+The platform already supports text interaction elsewhere. Voice Gateway Phase 1
+adds the smallest durable audio slice while preserving platform constraints:
 
-- LiteLLM remains the single gateway.
-- Clients do not call backends directly.
-- New capability is added via a thin Interface-layer service.
+- XTTS-v2 is intended to run locally on the Orin.
+- Phase 1 remains local-first and localhost-only.
+- Later STT and LiteLLM integration can layer on top of the same package.
 
 ## Current Status
 - Orin is the designated Voice Gateway host.
 - A live Voice Gateway deployment is not documented yet.
+- The current scaffold remains provisional until a repo-tracked container build
+  succeeds on Orin and the XTTS import gate passes inside that runtime.
 
-## Topology (post-deploy target)
-- **Orin** hosts Voice Gateway (STT/TTS): `192.168.1.93`
-- **Mini** hosts LiteLLM gateway and Open WebUI
-- Voice Gateway calls LiteLLM over the LAN (not localhost).
-- Mini/Open WebUI can call Voice Gateway over the LAN for STT/TTS.
+## Phase 1 Topology
+- **Orin** hosts the Voice Gateway Phase 1 runtime.
+- The active recovery path packages the XTTS runtime and the localhost-only
+  wrapper together in a repo-built container.
+- No Mini caller is required for Phase 1.
+- No LAN bind is part of the Phase 1 contract.
 
-## v1 Data Flow
-1) Capture audio (push-to-talk) on the Orin (Voice Gateway)
-2) STT: audio → text (on Orin)
-3) LLM: text → response (via LiteLLM on Mini)
-4) TTS: response → audio (on Orin)
-5) Play audio locally (Orin)
+## Phase 1 Data Flow
+1) Operator provides text locally
+2) Voice Gateway discovers built-in XTTS speakers
+3) XTTS-v2 synthesizes WAV output
+4) CLI optionally plays the WAV locally
+5) HTTP wrapper, when used, returns the WAV over localhost only
 
 ## Boundary Rules
-- Voice Gateway is an Interface-layer client.
-- Routing decisions belong to LiteLLM config (logical model names).
-- Voice Gateway may choose between logical names (fast vs smart), but must not embed backend URLs.
+- Voice Gateway remains in the Interface layer.
+- Phase 1 does not call LiteLLM or any inference backend directly.
+- Phase 1 does not implement STT.
+- The engine/runtime packaging choice must not change the HTTP or CLI contract.
 
-## Component Diagram (logical)
-[Mic] → (Voice Gateway)
-  ├─ STT backend (local)
-  ├─ LiteLLM API client (gateway)
-  ├─ TTS backend (local)
-  └─ Audio output (speaker)
+## Component Diagram (Phase 1)
+[Text input] → (Voice Gateway)
+  ├─ built-in speaker discovery
+  ├─ XTTS-v2 engine
+  ├─ WAV output
+  └─ optional local playback
 
 ## Degradation Strategy
-- If preferred model fails: retry once, then fallback to a “fast” logical model if configured.
-- If all LLM attempts fail: speak a short apology and log the failure.
-- If STT fails: speak “I didn’t catch that” and log.
-- If TTS fails: log and optionally print response text to console.
+- If XTTS dependencies are unavailable: fail fast with a documented preflight error.
+- If built-in speaker discovery fails: readiness fails and synth calls return deterministic errors.
+- If playback fails: keep the generated WAV and report playback failure separately.
+- If bootstrap is not proven on Orin: stop feature work and recover packaging/docs first.
 
 ## Observability
-Voice Gateway logs structured timing for each stage so the system can be tuned and compared later
-(MLX vs OpenVINO vs other inference backends) without rewriting the interface layer.
+Voice Gateway logs structured timing for discovery, model load, synthesis, WAV
+write, and optional playback so later phases can extend the same log contract.
 
 ## Security / Exposure
-- Voice Gateway is LAN-private on the Orin. It must not be exposed to the public internet.
-- Only internal callers (Mini services) should reach it.
-- Any optional admin/control endpoint must bind to localhost only on the Orin.
+- Phase 1 HTTP binds to `127.0.0.1` only.
+- No LAN or public exposure is introduced in Phase 1.
+- No model download should be triggered during bootstrap validation.
+
+## Later Phases
+- STT
+- LiteLLM orchestration
+- Mini-to-Orin callers
+- cloned voice enrollment

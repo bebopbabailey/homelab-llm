@@ -1,0 +1,11 @@
+{
+  "default_voice_policy": "first_discovered_builtin",
+  "voices": [
+    {
+      "id": "default",
+      "mode": "builtin",
+      "backend_speaker": null,
+      "active": true
+    }
+  ]
+}

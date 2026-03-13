@@ -1,7 +1,10 @@
 # Interface Layer Constraints
 
 ## Hard constraints
-- Do not call model backends directly. All traffic goes through LiteLLM.
+- Do not call external LLM/model backends directly. LLM traffic goes through
+  LiteLLM.
+- Local service-bound STT/TTS engines are allowed when the service contract
+  explicitly permits them.
 - Do not expose new LAN services without approval.
 - Do not store secrets in the repo.
 
