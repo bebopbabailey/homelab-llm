@@ -1,8 +1,8 @@
 {
   "version": 1,
   "submodules": {
-    "layer-gateway/optillm-proxy": "cb7f65afbce5393dc742a56a8b18a676f201ed8d",
-    "layer-gateway/litellm-orch": "56c7b723e2f76f6e593ffd05f508db5d3d3fad64"
+    "layer-gateway/optillm-proxy": "e19fd0c0d0c6db18affcc59fdb59aa196eb175d7",
+    "layer-gateway/litellm-orch": "48c1ac8925ea422e85bfa905c13fe4e0a1338772"
   },
   "optillm_proxy": {
     "package": {
