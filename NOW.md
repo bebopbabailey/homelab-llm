@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Harden the local Voice Gateway TTS runtime path and document the minimum Open WebUI TTS integration path:
-  - digest-pin the NVIDIA runtime base image lineage used by the Orin XTTS proof stack.
-  - codify the canonical local smoke sequence, including `/v1/speakers` and the observed cold-path readiness behavior.
-  - document the Mini-local SSH forward path and the dedicated Open WebUI `AUDIO_TTS_*` settings for TTS-only proof use.
+- Run the bounded GPT-OSS 20B LiteLLM day-2 operations confidence soak on the kept experimental lane:
+  - prove `metal-test-gptoss20b-enforce` stays stable and observable over a modest sequence of spaced requests
+  - confirm ordinary text, synthesis, noop-tool, and retrieval/follow-up flows stay clean under the guardrail
+  - classify whether the lane is ready for a canonical-`fast` promotion-planning pass
 
 NEXT UP
-- Open WebUI TTS-only proof on the Mini using the dedicated `AUDIO_TTS_*` settings and the Mini-local SSH forward to the Orin loopback wrapper.
+- Keep the lane experimental only unless the soak is clean enough to justify designing a controlled promotion plan toward canonical `fast`.
