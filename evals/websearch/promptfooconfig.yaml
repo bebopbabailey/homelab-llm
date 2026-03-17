@@ -1,0 +1,32 @@
+description: Open WebUI supported-path web-search evaluation baseline
+prompts:
+  - '{{query}}'
+providers:
+  - id: file://providers/owui_websearch.py
+    label: owui-fast
+    config:
+      model: fast
+      stream: true
+      timeoutMs: 120000
+  - id: file://providers/owui_websearch.py
+    label: owui-research
+    config:
+      model: deep
+      stream: true
+      timeoutMs: 120000
+defaultTest:
+  assert:
+    - type: python
+      metric: non_empty_output
+      value: file://assertions.py:assert_non_empty_output
+    - type: python
+      metric: no_blocked_domains
+      value: file://assertions.py:assert_no_blocked_domains
+    - type: python
+      metric: expected_sources
+      value: file://assertions.py:assert_expected_sources
+evaluateOptions:
+  maxConcurrency: 1
+  cache: false
+  repeat: 1
+tests: file://queries.jsonl

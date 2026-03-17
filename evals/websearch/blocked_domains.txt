@@ -1,0 +1,12 @@
+# Eval-only blocked domain / host policy.
+# Keep in sync with the documented Open WebUI fetch/search denylist.
+localhost
+127.0.0.1
+192.168.1.70
+192.168.1.71
+192.168.1.72
+100.69.99.60
+code.tailfd1400.ts.net
+chat.tailfd1400.ts.net
+gateway.tailfd1400.ts.net
+search.tailfd1400.ts.net

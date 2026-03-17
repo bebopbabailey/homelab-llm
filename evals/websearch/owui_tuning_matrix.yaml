@@ -1,0 +1,141 @@
+description: Supported Open WebUI web-search tuning matrix
+scope:
+  - Open WebUI documented web-search knobs only
+  - current supported stack only
+  - no provider changes
+  - no loader-engine changes
+  - no concurrency changes
+  - no timeout changes
+  - no SearXNG engine changes
+  - no runtime glue
+pinned_tooling:
+  promptfoo: 0.120.27
+  node_requirements:
+    - 20.20+
+    - 22.22+
+baseline:
+  lane_default: fast
+  env:
+    WEB_SEARCH_RESULT_COUNT: 6
+    WEB_SEARCH_CONCURRENT_REQUESTS: 1
+    WEB_LOADER_ENGINE: safe_web
+    WEB_LOADER_TIMEOUT: 15
+    WEB_LOADER_CONCURRENT_REQUESTS: 2
+    WEB_SEARCH_DOMAIN_FILTER_LIST: '!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net'
+  immutable_env:
+    ENABLE_PERSISTENT_CONFIG: false
+    WEB_FETCH_FILTER_LIST: keep_current_value
+    WEB_SEARCH_ENGINE: searxng
+    SEARXNG_QUERY_URL: http://127.0.0.1:8888/search?q=<query>&format=json
+stages:
+  - id: lane-decision
+    description: Score existing fast vs deep baseline artifacts before any runtime mutation.
+    profiles:
+      - baseline
+    lanes:
+      - owui-fast
+      - owui-research
+    slices:
+      - smoke
+      - freshness-high-extra
+    gate:
+      - no runtime config changes until lane lock is complete
+  - id: domain-filter-tuning
+    description: Tune only WEB_SEARCH_DOMAIN_FILTER_LIST on the winning lane.
+    profiles:
+      - df-zhihu
+      - df-zhihu-explicit
+      - df-zhihu-explicit-spam
+    lanes:
+      - winner_from_lane_decision
+    slices:
+      - smoke
+      - freshness-high-extra
+      - adversarial-junk
+      - technical-docs
+    preflight:
+      - ENABLE_PERSISTENT_CONFIG=False must be active before using 25-websearch-tuning.conf
+      - WEB_FETCH_FILTER_LIST must remain unchanged
+      - WEB_LOADER_ENGINE must remain safe_web
+      - WEB_SEARCH_CONCURRENT_REQUESTS must remain 1
+  - id: deferred-follow-ons
+    description: Explicitly deferred until after domain-filter results are reviewed.
+    profiles:
+      - result-count-wave
+      - loader-wave
+      - provider-bakeoff
+    enabled_by_default: false
+profiles:
+  - id: baseline
+    description: No override; current production baseline.
+    overrides: {}
+  - id: df-zhihu
+    description: Block Zhihu only.
+    overrides:
+      WEB_SEARCH_DOMAIN_FILTER_LIST: '!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net,!zhihu.com'
+  - id: df-zhihu-explicit
+    description: Block Zhihu plus explicit domains observed in baseline freshness artifacts.
+    overrides:
+      WEB_SEARCH_DOMAIN_FILTER_LIST: '!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net,!zhihu.com,!xvideos.com,!xvideos.tube,!pornhub.com'
+  - id: df-zhihu-explicit-spam
+    description: Add the observed crossword spam domain to the explicit denylist set.
+    overrides:
+      WEB_SEARCH_DOMAIN_FILTER_LIST: '!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net,!zhihu.com,!xvideos.com,!xvideos.tube,!pornhub.com,!dailythemedcrosswordanswers.com'
+rejected_in_this_phase:
+  - '!reddit.com'
+  - result-count changes
+  - loader timeout changes
+  - loader concurrency changes
+  - search concurrency changes
+  - allowlist-only domain policies
+  - provider bakeoffs
+slices:
+  - id: smoke
+    purpose: quick regression signal
+    promptfoo_filters:
+      - enabled=true
+      - smoke=true
+  - id: freshness-high-extra
+    purpose: freshness-sensitive follow-up cases without duplicating smoke rows
+    promptfoo_filters:
+      - enabled=true
+      - freshness_level=high
+      - smoke=false
+  - id: adversarial-junk
+    purpose: verify the filter helps where it should
+    promptfoo_filters:
+      - enabled=true
+      - category=adversarial-junk
+  - id: technical-docs
+    purpose: detect collateral damage on docs-oriented queries
+    promptfoo_filters:
+      - enabled=true
+      - category=technical-docs
+rubrics:
+  lane_decision:
+    deep_promotes_if:
+      - assertions_pass
+      - blocked_domain_hits == 0
+      - usefulness_delta >= 0.5 or freshness_delta >= 0.5
+      - citation_quality_delta >= -0.25
+      - junk_domain_delta >= -0.25
+      - median_latency_ratio <= 1.75
+    fallback: keep_fast
+  config_promotion:
+    candidate_promotes_if:
+      - assertions_pass
+      - blocked_domain_hits == 0
+      - smoke_empty_outputs == 0
+      - smoke_expected_source_failures == 0
+      - adversarial_junk_delta >= +0.50 on junk_domain_score
+      - technical_docs_usefulness_delta >= -0.25
+      - technical_docs_citation_delta >= -0.25
+      - smoke_plus_freshness_usefulness_delta >= -0.25
+      - smoke_plus_freshness_freshness_delta >= -0.25
+    tie_breaker: choose_the_narrowest_filter_that_passes
+    fallback: keep_current_baseline
+notes:
+  - Keep WEB_FETCH_FILTER_LIST unchanged in every experiment.
+  - Use /etc/systemd/system/open-webui.service.d/25-websearch-tuning.conf as the temporary single-variable override file.
+  - No runtime override is allowed until the winning lane is manually scored.
+  - Promote a winner into 20-websearch-baseline.conf only after manual scoring and rubric review.
