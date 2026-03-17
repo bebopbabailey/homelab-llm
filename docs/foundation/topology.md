@@ -2,20 +2,24 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
-- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).
+- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal` bound to `192.168.1.72`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX: designated Voice Gateway host and future edge inference / performance experiments. Current runtime status is canonical in `docs/foundation/orin-agx.md`.
+- Jetson Orin AGX: canonical speech appliance host with LAN-visible `voice-gateway` and localhost-only Speaches behind it. Current runtime status is canonical in `docs/foundation/orin-agx.md`.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
 
 ### Mini (Ubuntu 24.04)
-- Role: gateway + UI + search + orchestration.
+- Role: gateway + UI + search + orchestration + LAN file sharing.
 - Access: local repo on Mini.
 - Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.
 - Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires bearer auth for `/v1/*` and `/health`; readiness/liveliness and `/metrics/` are open).
   LiteLLM `boost` routes to Studio OptiLLM proxy (`:4020`).
+  OpenHands Phase A, when launched, is local Docker-direct on `127.0.0.1:4031`
+  with optional tailnet-only access at `https://hands.tailfd1400.ts.net/`.
+  OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
+  Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
 - Role: MLX inference host.
@@ -26,9 +30,12 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   Vector-store labels are background-lane managed labels:
   `com.bebop.pgvector-main`, `com.bebop.memory-api-main`,
   `com.bebop.memory-ingest-nightly`, `com.bebop.memory-backup-nightly`.
+- Current networking note: the canonical Mini -> Studio MLX path is the Studio
+  LAN IP `192.168.1.72`; Tailscale hostnames are not part of the locked MLX lane
+  transport contract.
 
 ### Orin AGX
-- Role: designated Voice Gateway host + future edge inference / performance experiments.
+- Role: canonical speech appliance host + future edge inference / performance experiments.
 - Access: `ssh orin` (SSH alias; see `docs/foundation/orin-agx.md` for host identity conventions).
 - Sources of truth: `docs/foundation/orin-agx.md`.
 - Safe checks: `findmnt /mnt/seagate -R -o TARGET,SOURCE,FSTYPE,OPTIONS`, `ss -ltnp`.
@@ -45,9 +52,13 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
+| OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
+| OpenHands (Phase A, operator-local) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
+| Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
 | Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
 | Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
+| Voice Gateway | Orin | 18080 | http://192.168.1.93:18080/v1 | /health, /health/readiness |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
 | Studio main vector DB (postgres+pgvector) | Studio | 55432 | http://127.0.0.1:55432 | n/a |
 | Studio main memory API | Studio | 55440 | http://127.0.0.1:55440 | /health |
@@ -74,30 +85,37 @@ Studio scheduling contract:
 Note: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal for `8100-8119`.
 
-### OptiLLM local (status)
-- No inference backends are currently deployed on Orin.
-- Voice Gateway is designated for Orin, but a live deployment is not documented yet.
-- Current Orin host state is canonical in `docs/foundation/orin-agx.md`; use the
-  latest dated journal snapshot when checking volatile host details.
-- Studio OptiLLM proxy serves LiteLLM `boost`.
+### Orin speech appliance (status)
+- `voice-gateway` is the approved LAN-visible speech facade on Orin.
+- Speaches remains localhost-only behind `voice-gateway`.
+- LiteLLM routes speech aliases directly to the Orin `voice-gateway` LAN `/v1` endpoint.
+- Open WebUI must use LiteLLM for STT/TTS and must not call the Orin directly.
+- Studio OptiLLM proxy serves LiteLLM `boost` and is unrelated to the speech appliance path.
 
 ## MCP Tools (stdio, no ports)
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
 - `search.web` — stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.
 
 ## Exposure and Secrets
-- LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,
-  LiteLLM 4000, Open WebUI 3000, MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).
+- LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
+- LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` (localhost remains valid).
+- LAN-only from trusted local hosts: Studio MLX 8100-8102 via `192.168.1.72`.
+- Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
+  OpenHands Phase A is local on `127.0.0.1:4031` and may be exposed tailnet-only
+  at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
   Studio local-only: main vector DB 55432, memory API 55440.
 - Internal tailnet transport used by Studio OptiLLM upstream:
-  - `100.69.99.60:4443` (Tailscale TCP forward on Mini -> `127.0.0.1:4000`)
+  - `http://192.168.1.71:4000/v1`
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
   - LiteLLM: `layer-gateway/litellm-orch/config/env.local`
   - Open WebUI: `/etc/open-webui/env`
+  - OpenCode Web: `/etc/opencode/env`
   - OpenVINO: `/etc/homelab-llm/ov-server.env`
   - SearXNG: `/etc/searxng/env`
+  - Samba passdb: `smbpasswd -a christopherbailey` / `pdbedit`
+  OpenHands Phase A intentionally has no shared host env file in this phase.
 
 ## Web Search Contract
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -113,3 +131,11 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
 - `websearch-orch` is not part of the supported runtime path.
+
+## Speech Contract
+- LiteLLM is the only client-facing speech gateway.
+- Open WebUI uses `AUDIO_STT_*` and `AUDIO_TTS_*` values pointed at LiteLLM.
+- LiteLLM routes `voice-stt-canary`, `voice-tts-canary`, `voice-stt`, and `voice-tts`
+  directly to the Orin `voice-gateway` LAN `/v1` facade.
+- `voice-gateway` maps external voice aliases `default` and `alloy` to the configured
+  Kokoro backend voice and forwards STT/TTS to localhost-only Speaches.

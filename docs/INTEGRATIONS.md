@@ -17,7 +17,7 @@
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
 - MLX alias set (current lane mapping):
   - `deep` -> `8100` (`mlx-gpt-oss-120b-mxfp4-q4`)
-  - `main` -> `8101` (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
+  - `main` -> `8101` (`mlx-llama-3-3-70b-4bit-instruct`)
   - `fast` -> `8102` (`mlx-gpt-oss-20b-mxfp4-q4`)
   `8120-8139` remain reserved for experimental canaries (only used when explicitly configured and not required to use `mlxctl`).
 - MLX registry is the canonical link from `model_id` to inference source:
@@ -103,6 +103,13 @@ if a param is rejected by the backend.
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
 - Health: `/health` on port 3000.
+- Canonical voice path uses dedicated Open WebUI `AUDIO_STT_*` and `AUDIO_TTS_*`
+  settings pointed at LiteLLM, not direct Orin URLs.
+- LiteLLM speech aliases:
+  - canary: `voice-stt-canary`, `voice-tts-canary`
+  - stable: `voice-stt`, `voice-tts`
+- LiteLLM routes those aliases directly to the Orin `voice-gateway` LAN `/v1`
+  facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
 - Result and loader policy is explicit in documented Open WebUI env vars:
   `WEB_SEARCH_RESULT_COUNT=6`, `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
@@ -113,6 +120,9 @@ if a param is rejected by the backend.
 - LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
 - `ENABLE_PERSISTENT_CONFIG=False` is active in deployment, so systemd env/drop-ins
   are authoritative and Admin UI changes to these settings do not persist across restart.
+- Speech canary promotion requires a post-restart verification that the effective
+  `AUDIO_*` settings still match the env values and are not being overridden by stale
+  Admin UI state.
 
 ## Web Search Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -128,16 +138,18 @@ if a param is rejected by the backend.
   schema injection/repair/render loop for web search.
 
 ## Tailscale Services (tailnet HTTPS)
-- Services are exposed via `tailscale serve --service=svc:<name>` on the Mini.
+- Services are exposed via `tailscale serve --service=svc:<name>` on the Mini
+  only for optional remote operator access.
 - Hostnames (tailnet only):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)
+  - `https://codeagent.tailfd1400.ts.net/` → OpenCode Web (4096)
   - `https://gateway.tailfd1400.ts.net/` → LiteLLM (4000)
+  - `https://hands.tailfd1400.ts.net/` → OpenHands (4031)
   - `https://search.tailfd1400.ts.net/` → SearXNG (8888)
 - Access is controlled by **grants** (not legacy ACLs). Use `svc:*` in `dst`.
 - Internal Studio upstream path (current):
-  - Studio OptiLLM uses Mini tailnet TCP forward `http://100.69.99.60:4443/v1`
-  - Mini maps `100.69.99.60:4443 -> 127.0.0.1:4000` via `tailscale serve --tcp`
+  - Studio OptiLLM uses Mini LiteLLM over LAN at `http://192.168.1.71:4000/v1`
 
 ## SearXNG search
 - Local SearXNG: `http://127.0.0.1:8888/search?q=<query>&format=json`
@@ -162,17 +174,68 @@ if a param is rejected by the backend.
 - Key file: `~/.config/opencode/litellm_api_key` (local-only secret).
 - Provider: LiteLLM OpenAI-compatible.
   - On Mini: `baseURL=http://127.0.0.1:4000/v1`
-  - On tailnet devices: `baseURL=https://gateway.tailfd1400.ts.net/v1`
-  - Internal infra fallback (not default for end-user clients): `http://100.69.99.60:4443/v1`
-- Models: use LiteLLM handles (e.g., `deep`, `fast`, `main`, `boost`).
-- Recommended defaults for simple setup:
-  - `model=litellm/main`
-  - `small_model=litellm/main`
-  - `permission.bash=ask`, `permission.edit=ask`
-- Current lane note: `main` (`qwen3-next-80b`) is staged with
-  `tool_choice=auto` support under `mlxctl` vLLM arg compilation
-  (`qwen3` logical parser resolved to runtime parser enum on launch).
-- MCP parity is out of scope for this simple setup and can be added later.
+  - On LAN devices: `baseURL=http://192.168.1.71:4000/v1`
+  - Optional remote operator path: `https://gateway.tailfd1400.ts.net/v1`
+- User-global config must already expose the `litellm` provider and the direct
+  lanes `litellm/deep`, `litellm/main`, and `litellm/fast`.
+- Repo-local OpenCode behavior in this repo is controlled by:
+  - `opencode.json`
+  - `.opencode/instructions/`
+  - `.opencode/agents/`
+  - `.opencode/skills/`
+- Repo-local defaults:
+  - default lane: `deep`
+  - canary lane: `main`
+  - synthesis-only lane: `fast`
+  - approval prompts stay `ask` for `bash` and `edit`
+- Current lane note: `main` (`llama-3.3-70b`) is the validated tool-capable
+  lane under `mlxctl` vLLM arg compilation.
+  The locked live `8101` lane uses `tool_choice=auto`,
+  `tool_call_parser=llama3_json`, and `reasoning_parser=null`.
+- Repo-shared OpenCode workflow and verification live in `docs/OPENCODE.md` and
+  `docs/foundation/testing.md`.
+
+## OpenCode Web (Mini)
+- Service boundary: `layer-interface/opencode-web`.
+- Bind: `http://127.0.0.1:4096` locally, `0.0.0.0:4096` at the listener.
+- Tailnet operator URL: `https://codeagent.tailfd1400.ts.net/`
+- Tailscale exposure: dedicated Service `svc:codeagent`
+- Auth: HTTP Basic Auth from `/etc/opencode/env`.
+- Runtime contract is repo-managed via `platform/ops/systemd/opencode-web.service`.
+- Working directory is `/home/christopherbailey/homelab-llm`.
+- Writable sandbox allowlist is intentionally narrow:
+  - `/home/christopherbailey/homelab-llm`
+  - `~/.local/share/opencode`
+  - `~/.local/state/opencode`
+  - `~/.cache/opencode`
+- Approval prompts inside OpenCode do not override the service sandbox. Repo editability depends on `ReadWritePaths=` in the systemd unit.
+
+## OpenHands (Mini, Phase A local bring-up)
+- Service boundary: `layer-gateway/openhands`.
+- Primary launch path: Docker-direct on the Mini, published locally to `127.0.0.1:4031`.
+- Optional remote operator path: `https://hands.tailfd1400.ts.net/` through `tailscale serve --service=svc:hands`.
+- Install path: `uv tool install openhands --python 3.12`.
+- Workspace contract: mount only a disposable host path into `/workspace` via
+  `SANDBOX_VOLUMES`; do not mount the live monorepo in Phase A.
+- Model/provider contract in Phase A: temporary provider/API key entered in the
+  OpenHands UI only. No repo config, shared host env file, or LiteLLM wiring.
+- Phase B handoff contract, once LiteLLM policy is ready:
+  - Custom model: `litellm_proxy/code-reasoning`
+  - Base URL: `http://192.168.1.71:4000/v1`
+  - API key: LiteLLM team service-account key `openhands-worker`
+- Minimum LiteLLM policy gate for that handoff:
+  - one stable alias only: `code-reasoning`
+  - one team-owned service-account key only: `team_id=openhands-workers`, `key_alias=openhands-worker`
+  - model allowlist restricted to `code-reasoning`
+  - MCP/tool access denied for the worker key
+  - current deployment enforces worker `allowed_routes`; the OpenHands worker is restricted to `/v1/models`, `/v1/model/info`, and `/v1/chat/completions`
+  - worker usage is attributable in LiteLLM spend logs by `key_alias=openhands-worker` and `team_id=openhands-workers`
+- Current runtime note:
+  - `http://host.docker.internal:4000/v1` is not the canonical path for OpenHands on this Mini
+  - the current canonical infra path to LiteLLM is `http://192.168.1.71:4000/v1`
+- Security posture: Docker sandbox only, operator-supervised, no GitHub
+  integration, no deploy rights, no auto-merge, no LAN exposure, tailnet access
+  limited to dedicated service `svc:hands`.
 
 ## OptiLLM boost lane (opt-in)
 - `boost` routes to the Studio OptiLLM proxy (`http://192.168.1.72:4020/v1`) via `OPTILLM_API_BASE`.
@@ -180,7 +243,7 @@ if a param is rejected by the backend.
 - Studio OptiLLM is a single instance; both handles share it.
 - Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
 - Observability: `boost` appears in Studio `optillm-proxy` logs.
-- Requests must include bearer auth for the target backend key (`OPTILLM_API_KEY` for `boost`).
+- Studio backend auth is not required for `boost`; network isolation comes from the dedicated Studio LAN bind and the LiteLLM-only caller contract.
 
 Deterministic coding-quality aliases (current):
 - `boost-plan` -> `plansearch-deep`
@@ -189,7 +252,8 @@ Deterministic coding-quality aliases (current):
 - `boost-ideate` -> `moa-deep`
 - `boost-fastdraft` -> `bon-fast`
 
-These aliases avoid request-body coupling in OpenCode while keeping approach selection explicit.
+These aliases are valid OptiLLM routing handles, but they are not the default
+repo-local OpenCode control plane.
 
 ### OptiLLM validation checklist (router + plugins)
 1) Router is active (log line: `Using approach(es) ['router']`).
@@ -204,7 +268,7 @@ and where this repo uses callbacks vs guardrails.
 ### Harmony normalization policy (gateway canonical layer)
 - MLX backend runtime is `vllm-metal` (`vllm serve` under `mlxctl`/launchd); Harmony normalization is done at LiteLLM.
 - Applied to GPT lanes only: `deep`, `fast`, `boost`, `boost-deep`.
-- Qwen lane (`main`) remains passthrough.
+- Llama lane (`main`) remains passthrough.
 - Guardrail pre-call mutates prior assistant history only when strict Harmony wire
   markers are present (`<|channel|>`, `<|message|>`, plus `analysis|final` channel).
 - Guardrail post-call returns `final` channel content only for client-visible text.
@@ -219,10 +283,10 @@ and where this repo uses callbacks vs guardrails.
 - Status: available as a standalone backend; no LiteLLM handles are currently registered.
 
 ## OptiLLM optimization proxy
-- Studio-local proxy: `http://192.168.1.72:4020/v1` (binds `0.0.0.0:4020` on the Studio).
+- Studio LAN proxy: `http://192.168.1.72:4020/v1` (binds `192.168.1.72:4020` on the Studio).
 - Current usage: active LiteLLM `boost` path.
-- Requests must include `Authorization: Bearer <OPTILLM_API_KEY>` (even for localhost tests).
-- Current upstream: Mini LiteLLM through tailnet TCP forward `http://100.69.99.60:4443/v1`.
+- Requests do not require backend bearer auth on the Studio OptiLLM listener.
+- Current upstream: Mini LiteLLM through the Mini LAN URL `http://192.168.1.71:4000/v1`.
 - Upstream can be LiteLLM or MLX directly; avoid routing loops.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
@@ -249,11 +313,12 @@ Example:
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
 ```
 
-### OpenCode recommended coding workflow
-1. Generate primary plan with `litellm/boost-plan`.
-2. Run critique/verification pass with `litellm/boost-plan-verify`.
-3. Use `litellm/boost-ideate` only for architecture exploration where diverse candidate paths are needed.
-4. Use `litellm/boost-fastdraft` for quick implementation drafts.
+### Repo-local OpenCode workflow
+1. Start from root `AGENTS.md` and `docs/OPENCODE.md`.
+2. Use the repo-local `repo-deep` agent for grounded repo planning, review, and implementation work.
+3. Use `repo-main` only as a canary lane that must fail closed if it cannot gather real repo evidence.
+4. Use `repo-fast` only for drafting or synthesis from already-provided text.
+5. Treat OptiLLM `boost*` aliases as a separate, opt-in path rather than the default OpenCode workflow.
 
 ## Tiny Agents hook (plan)
 - Add `TINYAGENTS_API_BASE` and `TINYAGENTS_MODEL` to env.
@@ -276,5 +341,5 @@ Example:
   execution by default.
 
 ## Client base URL recommendation
-- Prefer tailnet HTTPS: `https://gateway.tailfd1400.ts.net/v1`.
-- Local host-only calls use `http://127.0.0.1:4000/v1` (on the Mini).
+- Prefer LAN when local: `http://192.168.1.71:4000/v1`.
+- Local host-only calls on the Mini can still use `http://127.0.0.1:4000/v1`.

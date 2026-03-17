@@ -1,6 +1,8 @@
 # Journal Index
+- [2026-03-16 — LAN-first Studio gateway contract reset](2026-03-16-lan-first-studio-gateway-contract-reset.md)
 - [2026-03-12 — Voice Gateway XTTS runtime-proof recovery on Orin](2026-03-12-voice-gateway-xtts-runtime-proof-recovery.md)
 - [2026-03-10 — Orin Phase 1 preflight corrections](2026-03-10-orin-phase1-preflight-corrections.md)
+- [2026-03-10 — Studio backend auth removal and tailnet-only boundary](2026-03-10-studio-backend-auth-removal-and-tailnet-boundary.md)
 - [2026-03-10 — Orin post-upgrade baseline snapshot](2026-03-10-orin-post-upgrade-baseline.md)
 - [2026-03-10 — Orin voice baseline snapshot](2026-03-10-orin-voice-baseline.md)
 - [2026-03-07 — websearch supported-path reset](2026-03-07-websearch-supported-path-reset.md)

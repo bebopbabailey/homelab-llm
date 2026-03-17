@@ -5,9 +5,9 @@ import urllib.request
 import urllib.error
 
 MODELS = {
-    "mlx-gpt-oss-120b-mxfp4-q4": "http://192.168.1.72:8100/v1/chat/completions",
-    "mlx-gemma-3-27b-it-qat-4bit": "http://192.168.1.72:8101/v1/chat/completions",
-    "mlx-gpt-oss-20b-mxfp4-q4": "http://192.168.1.72:8102/v1/chat/completions",
+    "mlx-gpt-oss-120b-mxfp4-q4": "http://thestudio.tailfd1400.ts.net:8100/v1/chat/completions",
+    "mlx-gemma-3-27b-it-qat-4bit": "http://thestudio.tailfd1400.ts.net:8101/v1/chat/completions",
+    "mlx-gpt-oss-20b-mxfp4-q4": "http://thestudio.tailfd1400.ts.net:8102/v1/chat/completions",
 }
 
 PROMPTS = {

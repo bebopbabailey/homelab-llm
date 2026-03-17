@@ -17,7 +17,7 @@ while allowing backend models to evolve independently.
    - TinyAgents connects to MCP servers; LiteLLM remains the LLM gateway.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
 4) Optimization proxy (current)
-   - OptiLLM runs on the Studio (`0.0.0.0:4020`) and is consumed through LiteLLM `boost` handles.
+   - OptiLLM runs on the Studio (`192.168.1.72:4020`) and is consumed through LiteLLM `boost` handles over the LAN contract.
    - Clients include `optillm_approach` in the request body when they want to override default router behavior.
    - Single OptiLLM instance serves both `boost` and `boost-deep`.
 5) Specialist Backends (current)

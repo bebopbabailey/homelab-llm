@@ -70,6 +70,33 @@ def router_assertions(router_text):
     return ok_drop, ok_fast_main
 
 
+def lane_override_assertions(argv, override):
+    failures = []
+    if not override:
+        return failures
+    if override.get("tool_choice_mode") == "auto" and "--enable-auto-tool-choice" not in argv:
+        failures.append("missing --enable-auto-tool-choice")
+    parser = override.get("tool_call_parser", "__missing__")
+    if parser != "__missing__":
+        if "--tool-call-parser" not in argv or parser not in argv:
+            failures.append(f"missing --tool-call-parser {parser}")
+    reasoning = override.get("reasoning_parser", "__missing__")
+    if reasoning is None:
+        if "--reasoning-parser" in argv:
+            failures.append("unexpected --reasoning-parser")
+    elif reasoning != "__missing__":
+        if "--reasoning-parser" not in argv or reasoning not in argv:
+            failures.append(f"missing --reasoning-parser {reasoning}")
+    return failures
+
+
+def parse_systemd_execstart(text):
+    match = re.search(r"ExecStart=.*? --host (\S+) --port (\d+)", text)
+    if not match:
+        return None, None
+    return match.group(1), int(match.group(2))
+
+
 def check_fast(lock):
     failures = []
     if not LOCK_PATH.exists():
@@ -144,26 +171,77 @@ def check_full(lock, host):
     if proc.returncode != 0 or "state = running" not in proc.stdout:
         failures.append("studio optillm launchd label not running")
 
+    proc = studio_run(f"sudo plutil -convert json -o - /Library/LaunchDaemons/{label}.plist", host)
+    try:
+        plist = parse_remote_json(proc, f"plist {label}")
+        argv = plist.get("ProgramArguments", [])
+        runtime = lock["optillm_proxy"]["runtime"]
+        try:
+            host_index = argv.index("--host")
+            observed_host = argv[host_index + 1]
+        except Exception:
+            observed_host = None
+        try:
+            port_index = argv.index("--port")
+            observed_port = int(argv[port_index + 1])
+        except Exception:
+            observed_port = None
+        try:
+            base_index = argv.index("--base-url")
+            observed_base = argv[base_index + 1]
+        except Exception:
+            observed_base = None
+        try:
+            model_index = argv.index("--model")
+            observed_model = argv[model_index + 1]
+        except Exception:
+            observed_model = None
+        if observed_host != runtime["bind_host"]:
+            failures.append("studio optillm bind host drift")
+        if observed_port != runtime["port"]:
+            failures.append("studio optillm port drift")
+        if observed_base != runtime["base_url"]:
+            failures.append("studio optillm base-url drift")
+        if observed_model != runtime["model"]:
+            failures.append("studio optillm model drift")
+    except Exception as exc:
+        failures.append(str(exc))
+
     for port, label in lock["mlx"]["lanes"].items():
         proc = studio_run(f"sudo plutil -convert json -o - /Library/LaunchDaemons/{label}.plist", host)
         try:
             plist = parse_remote_json(proc, f"plist {label}")
             env = plist.get("EnvironmentVariables", {})
             argv = plist.get("ProgramArguments", [])
+            try:
+                host_index = argv.index("--host")
+                observed_host = argv[host_index + 1]
+            except Exception:
+                observed_host = None
+            if observed_host != lock["mlx"].get("bind_host"):
+                failures.append(f"{label} bind host drift")
             if env.get("VLLM_METAL_MEMORY_FRACTION") != lock["mlx"]["memory_fraction"]:
                 failures.append(f"{label} memory fraction drift")
-            if "--api-key" not in argv:
-                failures.append(f"{label} missing --api-key")
             if "--no-async-scheduling" not in argv:
                 failures.append(f"{label} missing --no-async-scheduling")
             if any("paged" in str(arg).lower() for arg in argv) or env.get("VLLM_METAL_USE_PAGED_ATTENTION"):
                 failures.append(f"{label} enables paged attention")
+            override = (lock.get("mlx", {}).get("lane_overrides") or {}).get(str(port))
+            for failure in lane_override_assertions(argv, override):
+                failures.append(f"{label} {failure}")
         except Exception as exc:
             failures.append(str(exc))
 
     proc = run(["systemctl", "is-active", "litellm-orch.service"], check=False)
     if proc.returncode != 0 or proc.stdout.strip() != "active":
         failures.append("litellm-orch.service is not active")
+
+    proc = run(["systemctl", "show", "litellm-orch.service", "-p", "ExecStart"], check=False)
+    host_value, port_value = parse_systemd_execstart(proc.stdout)
+    if host_value != lock["litellm"]["bind_host"]:
+        failures.append("litellm-orch bind host drift")
+    if port_value != lock["litellm"]["port"]:
+        failures.append("litellm-orch port drift")
 
     return failures
 

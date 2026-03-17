@@ -89,6 +89,43 @@ class ValidateRuntimeLockTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             vr.parse_remote_json(proc, 'ctx')
 
+    def test_lane_override_assertions(self):
+        argv = [
+            "vllm",
+            "serve",
+            "--enable-auto-tool-choice",
+            "--tool-call-parser",
+            "hermes",
+        ]
+        override = {
+            "tool_choice_mode": "auto",
+            "tool_call_parser": "hermes",
+            "reasoning_parser": None,
+        }
+        self.assertEqual(vr.lane_override_assertions(argv, override), [])
+
+    def test_lane_override_assertions_flags_unexpected_reasoning_parser(self):
+        argv = [
+            "vllm",
+            "serve",
+            "--enable-auto-tool-choice",
+            "--tool-call-parser",
+            "hermes",
+            "--reasoning-parser",
+            "qwen3",
+        ]
+        override = {
+            "tool_choice_mode": "auto",
+            "tool_call_parser": "hermes",
+            "reasoning_parser": None,
+        }
+        failures = vr.lane_override_assertions(argv, override)
+        self.assertTrue(any("unexpected --reasoning-parser" in failure for failure in failures))
+
+    def test_parse_systemd_execstart(self):
+        text = "ExecStart=/path/to/litellm --config x --host 0.0.0.0 --port 4000\n"
+        self.assertEqual(vr.parse_systemd_execstart(text), ("0.0.0.0", 4000))
+
 
 if __name__ == '__main__':
     unittest.main()

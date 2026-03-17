@@ -24,6 +24,13 @@ ssh studio "mlxctl reconcile --json"
 ./platform/ops/scripts/mlxctl studio-cli-sha
 ```
 
+Mini-side LAN reachability checks:
+```bash
+for p in 8100 8101 8102; do
+  curl -fsS "http://192.168.1.72:${p}/v1/models" | jq .
+done
+```
+
 Reconcile contract:
 - `mlxctl reconcile` is dry-run by default.
 - Use `mlxctl reconcile --apply` only when stale assignment candidates are confirmed.
@@ -48,13 +55,44 @@ ssh studio "sudo launchctl print system/com.bebop.mlx-lane.8102 | sed -n '1,80p'
 
 # Interpretation:
 # `listener_visible=false` can still be healthy under root-owned launchd lanes.
-# Prefer `http_models_ok=true` in `mlxctl status --checks --json` as serving truth.
+# Prefer lane state in `mlxctl status --checks --json` for desired vs actual truth.
+# For load/readiness transitions, `/v1/chat/completions` is the primary readiness proof
+# and `/v1/models` is only the served-model identity check.
 
 # 3) Validate rendered vLLM args (main lane auto-tool)
 ./platform/ops/scripts/mlxctl vllm-capabilities --json
 ./platform/ops/scripts/mlxctl vllm-render --ports 8101 --validate --json
 ssh studio "ps -eo pid,command | rg -- '--port 8101|enable-auto-tool-choice|tool-call-parser'"
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+payload={
+  'model':'mlx-llama-3-3-70b-4bit-instruct',
+  'messages':[{'role':'user','content':'Use the noop tool once, then stop.'}],
+  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
+  'tool_choice':'auto',
+  'stream':False,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY"
+# For `8101`, success means structured `tool_calls`, not raw `<tool_call>` text.
 ```
+
+Load safety contract:
+- `mlxctl load` updates lane `desired_target` immediately.
+- A healthy lane is not torn down until preflight passes in the serving venv.
+- A candidate is only marked as serving after two consecutive readiness passes
+  with no restart between them.
+- Failed loads keep `actual_serving_target` unchanged when the old lane is still
+  serving, or explicitly mark the lane down when in-place cutover fails.
 
 Scoped lane restart safety:
 - `mlx-launch-start --ports ...` refuses partial assigned-team-lane scope.
@@ -62,7 +100,7 @@ Scoped lane restart safety:
 
 Quality gate (from repo host with Studio network access):
 ```bash
-uv run python platform/ops/scripts/mlx_quality_gate.py --host 192.168.1.72 --json
+uv run python platform/ops/scripts/mlx_quality_gate.py --host thestudio.tailfd1400.ts.net --json
 ```
 
 ## Studio SSH preflight + lock-state handling

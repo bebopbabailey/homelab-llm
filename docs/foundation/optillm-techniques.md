@@ -6,6 +6,13 @@ Set the approach per request via `optillm_approach`, e.g.:
 {"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon"}
 ```
 
+## OpenCode hardening caveat
+- This document describes OptiLLM techniques, not the default OpenCode
+  repo-work control plane.
+- Current OpenCode hardening in this repo uses the direct lanes `deep`, `main`,
+  and `fast`.
+- OptiLLM aliases are intentionally out of scope for this hardening phase.
+
 Decode-time techniques note (current direction):
 - Proxy-safe orchestration stays in OptiLLM (`optillm_approach=...`).
 - Decode-loop algorithms (not proxy-safe) are backend-runtime specific and are not
@@ -31,8 +38,10 @@ Examples (request-body techniques via gateway):
 - Deterministic coding-quality aliases are available through LiteLLM:
   `boost-plan`, `boost-plan-verify`, `boost-ideate`, `boost-fastdraft`.
 
-## Coding north-star defaults (OpenCode + MLX/vLLM-metal)
-- `boost-plan` (`plansearch-openai/deep`) is the default for high-quality coding plans.
+## OptiLLM coding profiles (not the repo-local OpenCode default)
+- Repo-default OpenCode behavior is documented in `docs/OPENCODE.md`.
+- `boost-plan` (`plansearch-openai/deep`) is the default high-quality planning
+  profile when intentionally using OptiLLM.
 - `boost-plan-verify` (`self_consistency-openai/deep`) is the verifier pass.
 - `boost-ideate` (`moa-openai/deep`) is for divergent architecture exploration.
 - `boost-fastdraft` (`bon-openai/fast`) is the lower-cost drafting lane.

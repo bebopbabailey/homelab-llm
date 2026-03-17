@@ -70,6 +70,7 @@ listener_pid = one_line(["lsof", "-nP", "-tiTCP:8100", "-sTCP:LISTEN"])
 listener_cmd = ""
 ancestors = []
 under_mlx_launch = False
+under_launchd = False
 is_vllm_listener = False
 
 if listener_pid:
@@ -90,6 +91,8 @@ if listener_pid:
         if not ppid or ppid == current or ppid == "1":
             if ppid == "1":
                 root_cmd = one_line(["ps", "-p", "1", "-o", "command="])
+                root_cmd_l = root_cmd.lower()
+                under_launchd = "/sbin/launchd" in root_cmd_l or root_cmd_l == "launchd"
                 ancestors.append({"pid": "1", "ppid": "0", "command": root_cmd})
             break
         current = ppid
@@ -99,6 +102,7 @@ payload = {
     "listener_command": listener_cmd,
     "is_vllm_listener": is_vllm_listener,
     "under_mlx_launch": under_mlx_launch,
+    "under_launchd": under_launchd,
     "ancestry": ancestors,
 }
 print(json.dumps(payload))
@@ -118,6 +122,7 @@ print(json.dumps(payload))
             "listener_command": "",
             "is_vllm_listener": False,
             "under_mlx_launch": False,
+            "under_launchd": False,
             "ancestry": [],
             "error": (proc.stderr or "").strip() or "failed to inspect runtime",
         }
@@ -130,10 +135,21 @@ print(json.dumps(payload))
             "listener_command": "",
             "is_vllm_listener": False,
             "under_mlx_launch": False,
+            "under_launchd": False,
             "ancestry": [],
             "error": "invalid runtime payload",
         }
     return data
+
+
+def _runtime_8100_ok(runtime_8100: dict[str, Any]) -> bool:
+    if not runtime_8100.get("listener_pid"):
+        return False
+    if not runtime_8100.get("is_vllm_listener"):
+        return False
+    # Current healthy Studio reality is per-lane launchd ownership. Retain
+    # mlx-launch ancestry acceptance for older recovered states.
+    return bool(runtime_8100.get("under_mlx_launch") or runtime_8100.get("under_launchd"))
 
 
 def _observation_guidance() -> dict[str, Any]:
@@ -145,7 +161,8 @@ def _observation_guidance() -> dict[str, Any]:
             "ssh studio \"launchctl print system/com.bebop.optillm-proxy | rg -n 'state =|pid =|program ='\""
         ],
         "good_looks_like": [
-            "inference listeners stay owned by vllm serve under mlx-launch ancestry",
+            "inference listeners stay owned by vllm serve under launchd-managed ancestry",
+            "either direct per-lane launchd ownership or legacy mlx-launch ancestry is acceptable",
             "managed inference labels stay enabled and loaded",
             "transient maintenance/deploy commands run through utility clamp",
             "no unmanaged owned launchd labels are present"
@@ -215,7 +232,7 @@ def main() -> int:
     strict = evaluate_policy(policy, args.host, use_utility_wrapper=use_utility_wrapper)
     runtime_8100 = _collect_8100_runtime(args.host, use_utility_wrapper=use_utility_wrapper)
 
-    runtime_ok = bool(runtime_8100.get("listener_pid")) and runtime_8100.get("is_vllm_listener") and runtime_8100.get("under_mlx_launch")
+    runtime_ok = _runtime_8100_ok(runtime_8100)
     overall_ok = bool(strict.get("ok")) and runtime_ok
 
     payload = {

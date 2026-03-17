@@ -7,8 +7,11 @@ Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM ali
 ## Runtime Reality (2026-03-01)
 - Active Studio inference listeners:
   - `8100` -> `mlx-gpt-oss-120b-mxfp4-q4` (deep)
-  - `8101` -> `mlx-qwen3-next-80b-mxfp4-a3b-instruct` (main)
+  - `8101` -> `mlx-llama-3-3-70b-4bit-instruct` (main)
   - `8102` -> `mlx-gpt-oss-20b-mxfp4-q4` (fast)
+- Canonical Mini -> Studio transport for active team lanes is the Studio LAN IP
+  `192.168.1.72`; the MLX lane transport contract no longer depends on Studio
+  Tailscale hostnames.
 - Team-lane runtime command family is `vllm serve` (`vllm-metal`) under
   per-lane launchd labels:
   - `com.bebop.mlx-lane.8100`
@@ -22,7 +25,7 @@ Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM ali
 Shape (abridged):
 ```json
 {
-  "version": 1,
+  "version": 2,
   "models": {
     "mlx-gpt-oss-120b-mxfp4-q4": {
       "repo_id": "mlx-community/gpt-oss-120b-MXFP4-Q4",
@@ -35,6 +38,30 @@ Shape (abridged):
       "tool_call_parser": "harmony",
       "reasoning_parser": "harmony"
     }
+  },
+  "lanes": {
+    "8100": {
+      "desired_target": {
+        "target_slug": "mlx-gpt-oss-120b-mxfp4-q4",
+        "repo_id": "mlx-community/gpt-oss-120b-MXFP4-Q4",
+        "expected_served_model_identity": "mlx-gpt-oss-120b-mxfp4-q4"
+      },
+      "actual_serving_target": {
+        "target_slug": "mlx-gpt-oss-120b-mxfp4-q4",
+        "repo_id": "mlx-community/gpt-oss-120b-MXFP4-Q4",
+        "expected_served_model_identity": "mlx-gpt-oss-120b-mxfp4-q4"
+      },
+      "last_known_good_target": {
+        "target_slug": "mlx-gpt-oss-120b-mxfp4-q4",
+        "repo_id": "mlx-community/gpt-oss-120b-MXFP4-Q4",
+        "expected_served_model_identity": "mlx-gpt-oss-120b-mxfp4-q4"
+      },
+      "actual_served_model_identity": "mlx-gpt-oss-120b-mxfp4-q4",
+      "health_state": "serving",
+      "reconciliation_state": "converged",
+      "last_failure": {},
+      "last_transition_time": "2026-03-13T00:00:00Z"
+    }
   }
 }
 ```
@@ -43,9 +70,17 @@ Key fields:
 - `model_id`: canonical handle identity.
 - `cache_path`: runtime artifact path.
 - `source_path`: canonical source path (usually same as `cache_path`).
-- `port`: active per-port assignment.
+- `port`: compatibility mirror of actual serving truth for the current model.
 - `chat_template` / `tool_call_parser` / `reasoning_parser`: parser safety contract.
+- `chat_template_args`: logical GPT/chat-template kwargs. Under `vllm-metal`,
+  `mlxctl` compiles these into `--default-chat-template-kwargs`; under
+  `mlx_lm.server`, it compiles them into `--chat-template-args`.
 - `og_path` (optional): original artifact path used for conversion/offload workflows.
+- `lanes.<port>.desired_target`: operator intent.
+- `lanes.<port>.actual_serving_target`: last target that actually proved ready.
+- `lanes.<port>.last_known_good_target`: explicit rollback reference.
+- `lanes.<port>.actual_served_model_identity`: observed `/v1/models` identity.
+- `lanes.<port>.health_state` / `reconciliation_state`: control-plane truth for serving vs transition vs failure.
 
 ## Controller (`mlxctl`)
 `mlxctl` is the supported command for MLX lifecycle:
@@ -63,43 +98,72 @@ Backend behavior:
 - `mlx_lm.server` and `mlx-openai-server` are legacy fallback references only and are not part of the active runtime contract.
 
 Source of truth contract:
-- Runtime and gateway wiring are derived from registry state.
+- Runtime and gateway wiring are derived from registry state, but desired state and actual serving state are independent lane fields.
 - Avoid ad-hoc edits to launch scripts for model assignment.
 - Mutating commands are parity-gated against the Studio binary.
   Run `mlxctl studio-cli-sha` and, when needed, `mlxctl sync-studio-cli`.
 - `mlxctl reconcile` is dry-run by default; mutation requires `--apply`.
   Stale assignment candidates are only entries with no listener, no runtime
   process, and no successful local `/v1/models` probe.
+- `load` now updates `desired_target` immediately, but only updates
+  `actual_serving_target` after preflight and full readiness pass.
+- Failed loads never claim serving success; state remains explicit when desired
+  differs from actual or when a lane is down.
 
 ## Harmony / Parser Contract
 For GPT-OSS entries, registry must keep:
 - `tool_call_parser: harmony`
 - `reasoning_parser: harmony`
 - valid `chat_template`
+- `chat_template_args` aligned with the GPT lane policy (currently
+  `{"enable_thinking": false, "reasoning_effort": "low"}`)
 
-For Qwen3 entries, registry must keep:
-- `tool_call_parser: qwen3`
-- `reasoning_parser: qwen3`
-- optional discovered `chat_template`
+For Llama 3.3 entries, registry must keep:
+- `vllm.profile: llama3_json`
+- `vllm.tool_choice_mode: auto`
+- no default reasoning parser
 
 For `vllm-metal` launch behavior, registry now supports a nested `vllm` block:
-- `vllm.profile` (`qwen3_main|gpt_oss_lane|generic`)
+- `vllm.profile` (resolved against required metadata in `platform/ops/mlx-runtime-profiles.json`)
 - `vllm.tool_choice_mode` (`none|auto`)
 - `vllm.tool_call_parser`, `vllm.reasoning_parser`
 - `vllm.max_model_len`, `vllm.memory_fraction`, `vllm.async_scheduling`
 
+Runtime-profile metadata is required:
+- file: `platform/ops/mlx-runtime-profiles.json`
+- schema versioned
+- `vllm-render --validate` fails if profile resolution is missing or ambiguous
+- family defaults now live in metadata instead of scattered conditionals
+
 Runtime compatibility is resolved at launch time:
-- Registry keeps logical parser values (`qwen3`).
-- `mlxctl` resolves runtime parser enums from current vLLM capabilities
-  (for example `qwen3` -> `qwen3_xml` when required by the installed build).
+- Registry keeps logical family/profile defaults and lets `mlxctl` resolve the
+  effective runtime parser enums from current vLLM capabilities.
+- Lane-local `vllm` overrides may intentionally diverge from top-level family
+  metadata when a specific runtime needs a different parser contract.
 - `tool_choice_mode=auto` is fail-closed: launch is blocked if the current vLLM
   binary lacks `--enable-auto-tool-choice` or a compatible tool parser.
+- Family/runtime preflight runs before a healthy lane is torn down:
+  - architecture/config preflight in the serving venv
+  - family/parser profile validation
+  - runtime capability validation
+- Readiness is no longer pid/port based. vLLM-backed loads require:
+  - service exists / not disabled
+  - stable process
+  - successful `/v1/models` identity check
+  - successful minimal non-streaming `/v1/chat/completions` probe
+  - two consecutive full passes with no restart between them
 
 Current staged default:
-- `main` (`8101`, qwen3-next-80b) uses `tool_choice_mode=auto`.
+- `main` (`8101`, llama-3.3-70b) uses `tool_choice_mode=auto`.
+- Active `8101` lock render uses `vllm.profile=llama3_json`,
+  `vllm.tool_call_parser=llama3_json`, and `vllm.reasoning_parser=null`.
 - `deep`/`fast` remain on `tool_choice_mode=none` until explicitly changed.
+- GPT-OSS family defaults now carry chat-template kwargs into the vLLM render so
+  direct canaries and future lane reloads do not silently drop the GPT thinking
+  controls on the active `vllm-metal` path.
 - Team lanes render `VLLM_METAL_MEMORY_FRACTION=auto`.
-- Team lanes require `--api-key`.
+- Team lanes render `--host 192.168.1.72` for the active Mini -> Studio path.
+- Team lanes do not require backend bearer auth.
 - Team lanes keep `--no-async-scheduling`.
 - Paged attention is off in the current runtime contract.
 
@@ -119,7 +183,7 @@ Served-set source of truth:
 - Registry data enriches metadata for those served handles.
 
 Current alias intent:
-- `main` -> qwen3-next-80b (`8101`)
+- `main` -> llama-3.3-70b (`8101`)
 - `deep` -> gpt-oss-120b (`8100`)
 - `fast` -> gpt-oss-20b (`8102`)
 - `boost` / `boost-deep` -> Studio OptiLLM proxy (`4020`)
@@ -130,7 +194,7 @@ Current alias intent:
 - Active set currently uses only `8100/8101/8102`.
 - Conservative lane defaults when registry fields are missing:
   - `8100` (`gpt-oss-120b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=0.55`, `vllm_async_scheduling=false`
-  - `8101` (`qwen3-next-80b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=0.50`, `vllm_async_scheduling=false`
+  - `8101` (`llama-3.3-70b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=auto`, `vllm_async_scheduling=false`
   - `8102` (`gpt-oss-20b`): `vllm_max_model_len=32768`, `vllm_memory_fraction=0.45`, `vllm_async_scheduling=false`
 
 ## Offload Policy
@@ -139,7 +203,7 @@ Current alias intent:
 
 ## Notes
 - Studio `/v1/models` may report snapshot-path IDs.
-- Use registry + `mlxctl status` as canonical identity mapping.
+- Use registry lane state + `mlxctl status` as canonical control-plane truth.
 - `mlxctl status --json` is JSON-only; add `--table` for mixed human+JSON output.
 - `status=running` can be valid even when `listener_visible=false` (process is
   present; listener visibility may be delayed or restricted).
@@ -148,6 +212,8 @@ Current alias intent:
   `launchd_loaded`, `launchd_disabled`, and `http_models_ok`.
 - `http_models_ok=true` is the serving-truth signal when listener visibility is
   delayed or hidden under root-owned launchd process ownership.
+- For vLLM readiness and successful load transitions, `/v1/chat/completions`
+  is the primary serving proof and `/v1/models` is an identity check only.
 - `mlxctl mlx-launch-start` materializes and (re)starts per-lane launchd jobs from registry assignments.
 - `mlxctl mlx-launch-start --ports` rejects partial assigned-team-lane scope unless
   `--allow-partial` is provided.
@@ -158,3 +224,5 @@ Current alias intent:
   remotely and applying launchctl steps on Studio through the sudo wrapper path.
 - Output-quality gate: run `platform/ops/scripts/mlx_quality_gate.py` after
   reboot/model changes to catch protocol leakage or hangs on `fast/main/deep`.
+- For `main` tool-calling work, the acceptance bar is structured `tool_calls`
+  from `8101`, not just HTTP 200 or plain-text tool markup.

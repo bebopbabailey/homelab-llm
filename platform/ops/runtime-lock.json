@@ -15,10 +15,19 @@
       "label": "com.bebop.optillm-proxy",
       "exact_sha_required": true,
       "patching_allowed": false
+    },
+    "runtime": {
+      "bind_host": "192.168.1.72",
+      "port": 4020,
+      "base_url": "http://192.168.1.71:4000/v1",
+      "model": "main"
     }
   },
   "litellm": {
     "router_yaml": "layer-gateway/litellm-orch/config/router.yaml",
+    "bind_host": "0.0.0.0",
+    "port": 4000,
+    "canonical_lan_base_url": "http://192.168.1.71:4000/v1",
     "drop_params": true,
     "fallbacks": {
       "fast": [
@@ -29,8 +38,16 @@
   "mlx": {
     "paged_attention": false,
     "async_scheduling": false,
+    "bind_host": "192.168.1.72",
     "memory_fraction": "auto",
-    "api_key_required": true,
+    "api_key_required": false,
+    "lane_overrides": {
+      "8101": {
+        "tool_choice_mode": "auto",
+        "tool_call_parser": "llama3_json",
+        "reasoning_parser": null
+      }
+    },
     "lanes": {
       "8100": "com.bebop.mlx-lane.8100",
       "8101": "com.bebop.mlx-lane.8101",

@@ -19,16 +19,21 @@
     {
       "lane": "deep",
       "prompt": "Reply with exactly one short sentence about oranges.",
+      "request_timeout_s": 90,
+      "max_tokens": 256,
       "required_substrings": []
     },
     {
       "lane": "main",
       "prompt": "Reply with exactly one short sentence about apples.",
+      "max_tokens": 128,
       "required_substrings": []
     },
     {
       "lane": "fast",
       "prompt": "Reply with exactly one short sentence about bananas.",
+      "request_timeout_s": 90,
+      "max_tokens": 256,
       "required_substrings": []
     }
   ]

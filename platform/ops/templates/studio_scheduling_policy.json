@@ -58,6 +58,22 @@
     "com.bebop.optillm-proxy": {
       "lane": "inference",
       "plist_path": "/Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
+    },
+    "com.bebop.pgvector-main": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.pgvector-main.plist"
+    },
+    "com.bebop.memory-api-main": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.memory-api-main.plist"
+    },
+    "com.bebop.memory-ingest-nightly": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.memory-ingest-nightly.plist"
+    },
+    "com.bebop.memory-backup-nightly": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.memory-backup-nightly.plist"
     }
   },
   "retired_labels": {

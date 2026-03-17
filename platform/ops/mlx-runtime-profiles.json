@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "default_profile": "generic",
+  "profiles": {
+    "generic": {
+      "tool_choice_mode": "none",
+      "tool_call_parser": null,
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "tokenizer",
+      "auto_tool_choice_policy": "allowed",
+      "reasoning_parser_policy": "optional",
+      "readiness_probe_mode": "chat_basic",
+      "readiness_acceptance_predicate": "assistant_text_or_tool_calls",
+      "readiness_max_tokens": 32,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "gpt_oss_lane": {
+      "match_any": [
+        "gpt-oss"
+      ],
+      "tool_choice_mode": "none",
+      "tool_call_parser": null,
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "tokenizer",
+      "chat_template_kwargs": {
+        "enable_thinking": false,
+        "reasoning_effort": "low"
+      },
+      "auto_tool_choice_policy": "allowed",
+      "reasoning_parser_policy": "optional",
+      "readiness_probe_mode": "chat_basic",
+      "readiness_acceptance_predicate": "assistant_text_or_tool_calls",
+      "readiness_max_tokens": 256,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "gpt_oss_fast_openai_tools": {
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "openai",
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "tokenizer",
+      "chat_template_kwargs": {
+        "enable_thinking": false,
+        "reasoning_effort": "low"
+      },
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "forbidden",
+      "readiness_probe_mode": "chat_tool_noop",
+      "readiness_acceptance_predicate": "noop_tool_call",
+      "readiness_max_tokens": 256,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "gpt_oss_tools_experimental": {
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "openai",
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "tokenizer",
+      "chat_template_kwargs": {
+        "enable_thinking": false,
+        "reasoning_effort": "low"
+      },
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "forbidden",
+      "readiness_probe_mode": "chat_tool_noop",
+      "readiness_acceptance_predicate": "noop_tool_call",
+      "readiness_max_tokens": 256,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "qwen3_main": {
+      "match_any": [
+        "qwen3-next-80b",
+        "qwen3",
+        "qwen-3"
+      ],
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "qwen3",
+      "reasoning_parser": "qwen3",
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "local_if_present",
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "optional",
+      "readiness_probe_mode": "chat_tool_noop",
+      "readiness_acceptance_predicate": "noop_tool_call",
+      "readiness_max_tokens": 64,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "llama3_json": {
+      "match_any": [
+        "llama-3.3",
+        "llama 3.3",
+        "llama3.3",
+        "llama-3-3"
+      ],
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "llama3_json",
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": false,
+      "chat_template_strategy": "tokenizer",
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "forbidden",
+      "readiness_probe_mode": "chat_tool_noop",
+      "readiness_acceptance_predicate": "noop_tool_call",
+      "readiness_max_tokens": 64,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "seed_oss": {
+      "match_any": [
+        "seed-oss-36b",
+        "seed-oss",
+        "seed oss"
+      ],
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "seed_oss",
+      "reasoning_parser": null,
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": true,
+      "chat_template_strategy": "local_required",
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "forbidden",
+      "readiness_probe_mode": "chat_tool_noop",
+      "readiness_acceptance_predicate": "noop_tool_call",
+      "readiness_max_tokens": 128,
+      "minimum_runtime_requirements": [],
+      "known_unsupported_runtime_combinations": []
+    },
+    "glm47": {
+      "match_any": [
+        "glm-4.7",
+        "glm 4.7",
+        "glm4.7",
+        "glm-4-7"
+      ],
+      "tool_choice_mode": "auto",
+      "tool_call_parser": "glm47",
+      "reasoning_parser": "glm45",
+      "chat_template_mode": "tokenizer",
+      "trust_remote_code": true,
+      "chat_template_strategy": "tokenizer",
+      "auto_tool_choice_policy": "recommended",
+      "reasoning_parser_policy": "optional",
+      "readiness_probe_mode": "chat_basic",
+      "readiness_acceptance_predicate": "assistant_text_or_tool_calls",
+      "readiness_max_tokens": 32,
+      "recommended_served_model_name": "glm-4.7-flash",
+      "minimum_runtime_requirements": [
+        "fresh_vllm_pre_release",
+        "transformers_git_main_for_local_support"
+      ],
+      "known_unsupported_runtime_combinations": [
+        "transformers_without_glm4_moe_lite_support",
+        "vllm_runtime_without_registered_glm47_reasoning_parser"
+      ]
+    }
+  }
+}

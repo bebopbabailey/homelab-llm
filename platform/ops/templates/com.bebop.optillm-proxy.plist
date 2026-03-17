@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.optillm-proxy</string>
+  <key>UserName</key>
+  <string>thestudio</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/thestudio/optillm-proxy</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/thestudio/optillm-proxy/.venv/bin/optillm</string>
+    <string>--host</string>
+    <string>192.168.1.72</string>
+    <string>--port</string>
+    <string>4020</string>
+    <string>--base-url</string>
+    <string>http://192.168.1.71:4000/v1</string>
+    <string>--model</string>
+    <string>main</string>
+    <string>--plugins-dir</string>
+    <string>/Users/thestudio/optillm-proxy</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OPENAI_API_KEY</key>
+    <string>__SET_ON_STUDIO_ONLY__</string>
+    <key>HF_HOME</key>
+    <string>/Users/thestudio/models/hf</string>
+    <key>TRANSFORMERS_CACHE</key>
+    <string>/Users/thestudio/models/hf/hub</string>
+    <key>PYTORCH_ENABLE_MPS_FALLBACK</key>
+    <string>0</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/Library/Logs/optillm-proxy.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/Library/Logs/optillm-proxy.err</string>
+</dict>
+</plist>

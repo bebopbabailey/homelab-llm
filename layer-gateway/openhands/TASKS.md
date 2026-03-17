@@ -1,0 +1,9 @@
+# Tasks: OpenHands (Mini Phase A)
+
+- [x] Add the Phase A docs bundle and canonical doc updates.
+- [x] Verify Docker-direct launch on `127.0.0.1:4031`.
+- [ ] Verify only the disposable workspace is mounted into `/workspace` during a
+  sandboxed task run.
+- [x] Prepare one scratch-repo target with a failing stdlib `unittest`.
+- [ ] Run one scratch-repo loop: `plan -> patch -> validate -> summarize`.
+- [x] Keep LiteLLM handoff documented but unimplemented until policy is ready.

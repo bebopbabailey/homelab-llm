@@ -17,9 +17,9 @@ if [[ -n "${OPENCODE_LITELLM_BASE_URL:-}" ]]; then
 else
   BASE_URL=""
   for candidate in \
-    "https://gateway.tailfd1400.ts.net/v1" \
-    "http://100.69.99.60:4443/v1" \
-    "http://127.0.0.1:4000/v1"
+    "http://192.168.1.71:4000/v1" \
+    "http://127.0.0.1:4000/v1" \
+    "https://gateway.tailfd1400.ts.net/v1"
   do
     if probe_url "${candidate}"; then
       BASE_URL="${candidate}"
@@ -27,7 +27,7 @@ else
     fi
   done
   if [[ -z "${BASE_URL}" ]]; then
-    BASE_URL="http://127.0.0.1:4000/v1"
+    BASE_URL="http://192.168.1.71:4000/v1"
   fi
 fi
 

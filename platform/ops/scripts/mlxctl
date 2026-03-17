@@ -32,9 +32,12 @@ DEFAULT_GATEWAY_MLXCTL = "/home/christopherbailey/homelab-llm/platform/ops/scrip
 DEFAULT_HANDLES_PATH = "/home/christopherbailey/homelab-llm/layer-gateway/registry/handles.jsonl"
 DEFAULT_ENSEMBLES_DOC = "/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy/ENSEMBLES.md"
 DEFAULT_MLX_HOST = "192.168.1.72"
+DEFAULT_MLX_BIND_HOST = "192.168.1.72"
 DEFAULT_CONTEXT_LENGTH = 131072
 DEFAULT_MAX_OUTPUT_TOKENS = 64000
 DEFAULT_TEMPLATE_DIR = "/opt/mlx-launch/templates"
+DEFAULT_RUNTIME_PROFILES = "mlx-runtime-profiles.json"
+REGISTRY_VERSION = 2
 
 TEAM_RANGE = range(8100, 8120)
 EXPERIMENTAL_RANGE = range(8120, 8140)
@@ -88,6 +91,10 @@ def _studio_host_label() -> str:
     return _studio_ssh_target().split("@", 1)[-1]
 
 
+def _mlx_bind_host() -> str:
+    return os.environ.get("MLX_BIND_HOST", DEFAULT_MLX_BIND_HOST).strip() or DEFAULT_MLX_BIND_HOST
+
+
 def _studio_utility_wrapper():
     if os.environ.get("STUDIO_UTILITY_WRAPPER_DISABLE", "").strip().lower() in {"1", "true", "yes"}:
         return None
@@ -107,7 +114,7 @@ def _ssh_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
     host = studio_ssh.split("@", 1)[-1].strip().lower()
-    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72"}:
+    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72", "thestudio.tailfd1400.ts.net"}:
         return _run(["bash", "-lc", remote], input_bytes=input_bytes, check=check)
     wrapper = _studio_utility_wrapper()
     if wrapper:
@@ -127,7 +134,7 @@ def _studio_sudo_cmd(studio_ssh: str, argv, *, input_bytes=None, check=True):
     else:
         remote = " ".join(shlex.quote(part) for part in argv)
     host = studio_ssh.split("@", 1)[-1].strip().lower()
-    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72"}:
+    if _is_local_host() and host in {"studio", "localhost", "127.0.0.1", "192.168.1.72", "thestudio.tailfd1400.ts.net"}:
         return _run(["sudo", "-n", "bash", "-lc", remote], input_bytes=input_bytes, check=check)
     wrapper = _studio_utility_wrapper()
     if wrapper:
@@ -322,6 +329,20 @@ def _registry_path():
     return Path(os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY))
 
 
+def _runtime_profiles_path() -> Path:
+    override = os.environ.get("MLX_RUNTIME_PROFILES")
+    if override:
+        return Path(override)
+    script_path = Path(__file__).resolve()
+    sibling = script_path.with_name(DEFAULT_RUNTIME_PROFILES)
+    if sibling.exists():
+        return sibling
+    repo_local = script_path.parents[1] / DEFAULT_RUNTIME_PROFILES
+    if repo_local.exists():
+        return repo_local
+    return sibling
+
+
 def _hf_home():
     return Path(os.environ.get("HF_HOME", DEFAULT_HF_HOME))
 
@@ -341,12 +362,171 @@ def _registry_lock(path: Path):
 def _load_registry(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
-        path.write_text(json.dumps({"version": 1, "models": {}}, indent=2))
+        path.write_text(json.dumps({"version": REGISTRY_VERSION, "models": {}, "lanes": {}}, indent=2))
     with _registry_lock(path):
         data = _loads_json_or_die(path.read_text(), context=f"registry file {path}", default="{}")
-    data.setdefault("version", 1)
+    data = _migrate_registry(data)
+    data.setdefault("version", REGISTRY_VERSION)
     data.setdefault("models", {})
+    data.setdefault("lanes", {})
     return data
+
+
+def _timestamp_utc() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _empty_failure_record() -> dict:
+    return {}
+
+
+def _target_record_from_entry(slug: str, entry: dict) -> dict:
+    return {
+        "target_slug": slug,
+        "repo_id": entry.get("repo_id"),
+        "expected_served_model_identity": _expected_served_model_identity(entry),
+    }
+
+
+def _lane_state_default(port: int) -> dict:
+    return {
+        "port": int(port),
+        "desired_target": None,
+        "actual_serving_target": None,
+        "last_known_good_target": None,
+        "actual_served_model_identity": None,
+        "health_state": "down",
+        "reconciliation_state": "converged",
+        "last_failure": _empty_failure_record(),
+        "last_transition_time": None,
+    }
+
+
+def _migrate_registry(data: dict) -> dict:
+    version = int(data.get("version") or 1)
+    models = data.setdefault("models", {})
+    lanes = data.setdefault("lanes", {})
+    if version >= REGISTRY_VERSION:
+        for port in PORT_RANGE:
+            lanes.setdefault(str(port), _lane_state_default(port))
+        return data
+
+    for port in PORT_RANGE:
+        lanes.setdefault(str(port), _lane_state_default(port))
+    for slug, entry in models.items():
+        port = entry.get("port")
+        if not port:
+            continue
+        try:
+            port = int(port)
+        except Exception:
+            continue
+        lane = lanes.setdefault(str(port), _lane_state_default(port))
+        target = _target_record_from_entry(slug, entry)
+        lane["desired_target"] = target
+        lane["actual_serving_target"] = target
+        lane["last_known_good_target"] = target
+        lane["actual_served_model_identity"] = target["expected_served_model_identity"]
+        lane["health_state"] = "serving"
+        lane["reconciliation_state"] = "converged"
+        lane["last_transition_time"] = lane.get("last_transition_time") or _timestamp_utc()
+    data["version"] = REGISTRY_VERSION
+    return data
+
+
+def _lane_state(data: dict, port: int) -> dict:
+    lanes = data.setdefault("lanes", {})
+    key = str(int(port))
+    if key not in lanes:
+        lanes[key] = _lane_state_default(int(port))
+    return lanes[key]
+
+
+def _desired_target_for_port(data: dict, port: int) -> Optional[dict]:
+    return _lane_state(data, port).get("desired_target")
+
+
+def _actual_target_for_port(data: dict, port: int) -> Optional[dict]:
+    lane = _lane_state(data, port)
+    target = lane.get("actual_serving_target")
+    if target:
+        return target
+    # compatibility path for old registries / manual edits
+    for slug, entry in data.get("models", {}).items():
+        if entry.get("port") == port:
+            target = _target_record_from_entry(slug, entry)
+            lane["actual_serving_target"] = target
+            lane["last_known_good_target"] = lane.get("last_known_good_target") or target
+            lane["actual_served_model_identity"] = lane.get("actual_served_model_identity") or target["expected_served_model_identity"]
+            return target
+    return None
+
+
+def _boot_target_for_port(data: dict, port: int) -> Optional[dict]:
+    lane = _lane_state(data, port)
+    if lane.get("reconciliation_state") == "transitioning" and lane.get("desired_target"):
+        return lane.get("desired_target")
+    actual = _actual_target_for_port(data, port)
+    if actual:
+        return actual
+    if lane.get("desired_target"):
+        return lane.get("desired_target")
+    return None
+
+
+def _clear_model_port_assignments(data: dict, port: int):
+    for entry in data.get("models", {}).values():
+        if entry.get("port") == int(port):
+            entry["port"] = None
+
+
+def _set_model_port_assignment(data: dict, slug: str, port: int):
+    _clear_model_port_assignments(data, port)
+    entry = data.get("models", {}).get(slug)
+    if entry is None:
+        raise SystemExit(f"registry missing model entry for {slug}")
+    entry["port"] = int(port)
+
+
+def _set_lane_desired_target(data: dict, port: int, target: Optional[dict], *, transition_state: str = "transitioning"):
+    lane = _lane_state(data, port)
+    lane["desired_target"] = target
+    lane["reconciliation_state"] = transition_state
+    lane["last_transition_time"] = _timestamp_utc()
+    if transition_state == "transitioning":
+        lane["health_state"] = "starting" if target else "down"
+
+
+def _set_lane_actual_target(
+    data: dict,
+    port: int,
+    target: Optional[dict],
+    *,
+    health_state: str,
+    served_model_identity: Optional[str],
+):
+    lane = _lane_state(data, port)
+    lane["actual_serving_target"] = target
+    lane["actual_served_model_identity"] = served_model_identity
+    lane["health_state"] = health_state
+    lane["reconciliation_state"] = "converged"
+    lane["last_transition_time"] = _timestamp_utc()
+    if target:
+        lane["last_known_good_target"] = target
+
+
+def _record_lane_failure(
+    data: dict,
+    port: int,
+    *,
+    health_state: str,
+    failure: dict,
+):
+    lane = _lane_state(data, port)
+    lane["health_state"] = health_state
+    lane["reconciliation_state"] = "failed"
+    lane["last_failure"] = failure
+    lane["last_transition_time"] = _timestamp_utc()
 
 
 def _port_for_model(model_id: str, data):
@@ -714,7 +894,13 @@ def _prompt_yes_no(message: str):
 
 
 def _model_on_port(data, port: int):
-    for slug, entry in data["models"].items():
+    actual = _actual_target_for_port(data, port)
+    if actual:
+        slug = actual.get("target_slug")
+        entry = data.get("models", {}).get(slug)
+        if slug and entry:
+            return slug, entry
+    for slug, entry in data.get("models", {}).items():
         if entry.get("port") == port:
             return slug, entry
     return None, None
@@ -731,7 +917,7 @@ def _wait_for_port(port: int, timeout: int = 60):
 
 def _models_endpoint_ok(port: int, timeout: int = 2) -> bool:
     try:
-        req = urlrequest.Request(f"http://127.0.0.1:{port}/v1/models", method="GET")
+        req = urlrequest.Request(f"http://{_mlx_bind_host()}:{port}/v1/models", method="GET")
         with urlrequest.urlopen(req, timeout=timeout) as resp:
             code = getattr(resp, "status", 200)
             return 200 <= int(code) < 300
@@ -740,7 +926,10 @@ def _models_endpoint_ok(port: int, timeout: int = 2) -> bool:
 
 
 def _available_port(data, preferred_range):
-    assigned = {entry.get("port") for entry in data.get("models", {}).values() if entry.get("port")}
+    assigned = set()
+    for port in preferred_range:
+        if _actual_target_for_port(data, port) or _desired_target_for_port(data, port):
+            assigned.add(port)
     for port in preferred_range:
         if port in assigned:
             continue
@@ -797,13 +986,15 @@ def cmd_list(_args):
 
 def cmd_status(_args):
     data = _load_registry(_registry_path())
-    port_map = {entry.get("port"): slug for slug, entry in data["models"].items() if entry.get("port")}
     disabled_map = _launchctl_disabled_map() if getattr(_args, "checks", False) else {}
     rows = []
     for port in PORT_RANGE:
         pids = _port_listening(port)
         proc_pids = _mlx_pids_for_port(port)
-        slug = port_map.get(port)
+        desired = _desired_target_for_port(data, port)
+        actual = _actual_target_for_port(data, port)
+        lane = _lane_state(data, port)
+        slug = actual.get("target_slug") if actual else None
         listener_visible = bool(pids)
         status = "listening" if listener_visible else ("running" if proc_pids else "idle")
         pid_str = ",".join(pids if pids else [str(pid) for pid in proc_pids]) if (pids or proc_pids) else "-"
@@ -814,6 +1005,18 @@ def cmd_status(_args):
         if runtime_cmd:
             runtime_family = _mlx_process_family(runtime_cmd) or "-"
             runtime_model = _runtime_model_path_from_command(runtime_cmd) or "-"
+        http_models_ok = _models_endpoint_ok(port) if getattr(_args, "checks", False) and status != "idle" else None
+        effective_health = lane.get("health_state")
+        effective_reconciliation = lane.get("reconciliation_state")
+        if desired or actual:
+            if http_models_ok is True:
+                effective_health = "serving"
+            elif proc_pids:
+                effective_health = "starting"
+            elif status == "idle":
+                effective_health = "down"
+            if effective_health == "down":
+                effective_reconciliation = "failed"
         row = {
             "port": port,
             "status": status,
@@ -822,9 +1025,14 @@ def cmd_status(_args):
             "runtime_family": runtime_family,
             "runtime_model_path": runtime_model,
             "listener_visible": listener_visible,
+            "desired_target": desired,
+            "actual_serving_target": actual,
+            "last_known_good_target": lane.get("last_known_good_target"),
+            "health_state": effective_health,
+            "reconciliation_state": effective_reconciliation,
         }
         if getattr(_args, "checks", False):
-            row["http_models_ok"] = _models_endpoint_ok(port) if status != "idle" else None
+            row["http_models_ok"] = http_models_ok
         if getattr(_args, "checks", False) and port in TEAM_RANGE:
             lane_state = _lane_launchd_state(port, disabled_map=disabled_map)
             row["launchd_label"] = lane_state["label"]
@@ -895,6 +1103,122 @@ def _is_gpt_oss_entry(entry: dict) -> bool:
 def _is_qwen3_entry(entry: dict) -> bool:
     text = _entry_identity_text(entry)
     return "qwen3" in text or "qwen-3" in text
+
+
+def _load_runtime_profiles() -> dict:
+    path = _runtime_profiles_path()
+    if not path.exists():
+        raise SystemExit(f"missing runtime profile metadata: {path}")
+    payload = _loads_json_or_die(path.read_text(), context=f"runtime profile metadata {path}", default="{}")
+    if int(payload.get("schema_version") or 0) != 1:
+        raise SystemExit(f"unsupported runtime profile schema_version in {path}")
+    profiles = payload.get("profiles")
+    if not isinstance(profiles, dict) or not profiles:
+        raise SystemExit(f"runtime profile metadata missing profiles map: {path}")
+    default_name = payload.get("default_profile")
+    if not isinstance(default_name, str) or not default_name.strip():
+        raise SystemExit(f"runtime profile metadata missing default_profile: {path}")
+    if default_name not in profiles:
+        raise SystemExit(f"default_profile {default_name!r} not found in runtime profiles: {path}")
+    for name, profile in profiles.items():
+        if not isinstance(profile, dict):
+            raise SystemExit(f"runtime profile {name!r} must be an object")
+        for key in (
+            "tool_choice_mode",
+            "auto_tool_choice_policy",
+            "reasoning_parser_policy",
+            "readiness_probe_mode",
+            "readiness_acceptance_predicate",
+            "readiness_max_tokens",
+        ):
+            if key not in profile:
+                raise SystemExit(f"runtime profile {name!r} missing required key {key!r}")
+    return payload
+
+
+def _profile_matches_entry(profile: dict, entry: dict) -> bool:
+    text = _entry_identity_text(entry)
+    any_tokens = [str(token).strip().lower() for token in profile.get("match_any") or [] if str(token).strip()]
+    all_tokens = [str(token).strip().lower() for token in profile.get("match_all") or [] if str(token).strip()]
+    if any_tokens and not any(token in text for token in any_tokens):
+        return False
+    if all_tokens and not all(token in text for token in all_tokens):
+        return False
+    return bool(any_tokens or all_tokens)
+
+
+def _resolve_runtime_profile(entry: dict) -> tuple[str, dict]:
+    runtime_profiles = _load_runtime_profiles()
+    profiles = runtime_profiles["profiles"]
+    explicit = _entry_vllm_value(entry, "profile")
+    if isinstance(explicit, str) and explicit.strip():
+        profile_name = explicit.strip()
+        if profile_name not in profiles:
+            raise SystemExit(f"runtime profile {profile_name!r} not found in {_runtime_profiles_path()}")
+        return profile_name, profiles[profile_name]
+
+    matches = [name for name, profile in profiles.items() if _profile_matches_entry(profile, entry)]
+    if len(matches) > 1:
+        raise SystemExit(
+            f"runtime profile resolution is ambiguous for {entry.get('model_id') or entry.get('repo_id')}: "
+            + ", ".join(sorted(matches))
+        )
+    if len(matches) == 1:
+        return matches[0], profiles[matches[0]]
+    default_name = runtime_profiles["default_profile"]
+    return default_name, profiles[default_name]
+
+
+def _profile_value(entry: dict, key: str, legacy_key: Optional[str] = None):
+    explicit = _entry_vllm_value(entry, key, legacy_key)
+    if explicit is not None:
+        return explicit
+    _name, profile = _resolve_runtime_profile(entry)
+    return profile.get(key)
+
+
+def _default_vllm_trust_remote_code(entry: dict) -> bool:
+    return _coerce_bool(_profile_value(entry, "trust_remote_code"), default=False)
+
+
+def _effective_vllm_chat_template(entry: dict, *, validate: bool = True) -> Optional[str]:
+    explicit = entry.get("chat_template")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    strategy = str(_profile_value(entry, "chat_template_strategy") or "tokenizer").strip().lower()
+    if strategy == "tokenizer":
+        return None
+    local_template = _resolve_local_chat_template(entry)
+    if strategy == "local_if_present":
+        return local_template
+    if strategy == "local_required":
+        if local_template:
+            return local_template
+        if validate:
+            raise SystemExit(
+                f"{_expected_served_model_identity(entry)} runtime profile requires a local chat_template.jinja, "
+                f"but none was found near {entry.get('cache_path')}"
+            )
+        return None
+    if validate:
+        raise SystemExit(
+            f"{_expected_served_model_identity(entry)} runtime profile has unsupported "
+            f"chat_template_strategy={strategy!r}"
+        )
+    return None
+
+
+def _expected_served_model_identity(entry: dict) -> str:
+    explicit = entry.get("served_model_name")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    recommended = _profile_value(entry, "recommended_served_model_name")
+    if isinstance(recommended, str) and recommended.strip() and entry.get("use_profile_served_model_name") is True:
+        return recommended.strip()
+    model_id = entry.get("model_id")
+    if isinstance(model_id, str) and model_id.strip():
+        return model_id.strip()
+    raise SystemExit("registry entry missing model_id/served_model_name")
 
 
 def _resolve_gpt_oss_chat_template(entry: dict) -> Optional[str]:
@@ -1100,15 +1424,8 @@ def _entry_vllm_value(entry: dict, key: str, legacy_key: Optional[str] = None):
 
 
 def _default_vllm_profile(entry: dict) -> str:
-    explicit = _entry_vllm_value(entry, "profile")
-    if isinstance(explicit, str) and explicit.strip():
-        return explicit.strip()
-    text = _entry_identity_text(entry)
-    if "qwen3-next-80b" in text:
-        return "qwen3_main"
-    if "gpt-oss" in text:
-        return "gpt_oss_lane"
-    return "generic"
+    profile_name, _profile = _resolve_runtime_profile(entry)
+    return profile_name
 
 
 def _default_vllm_tool_choice_mode(entry: dict) -> str:
@@ -1117,28 +1434,38 @@ def _default_vllm_tool_choice_mode(entry: dict) -> str:
         lowered = explicit.strip().lower()
         if lowered in {"none", "auto"}:
             return lowered
-    profile = _default_vllm_profile(entry)
-    if profile == "qwen3_main":
-        return "auto"
-    return "none"
+    value = str(_profile_value(entry, "tool_choice_mode") or "none").strip().lower()
+    if value not in {"none", "auto"}:
+        raise SystemExit(f"unsupported tool_choice_mode {value!r} for {_expected_served_model_identity(entry)}")
+    return value
 
 
 def _default_vllm_tool_parser(entry: dict) -> Optional[str]:
     explicit = _entry_vllm_value(entry, "tool_call_parser", "tool_call_parser")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
-    if _default_vllm_profile(entry) == "qwen3_main":
-        return "qwen3"
-    return None
+    value = _profile_value(entry, "tool_call_parser")
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def _default_vllm_reasoning_parser(entry: dict) -> Optional[str]:
     explicit = _entry_vllm_value(entry, "reasoning_parser", "reasoning_parser")
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
-    if _default_vllm_profile(entry) == "qwen3_main":
-        return "qwen3"
-    return None
+    value = _profile_value(entry, "reasoning_parser")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _coerce_optional_parser_override(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"none", "null", "unset"}:
+            return None
+        if lowered:
+            return value.strip()
+    return value
 
 
 def _default_vllm_max_model_len(entry: dict) -> int:
@@ -1231,12 +1558,18 @@ def _detect_vllm_capabilities(vllm_bin: Optional[str] = None) -> dict:
     match = re.search(r"--tool-call-parser\s+\{([^}]*)\}", text)
     if match:
         parser_choices = [item.strip() for item in match.group(1).split(",") if item.strip()]
+    reasoning_choices = []
+    reasoning_match = re.search(r"--reasoning-parser\s+\{([^}]*)\}", text)
+    if reasoning_match:
+        reasoning_choices = [item.strip() for item in reasoning_match.group(1).split(",") if item.strip()]
     return {
         "vllm_bin": argv[0],
         "supports_auto_tool_choice": "--enable-auto-tool-choice" in text,
         "supports_tool_call_parser": "--tool-call-parser" in text,
         "supports_reasoning_parser": "--reasoning-parser" in text,
+        "supports_default_chat_template_kwargs": "--default-chat-template-kwargs" in text,
         "tool_call_parsers": parser_choices,
+        "reasoning_parsers": reasoning_choices,
     }
 
 
@@ -1250,26 +1583,58 @@ def _resolve_tool_call_parser(logical: str, capabilities: dict) -> Optional[str]
     return None
 
 
+def _default_vllm_chat_template_kwargs(entry: dict) -> Optional[dict]:
+    explicit = _entry_vllm_value(entry, "chat_template_kwargs")
+    if isinstance(explicit, dict):
+        return explicit
+    if isinstance(explicit, str) and explicit.strip():
+        try:
+            parsed = json.loads(explicit)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(
+                f"{_expected_served_model_identity(entry)} has invalid vllm.chat_template_kwargs JSON: {exc}"
+            )
+        if not isinstance(parsed, dict):
+            raise SystemExit(f"{_expected_served_model_identity(entry)} vllm.chat_template_kwargs must decode to an object")
+        return parsed
+
+    top_level = entry.get("chat_template_args")
+    if isinstance(top_level, dict):
+        return top_level
+    if isinstance(top_level, str) and top_level.strip():
+        try:
+            parsed = json.loads(top_level)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"{_expected_served_model_identity(entry)} has invalid chat_template_args JSON: {exc}")
+        if not isinstance(parsed, dict):
+            raise SystemExit(f"{_expected_served_model_identity(entry)} chat_template_args must decode to an object")
+        return parsed
+
+    profile_value = _profile_value(entry, "chat_template_kwargs")
+    if isinstance(profile_value, dict):
+        return profile_value
+    return None
+
+
 def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, *, validate: bool = True) -> dict:
     model_path = entry.get("cache_path")
     if not model_path:
         raise SystemExit("registry entry missing cache_path for vllm launch")
-    served_model_name = entry.get("served_model_name") or entry.get("model_id")
-    if not served_model_name:
-        raise SystemExit("registry entry missing model_id/served_model_name for vllm launch")
+    profile_name, profile = _resolve_runtime_profile(entry)
+    served_model_name = _expected_served_model_identity(entry)
     entry = dict(entry)
     entry.setdefault("served_model_name", served_model_name)
     entry.setdefault("port", port)
-    lane_api_key = ""
-    if validate:
-        _, lane_api_key = _validated_lane_api_key(entry)
-    else:
-        _, lane_api_key = _resolve_lane_api_key(entry)
     memory_fraction = _validated_vllm_memory_fraction(entry) if validate else _default_vllm_memory_fraction(entry).strip().lower()
+    trust_remote_code = _default_vllm_trust_remote_code(entry)
+    chat_template = _effective_vllm_chat_template(entry, validate=validate)
 
     tool_choice_mode = _default_vllm_tool_choice_mode(entry)
     if tool_choice_mode not in {"none", "auto"}:
         raise SystemExit(f"unsupported vllm tool_choice_mode={tool_choice_mode!r} for {served_model_name}")
+    auto_policy = str(profile.get("auto_tool_choice_policy") or "allowed").strip().lower()
+    if tool_choice_mode == "auto" and auto_policy == "forbidden":
+        raise SystemExit(f"{served_model_name} runtime profile forbids auto tool choice")
 
     argv = [
         capabilities["vllm_bin"],
@@ -1284,8 +1649,17 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         "--max-model-len",
         str(_default_vllm_max_model_len(entry)),
     ]
-    if lane_api_key:
-        argv += ["--api-key", lane_api_key]
+    if trust_remote_code:
+        argv += ["--trust-remote-code"]
+    if chat_template:
+        argv += ["--chat-template", chat_template]
+    chat_template_kwargs = _default_vllm_chat_template_kwargs(entry)
+    if chat_template_kwargs is not None:
+        if validate and not capabilities.get("supports_default_chat_template_kwargs"):
+            raise SystemExit(
+                f"{served_model_name} requires default_chat_template_kwargs, but vLLM lacks --default-chat-template-kwargs"
+            )
+        argv += ["--default-chat-template-kwargs", json.dumps(chat_template_kwargs, sort_keys=True)]
     if _default_vllm_async_scheduling(entry):
         argv += ["--async-scheduling"]
     else:
@@ -1313,7 +1687,20 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         argv += ["--tool-call-parser", parser_resolved]
 
     reasoning_parser = _default_vllm_reasoning_parser(entry)
+    reasoning_policy = str(profile.get("reasoning_parser_policy") or "optional").strip().lower()
+    reasoning_choices = set(capabilities.get("reasoning_parsers") or [])
     explicit_reasoning = "reasoning_parser" in _entry_vllm_config(entry)
+    if reasoning_policy == "forbidden" and reasoning_parser:
+        raise SystemExit(f"{served_model_name} runtime profile forbids a reasoning parser")
+    if reasoning_policy == "required" and not reasoning_parser:
+        raise SystemExit(f"{served_model_name} runtime profile requires a reasoning parser")
+    if reasoning_parser and validate and not capabilities.get("supports_reasoning_parser"):
+        raise SystemExit(f"{served_model_name} requires reasoning_parser={reasoning_parser!r}, but vLLM lacks --reasoning-parser")
+    if reasoning_parser and validate and reasoning_choices and reasoning_parser not in reasoning_choices:
+        raise SystemExit(
+            f"{served_model_name} reasoning_parser={reasoning_parser!r} unsupported by current vLLM reasoning parser set: "
+            + ", ".join(sorted(reasoning_choices))
+        )
     if reasoning_parser and capabilities.get("supports_reasoning_parser") and (tool_choice_mode == "auto" or explicit_reasoning):
         argv += ["--reasoning-parser", reasoning_parser]
 
@@ -1327,7 +1714,13 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         "tool_call_parser_logical": parser_logical,
         "tool_call_parser_resolved": parser_resolved,
         "reasoning_parser": reasoning_parser,
-        "profile": _default_vllm_profile(entry),
+        "trust_remote_code": trust_remote_code,
+        "chat_template": chat_template,
+        "chat_template_kwargs": chat_template_kwargs,
+        "profile": profile_name,
+        "readiness_probe_mode": str(profile.get("readiness_probe_mode") or "chat_basic"),
+        "readiness_acceptance_predicate": str(profile.get("readiness_acceptance_predicate") or "assistant_text_or_tool_calls"),
+        "readiness_max_tokens": int(profile.get("readiness_max_tokens") or (64 if str(profile.get("readiness_probe_mode") or "chat_basic") == "chat_tool_noop" else 32)),
         "max_model_len": _default_vllm_max_model_len(entry),
         "async_scheduling": _default_vllm_async_scheduling(entry),
     }
@@ -1354,6 +1747,303 @@ def _default_startup_timeout(entry: dict) -> int:
     return 180
 
 
+def _runtime_python_from_vllm_bin(vllm_bin: str) -> str:
+    candidate = Path(vllm_bin).resolve().with_name("python")
+    if candidate.exists():
+        return str(candidate)
+    fallback = shutil.which("python3")
+    if not fallback:
+        raise SystemExit("python3 not found for vLLM runtime preflight")
+    return fallback
+
+
+def _profile_requires_chat_template(entry: dict) -> bool:
+    mode = str(_profile_value(entry, "chat_template_mode") or "tokenizer").strip().lower()
+    return mode not in {"none", "disabled"}
+
+
+def _preflight_family_runtime(entry: dict, capabilities: dict) -> dict:
+    profile_name, profile = _resolve_runtime_profile(entry)
+    tool_choice_mode = _default_vllm_tool_choice_mode(entry)
+    parser = _default_vllm_tool_parser(entry)
+    reasoning = _default_vllm_reasoning_parser(entry)
+    if tool_choice_mode == "auto":
+        if not capabilities.get("supports_auto_tool_choice"):
+            raise SystemExit(f"{_expected_served_model_identity(entry)} requires auto tool choice, but vLLM does not support it")
+        if not parser:
+            raise SystemExit(f"{_expected_served_model_identity(entry)} requires tool_choice_mode=auto but no tool_call_parser resolved")
+        resolved = _resolve_tool_call_parser(parser, capabilities)
+        if not resolved:
+            raise SystemExit(f"{_expected_served_model_identity(entry)} tool_call_parser={parser!r} unsupported by current vLLM runtime")
+    reasoning_choices = set(capabilities.get("reasoning_parsers") or [])
+    if reasoning and reasoning_choices and reasoning not in reasoning_choices:
+        raise SystemExit(
+            f"{_expected_served_model_identity(entry)} reasoning_parser={reasoning!r} unsupported by current vLLM runtime"
+        )
+    return {"profile_name": profile_name, "profile": profile, "tool_choice_mode": tool_choice_mode, "tool_call_parser": parser, "reasoning_parser": reasoning}
+
+
+def _preflight_architecture(entry: dict, capabilities: dict) -> dict:
+    cache_path = entry.get("cache_path")
+    if not cache_path:
+        raise SystemExit("registry entry missing cache_path for preflight")
+    vllm_bin = capabilities.get("vllm_bin") or os.environ.get("MLX_VLLM_BIN", DEFAULT_VLLM_BIN)
+    runtime_python = _runtime_python_from_vllm_bin(vllm_bin)
+    script = """
+import json
+import sys
+from transformers import AutoConfig, AutoTokenizer
+
+path = sys.argv[1]
+require_chat = sys.argv[2] == "1"
+summary = {"config_ok": False, "tokenizer_ok": False, "chat_template_ok": False}
+AutoConfig.from_pretrained(path)
+summary["config_ok"] = True
+tok = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
+summary["tokenizer_ok"] = True
+if require_chat:
+    if not hasattr(tok, "apply_chat_template"):
+        raise SystemExit("tokenizer lacks apply_chat_template")
+    tok.apply_chat_template([{"role": "user", "content": "ping"}], tokenize=False, add_generation_prompt=True)
+    summary["chat_template_ok"] = True
+print(json.dumps(summary))
+"""
+    result = subprocess.run(
+        [runtime_python, "-c", script, str(cache_path), "1" if _profile_requires_chat_template(entry) else "0"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip() or (result.stdout or "").strip()
+        raise SystemExit(stderr or "runtime preflight failed")
+    return _loads_json_or_die(result.stdout, context="runtime architecture preflight", default="{}")
+
+
+def _models_endpoint_payload(port: int, timeout: int = 2) -> dict:
+    try:
+        req = urlrequest.Request(f"http://{_mlx_bind_host()}:{port}/v1/models", method="GET")
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            payload = json.loads(body)
+            ids = []
+            for row in payload.get("data") or []:
+                if isinstance(row, dict):
+                    model_id = row.get("id")
+                    if model_id:
+                        ids.append(str(model_id))
+            return {"ok": 200 <= int(getattr(resp, "status", 200)) < 300, "ids": ids, "payload": payload}
+    except Exception as exc:
+        return {"ok": False, "ids": [], "error": str(exc)}
+
+
+def _message_has_nonempty_content(message) -> bool:
+    if not isinstance(message, dict):
+        return False
+    content = message.get("content")
+    if isinstance(content, str):
+        return bool(content.strip())
+    if isinstance(content, list):
+        return bool(content)
+    return False
+
+
+def _message_has_structured_tool_calls(message) -> bool:
+    if not isinstance(message, dict):
+        return False
+    tool_calls = message.get("tool_calls")
+    return isinstance(tool_calls, list) and bool(tool_calls)
+
+
+def _message_has_named_tool_call(message, tool_name: str) -> bool:
+    if not isinstance(message, dict):
+        return False
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list) or not tool_calls:
+        return False
+    first = tool_calls[0]
+    if not isinstance(first, dict):
+        return False
+    function = first.get("function")
+    if not isinstance(function, dict):
+        return False
+    return function.get("name") == tool_name
+
+
+def _chat_probe_payload(model: str, probe_mode: str, *, max_tokens: int) -> dict:
+    if probe_mode == "chat_tool_noop":
+        return {
+            "model": model,
+            "messages": [{"role": "user", "content": "Use the noop tool once, then stop."}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "noop",
+                        "description": "A no-op tool for readiness probes.",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                }
+            ],
+            "tool_choice": "auto",
+            "stream": False,
+            "max_tokens": max_tokens,
+        }
+    return {
+        "model": model,
+        "messages": [{"role": "user", "content": "Reply briefly."}],
+        "stream": False,
+        "max_tokens": max_tokens,
+    }
+
+
+def _chat_probe_accepts(message: dict, predicate: str, probe_mode: str) -> bool:
+    if predicate == "structured_tool_calls":
+        return _message_has_structured_tool_calls(message)
+    if predicate == "noop_tool_call":
+        if probe_mode != "chat_tool_noop":
+            return _message_has_structured_tool_calls(message)
+        return _message_has_named_tool_call(message, "noop")
+    return _message_has_nonempty_content(message) or _message_has_structured_tool_calls(message)
+
+
+def _chat_completion_probe(port: int, model: str, *, probe_mode: str, predicate: str, max_tokens: int, timeout: int = 8) -> dict:
+    payload = _chat_probe_payload(model, probe_mode, max_tokens=max_tokens)
+    try:
+        req = urlrequest.Request(
+            f"http://{_mlx_bind_host()}:{port}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8")
+            response = json.loads(body)
+            choices = response.get("choices")
+            if not isinstance(choices, list) or not choices:
+                return {"ok": False, "verdict": "missing choices", "response": response}
+            message = choices[0].get("message")
+            if not isinstance(message, dict):
+                return {"ok": False, "verdict": "missing assistant message", "response": response}
+            if not _chat_probe_accepts(message, predicate, probe_mode):
+                return {"ok": False, "verdict": "completion did not satisfy readiness acceptance predicate", "response": response}
+            return {"ok": True, "response": response}
+    except Exception as exc:
+        return {"ok": False, "verdict": str(exc)}
+
+
+def _stderr_log_path_for_port(port: int) -> Path:
+    if port in TEAM_RANGE:
+        return Path(f"/Users/thestudio/vllm-{port}.err.log")
+    return Path(f"/tmp/mlx-{port}.log")
+
+
+def _tail_text(path: Path, lines: int = 40) -> str:
+    if not path.exists():
+        return ""
+    raw = path.read_text(errors="replace").splitlines()
+    return "\n".join(raw[-lines:])
+
+
+def _failure_diagnostics(port: int, entry: dict, compiled: Optional[dict], verdict: str, phase: str) -> dict:
+    label = _lane_label(port) if port in TEAM_RANGE else None
+    stderr_path = _stderr_log_path_for_port(port)
+    actual_target = None
+    try:
+        data = _load_registry(_registry_path())
+        actual_target = _actual_target_for_port(data, port)
+    except Exception:
+        actual_target = None
+    models = _models_endpoint_payload(port)
+    return {
+        "time": _timestamp_utc(),
+        "phase": phase,
+        "requested_target": _target_record_from_entry(entry.get("model_id") or "", entry),
+        "actual_serving_target_at_failure": actual_target,
+        "expected_served_model_identity": _expected_served_model_identity(entry),
+        "observed_served_model_identity": (models.get("ids") or [None])[0],
+        "verdict": verdict,
+        "launchd_label": label,
+        "runtime_venv": _runtime_python_from_vllm_bin((compiled or {}).get("argv", [os.environ.get("MLX_VLLM_BIN", DEFAULT_VLLM_BIN)])[0]),
+        "stderr_log_path": str(stderr_path),
+        "stderr_tail": _tail_text(stderr_path),
+        "critical_argv": list((compiled or {}).get("argv") or []),
+    }
+
+
+def _format_failure_report(port: int, failure: dict) -> str:
+    critical_argv = " ".join(shlex.quote(token) for token in failure.get("critical_argv") or [])
+    stderr_tail = failure.get("stderr_tail") or "(empty)"
+    observed = failure.get("observed_served_model_identity") or "-"
+    requested = failure.get("requested_target") or {}
+    actual = failure.get("actual_serving_target_at_failure") or {}
+    return (
+        f"lane {port} failed during {failure.get('phase')}.\n"
+        f"requested target: {requested.get('target_slug')} ({requested.get('repo_id')})\n"
+        f"expected served model identity: {failure.get('expected_served_model_identity')}\n"
+        f"actual serving target at failure: {actual.get('target_slug') or '-'}\n"
+        f"observed served model identity: {observed}\n"
+        f"launchd label: {failure.get('launchd_label') or '-'}\n"
+        f"runtime venv: {failure.get('runtime_venv')}\n"
+        f"stderr log: {failure.get('stderr_log_path')}\n"
+        f"critical argv: {critical_argv or '-'}\n"
+        f"verdict: {failure.get('verdict')}\n"
+        f"stderr tail:\n{stderr_tail}"
+    )
+
+
+def _wait_for_vllm_readiness(port: int, entry: dict, compiled: dict, *, timeout: int) -> dict:
+    expected_identity = _expected_served_model_identity(entry)
+    probe_mode = compiled.get("readiness_probe_mode") or "chat_basic"
+    predicate = compiled.get("readiness_acceptance_predicate") or "assistant_text_or_tool_calls"
+    max_tokens = int(compiled.get("readiness_max_tokens") or (64 if probe_mode == "chat_tool_noop" else 32))
+    prior_pids = None
+    consecutive = 0
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        lane_state = _lane_launchd_state(port) if port in TEAM_RANGE else {"loaded": True, "disabled": False}
+        pids = tuple(sorted(_mlx_pids_for_port(port)))
+        stable = bool(pids) and (prior_pids is None or pids == prior_pids)
+        models = _models_endpoint_payload(port)
+        identity_ok = models.get("ok") and expected_identity in (models.get("ids") or [])
+        chat = _chat_completion_probe(
+            port,
+            expected_identity,
+            probe_mode=probe_mode,
+            predicate=predicate,
+            max_tokens=max_tokens,
+        ) if identity_ok and stable else {"ok": False, "verdict": "identity or process stability gate not yet satisfied"}
+        pass_ok = (
+            lane_state.get("disabled") is not True
+            and lane_state.get("loaded") is not False
+            and stable
+            and identity_ok
+            and chat.get("ok") is True
+        )
+        if pass_ok:
+            consecutive += 1
+            if consecutive >= 2:
+                return {
+                    "ok": True,
+                    "pids": list(pids),
+                    "served_model_identity": expected_identity,
+                    "models": models,
+                    "chat": chat,
+                }
+        else:
+            consecutive = 0
+        prior_pids = pids if pids else prior_pids
+        time.sleep(2)
+    verdict = chat.get("verdict") if isinstance(chat, dict) else "timed out before readiness probe passed"
+    return {
+        "ok": False,
+        "verdict": verdict or "timed out before readiness probe passed",
+        "models": models,
+        "chat": chat,
+        "pids": list(prior_pids or []),
+    }
+
+
 def _render_vllm_launch_start_script() -> str:
     return """#!/bin/zsh
 set -euo pipefail
@@ -1362,7 +2052,7 @@ cd /opt/mlx-launch
 export PATH="/opt/homebrew/bin:/Users/thestudio/.local/bin:/Users/thestudio/.venv-vllm-metal/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 REGISTRY_PATH="${MLX_REGISTRY_PATH:-/Users/thestudio/models/hf/hub/registry.json}"
-HOST="${MLX_BIND_HOST:-0.0.0.0}"
+HOST="${MLX_BIND_HOST:-192.168.1.72}"
 LOG_DIR="${MLX_VLLM_LOG_DIR:-/Users/thestudio}"
 VLLM_BIN="${MLX_VLLM_BIN:-/Users/thestudio/.venv-vllm-metal/bin/vllm}"
 
@@ -1671,7 +2361,7 @@ def _launch_server(entry, port: int):
 
 
 def _restart_team_lane(port: int):
-    cmd_mlx_launch_start(argparse.Namespace(ports=str(port)))
+    cmd_mlx_launch_start(argparse.Namespace(ports=str(port), allow_partial=True))
 
 
 def _stop_team_lane(port: int):
@@ -1697,30 +2387,49 @@ def cmd_load(args):
         else:
             raise SystemExit("load cancelled")
 
-    running_pids = _mlx_pids_for_port(port)
-    if running_pids or _port_listening(port):
-        if args.force:
-            cmd_unload(argparse.Namespace(port=str(port), sync=False))
-        else:
-            slug, _entry = _model_on_port(data, port)
-            model_name = slug if slug else "unknown"
-            if not _prompt_yes_no(f"model {model_name} already in port {port}. Unload model?"):
-                raise SystemExit("load cancelled")
-            cmd_unload(argparse.Namespace(port=str(port), sync=False))
-
     slug, entry = _find_entry(data, args.model)
     converted = False
     if not entry:
         slug, entry, converted = _ensure_model(data, args.model, args.name, args.convert, args.preconverted)
     _ensure_defaults(entry)
 
-    if entry.get("port") and entry.get("port") != port:
+    actual_target = _actual_target_for_port(data, port)
+    desired_target = _desired_target_for_port(data, port)
+    running_pids = _mlx_pids_for_port(port)
+    assigned_slug = actual_target.get("target_slug") if actual_target else None
+    port_occupied = bool(running_pids or _port_listening(port) or assigned_slug or desired_target)
+    if port_occupied and not args.force:
+        model_name = assigned_slug or (desired_target or {}).get("target_slug") or "unknown"
+        if not _prompt_yes_no(f"model {model_name} already targeted for port {port}. Replace it?"):
+            raise SystemExit("load cancelled")
+
+    if entry.get("port") and int(entry.get("port")) != port:
         raise SystemExit(f"model already assigned to port {entry['port']}; unload first")
 
     team_port = port in TEAM_RANGE
+    capabilities = _detect_vllm_capabilities() if team_port or os.environ.get("MLX_BACKEND", "vllm-metal").strip() in {"vllm-metal", "vllm", "vllm_metal"} else None
+    compiled = _compile_vllm_launch(entry, port, "127.0.0.1" if team_port else "0.0.0.0", capabilities, validate=True) if capabilities else None
+    target = _target_record_from_entry(slug, entry)
 
-    entry["port"] = port
+    _set_lane_desired_target(data, port, target, transition_state="transitioning")
     _write_registry(registry_path, data)
+
+    try:
+        arch = _preflight_architecture(entry, capabilities) if capabilities else {}
+        family = _preflight_family_runtime(entry, capabilities) if capabilities else {}
+    except SystemExit as exc:
+        health = "serving" if actual_target else "down"
+        failure = _failure_diagnostics(port, entry, compiled, str(exc), "preflight")
+        failure["preflight_summary"] = {"architecture": arch if "arch" in locals() else {}, "family_runtime": family if "family" in locals() else {}}
+        _record_lane_failure(data, port, health_state=health, failure=failure)
+        _write_registry(registry_path, data)
+        raise SystemExit(_format_failure_report(port, failure))
+
+    old_actual = actual_target
+    if old_actual:
+        _clear_model_port_assignments(data, port)
+        _set_lane_actual_target(data, port, None, health_state="down", served_model_identity=None)
+        _write_registry(registry_path, data)
 
     if team_port:
         _restart_team_lane(port)
@@ -1728,11 +2437,24 @@ def cmd_load(args):
         _launch_server(entry, port)
 
     startup_timeout = _default_startup_timeout(entry)
-    if not _wait_for_port(port, timeout=startup_timeout):
-        raise SystemExit(
-            f"model failed to start on port {port} within {startup_timeout}s "
-            f"(set registry startup_timeout_seconds to override)"
-        )
+    readiness = _wait_for_vllm_readiness(port, entry, compiled, timeout=startup_timeout) if compiled else {"ok": _wait_for_port(port, timeout=startup_timeout)}
+    if not readiness.get("ok"):
+        failure = _failure_diagnostics(port, entry, compiled, readiness.get("verdict") or f"model failed to reach readiness within {startup_timeout}s", "readiness")
+        if compiled:
+            failure["preflight_summary"] = {"architecture": arch, "family_runtime": family}
+        _record_lane_failure(data, port, health_state="down", failure=failure)
+        _write_registry(registry_path, data)
+        raise SystemExit(_format_failure_report(port, failure))
+
+    _set_model_port_assignment(data, slug, port)
+    _set_lane_actual_target(
+        data,
+        port,
+        target,
+        health_state="serving",
+        served_model_identity=readiness.get("served_model_identity") or _expected_served_model_identity(entry),
+    )
+    _write_registry(registry_path, data)
 
     if _is_gpt_oss_entry(entry):
         model_name = entry.get("model_id") or slug
@@ -1758,17 +2480,22 @@ def cmd_load(args):
 
 def cmd_unload(args):
     port = _parse_port_arg(args.port, arg_name="port", valid_range=PORT_RANGE, range_label="8100-8139")
+    registry_path = _registry_path()
+    data = _load_registry(registry_path)
 
     if port in TEAM_RANGE:
         _stop_team_lane(port)
     else:
         _stop_mlx_for_port(port)
 
-    registry_path = _registry_path()
-    data = _load_registry(registry_path)
-    for entry in data["models"].values():
-        if entry.get("port") == port:
-            entry["port"] = None
+    _clear_model_port_assignments(data, port)
+    lane = _lane_state(data, port)
+    lane["desired_target"] = None
+    lane["actual_serving_target"] = None
+    lane["actual_served_model_identity"] = None
+    lane["health_state"] = "down"
+    lane["reconciliation_state"] = "converged"
+    lane["last_transition_time"] = _timestamp_utc()
     _write_registry(registry_path, data)
     if args.sync:
         cmd_sync_gateway(argparse.Namespace(dry_run=False))
@@ -1799,9 +2526,14 @@ def cmd_unload_all(args):
             _stop_team_lane(port)
         else:
             _stop_mlx_for_port(port)
-        for entry in data["models"].values():
-            if entry.get("port") == port:
-                entry["port"] = None
+        _clear_model_port_assignments(data, port)
+        lane = _lane_state(data, port)
+        lane["desired_target"] = None
+        lane["actual_serving_target"] = None
+        lane["actual_served_model_identity"] = None
+        lane["health_state"] = "down"
+        lane["reconciliation_state"] = "converged"
+        lane["last_transition_time"] = _timestamp_utc()
     _write_registry(registry_path, data)
     if args.sync:
         cmd_sync_gateway(argparse.Namespace(dry_run=False))
@@ -1874,6 +2606,10 @@ def cmd_verify(_args):
     changed = False
     capabilities = None
     disabled_map = _launchctl_disabled_map()
+    try:
+        _load_runtime_profiles()
+    except SystemExit as exc:
+        missing.append(f"runtime profiles invalid: {exc}")
     for slug, entry in data["models"].items():
         if getattr(_args, "fix_defaults", False):
             if _ensure_defaults(entry):
@@ -1937,6 +2673,25 @@ def cmd_verify(_args):
                     _compile_vllm_launch(check_entry, int(port), "0.0.0.0", capabilities, validate=True)
                 except SystemExit as exc:
                     missing.append(f"{slug}: invalid vllm launch config: {exc}")
+    for port in TEAM_RANGE:
+        lane = _lane_state(data, port)
+        for label, target in (
+            ("desired", lane.get("desired_target")),
+            ("actual", lane.get("actual_serving_target")),
+            ("last_known_good", lane.get("last_known_good_target")),
+        ):
+            if not target:
+                continue
+            target_slug = target.get("target_slug")
+            if target_slug not in data.get("models", {}):
+                missing.append(f"lane {port}: {label} target missing from models: {target_slug}")
+        if _models_endpoint_ok(port, timeout=2):
+            actual = lane.get("actual_serving_target")
+            reconciliation = str(lane.get("reconciliation_state") or "")
+            if not actual:
+                missing.append(f"lane {port}: serving endpoint is healthy but actual_serving_target is null")
+            if reconciliation != "converged":
+                missing.append(f"lane {port}: serving endpoint is healthy but reconciliation_state={reconciliation!r}")
     for port, slugs in sorted(port_to_models.items()):
         if len(slugs) > 1:
             missing.append(f"port {port}: multiple registry assignments ({', '.join(sorted(slugs))})")
@@ -2134,7 +2889,7 @@ def _apply_port_map(assignments, studio_ssh: str, sync: bool):
 
 
 def cmd_assign_team(args):
-    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
     handles_path = Path(os.environ.get("HANDLES_PATH", DEFAULT_HANDLES_PATH))
     registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
 
@@ -2200,12 +2955,18 @@ def cmd_studio_cli_sha(_args):
 
 def cmd_sync_studio_cli(_args):
     local_path = Path(__file__).resolve()
+    local_profiles = _runtime_profiles_path()
+    if not local_profiles.exists():
+        raise SystemExit(f"runtime profile metadata missing locally: {local_profiles}")
     studio_host = _studio_ssh_target()
     studio_cmd = os.environ.get("STUDIO_MLXCTL", "/Users/thestudio/bin/mlxctl")
+    studio_profiles = str(Path(studio_cmd).with_name(DEFAULT_RUNTIME_PROFILES))
     stamp = int(time.time())
     backup = f"{studio_cmd}.bak-{stamp}"
     tmp = f"/tmp/mlxctl.sync.{stamp}"
+    tmp_profiles = f"/tmp/mlxctl.profiles.sync.{stamp}"
     payload = local_path.read_bytes()
+    profiles_payload = local_profiles.read_bytes()
     remote = (
         "set -euo pipefail; "
         f"cat > {shlex.quote(tmp)}; "
@@ -2214,6 +2975,13 @@ def cmd_sync_studio_cli(_args):
         f"rm -f {shlex.quote(tmp)}"
     )
     _ssh_cmd(studio_host, remote, input_bytes=payload, check=True)
+    remote_profiles = (
+        "set -euo pipefail; "
+        f"cat > {shlex.quote(tmp_profiles)}; "
+        f"install -m 0644 {shlex.quote(tmp_profiles)} {shlex.quote(studio_profiles)}; "
+        f"rm -f {shlex.quote(tmp_profiles)}"
+    )
+    _ssh_cmd(studio_host, remote_profiles, input_bytes=profiles_payload, check=True)
     local_sha = _sha256_path(local_path)
     remote_sha = _studio_cli_sha(studio_host, studio_cmd)
     if remote_sha != local_sha:
@@ -2225,6 +2993,7 @@ def cmd_sync_studio_cli(_args):
                 "studio_host": _studio_host_label(),
                 "studio_ssh_target": studio_host,
                 "studio_path": studio_cmd,
+                "studio_profiles_path": studio_profiles,
                 "backup": backup,
                 "sha256": local_sha,
             },
@@ -2283,24 +3052,6 @@ def _resolve_lane_api_key(entry: dict, env_assignments: Optional[dict[str, str]]
             env_assignments = _read_env_assignments(_gateway_env_local_path())
         value = env_assignments.get(env_name, "")
     return env_name, str(value).strip()
-
-
-def _is_blank_or_dummy_auth(value: Optional[str]) -> bool:
-    normalized = str(value or "").strip()
-    return not normalized or normalized.lower() == "dummy"
-
-
-def _validated_lane_api_key(entry: dict, env_assignments: Optional[dict[str, str]] = None) -> tuple[str, str]:
-    env_name, value = _resolve_lane_api_key(entry, env_assignments=env_assignments)
-    if _is_blank_or_dummy_auth(value):
-        handle = _lane_handle_for_entry(entry)
-        port = entry.get("port")
-        lane_text = f"{handle} on {port}" if port else handle
-        raise SystemExit(
-            f"{lane_text} requires non-dummy {env_name} in "
-            "layer-gateway/litellm-orch/config/env.local or the current environment"
-        )
-    return env_name, value
 
 _EP_PORT_RE = re.compile(r"^ep_mlx_(?:omni|slot)_(\d+)$")
 
@@ -2491,15 +3242,6 @@ def _update_env_local(path: Path, mlx_entries, host: str):
         handle = item["handle"]
         block.append(f"{_env_key(handle, 'MODEL')}=openai/{handle}")
     block.append("")
-    block.append("# API keys for active MLX team lanes (required when backend auth is enforced)")
-    for item in mlx_entries:
-        handle = item["handle"]
-        key_name = _env_key(handle, "API_KEY")
-        key_value = os.environ.get(key_name, existing.get(key_name, "")).strip()
-        if key_value.lower() == "dummy":
-            key_value = ""
-        block.append(f"{key_name}={key_value}")
-    block.append("")
     block.append("# Swap endpoint defaults (kept aligned with the MLX backend)")
     swap_api_base = single_api_base or f"http://{host}:{default_omni_port}/v1"
     block.append(f"SWAP_API_BASE={swap_api_base}")
@@ -2587,7 +3329,7 @@ def cmd_sync_gateway(args):
         subprocess.run(["ssh", gateway_host] + remote_cmd, check=False)
         return
 
-    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
     registry_path = os.environ.get("MLX_REGISTRY_PATH", DEFAULT_REGISTRY)
     registry = _fetch_registry_from_studio(studio_ssh, registry_path)
     handles_rows = _read_handles_jsonl(handles_path)
@@ -2830,18 +3572,23 @@ def _render_vllm_rows_for_ports(target_ports: list[int], *, host: str, validate:
     data = _load_registry(_registry_path())
     capabilities = _detect_vllm_capabilities()
     rows = []
-    for slug, entry in (data.get("models") or {}).items():
-        port = entry.get("port")
-        try:
-            port = int(port)
-        except Exception:
-            continue
+    candidate_ports = target_ports or list(TEAM_RANGE)
+    for port in candidate_ports:
         if port not in TEAM_RANGE:
             continue
-        if target_ports and port not in target_ports:
+        target = _boot_target_for_port(data, port)
+        if not target:
+            continue
+        slug = target.get("target_slug")
+        entry = (data.get("models") or {}).get(slug)
+        if not entry:
+            if validate:
+                raise SystemExit(f"team lane {port} boot target {slug!r} missing from registry models")
             continue
         model_path = entry.get("cache_path")
         if not model_path or not Path(model_path).exists():
+            if validate:
+                raise SystemExit(f"team lane {port} boot target {slug!r} missing cache_path")
             continue
         compiled = _compile_vllm_launch(entry, port, host, capabilities, validate=validate)
         rows.append(
@@ -2857,6 +3604,13 @@ def _render_vllm_rows_for_ports(target_ports: list[int], *, host: str, validate:
                 "tool_call_parser_logical": compiled["tool_call_parser_logical"],
                 "tool_call_parser_resolved": compiled["tool_call_parser_resolved"],
                 "reasoning_parser": compiled["reasoning_parser"],
+                "trust_remote_code": compiled["trust_remote_code"],
+                "chat_template": compiled["chat_template"],
+                "chat_template_kwargs": compiled.get("chat_template_kwargs"),
+                "served_model_name": _expected_served_model_identity(entry),
+                "readiness_probe_mode": compiled["readiness_probe_mode"],
+                "readiness_acceptance_predicate": compiled["readiness_acceptance_predicate"],
+                "readiness_max_tokens": compiled["readiness_max_tokens"],
             }
         )
     rows.sort(key=lambda row: row["port"])
@@ -2872,13 +3626,16 @@ def cmd_vllm_capabilities(args):
     print(f"supports_auto_tool_choice={caps.get('supports_auto_tool_choice')}")
     print(f"supports_tool_call_parser={caps.get('supports_tool_call_parser')}")
     print(f"supports_reasoning_parser={caps.get('supports_reasoning_parser')}")
+    print(f"supports_default_chat_template_kwargs={caps.get('supports_default_chat_template_kwargs')}")
     parsers = caps.get("tool_call_parsers") or []
     print("tool_call_parsers=" + (",".join(parsers) if parsers else "(none)"))
+    reasoning = caps.get("reasoning_parsers") or []
+    print("reasoning_parsers=" + (",".join(reasoning) if reasoning else "(none)"))
 
 
 def cmd_vllm_render(args):
     target_ports = _resolve_team_target_ports(getattr(args, "ports", ""))
-    host = os.environ.get("MLX_BIND_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    host = _mlx_bind_host()
     payload = _render_vllm_rows_for_ports(target_ports, host=host, validate=bool(getattr(args, "validate", False)))
     if getattr(args, "json", False):
         print(json.dumps(payload, indent=2))
@@ -2890,7 +3647,8 @@ def cmd_vllm_render(args):
     for row in rows:
         print(
             f"{row['port']}\t{row['model']}\tprofile={row['profile']}\t"
-            f"tool_choice={row['tool_choice_mode']}\tparser={row['tool_call_parser_resolved'] or '-'}"
+            f"tool_choice={row['tool_choice_mode']}\tparser={row['tool_call_parser_resolved'] or '-'}\t"
+            f"readiness={row['readiness_probe_mode']}@{row['readiness_max_tokens']}"
         )
         print("  " + " ".join(shlex.quote(token) for token in row["argv"]))
 
@@ -2927,6 +3685,10 @@ def cmd_vllm_set(args):
     if args.reasoning_parser:
         vllm["reasoning_parser"] = args.reasoning_parser
         entry["reasoning_parser"] = args.reasoning_parser
+    if args.vllm_tool_call_parser is not None:
+        vllm["tool_call_parser"] = _coerce_optional_parser_override(args.vllm_tool_call_parser)
+    if args.vllm_reasoning_parser is not None:
+        vllm["reasoning_parser"] = _coerce_optional_parser_override(args.vllm_reasoning_parser)
     _write_registry(registry_path, data)
     print(f"updated {slug}: vllm settings applied")
 
@@ -3001,7 +3763,7 @@ def cmd_mlx_launch_stop(args):
 def cmd_mlx_launch_start(args):
     """Start per-lane launchd jobs for assigned team lanes (8100-8119)."""
     studio_ssh = os.environ.get("STUDIO_SSH", "studio")
-    host = os.environ.get("MLX_BIND_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    host = _mlx_bind_host()
     log_dir = os.environ.get("MLX_VLLM_LOG_DIR", "/Users/thestudio")
     lane_label_prefix = os.environ.get("MLX_LANE_LABEL_PREFIX", DEFAULT_MLX_LANE_LABEL_PREFIX)
     legacy_label = os.environ.get("MLX_LAUNCHD_LABEL", os.environ.get("MLX_OPENAI_LAUNCHD_LABEL", DEFAULT_MLX_LAUNCHD_LABEL))
@@ -3145,9 +3907,9 @@ def cmd_repair_lanes(args):
         )
     )
     assigned_ports = sorted(
-        int(entry.get("port"))
-        for entry in data["models"].values()
-        if entry.get("port") and int(entry.get("port")) in TEAM_RANGE
+        port
+        for port in TEAM_RANGE
+        if _boot_target_for_port(data, port)
     )
     if requested_ports:
         assigned_ports = [port for port in assigned_ports if port in requested_ports]
@@ -3296,7 +4058,7 @@ for entry in models.values():
 
 
 def cmd_offload_og(args):
-    studio_ssh = os.environ.get("STUDIO_SSH", "thestudio@192.168.1.72")
+    studio_ssh = os.environ.get("STUDIO_SSH", "studio")
     offload_script = Path(os.environ.get("MLX_OFFLOAD_SCRIPT", DEFAULT_OFFLOAD_SCRIPT))
 
     candidates = _collect_offload_candidates(studio_ssh)
@@ -3397,12 +4159,14 @@ def main():
     vllm_render.add_argument("--json", action="store_true", help="Emit JSON payload")
     vllm_set = sub.add_parser("vllm-set", help="Update typed vLLM settings for a registry model")
     vllm_set.add_argument("model", help="Registry model_id slug or repo_id")
-    vllm_set.add_argument("--profile", choices=["qwen3_main", "gpt_oss_lane", "generic"])
+    vllm_set.add_argument("--profile")
     vllm_set.add_argument("--max-model-len", type=int)
     vllm_set.add_argument("--memory-fraction")
     vllm_set.add_argument("--tool-choice-mode", choices=["none", "auto"])
     vllm_set.add_argument("--tool-call-parser")
     vllm_set.add_argument("--reasoning-parser")
+    vllm_set.add_argument("--vllm-tool-call-parser")
+    vllm_set.add_argument("--vllm-reasoning-parser")
     vllm_set.add_argument("--clear-vllm", action="store_true", help="Reset nested vllm block to empty object")
     async_group = vllm_set.add_mutually_exclusive_group()
     async_group.add_argument("--async-scheduling", dest="async_scheduling", action="store_true")

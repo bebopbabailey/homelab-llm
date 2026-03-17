@@ -16,7 +16,63 @@ python3 platform/ops/scripts/validate_runtime_lock.py --mode full --host studio 
 
 Expected:
 - FAST passes in local CI/repo state with no patch artifacts or git-sourced OptiLLM.
-- FULL confirms Studio OptiLLM exact-SHA deploy plus MLX lane `auto`/`--api-key`/`--no-async-scheduling`.
+- FULL confirms Studio OptiLLM exact-SHA deploy plus MLX lane `auto`/`--no-async-scheduling` with no backend bearer auth.
+- FULL also confirms the locked `8101` parser override: `--tool-call-parser llama3_json`
+  and no `--reasoning-parser`.
+
+## OpenCode Web (Mini)
+Service install/source-of-truth check:
+```bash
+systemctl cat opencode-web.service
+systemctl show opencode-web.service \
+  -p User -p WorkingDirectory -p ExecStart \
+  -p ProtectSystem -p ProtectHome -p ReadWritePaths \
+  -p NoNewPrivileges -p PrivateTmp
+```
+
+Auth check:
+```bash
+curl -i http://127.0.0.1:4096/ | sed -n '1,20p'
+sudo bash -lc 'set -a; . /etc/opencode/env; user="${OPENCODE_SERVER_USERNAME:-opencode}"; curl -s -o /dev/null -w "%{http_code}\n" -u "$user:$OPENCODE_SERVER_PASSWORD" http://127.0.0.1:4096/'
+```
+
+Namespace writeability check:
+```bash
+pid="$(systemctl show -p MainPID --value opencode-web.service)"
+sudo nsenter -t "$pid" -m -- bash -lc '
+  set -e
+  touch /home/christopherbailey/homelab-llm/.opencode-write-test
+  rm /home/christopherbailey/homelab-llm/.opencode-write-test
+  touch /home/christopherbailey/homelab-llm/.git/.opencode-git-write-test
+  rm /home/christopherbailey/homelab-llm/.git/.opencode-git-write-test
+'
+```
+
+Negative least-privilege check:
+```bash
+pid="$(systemctl show -p MainPID --value opencode-web.service)"
+sudo nsenter -t "$pid" -m -- bash -lc 'touch /home/christopherbailey/.opencode-should-fail'
+```
+
+Expected:
+- unauthenticated `GET /` returns `401`
+- authenticated `GET /` returns `200`
+- repo-root and `.git` writes succeed from inside the service mount namespace
+- unrelated home-path write still fails
+
+Tailnet exposure check:
+```bash
+tailscale serve status --json
+curl -s -o /dev/null -w "%{http_code}\n" https://codeagent.tailfd1400.ts.net/
+sudo bash -lc 'set -a; . /etc/opencode/env; user="${OPENCODE_SERVER_USERNAME:-opencode}"; curl -s -o /dev/null -w "%{http_code}\n" -u "$user:$OPENCODE_SERVER_PASSWORD" https://codeagent.tailfd1400.ts.net/'
+```
+
+Expected:
+- top-level node `Web` has no `themini.tailfd1400.ts.net:443` entry for OpenCode
+- `Services["svc:codeagent"].Web["codeagent.tailfd1400.ts.net:443"]` proxies to `http://127.0.0.1:4096`
+- tailnet serve remains optional for remote operator access, not the canonical Mini ↔ Studio service path
+- unauthenticated `GET /` on `https://codeagent.tailfd1400.ts.net/` returns `401`
+- authenticated `GET /` on `https://codeagent.tailfd1400.ts.net/` returns `200`
 
 ## MLX Registry and Controller (Studio)
 
@@ -36,16 +92,22 @@ Notes:
 - `mlxctl verify` is read-only by default and also validates (on gateway hosts) that
   served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
 - Use `mlxctl verify --fix-defaults` only when explicitly persisting inferred defaults.
+- `mlxctl` now requires `platform/ops/mlx-runtime-profiles.json`; missing,
+  invalid, or ambiguous profile resolution is a validation failure.
 
 Expanded runtime inspection:
 ```bash
 mlxctl status --checks
 mlxctl status --checks --json
 mlxctl status --json
+mlxctl vllm-render --validate --json
 ```
 
 `status --checks` includes `http_models_ok` so lanes can be considered healthy
 even when `listener_visible=false` under root-owned launchd runtime.
+For load transitions, the primary readiness proof is a successful minimal
+non-streaming `/v1/chat/completions` probe. `/v1/models` is retained as the
+served-model identity check.
 
 Lane drift recovery (disabled/unloaded launchd labels):
 ```bash
@@ -69,6 +131,12 @@ mlxctl unload 8100
 mlxctl status --checks
 ```
 
+Expected `load` behavior:
+- `desired_target` updates immediately in lane state
+- unsupported targets fail before a healthy lane is torn down
+- success is declared only after two consecutive readiness passes with no restart between them
+- failed loads never claim the new target is serving
+
 Unload all ports:
 ```bash
 mlxctl unload-all
@@ -90,12 +158,54 @@ As of `2026-03-01`, expected production active lanes are `8100`, `8101`, and `81
 Any deviation should be treated as drift and triaged with `mlxctl status --checks`
 and `mlxctl verify`.
 
+Canonical Mini -> Studio transport for active MLX team lanes is the Studio LAN
+IP `192.168.1.72`.
+
+Mini-side reachability check:
+
+```bash
+for p in 8100 8101 8102; do
+  curl -fsS "http://192.168.1.72:${p}/v1/models" | jq .
+done
+```
+
 ```bash
 ACTIVE_PORTS=$(ssh studio "mlxctl status --json | jq -r '.ports[] | select(.status==\"listening\" or .status==\"running\") | .port'")
 for p in $ACTIVE_PORTS; do
   ssh studio "curl -fsS http://127.0.0.1:${p}/v1/models | jq ."
 done
 ```
+
+`main` tool-calling validation:
+```bash
+./platform/ops/scripts/mlxctl vllm-capabilities --json
+./platform/ops/scripts/mlxctl vllm-render --ports 8101 --validate --json
+
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+payload={
+  'model':'mlx-llama-3-3-70b-4bit-instruct',
+  'messages':[{'role':'user','content':'Use the noop tool once, then stop.'}],
+  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
+  'tool_choice':'auto',
+  'stream':False,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY"
+```
+
+Expected:
+- `tool_calls` is present and names `noop`
+- response `content` does not contain raw `<tool_call>`
 
 ## Studio scheduling policy (Mini -> Studio)
 This section is authoritative for Studio scheduling verification workflow.
@@ -287,13 +397,17 @@ Quality gate (post-reboot / post-change):
 ```bash
 mlxctl status --checks
 mlxctl verify
-uv run python /home/christopherbailey/homelab-llm/platform/ops/scripts/mlx_quality_gate.py --host 192.168.1.72 --json
+uv run python /home/christopherbailey/homelab-llm/platform/ops/scripts/mlx_quality_gate.py --host thestudio.tailfd1400.ts.net --json
 ```
 
 Expected:
 - exit code `0`
 - `failed: 0`
 - no raw protocol markers in output (`<|channel|>`, `<think>`, tool tags)
+- current golden fixture uses lane-specific budgets:
+  - `deep`: `max_tokens=256`, `request_timeout_s=90`
+  - `main`: `max_tokens=128`
+  - `fast`: `max_tokens=256`, `request_timeout_s=90`
 
 
 ## LiteLLM Aliases (Mini)
@@ -304,6 +418,64 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 
 Note: in the current deployment, unauthenticated `GET /health` may return `401`.
 Prefer `/health/readiness` as the default probe when validating service liveness.
+
+## OpenHands LiteLLM gate (Mini)
+Verify the stable alias and capability path:
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq -r '.data[].id' | rg '^code-reasoning$'
+
+curl -fsS "http://127.0.0.1:4000/v1/model/info" \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq '.data[] | select(.model_name=="code-reasoning")'
+```
+
+Verify the OpenHands worker key is model-scoped and MCP-denied:
+```bash
+export OPENHANDS_WORKER_KEY='<worker-key>'
+export OPENHANDS_LITELLM_BASE_URL='http://192.168.1.71:4000/v1'
+
+curl -fsS "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
+
+curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"main","messages":[{"role":"user","content":"Reply with exactly: main-should-fail"}],"stream":false,"max_tokens":32}'
+
+curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/mcp/tools" \
+  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY"
+
+curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/responses" \
+  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY"
+```
+
+Expected:
+- `code-reasoning` succeeds.
+- `main` is denied for the worker key.
+- MCP listing is denied for the worker key.
+- `/responses` is denied for the worker key.
+
+Attribution check:
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS -G http://127.0.0.1:4000/spend/logs/v2 \
+  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
+  --data-urlencode key_alias=openhands-worker \
+  --data-urlencode start_date="YYYY-MM-DD 00:00:00" \
+  --data-urlencode end_date="YYYY-MM-DD 23:59:59" \
+  --data-urlencode page=1 \
+  --data-urlencode page_size=20 | jq .
+```
+
+Expected:
+- successful worker calls appear with `key_alias=openhands-worker`
+- `team_id=openhands-workers`
+- `model_group=code-reasoning`
 
 ## Documentation predictability sweep (repo)
 Use this when running doc-consistency hardening work for coding-agent safety.
@@ -316,16 +488,38 @@ uv run python scripts/validate_handles.py
 
 Expected:
 - `docs_contract_audit.py` returns `ok: true` with `services_with_gaps: 0`.
+- `docs_contract_audit.py` also returns `layers_ok: true` and `overall_ok: true`
+  with `layers_with_gaps: 0`.
 - `validate_handles.py` returns `ok`.
 
-## OpenCode basic smoke (per host)
-Use your local `~/.config/opencode/opencode.json` and run:
+## OpenCode repo-local control-plane smoke
+Use your local `~/.config/opencode/opencode.json` together with the repo-local
+`opencode.json` and `.opencode/*` files:
 ```bash
+find .opencode -maxdepth 3 -type f | sort
+sed -n '1,220p' opencode.json
 opencode models litellm
-opencode run -m litellm/main "Reply with exactly: main-ok"
+opencode run --agent repo-deep "Inspect docs/OPENCODE.md and reply with exactly: repo-deep-ok"
+```
+
+Expected:
+- `repo-deep` succeeds with grounded repo access.
+- The repo-local OpenCode control surface is present on disk.
+
+## Direct lane canary checks
+Use these when validating machine-local lane readiness. `deep` is the required
+baseline. `main` and `fast` are canary probes and may legitimately fail with
+`litellm.NotFoundError` until backend provisioning and flags are ready.
+```bash
 opencode run -m litellm/deep "Reply with exactly: deep-ok"
+opencode run -m litellm/main "Reply with exactly: main-ok"
 opencode run -m litellm/fast "Reply with exactly: fast-ok"
 ```
+
+Expected:
+- `deep` passes when the machine-local `litellm` provider is configured.
+- `main` and `fast` are recorded as canary results; a `NotFoundError` indicates
+  lane-readiness work remains, not a repo-control-plane documentation failure.
 
 Backend preflight for `main` tool-calling:
 ```bash
@@ -343,7 +537,7 @@ Direct lane smoke for `tool_choice:\"auto\"`:
 ssh studio "python3 - <<'PY'
 import json, urllib.request
 payload={
-  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
+  'model':'mlx-llama-3-3-70b-4bit-instruct',
   'messages':[{'role':'user','content':'Reply with exactly: main-tool-ok'}],
   'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
   'tool_choice':'auto',
@@ -465,7 +659,7 @@ Suggested quality gate:
 
 ## OptiLLM proxy (Studio)
 ```bash
-curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq .
+curl -fsS http://192.168.1.72:4020/v1/models | jq .
 ```
 Note: missing the `Authorization` header returns `Invalid Authorization header`.
 
@@ -481,451 +675,79 @@ ssh orin 'sudo nvpmodel -q 2>/dev/null || true; sudo jetson_clocks --show 2>/dev
 ssh orin 'sudo docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" || true'
 ```
 
-## Voice Gateway Phase 1 (Orin local XTTS)
-Current active gate: B3 import/CUDA proof only. The old host-native `uv sync`
-commands are superseded. Stop before first XTTS model download.
-```bash
-ssh orin 'test -x /home/christopherbailey/.local/bin/uv && /home/christopherbailey/.local/bin/uv --version'
-ssh orin 'python3 --version'
-ssh orin 'df -h'
-ssh orin 'sudo docker info --format "root={{.DockerRootDir}} server={{.ServerVersion}}"'
+## Voice Gateway Speech Appliance (Orin)
+The canonical speech loop is now:
+
+`Open WebUI -> LiteLLM -> voice-gateway -> Speaches`
+
+Use direct Mini -> Orin LAN routing through `voice-gateway`. Do not add a Mini
+port-forward layer. Speaches stays localhost-only behind `voice-gateway`.
+
+Required Speaches appliance policy:
+```dotenv
+PRELOAD_MODELS=["Systran/faster-distil-whisper-large-v3","speaches-ai/Kokoro-82M-v1.0-ONNX"]
+STT_MODEL_TTL=-1
+TTS_MODEL_TTL=-1
 ```
 
-Do not run the superseded host-native XTTS bootstrap path from older notes.
-Rebuild the repo-tracked runtime-proof image if it is absent after the storage
-move:
+Direct Orin speech facade checks:
 ```bash
-tar -C /home/christopherbailey/homelab-llm/layer-interface/voice-gateway -cf - . \
-  | ssh orin 'rm -rf /tmp/voice-gateway-runtime-proof && mkdir -p /tmp/voice-gateway-runtime-proof && tar -C /tmp/voice-gateway-runtime-proof -xf -'
-
-ssh orin 'cd /tmp/voice-gateway-runtime-proof && sudo docker build -f Containerfile.runtime-proof -t voice-gateway-xtts-proof:local .'
+curl -fsS http://192.168.1.93:18080/health
+curl -fsS http://192.168.1.93:18080/health/readiness | jq .
+curl -fsS http://192.168.1.93:18080/v1/models -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
+curl -fsS http://192.168.1.93:18080/v1/speakers -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
+curl -fsS http://192.168.1.93:18080/v1/audio/speech   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -H "Content-Type: application/json"   -d '{"model":"tts-1","input":"Homelab speech canary.","voice":"alloy","response_format":"wav","speed":1.0}'   --output /tmp/voice-gateway-canary.wav
+curl -fsS http://192.168.1.93:18080/v1/audio/transcriptions   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -F 'file=@/tmp/voice-gateway-canary.wav'   -F 'model=whisper-1'
 ```
 
-Current proof image selection:
-- base image: `nvcr.io/nvidia/pytorch:25.06-py3-igpu`
-- required extra Python package: `coqui-tts==0.27.5`
-- explicit compatibility pin: `transformers==5.0.0`
-- required extra Python package: `soundfile>=0.12,<1.0`
-- required extra OS package: `libsndfile1`
-- required extra OS packages for torchaudio source build:
-  - `ffmpeg`
-  - `libavformat-dev`
-  - `libavcodec-dev`
-  - `libavutil-dev`
-  - `libavdevice-dev`
-  - `libavfilter-dev`
-- package/import note: the package name is `coqui-tts`, but the Python import
-  probe should use `from TTS.api import TTS`
-- pinned torchaudio source ref: `v2.8.0`
-- pinned torchaudio source commit:
-  `6e1c7fe9ff6d82b8665d0a46d859d3357d2ebaaa`
-- diagnostic note: `25.06-py3-igpu` is newer than the host JetPack 6.2 / CUDA
-  12.6 generation, so base-image / host compatibility is the first suspect if
-  the probe fails
-
-Current recovery gate:
-- do not use generic PyPI `pip install torchaudio`
-- keep the NVIDIA torch build untouched
-- source-build torchaudio from the pinned ref inside the proof image
-- install the built wheel with `--no-deps`
-- keep the NVIDIA torch/torchaudio state intact while reconciling
-  `coqui-tts==0.27.5` with a compatible `transformers` line
-- current upstream guidance is that `transformers>=5.1` is broken for
-  `coqui-tts` right now
-- the temporary compatibility line is `5.0.x`
-
-Inspect the current proof image first:
+Voice alias acceptance checks:
 ```bash
-ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
-import json
-from importlib import metadata
-
-result = {}
-try:
-    import sys
-    result["python_version"] = sys.version
-except Exception as exc:
-    result["python_version_error"] = repr(exc)
-
-try:
-    import torch
-    result["torch_version"] = torch.__version__
-    result["torch_cuda_version"] = torch.version.cuda
-except Exception as exc:
-    result["torch_import_error"] = repr(exc)
-
-try:
-    import torchaudio
-    result["torchaudio_version"] = torchaudio.__version__
-except Exception as exc:
-    result["torchaudio_import_error"] = repr(exc)
-
-try:
-    result["coqui_tts_package_version"] = metadata.version("coqui-tts")
-except Exception as exc:
-    result["coqui_tts_version_error"] = repr(exc)
-
-print(json.dumps(result, indent=2, sort_keys=True))
-PY'\'''
+curl -fsS http://192.168.1.93:18080/v1/speakers -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
+curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.93:18080/v1/audio/speech   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -H "Content-Type: application/json"   -d '{"model":"tts-1","input":"voice policy check","voice":"unknown","response_format":"wav","speed":1.0}'
 ```
 
-Reconfirm the current `TTS.api` failure before patching:
+Expected:
+- `default` and `alloy` resolve to the same initial Kokoro backend voice
+- unknown voices return clean `400` by default, unless config explicitly enables fallback
+
+## LiteLLM speech canary (Mini)
 ```bash
-ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
-try:
-    from TTS.api import TTS
-    print("TTS_IMPORT_OK")
-except Exception:
-    import traceback
-    traceback.print_exc()
-    raise
-PY'\'''
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/audio/speech   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -H "Content-Type: application/json"   -d '{"model":"voice-tts-canary","input":"LiteLLM speech canary.","voice":"alloy","response_format":"wav","speed":1.0}'   --output /tmp/litellm-voice-canary.wav
+
+curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -F 'file=@/tmp/litellm-voice-canary.wav'   -F 'model=voice-stt-canary'
 ```
 
-Inspect existing source-build tools and prerequisites:
+## Open WebUI voice canary
+Target values:
 ```bash
-ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 --version; echo "TOOLS"; for x in git cmake ninja gcc g++; do printf "%s=" "$x"; command -v "$x" || true; done; echo "PKGS"; dpkg -l | grep -E "ffmpeg|libavformat-dev|libavcodec-dev|libavutil-dev|libavdevice-dev|libavfilter-dev|libsndfile1|sox|libsox|pkg-config" || true'\'''
-```
-
-Then run the import/CUDA probe only:
-```bash
-ssh orin 'sudo docker run --rm --runtime nvidia --gpus all --network none voice-gateway-xtts-proof:local python3 - <<\"PY\"
-import json
-from importlib import metadata
-
-import soundfile
-import torch
-import torchaudio
-import transformers
-from TTS.api import TTS
-
-try:
-    cudnn_version = torch.backends.cudnn.version()
-except Exception:
-    cudnn_version = None
-
-payload = {
-    \"coqui_tts_package_version\": metadata.version(\"coqui-tts\"),
-    \"coqui_python_import\": \"from TTS.api import TTS\",
-    \"transformers_version\": transformers.__version__,
-    \"torch\": torch.__version__,
-    \"torchaudio\": torchaudio.__version__,
-    \"soundfile\": soundfile.__version__,
-    \"torch_cuda_version\": torch.version.cuda,
-    \"cudnn_version\": cudnn_version,
-    \"cuda_available\": torch.cuda.is_available(),
-    \"cuda_device_count\": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-    \"cuda_device_name\": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
-}
-print(json.dumps(payload, indent=2, sort_keys=True))
-PY'
-```
-
-Before the full probe, run one quick package-sanity check:
-```bash
-ssh orin 'sudo docker run --rm --runtime=nvidia --gpus all --network none voice-gateway-xtts-proof:local bash -lc '\''python3 -m pip show transformers coqui-tts tokenizers huggingface-hub'\'''
-```
-
-Stop after the probe result. Do not instantiate XTTS, synthesize audio, start
-the wrapper, or run any XTTS model-loading step in this phase.
-
-## Voice Gateway Phase 1 (Orin B4 model-download gate)
-B4 is storage/cache inspection and command documentation only. Do not trigger
-the first XTTS model pull in this phase.
-
-Inspect current storage and cache facts:
-```bash
-ssh orin 'df -h /'
-ssh orin 'df -h /srv/ssd'
-ssh orin 'sudo docker info --format "root={{.DockerRootDir}} default={{.DefaultRuntime}} runtimes={{json .Runtimes}}"'
-ssh orin 'sudo sh -lc "grep -R \"^root =\\|^state =\" /etc/containerd/config.toml 2>/dev/null || true"'
-ssh orin 'sudo docker image inspect voice-gateway-xtts-proof:local --format "size={{.Size}} created={{.Created}}"'
-ssh orin 'for p in /srv/ssd/cache/huggingface /srv/ssd/cache/huggingface/hub /srv/ssd/models /home/christopherbailey/.cache/huggingface /home/christopherbailey/.local/share/tts /root/.cache/huggingface /root/.local/share/tts; do if [ -e "$p" ]; then echo "== $p =="; du -sh "$p" 2>/dev/null || true; find "$p" -maxdepth 2 -mindepth 1 -print 2>/dev/null | sed -n "1,40p"; fi; done'
-```
-
-Validate the approved SSD-backed cache/output directories:
-```bash
-ssh orin 'sudo sh -lc '\''
-for p in \
-  /srv/ssd/models/voice-gateway \
-  /srv/ssd/cache/huggingface \
-  /srv/ssd/outputs/voice-gateway; do
-    echo "== $p ==";
-    if [ -d "$p" ]; then echo exists=yes; else echo exists=no; fi;
-    if [ -w "$p" ]; then echo writable=yes; else echo writable=no; fi;
-    ls -ld "$p" 2>/dev/null || true;
-  done
-'\'''
-```
-
-Approved later model-init-only command for B5 approval only:
-```bash
-ssh orin 'sudo docker run --rm \
-  --runtime=nvidia \
-  --gpus all \
-  --ipc=host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  -e TTS_HOME=/model-cache \
-  -e HF_HOME=/hf-cache \
-  -e COQUI_TOS_AGREED=1 \
-  -v /srv/ssd/models/voice-gateway:/model-cache \
-  -v /srv/ssd/cache/huggingface:/hf-cache \
-  voice-gateway-xtts-proof:local python3 - <<\"PY\"
-from TTS.api import TTS
-tts = TTS(\"tts_models/multilingual/multi-dataset/xtts_v2\", progress_bar=True)
-PY'
-```
-
-Approved later first-synth output paths for B5 handoff:
-- host: `/srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav`
-- container: `/output/voice-gateway-phase1.wav`
-
-B4 is complete only when:
-- `/srv/ssd/models/voice-gateway` exists and is writable
-- `/srv/ssd/cache/huggingface` exists and is writable
-- `/srv/ssd/outputs/voice-gateway` exists and is writable
-- the later model-init-only command is documented
-- the later output path is documented
-- no model download occurs
-
-After B4 closes:
-- do not run the approved model-init-only command until explicit B5 approval is given
-- do not drift into synthesis or wrapper work
-
-## Voice Gateway Phase 1 (Orin B5 first materialization + first synth)
-Run the first XTTS materialization and preset-speaker inspection:
-```bash
-ssh orin 'sudo docker run --rm \
-  --runtime=nvidia \
-  --gpus all \
-  --ipc=host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
-  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
-  -e TTS_HOME=/model-cache \
-  -e HF_HOME=/hf-cache \
-  -e COQUI_TOS_AGREED=1 \
-  voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
-import json
-from TTS.api import TTS
-model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
-tts = TTS(model_name=model_name, progress_bar=True)
-speakers = sorted({s for s in (tts.speakers or []) if isinstance(s, str) and s.strip()})
-languages = tts.languages or []
-print(json.dumps({
-    "model_name": model_name,
-    "selected_speaker": speakers[0] if speakers else None,
-    "speakers_count": len(speakers),
-    "speakers_preview": speakers[:10],
-    "languages": languages,
-    "en_available": ("en" in languages) if languages else True,
-}, indent=2, sort_keys=True))
-if languages and "en" not in languages:
-    raise SystemExit(43)
-if not speakers:
-    raise SystemExit(42)
-PY'\'''
-```
-
-Validate the materialized XTTS files:
-```bash
-ssh orin 'du -sh /srv/ssd/models/voice-gateway /srv/ssd/cache/huggingface 2>/dev/null'
-ssh orin 'for f in \
-  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/model.pth \
-  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/config.json \
-  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/vocab.json \
-  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/hash.md5 \
-  /srv/ssd/models/voice-gateway/tts/tts_models--multilingual--multi-dataset--xtts_v2/speakers_xtts.pth; do
-    if [ -s "$f" ]; then echo "ok $f"; else echo "missing $f"; exit 44; fi;
-  done'
-```
-
-Run exactly one cached one-shot synth:
-```bash
-ssh orin 'rm -f /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-ssh orin 'sudo docker run --rm \
-  --runtime=nvidia \
-  --gpus all \
-  --ipc=host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  --network none \
-  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
-  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
-  --mount type=bind,src=/srv/ssd/outputs/voice-gateway,dst=/output \
-  -e TTS_HOME=/model-cache \
-  -e HF_HOME=/hf-cache \
-  -e COQUI_TOS_AGREED=1 \
-  voice-gateway-xtts-proof:local bash -lc '\''python3 - <<\"PY\"
-import json
-from TTS.api import TTS
-model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
-tts = TTS(model_name=model_name, progress_bar=False).to("cuda")
-speakers = sorted({s for s in (tts.speakers or []) if isinstance(s, str) and s.strip()})
-languages = tts.languages or []
-if languages and "en" not in languages:
-    raise SystemExit(43)
-if not speakers:
-    raise SystemExit(42)
-speaker = speakers[0]
-output_path = "/output/voice-gateway-phase1.wav"
-tts.tts_to_file(
-    text="Phase one voice gateway check.",
-    speaker=speaker,
-    language="en",
-    file_path=output_path,
-)
-print(json.dumps({
-    "model_name": model_name,
-    "speaker": speaker,
-    "language": "en",
-    "output": output_path,
-}, indent=2, sort_keys=True))
-PY'\'''
-```
-
-## Voice Gateway Phase 1 (Orin canonical local TTS smoke)
-Build the thin wrapper-proof image from the proven runtime image:
-```bash
-tar -C /home/christopherbailey/homelab-llm/layer-interface/voice-gateway -cf - . \
-  | ssh orin 'rm -rf /tmp/voice-gateway-wrapper-proof && mkdir -p /tmp/voice-gateway-wrapper-proof && tar -C /tmp/voice-gateway-wrapper-proof -xf -'
-
-ssh orin 'cd /tmp/voice-gateway-wrapper-proof && sudo docker build -f Containerfile.wrapper-proof -t voice-gateway-wrapper-proof:local .'
-```
-
-Run the no-start import smoke:
-```bash
-ssh orin 'sudo docker run --rm \
-  --runtime=nvidia \
-  --gpus all \
-  --network none \
-  voice-gateway-wrapper-proof:local \
-  python3 - <<\"PY\"
-import voice_gateway.api
-import voice_gateway.service
-import voice_gateway.cli
-print("WRAPPER_IMPORT_OK")
-PY'
-```
-
-Start the wrapper on Orin with loopback-only host publish:
-```bash
-ssh orin 'sudo docker run --rm -d \
-  --name voice-gateway-wrapper-proof \
-  --runtime=nvidia \
-  --gpus all \
-  --ipc=host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  -p 127.0.0.1:18080:18080 \
-  --mount type=bind,src=/srv/ssd/models/voice-gateway,dst=/model-cache \
-  --mount type=bind,src=/srv/ssd/cache/huggingface,dst=/hf-cache \
-  --mount type=bind,src=/srv/ssd/outputs/voice-gateway,dst=/output \
-  -e TTS_HOME=/model-cache \
-  -e HF_HOME=/hf-cache \
-  -e COQUI_TOS_AGREED=1 \
-  voice-gateway-wrapper-proof:local \
-  python3 -m voice_gateway.service --host 0.0.0.0 --port 18080'
-```
-
-Verify the canonical local contract:
-```bash
-ssh orin 'curl -fsS http://127.0.0.1:18080/health'
-ssh orin 'curl -m 180 -fsS http://127.0.0.1:18080/health/readiness'
-ssh orin 'curl -m 180 -fsS http://127.0.0.1:18080/v1/speakers'
-ssh orin 'rm -f /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-ssh orin 'curl -fsS \
-  -H "Content-Type: application/json" \
-  -d '\''{"model":"xtts-v2","input":"Phase one voice gateway check.","voice":"default","response_format":"wav","language":"en"}'\'' \
-  http://127.0.0.1:18080/v1/audio/speech \
-  --output /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-```
-
-Cold-path note:
-- `GET /health/readiness` and `GET /v1/speakers` can take about `60-90s` on a cold path.
-- Use longer timeouts instead of assuming warm-cache behavior.
-
-Validate the returned WAV:
-```bash
-ssh orin 'test -s /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav && ls -lh /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-ssh orin 'python3 - <<\"PY\"
-import json, os, wave
-path = "/srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav"
-size = os.path.getsize(path)
-with wave.open(path, "rb") as wav:
-    channels = wav.getnchannels()
-    sample_width = wav.getsampwidth()
-    frame_rate = wav.getframerate()
-    frames = wav.getnframes()
-payload = {
-    "path": path,
-    "size_bytes": size,
-    "channels": channels,
-    "sample_width": sample_width,
-    "frame_rate": frame_rate,
-    "frames": frames,
-    "duration_sec": round(frames / frame_rate, 3) if frame_rate else 0,
-}
-assert size > 44 and channels > 0 and sample_width > 0 and frame_rate > 0 and frames > 0
-print(json.dumps(payload, indent=2, sort_keys=True))
-PY'
-```
-
-Optional DAC playback smoke:
-```bash
-ssh orin 'paplay --device=alsa_output.usb-Kiwi_Ears_Kiwi_Ears-Allegro_Mini_2020-02-20-0000-0000-0000-00.analog-stereo /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-# fallback only if paplay fails:
-ssh orin 'aplay -D plughw:3,0 /srv/ssd/outputs/voice-gateway/voice-gateway-phase1.wav'
-```
-
-Clean up:
-```bash
-ssh orin 'sudo docker stop voice-gateway-wrapper-proof'
-```
-
-## Voice Gateway Phase 1 (Mini-local Open WebUI TTS reachability)
-Use a Mini-local SSH forward instead of widening the Orin bind:
-```bash
-ssh -fN -o ExitOnForwardFailure=yes -L 127.0.0.1:18081:127.0.0.1:18080 orin
-```
-
-Verify the forwarded backend from the Mini:
-```bash
-curl -fsS http://127.0.0.1:18081/health
-curl -m 180 -fsS http://127.0.0.1:18081/health/readiness
-curl -m 180 -fsS http://127.0.0.1:18081/v1/speakers
-curl -fsS \
-  -H "Content-Type: application/json" \
-  -d '{"model":"xtts-v2","input":"Phase one voice gateway check.","voice":"default","response_format":"wav","language":"en"}' \
-  http://127.0.0.1:18081/v1/audio/speech \
-  --output /tmp/openwebui-tts-smoke.wav
-file /tmp/openwebui-tts-smoke.wav
-```
-
-Target Open WebUI TTS values for the current installed build:
-```bash
+AUDIO_STT_ENGINE=openai
+AUDIO_STT_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1
+AUDIO_STT_MODEL=voice-stt-canary
 AUDIO_TTS_ENGINE=openai
-AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:18081/v1
-AUDIO_TTS_OPENAI_API_KEY=voice-gateway-local-dev
-AUDIO_TTS_MODEL=xtts-v2
-AUDIO_TTS_VOICE=default
-AUDIO_TTS_OPENAI_PARAMS={}
+AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1
+AUDIO_TTS_MODEL=voice-tts-canary
+AUDIO_TTS_VOICE=alloy
 ```
 
-Do not repoint the global LiteLLM/OpenAI settings just to prove TTS.
+Post-restart verification is required:
+```bash
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_STT_'
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_TTS_'
+curl -fsS http://127.0.0.1:3000/health | jq .
+```
+
+Promotion is blocked if stale Admin UI audio state overrides the env-backed values
+after restart.
+
+## Diarization promotion gate
+Do not promote any diarization-capable enriched transcription format until an
+end-to-end test proves it survives the LiteLLM/OpenAI-compatible transcription
+path without breaking clients.
 
 Verify OptiLLM directly (Mini): see “OptiLLM via LiteLLM `boost` (Mini)” above.
-
-Verify direct MLX handles (when models are registered):
-```bash
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer $LITELLM_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"mlx-<base-model>","messages":[{"role":"user","content":"ping"}],"max_tokens":128}' \
-  | jq .
-```
 
 ## OpenVINO (Mini)
 ```bash
@@ -968,6 +790,24 @@ curl -fsS http://192.168.1.72:9999/v1/models | jq .
 ```bash
 curl -fsS "http://127.0.0.1:8888/search?q=ping&format=json" | jq .
 ```
+
+## Samba SMB (Mini Finder)
+```bash
+sudo testparm -s | rg 'interfaces =|bind interfaces only =|map to guest =|server min protocol ='
+sudo testparm -s | sed -n '/\\[mini-root\\]/,/^\\[/p'
+sudo testparm -s | sed -n '/\\[seagate\\]/,/^\\[/p'
+sudo pdbedit -L | rg '^christopherbailey:'
+sudo systemctl --no-pager --full status smbd.service nmbd.service
+sudo journalctl -u smbd -u nmbd -n 50 --no-pager
+```
+
+Finder manual checks from the MacBook:
+- Connect with `Cmd-K` to `smb://192.168.1.71/mini-root`
+- Connect with `Cmd-K` to `smb://192.168.1.71/seagate`
+- Browse `/home`, `/mnt`, `/etc`, `/usr`
+- Create and delete a test file in `/home/christopherbailey/Downloads`
+- Create and delete a test file in `/mnt/seagate/backups`
+- Verify writes to `/etc` fail
 
 ## Open WebUI Web Search Phase A Baseline (Mini, end-user flow)
 Goal: verify baseline search viability before adding rerankers/vector stores.
