@@ -71,6 +71,7 @@ Goal: Keep gateway tool-agnostic but orchestration-friendly.
 - [ ] Optional: allow the orchestrator to switch routing profiles (config sets)
 - [ ] Ensure all changes remain config-driven and reversible
 - [x] Add model-level prompt injection via LiteLLM callbacks (no per-request prompt_id)
+- [ ] Add Pushcut OpenAPI→MCP bridge behind LiteLLM after a clean, isolated design pass
 
 ## Nice to Haves
 - [ ] Add a helper script to detect or extract MLX chat templates and launch MLX servers with `--chat-template-file` automatically (durable model swaps).

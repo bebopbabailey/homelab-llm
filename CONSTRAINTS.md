@@ -6,7 +6,8 @@ This service inherits global + layer constraints:
 
 ## Hard constraints
 - Remain a gateway/routing service only. No inference runtime changes in this service.
-- Current deployment bind is `0.0.0.0:4000`; any bind/port changes require an approved migration plan and canon doc updates.
+- Current deployment bind is `0.0.0.0:4000`; localhost use remains valid, and
+  Studio upstreaming uses the Mini LAN URL `http://192.168.1.71:4000/v1`.
 - Preserve auth requirements for API and health surfaces as documented in canonical docs.
 - Keep client contract as LiteLLM-first; do not introduce direct client -> backend paths.
 - For Studio team lanes (`8100-8119`), keep `mlxctl` as source of truth (`sync-gateway` flow).
@@ -28,7 +29,8 @@ This service inherits global + layer constraints:
 
 ## Validation pointers
 - `curl -fsS http://127.0.0.1:4000/health/readiness`
-- `curl -fsS -H "Authorization: Bearer $LITELLM_MASTER_KEY" http://127.0.0.1:4000/v1/models | jq .`
+- `curl -fsS http://192.168.1.71:4000/health/readiness`
+- `curl -fsS -H "Authorization: Bearer $LITELLM_MASTER_KEY" http://192.168.1.71:4000/v1/models | jq .`
 - `rg -n "modify_params|target_models|coerce_stream_false" config/router.yaml`
 
 ## Change guardrail

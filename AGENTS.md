@@ -1,46 +1,34 @@
-# Repository Guidelines
+# AGENTS — litellm-orch
 
-## Project Structure & Module Organization
-- Root docs: `README.md`, `ARCHITECTURE.md`, `SERVICE_SPEC.md`, `DEV_CONTRACT.md`, `TASKS.md`, `AIDER.md`, `AGENT_PREFERENCES.md`.
-- Runtime config: `config/router.yaml` and `config/env.example` (copy to `config/env.local` for real values).
-- External services: OpenVINO on `localhost:9000`; Studio MLX lanes on `:8100/:8101/:8102`.
-  Ports `8100-8119` are `mlxctl`-managed team lanes; `8120-8139` are experimental
-  canary ports and do not require `mlxctl`.
-- Source code: currently minimal (`main.py` placeholder); gateway logic will live in this repo.
-- Scripts/tests: `scripts/`, `docs/`, `logs/`, and `callbacks/` are available; add runbooks and tests as phases progress.
+## Scope
+- Mini-hosted LiteLLM gateway service for client routing, auth, retries,
+  fallbacks, and generic tool/search proxying.
+- This service is routing-only; it must not implement inference.
 
-## Build, Test, and Development Commands
-There is no build or test pipeline yet. Use `uv` for all dependency management.
-- `uv sync` installs pinned dependencies into `.venv`.
-- `uv run python main.py` is a simple sanity check that the environment runs.
-When the LiteLLM proxy entrypoint is added, document the exact command here.
+## Read First
+- `SERVICE_SPEC.md`
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`
 
-## Coding Style & Naming Conventions
-- Python only (3.12). Keep code minimal and configuration-driven.
-- Use `snake_case` for Python modules/functions and descriptive, explicit names for config keys.
-- Routing model names use handles (`mlx-*`) while upstream
-  `litellm_params.model` values use `openai/<base-model>` for OpenAI-compatible backends.
-- Prefer small, reversible changes; avoid hardcoding IPs/ports in Python—use env vars + `config/router.yaml`.
+## Runtime Reality
+- Bind stays `0.0.0.0:4000`; on-host callers can still use `127.0.0.1:4000`.
+- Canonical Studio upstream path to LiteLLM is the Mini LAN URL
+  `http://192.168.1.71:4000/v1`.
+- Team MLX lanes `8100-8119` remain `mlxctl`-managed.
+- Client contract stays LiteLLM-first; do not introduce direct client-to-backend
+  paths.
+- OpenCode repo-work defaults are documented in `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`,
+  not in this service-local file.
 
-## Testing Guidelines
-- No tests yet; add `tests/` when behavior is implemented.
-- When tests exist, follow `test_*.py` naming and keep fixtures lightweight.
-- Document any required local services (MLX/OpenVINO) alongside tests that depend on them.
+## Change Guardrails
+- No bind, port, auth, or routing changes without updating canonical docs per
+  `docs/_core/CHANGE_RULES.md`.
+- No secrets in `config/env.local` or other git-managed files.
+- Keep `config/router.yaml`, service docs, and handle-validation expectations in
+  sync.
 
-## Commit & Pull Request Guidelines
-- No commit history exists yet, so there are no established conventions.
-- Suggested format: short, imperative subject lines (e.g., “Add Aider runbook”).
-- PRs should include: scope summary, config changes, and any required environment variables.
-
-## Task Alignment & Agent Behavior
-- `TASKS.md` is the source of truth for phases and scope. **MUST** update it before adding new features.
-- **MUST** follow `AGENT_PREFERENCES.md`: prefer small, reversible changes and keep docs current.
-- **MUST** honor `DEV_CONTRACT.md` constraints: routing-only, no inference, use `uv`, and **DO NOT** modify existing services.
-- **MUST** treat the MLX registry as the source of truth for `8100-8119`; use
-  `mlxctl sync-gateway` to update router/env/handles for those managed lanes.
-
-## Security & Configuration Tips
-- **DO NOT** touch existing services (OLLAMA on `11434`, OpenVINO on `9000`).
-- MLX active runtime is per-port `vllm-metal` (`vllm serve`) lanes on Studio (`:8100/:8101/:8102`).
-- Keep secrets and hostnames in `config/env.local` (git-ignored).
-- The gateway is routing-only; inference must remain external.
+## Validation
+- `curl -fsS http://127.0.0.1:4000/health/readiness`
+- `curl -fsS http://192.168.1.71:4000/health/readiness`
+- `curl -fsS -H "Authorization: Bearer $LITELLM_MASTER_KEY" http://192.168.1.71:4000/v1/models | jq .`
+- `rg -n "modify_params|target_models|coerce_stream_false" config/router.yaml`
