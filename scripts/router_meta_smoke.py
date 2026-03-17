@@ -18,7 +18,7 @@ PROMPTS = [
     "Describe pros/cons of monolith vs microservices.",
 ]
 
-BASE_URL = os.environ.get("ROUTER_META_PROXY_URL", "http://127.0.0.1:4020/v1")
+BASE_URL = os.environ.get("ROUTER_META_PROXY_URL", "http://192.168.1.72:4020/v1")
 API_KEY = os.environ.get("OPTILLM_API_KEY", "")
 MODEL = os.environ.get("ROUTER_META_MODEL", "mlx-gpt-oss-120b-mxfp4-q4")
 def main() -> None:

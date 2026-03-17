@@ -26,15 +26,15 @@ tail -n 200 -f /Users/thestudio/Library/Logs/optillm-proxy.err
 ## Identity and configuration (Studio)
 - LaunchDaemon: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`
 - Label: `com.bebop.optillm-proxy`
-- Listener: `0.0.0.0:4020`
-- Upstream (current): Mini LiteLLM via tailnet TCP forward (`http://100.69.99.60:4443/v1`)
+- Listener: `192.168.1.72:4020`
+- Upstream (current): Mini LiteLLM over LAN (`http://192.168.1.71:4000/v1`)
 
-Do not commit secrets: the plist contains `--optillm-api-key` and may also set
-`OPENAI_API_KEY`. Keep real values out of git.
+Do not commit secrets: the plist may set `OPENAI_API_KEY`. Keep real values out of git.
 
 ## Auth reminder
-- OptiLLM requires `Authorization: Bearer <OPTILLM_API_KEY>` for all requests, even from localhost.
-- Missing headers return `Invalid Authorization header`.
+- OptiLLM no longer requires backend bearer auth on `4020`.
+- Access control comes from the dedicated Studio LAN bind plus the LiteLLM-only
+  caller contract.
 
 ### Confirm approach usage
 OptiLLM already logs the selected approaches at INFO level. Look for:
@@ -67,15 +67,14 @@ Expected:
 
 ### Studio: direct proxy check
 ```bash
-curl -fsS http://127.0.0.1:4020/v1/models \
-  -H "Authorization: Bearer $OPTILLM_API_KEY" \
+curl -fsS http://192.168.1.72:4020/v1/models \
   | jq -r '.data[].id' | head
 ```
 
 ### Mini: through LiteLLM `boost`
 Preferred check (keeps clients LiteLLM-only):
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://192.168.1.71:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' \
@@ -84,7 +83,7 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 
 Deep lane check:
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://192.168.1.71:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"boost-deep","messages":[{"role":"user","content":"ping"}],"optillm_approach":"router","max_tokens":32}' \
@@ -93,7 +92,7 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 
 Canary trio planner check:
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://192.168.1.71:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"boost-plan-trio","messages":[{"role":"user","content":"Draft a rollback-first deployment plan in 5 bullets."}],"max_tokens":256}' \
@@ -110,7 +109,7 @@ Run from Mini:
 ```bash
 cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 ./scripts/canary_plansearch_profiles.py \
-  --url http://127.0.0.1:4000/v1/chat/completions \
+  --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_API_KEY" \
   --model-a boost-plan \
   --model-b boost-plan-trio \
@@ -127,7 +126,7 @@ Compact Trio gate run (recommended for current canary):
 ```bash
 cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 ./scripts/canary_plansearch_profiles.py \
-  --url http://127.0.0.1:4000/v1/chat/completions \
+  --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_API_KEY" \
   --model-a boost-plan \
   --model-b boost-plan-trio \
@@ -147,7 +146,7 @@ Artifact generation command:
 cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
 uv run python scripts/canary_plansearch_profiles.py \
-  --url http://127.0.0.1:4000/v1/chat/completions \
+  --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_MASTER_KEY" \
   --model-a boost-plan \
   --model-b boost-plan-trio \
@@ -209,7 +208,7 @@ Overrides (all optional):
 - `OPTILLM_STUDIO_HOST` (default: `studio`)
 - `OPTILLM_LAUNCHD_LABEL` (default: `com.bebop.optillm-proxy`)
 - `OPTILLM_STUDIO_UTILITY_WRAPPER` (default: repo `platform/ops/scripts/studio_run_utility.sh`)
-- `OPTILLM_API_KEY_ENV` (default: `/etc/optillm-proxy/env`)
+- `OPENAI_API_KEY` remains the upstream credential when the proxy calls LiteLLM.
 - `OPTILLM_SMOKE_MODEL` (default: `mlx-gpt-oss-120b-mxfp4-q4`)
 - `OPTILLM_SMOKE_APPROACH` (default: `bon`)
 - `OPTILLM_SMOKE_MAX_TOKENS` (default: `32`)

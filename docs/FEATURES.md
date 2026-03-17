@@ -4,8 +4,8 @@ Status: running with **all bundled plugins loaded** (as of 2026-01-19).
 
 ## Core
 - **Approach**: none (per-request technique selection via `optillm_approach`).
-- **Bind**: 127.0.0.1:4020
-- **Upstream**: LiteLLM or MLX (`http://127.0.0.1:4000/v1` or MLX ports)
+- **Bind**: 192.168.1.72:4020
+- **Upstream**: Mini LiteLLM over LAN (`http://192.168.1.71:4000/v1`) or MLX ports
 
 ## Techniques (Approaches)
 These are inference-time strategies selectable via `optillm_approach` (request body) or prompt tags. Descriptions are based on OptiLLM docs.

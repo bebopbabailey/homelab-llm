@@ -7,9 +7,10 @@
 
 ## Runtime Reality
 - Runtime owner: launchd label `com.bebop.optillm-proxy` on Studio.
-- Bind/port: `0.0.0.0:4020` (current deployment contract).
-- Auth: proxy requires bearer token (`OPTILLM_API_KEY`) for API access.
-- Upstream: LiteLLM path as documented in service/canonical docs.
+- Bind/port: `192.168.1.72:4020` for the LAN-first `boost*` path.
+- Auth: no backend bearer token; rely on the dedicated Studio LAN bind and the
+  LiteLLM-only caller contract.
+- Upstream: Mini LiteLLM at `http://192.168.1.71:4000/v1`.
 - Deployment source of truth remains this repo; deployment helper is
   `scripts/deploy_studio.sh`.
 
@@ -31,8 +32,8 @@
 
 ## Verification Commands
 ```bash
-curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer $OPTILLM_API_KEY" | jq .
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://192.168.1.72:4020/v1/models | jq .
+curl -fsS http://192.168.1.71:4000/v1/chat/completions \
   -H "Authorization: Bearer $LITELLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model":"boost","messages":[{"role":"user","content":"ping"}],"optillm_approach":"bon","max_tokens":16}' | jq .

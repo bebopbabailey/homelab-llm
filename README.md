@@ -10,11 +10,12 @@ This service behaves like “just another OpenAI-compatible provider” from Lit
 
 ## Placement in the homelab
 
-**Local-only proxy. No direct client access.**
+**LAN-first gateway upstream. No direct end-user client access.**
 
-Client(s) → LiteLLM (gateway) → OptiLLM (localhost-only) → LiteLLM (upstream) → Real backends
+Client(s) → LiteLLM (gateway) → OptiLLM (Studio LAN) → LiteLLM (Mini LAN) → Real backends
 
-OptiLLM must bind to `127.0.0.1` only. External binding is intentionally out of scope.
+OptiLLM binds to the Studio LAN IP `192.168.1.72` so LiteLLM can reach it
+directly without a tailnet bridge.
 
 ---
 
@@ -90,22 +91,13 @@ handles stable and prevent alias sprawl.
 There are **two separate authentication concerns**.
 
 ### 1) OptiLLM proxy authentication
-- Protects access *to OptiLLM itself*
-- **Use `--optillm-api-key`** (recommended)
-- Requests must include:
-```
-Authorization: Bearer <OPTILLM_API_KEY>
-```
-Missing this header returns `Invalid Authorization header` even on localhost.
+- The current Studio deployment does not require backend bearer auth.
+- Protect access with the dedicated Studio LAN bind and the LiteLLM-only caller contract.
 
 ### 2) Upstream authentication
 - Used when OptiLLM calls the upstream (LiteLLM or MLX)
 - Usually provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
-- This is unrelated to `OPTILLM_API_KEY`
-
-Important: setting `OPTILLM_API_KEY` in the environment triggers OptiLLM's
-**local inference mode**. Do not set it when using a remote upstream (LiteLLM).
-Use the `--optillm-api-key` flag instead.
+- This is unrelated to any proxy-side listener auth.
 
 ## Proxy provider config (required)
 OptiLLM's proxy plugin reads its provider list from:
@@ -117,7 +109,7 @@ For this homelab, it should point to the configured upstream (LiteLLM or MLX):
 ```yaml
 providers:
   - name: litellm
-    base_url: http://127.0.0.1:4000/v1
+    base_url: http://192.168.1.71:4000/v1
     api_key: dummy
 ```
 
@@ -125,8 +117,8 @@ providers:
 
 ## Install and run (uv-only)
 
-This repo does not allow Docker installs. Use `uv` with a **pinned fork**
-of OptiLLM and run it as a local service.
+This repo does not allow Docker installs. Use `uv` and run OptiLLM as the
+Studio launchd service described in the service docs.
 
 ```bash
 cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
@@ -139,31 +131,24 @@ Run manually (for quick verification):
 ```bash
 OPENAI_API_KEY="<litellm-proxy-or-upstream-key>" \
 uv run optillm \
-  --host 127.0.0.1 \
+  --host 192.168.1.72 \
   --port 4020 \
-  --base-url http://127.0.0.1:4000/v1 \
+  --base-url http://192.168.1.71:4000/v1 \
   --approach none \
-  --model <base-model> \
-  --optillm-api-key "<optillm-proxy-key>"
+  --model <base-model>
 ```
 
 Notes:
 - `OPENAI_API_KEY` is used by OptiLLM when calling the upstream (LiteLLM or MLX).
-- `--optillm-api-key` protects the OptiLLM proxy itself.
 - `--base-url` points at LiteLLM or directly at an MLX OpenAI-compatible endpoint.
 - OptiLLM local (Studio) uses `/Users/thestudio/models/hf/hub` and pins
   `transformers<5` for router compatibility.
 
-## Pinned fork (durability)
+## Locked runtime (durability)
 
-OptiLLM is pinned to a fork so local patches survive upgrades. The dependency
-is defined in `pyproject.toml` as a git URL with a commit hash.
-
-Current pin:
-- Repo: `git@github.com:bebopbabailey/optillm.git`
-- Commit: `7525e45`
-
-See `RUNBOOK.md` for update steps.
+OptiLLM is pinned from PyPI and deployed to Studio by exact git SHA from this
+repo. See `RUNBOOK.md` and `platform/ops/runtime-lock.json` for the locked
+contract.
 
 ## Router model (internal)
 - The `router` plugin uses an internal classifier model (not exposed via LiteLLM).

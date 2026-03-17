@@ -9,7 +9,7 @@
 
 Runs OptiLLM as an OpenAI-compatible inference proxy that applies proxy-safe
 optimization strategies before forwarding requests upstream to an OpenAI-compatible
-backend (currently Mini LiteLLM via tailnet TCP forward).
+backend (currently Mini LiteLLM over the LAN contract).
 
 End-user clients must never access this service directly.
 
@@ -20,10 +20,10 @@ End-user clients must never access this service directly.
 | Property | Value |
 |--------|------|
 | Host | Mac Studio (launchd) |
-| Bind address | 0.0.0.0 |
+| Bind address | 192.168.1.72 |
 | Port | 4020 |
-| External access | LAN-exposed (auth required); intended caller is LiteLLM `boost` |
-| TLS | Not required (LAN; protected by bearer auth) |
+| External access | LAN-only; intended caller is LiteLLM `boost` |
+| TLS | Not required (trusted LAN transport) |
 
 ---
 
@@ -42,27 +42,21 @@ Minimum required:
 | Item | Value |
 |----|------|
 | Upstream type | OpenAI-compatible API |
-| Upstream service | LiteLLM on Mini (localhost-bound, reached via tailnet TCP forward) |
-| Upstream base URL | http://100.69.99.60:4443/v1 |
+| Upstream service | LiteLLM on Mini (LAN-reachable) |
+| Upstream base URL | http://192.168.1.71:4000/v1 |
 
 ---
 
 ## Authentication
 
 ### OptiLLM proxy auth
--- Controlled via `--optillm-api-key` (do not set `OPTILLM_API_KEY` env)
-- LiteLLM must include:
-```
-Authorization: Bearer <OPTILLM_API_KEY>
-```
-Missing this header returns `Invalid Authorization header` (even on localhost).
+- The current Studio deployment does not require backend bearer auth.
+- Access control comes from the dedicated Studio LAN bind and the LiteLLM-only
+  caller contract.
 
 ### Upstream auth
 - Provided via `OPENAI_API_KEY` (or equivalent LiteLLM config)
 - Used only for OptiLLM → upstream calls
-
-Important: setting `OPTILLM_API_KEY` in the environment triggers OptiLLM's
-local inference mode. Use the flag instead.
 
 ---
 
@@ -103,13 +97,12 @@ Expected external configuration (env file, not committed):
 Example env file path (systemd): `/etc/optillm-proxy/env`.
 
 Runtime flags (systemd `ExecStart` should pass explicitly):
-- `--host 0.0.0.0`
+- `--host 192.168.1.72`
 - `--port 4020`
 - `--base-url <upstream OpenAI-compatible endpoint>`
 - `--approach none`
 - `--model <base_model>` (example: `qwen3-235b-a22b-instruct-2507-6bit`)
 - `--plugins-dir <path>` (local plugin overrides)
-- `--optillm-api-key <key>` (proxy auth)
 
 Deployment contract:
 - Install path is `uv sync --frozen` from this repo checkout.
@@ -255,7 +248,7 @@ This should point to the configured upstream (LiteLLM or MLX), e.g.:
 ```yaml
 providers:
   - name: litellm
-    base_url: http://127.0.0.1:4000/v1
+    base_url: http://192.168.1.71:4000/v1
     api_key: dummy
 ```
 
