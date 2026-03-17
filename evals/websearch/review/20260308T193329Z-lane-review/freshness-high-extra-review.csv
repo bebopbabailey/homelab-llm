@@ -1,0 +1,9 @@
+profile_id,lane,run_id,query_id,usefulness_score,citation_quality_score,freshness_score,junk_domain_score,comments
+baseline,owui-fast,20260308T193329Z,ws-003,,,,,
+baseline,owui-fast,20260308T193329Z,ws-004,,,,,
+baseline,owui-fast,20260308T193329Z,ws-005,,,,,
+baseline,owui-fast,20260308T193329Z,ws-032,,,,,
+baseline,owui-research,20260308T193329Z,ws-003,,,,,
+baseline,owui-research,20260308T193329Z,ws-004,,,,,
+baseline,owui-research,20260308T193329Z,ws-005,,,,,
+baseline,owui-research,20260308T193329Z,ws-032,,,,,
