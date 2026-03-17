@@ -17,11 +17,30 @@ If drift is discovered:
   - `TOPOLOGY.md`
   - Example: changing LiteLLM from 4000 to 4010 requires updating all three files.
 
+- If a Tailscale Serve hostname, service-host mapping, or exposed operator URL changes, update:
+  - `docs/PLATFORM_DOSSIER.md`
+  - `docs/foundation/topology.md`
+  - `TOPOLOGY.md`
+  - `docs/INTEGRATIONS.md`
+  - `docs/foundation/testing.md`
+  - affected service `SERVICE_SPEC.md` / `RUNBOOK.md` / `CONSTRAINTS.md`
+  - Example: moving OpenCode Web from a node-root hostname to `svc:codeagent` requires both runtime validation and doc updates across canon and the service bundle.
+
 ## Integrations and Routing
 - If an integration is added/removed or routing logic changes, update:
   - `docs/INTEGRATIONS.md`
   - `docs/PLATFORM_DOSSIER.md`
   - Example: adding Open WebUI → LiteLLM routing or disabling OptiLLM requires updates in both docs.
+
+## OpenCode control plane
+- If repo-local OpenCode defaults, lane policy, agent names, skill names, or
+  verification assumptions change, update:
+  - `docs/OPENCODE.md`
+  - `docs/INTEGRATIONS.md`
+  - `docs/foundation/testing.md`
+  - `docs/foundation/runtime-lock.md`
+  - Example: changing the default OpenCode repo-work lane from `deep` to
+    another handle requires both doc and verification-contract updates.
 
 ## Service Behavior and Contracts
 - If a service's inputs, outputs, env vars, health checks, or lifecycle steps change, update:

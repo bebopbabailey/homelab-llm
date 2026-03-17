@@ -13,6 +13,7 @@ This DoD applies to **canonical operational docs** only:
 - `docs/PLATFORM_DOSSIER.md`
 - `docs/foundation/topology.md`
 - `docs/INTEGRATIONS.md`
+- `docs/OPENCODE.md`
 - `docs/foundation/testing.md`
 - `TOPOLOGY.md`
 
@@ -56,6 +57,7 @@ actions if they drift.
 Evidence sources (preferred order):
 - systemd unit `ExecStart` flags (authoritative for binds/ports)
 - `/etc/*env` EnvironmentFile values
+- `tailscale serve status --json` for service-host exposure and tailnet HTTPS routing
 - live health endpoints
 
 Checks (Mini examples; adapt per host):
@@ -67,11 +69,14 @@ sudo systemctl cat open-webui.service | sed -n '1,200p'
 # liveness
 curl -fsS http://127.0.0.1:4000/v1/models -H "Authorization: Bearer $LITELLM_API_KEY" | jq -r '.data[].id' | head
 curl -fsS http://127.0.0.1:3000/health | jq .
+tailscale serve status --json | jq .
 ```
 
 Expected signals:
 - bind addresses and ports match canonical docs
 - any LAN exposure is explicitly documented as “approved/maintenance-only”
+- service-host mappings match canonical docs
+- stale node-root Serve mappings are absent when canon says service-host-only
 
 ### B) Auth requirements
 
@@ -119,8 +124,8 @@ Evidence sources:
 
 Checks:
 ```bash
-# on Studio
-curl -fsS http://127.0.0.1:4020/v1/models -H "Authorization: Bearer dummy" | jq -r '.object'
+# on Mini or Studio LAN
+curl -fsS http://192.168.1.72:4020/v1/models | jq -r '.object'
 
 # on Mini: confirm the `boost` handle is present in LiteLLM model list
 curl -fsS http://127.0.0.1:4000/v1/models \
@@ -154,6 +159,29 @@ If a technology is “maintenance-only” or “not supported going forward” (
 OpenVINO in your current roadmap), canonical docs must:
 - explicitly state the posture (maintenance-only vs active)
 - not instruct new builds/evaluations unless they are marked archived/deprecated
+
+### F) OpenCode control plane defaults
+
+Evidence sources:
+- `opencode.json`
+- `.opencode/instructions/repo-baseline.md`
+- `.opencode/agents/*.md`
+- `.opencode/skills/*/SKILL.md`
+- `docs/OPENCODE.md`
+
+Checks:
+```bash
+find .opencode -maxdepth 3 -type f | sort
+sed -n '1,220p' opencode.json
+opencode run --agent repo-deep "Inspect docs/OPENCODE.md and reply with exactly: repo-deep-ok"
+```
+
+Expected signals:
+- repo-local OpenCode default lane is `deep`
+- `main` is documented as a canary lane, not the repo default
+- `fast` is documented as synthesis-only
+- canonical docs do not tell operators to default to OptiLLM workflows for
+  normal OpenCode repo work
 
 ## Severity rubric
 
@@ -195,9 +223,13 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 
 curl -fsS http://127.0.0.1:4000/health/readiness | jq .
 
+# Mini: repo-local OpenCode control plane
+find .opencode -maxdepth 3 -type f | sort
+sed -n '1,220p' opencode.json
+opencode run --agent repo-deep "Inspect docs/OPENCODE.md and reply with exactly: repo-deep-ok"
+
 # Studio: OptiLLM proxy lane + MLX controller
-curl -fsS http://127.0.0.1:4020/v1/models \
-  -H "Authorization: Bearer $OPTILLM_API_KEY" \
+curl -fsS http://192.168.1.72:4020/v1/models \
   | jq -r '.object'
 
 mlxctl status
@@ -206,6 +238,7 @@ mlxctl status
 Expected outcome:
 - Canonical docs in scope remain accurate:
   `docs/PLATFORM_DOSSIER.md`, `docs/foundation/topology.md`,
-  `docs/INTEGRATIONS.md`, `docs/foundation/testing.md`, `TOPOLOGY.md`.
+  `docs/INTEGRATIONS.md`, `docs/OPENCODE.md`,
+  `docs/foundation/testing.md`, `TOPOLOGY.md`.
 - Any mismatches are captured as claim IDs in the monthly ledger with a clear
   disposition.

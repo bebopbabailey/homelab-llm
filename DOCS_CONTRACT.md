@@ -21,6 +21,7 @@ Purpose: define what the layer is allowed to do and its contracts.
 
 Must include:
 - **README.md** — layer mission + scope
+- **AGENTS.md** — thin layer entrypoint + descent guidance
 - **CONSTRAINTS.md** — layer-specific non-negotiables
 - **DEPENDENCIES.md** — contracts to adjacent layers (inputs/outputs)
 - **RUNBOOK.md** — layer-level health checks and restart boundaries
@@ -38,6 +39,13 @@ Must include:
 - `docs/README.md` — optional deep-dive entrypoint
 
 ## Notes
+- Read order for edits should descend from root to layer to service.
+- If touched files are below the service root, read every `AGENTS.md` on the path
+  from the service root to the touched directory, with the deepest applicable
+  file treated as the most specific guidance.
+- Registry/data directories under `layer-*/registry` are not service directories by default.
+- Service-level documentation requirements apply only to directories that expose an actual service contract.
+- Data registries may document themselves, but they are not audited as services unless intentionally promoted to service status.
 - Keep constraints short, explicit, and enforceable.
 - Avoid duplicating global constraints in every service; reference root docs when possible.
 - Prefer facts over aspirations. If a service is not active, say so explicitly.

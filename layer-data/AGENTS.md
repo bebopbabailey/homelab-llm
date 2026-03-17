@@ -1,14 +1,14 @@
-# Interface Layer (AGENTS)
+# Data Layer (AGENTS)
 
 Primary navigation: `docs/_core/README.md`.
 
 ## Scope
-This file applies to `layer-interface/*`.
+This file applies to `layer-data/*`.
 
 ## Read before changes
-- `layer-interface/CONSTRAINTS.md`
-- `layer-interface/DEPENDENCIES.md`
-- `layer-interface/RUNBOOK.md`
+- `layer-data/CONSTRAINTS.md`
+- `layer-data/DEPENDENCIES.md`
+- `layer-data/RUNBOOK.md`
 - If touching a service, read that service's `AGENTS.md`, `CONSTRAINTS.md`,
   `RUNBOOK.md`, and `SERVICE_SPEC.md`.
 - If touched files are below the service root, read every `AGENTS.md` on the

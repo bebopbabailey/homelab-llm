@@ -29,19 +29,19 @@ and constraints so new work stays compatible with the existing platform.
 - `docs/foundation/constraints-and-decisions.md` — immutable constraints.
 - `docs/INTEGRATIONS.md` — LiteLLM routing + Open WebUI/OpenVINO/OptiLLM linkage.
 - `docs/OPENCODE.md` — OpenCode client setup + LiteLLM presets + MCP tooling.
-- `docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
+- `layer-interface/open-webui/docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
 - `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
 - `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
 - `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
 - `layer-*/<service>/SERVICE_SPEC.md` — per-service runtime contract and env locations.
 - `layer-gateway/litellm-orch/ARCHITECTURE.md` and `layer-inference/ov-llm-server/ARCHITECTURE.md`
   — layered architecture framing.
-- `layer-*/<service>/SERVICE_SPEC.md` — per-service contract details.
 - `docs/foundation/tool-contracts.md` — tool interfaces and expectations.
 - Tool contracts should include both OpenAPI (HTTP transport) and MCP tool
   schemas (tool-level interface) where applicable.
 
 ## Agent Expectations (global)
+- Repo-root descent rules live in root `AGENTS.md` and `docs/_core/README.md`.
 - Update `NOW.md` and service `AGENTS.md` before implementing new features.
 - Prefer small, reversible changes; ask before large refactors.
 - Keep docs current; avoid backlog drift.

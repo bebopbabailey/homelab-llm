@@ -1,14 +1,14 @@
-# Interface Layer (AGENTS)
+# Inference Layer (AGENTS)
 
 Primary navigation: `docs/_core/README.md`.
 
 ## Scope
-This file applies to `layer-interface/*`.
+This file applies to `layer-inference/*`.
 
 ## Read before changes
-- `layer-interface/CONSTRAINTS.md`
-- `layer-interface/DEPENDENCIES.md`
-- `layer-interface/RUNBOOK.md`
+- `layer-inference/CONSTRAINTS.md`
+- `layer-inference/DEPENDENCIES.md`
+- `layer-inference/RUNBOOK.md`
 - If touching a service, read that service's `AGENTS.md`, `CONSTRAINTS.md`,
   `RUNBOOK.md`, and `SERVICE_SPEC.md`.
 - If touched files are below the service root, read every `AGENTS.md` on the

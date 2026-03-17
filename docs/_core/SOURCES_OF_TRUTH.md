@@ -15,6 +15,12 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `docs/foundation/runtime-lock.md`
     - `docs/foundation/ov-llm-server.md`
     - `docs/foundation/orin-agx.md`
+- Repo-local OpenCode control plane:
+    - `opencode.json`
+    - `.opencode/instructions/repo-baseline.md`
+    - `.opencode/agents/*.md`
+    - `.opencode/skills/*/SKILL.md`
+    - `docs/OPENCODE.md` (supporting narrative doc for the repo-local control surface)
 - Registry/template data (prefer data over summaries):
     - `layer-gateway/registry/handles.jsonl`
     - `layer-inference/registry/models.jsonl`
@@ -74,7 +80,7 @@ Archived or deprecated material kept for reference only.
 - `docs/archive/TINYAGENTS_PLAN.md.old`
 - `docs/deprecated/README.md`
 - `docs/deprecated/benny-model-onboarding.md`
-- `docs/deprecated/prompts/README.md`
+- `docs/deprecated/prompts/benny/`
 - `docs/DECISIONS.md`
 
 ## Conflict Rule

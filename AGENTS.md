@@ -29,11 +29,23 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - List the exact files you intend to change.
 - Select verification mode (FAST or FULL) and list the commands you will run.
 
+## Per-layer consultation
+If you touch anything inside a layer, read first:
+- `layer-*/AGENTS.md` (if present)
+- `layer-*/CONSTRAINTS.md`
+- `layer-*/DEPENDENCIES.md`
+- `layer-*/RUNBOOK.md`
+
 ## Per-service consultation
 If you touch a service (code, config, or docs), read first:
 - `layer-*/<service>/AGENTS.md`
 - `layer-*/<service>/CONSTRAINTS.md`
 - `layer-*/<service>/RUNBOOK.md`
+- `layer-*/<service>/SERVICE_SPEC.md`
+
+If touched files are below the service root, read every `AGENTS.md` on the path
+from the service root to the touched directory, with the deepest applicable
+file treated as the most specific guidance.
 
 If any are missing, state that and proceed with the least risky interpretation.
 

@@ -20,3 +20,7 @@ CREDENTIALS.md
 
 .gemini/
 gha-creds-*.json
+evals/websearch/artifacts/
+themini.tailfd1400.ts.net.crt
+themini.tailfd1400.ts.net.key
+layer-interface/voice-gateway/tests/*.wav
