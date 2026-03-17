@@ -1,54 +1,54 @@
 # Service Spec: Open WebUI
 
 ## Purpose
-Human-facing UI for LLM interactions routed through LiteLLM.
+Human-facing UI for LLM and voice interactions routed through LiteLLM.
 
 ## Interface
-- HTTP UI: `0.0.0.0:3000` (LAN + tailnet exposure in current deployment)
+- HTTP UI: `0.0.0.0:3000`
 - Health: `GET /health`
 
 ## Dependencies
 - LiteLLM proxy at `http://127.0.0.1:4000/v1`
-- Current TTS integration target:
-  - Voice Gateway on the Orin via dedicated Open WebUI TTS config, not the global LiteLLM OpenAI config
-  - proof-only reachability path on the Mini:
-    - `127.0.0.1:18081 -> orin:127.0.0.1:18080`
-  - TTS-only in this phase; STT is out of scope
-- Local SearXNG JSON endpoint via documented Open WebUI config:
-  - `WEB_SEARCH_ENGINE=searxng`
-  - `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`
-  - `WEB_SEARCH_RESULT_COUNT=6`
-  - `WEB_SEARCH_CONCURRENT_REQUESTS=1`
-  - `WEB_SEARCH_DOMAIN_FILTER_LIST=["!localhost","!127.0.0.1","!192.168.1.70","!192.168.1.71","!192.168.1.72","!100.69.99.60","!code.tailfd1400.ts.net","!chat.tailfd1400.ts.net","!gateway.tailfd1400.ts.net","!search.tailfd1400.ts.net"]`
-- Built-in Open WebUI loader via documented config:
-  - `WEB_LOADER_ENGINE=safe_web`
-  - `WEB_LOADER_TIMEOUT=15`
-  - `WEB_LOADER_CONCURRENT_REQUESTS=2`
-  - `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`
+- Speech path:
+  - Open WebUI -> LiteLLM only
+  - LiteLLM -> Orin `voice-gateway` only
+  - Open WebUI must not call the Orin directly for STT or TTS
+- Local SearXNG JSON endpoint via documented Open WebUI config
 
 ## Configuration
 - `/etc/open-webui/env` (systemd `EnvironmentFile`)
 - `/etc/systemd/system/open-webui.service.d/*.conf` (service overrides)
-- `/etc/systemd/system/open-webui.service.d/50-querygen-hotfix.conf`
-  (`ExecStartPre` runtime patch for query-generation fallback hardening)
-- Runtime patch helper:
-  `/home/christopherbailey/homelab-llm/scripts/openwebui_querygen_hotfix.py`
-- Data stored in `/home/christopherbailey/.open-webui`
-- Dedicated TTS config surface in the installed build:
-  - `AUDIO_TTS_ENGINE`
-  - `AUDIO_TTS_OPENAI_API_BASE_URL`
-  - `AUDIO_TTS_OPENAI_API_KEY`
-  - `AUDIO_TTS_MODEL`
-  - `AUDIO_TTS_VOICE`
-  - `AUDIO_TTS_OPENAI_PARAMS`
-  - `AUDIO_TTS_SPLIT_ON`
+- data stored in `/home/christopherbailey/.open-webui`
 
-## Ownership Boundary
-- Open WebUI owns web-search UX plus provider/loader configuration.
-- LiteLLM remains the single LLM gateway and does not inject web-search-specific schemas or citations.
-- `websearch-orch` is not part of the supported Open WebUI path.
+## Audio configuration surface
+- `AUDIO_STT_ENGINE`
+- `AUDIO_STT_OPENAI_API_BASE_URL`
+- `AUDIO_STT_OPENAI_API_KEY`
+- `AUDIO_STT_MODEL`
+- `AUDIO_TTS_ENGINE`
+- `AUDIO_TTS_OPENAI_API_BASE_URL`
+- `AUDIO_TTS_OPENAI_API_KEY`
+- `AUDIO_TTS_MODEL`
+- `AUDIO_TTS_VOICE`
+- `AUDIO_TTS_OPENAI_PARAMS`
+- `AUDIO_TTS_SPLIT_ON`
 
-## Config Authority
-- Current deployment sets `ENABLE_PERSISTENT_CONFIG=False`.
-- Systemd env/drop-ins remain authoritative across restarts.
-- Admin UI changes to these env-backed settings are non-persistent after restart.
+## Canonical canary values
+- `AUDIO_STT_ENGINE=openai`
+- `AUDIO_STT_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`
+- `AUDIO_STT_MODEL=voice-stt-canary`
+- `AUDIO_TTS_ENGINE=openai`
+- `AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`
+- `AUDIO_TTS_MODEL=voice-tts-canary`
+- `AUDIO_TTS_VOICE=alloy`
+
+## Config authority
+- `ENABLE_PERSISTENT_CONFIG=False` is required for this path.
+- systemd env/drop-ins are authoritative across restart.
+- canary promotion requires post-restart verification that no stale Admin UI audio
+  state is overriding the expected env-driven values.
+
+## Ownership boundary
+- Open WebUI owns the human UI and audio UX.
+- LiteLLM remains the single client-facing gateway for LLM, STT, and TTS.
+- `voice-gateway` remains the repo-owned speech boundary on the Orin.

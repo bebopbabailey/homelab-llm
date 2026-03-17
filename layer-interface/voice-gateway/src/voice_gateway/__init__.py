@@ -1,4 +1,4 @@
-"""Voice Gateway Phase 1 package."""
+"""Voice Gateway package."""
 
 __all__ = ["__version__"]
 

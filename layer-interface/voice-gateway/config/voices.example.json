@@ -1,10 +1,16 @@
 {
-  "default_voice_policy": "first_discovered_builtin",
+  "default_voice_policy": "configured_default",
+  "unknown_voice_policy": "reject",
+  "fallback_voice_id": "default",
   "voices": [
     {
       "id": "default",
-      "mode": "builtin",
-      "backend_speaker": null,
+      "backend_voice": "af_heart",
+      "active": true
+    },
+    {
+      "id": "alloy",
+      "backend_voice": "af_heart",
       "active": true
     }
   ]

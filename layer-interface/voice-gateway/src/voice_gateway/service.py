@@ -9,7 +9,7 @@ from voice_gateway.settings import Settings
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the Phase 1 Voice Gateway localhost service")
+    parser = argparse.ArgumentParser(description="Run the Voice Gateway HTTP service")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", required=True, type=int)
     return parser

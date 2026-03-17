@@ -20,7 +20,7 @@ def _engine_from_settings(settings: Settings) -> TtsEngine:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Voice Gateway Phase 1 CLI")
+    parser = argparse.ArgumentParser(description="Voice Gateway CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("list-speakers", help="List discovered built-in XTTS speakers")
