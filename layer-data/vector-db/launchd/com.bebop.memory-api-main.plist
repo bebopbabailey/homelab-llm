@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.memory-api-main</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/thestudio/optillm-proxy/layer-data/vector-db/.venv/bin/python</string>
+    <string>-m</string>
+    <string>uvicorn</string>
+    <string>app.main:app</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>55440</string>
+    <string>--workers</string>
+    <string>1</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MEMORY_DB_HOST</key>
+    <string>127.0.0.1</string>
+    <key>MEMORY_DB_PORT</key>
+    <string>55432</string>
+    <key>MEMORY_DB_USER</key>
+    <string>memory_app</string>
+    <key>MEMORY_DB_NAME</key>
+    <string>memory_main</string>
+    <key>MEMORY_DB_AUTO_INIT</key>
+    <string>false</string>
+    <key>MEMORY_EMBED_PRIMARY</key>
+    <string>studio-qwen-embed-0.6b</string>
+    <key>MEMORY_EMBED_FALLBACK</key>
+    <string>studio-mxbai-embed-large-v1</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>WorkingDirectory</key>
+  <string>/Users/thestudio/optillm-proxy/layer-data/vector-db</string>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/data/memory-main/logs/memory-api-main.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/data/memory-main/logs/memory-api-main.err</string>
+  <key>UserName</key>
+  <string>thestudio</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>LowPriorityBackgroundIO</key>
+  <true/>
+</dict>
+</plist>

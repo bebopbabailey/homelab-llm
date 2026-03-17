@@ -1,0 +1,14 @@
+{"query_id":"M01","bucket":"instrument_lookup","query":"How do I split the Nord Stage keyboard into zones for left-hand bass and right-hand piano?","answerable":true,"must_have_signals":["split","zone","Nord Stage"],"notes":"nord split"}
+{"query_id":"M02","bucket":"instrument_lookup","query":"How do I save and recall a Performance on Yamaha MODX?","answerable":true,"must_have_signals":["Performance","store","recall","MODX"],"notes":"modx performance"}
+{"query_id":"M03","bucket":"instrument_lookup","query":"How do I route MIDI out from MODX to external gear while keeping local control?","answerable":true,"must_have_signals":["MIDI","local control","MODX"],"notes":"midi routing"}
+{"query_id":"M04","bucket":"instrument_lookup","query":"How do I assign expression pedal behavior on Nord Stage?","answerable":true,"must_have_signals":["pedal","assign","Nord"],"notes":"pedal assignment"}
+{"query_id":"M05","bucket":"signal_flow","query":"What is a safe gain staging order for synth -> interface -> DAW?","answerable":true,"must_have_signals":["gain staging","interface","DAW"],"notes":"signal path"}
+{"query_id":"M06","bucket":"signal_flow","query":"How do I avoid clipping when layering multiple keyboard parts live?","answerable":true,"must_have_signals":["clipping","layer","level"],"notes":"live levels"}
+{"query_id":"M07","bucket":"procedure","query":"How do I factory reset a keyboard without losing user backups?","answerable":true,"must_have_signals":["backup","factory reset"],"notes":"safety procedure"}
+{"query_id":"M08","bucket":"procedure","query":"How do I back up patches/programs from hardware to USB?","answerable":true,"must_have_signals":["backup","USB","program"],"notes":"backup path"}
+{"query_id":"M09","bucket":"procedure","query":"How do I update firmware for my instrument safely?","answerable":true,"must_have_signals":["firmware","update","power"],"notes":"firmware safety"}
+{"query_id":"M10","bucket":"troubleshooting","query":"Why is there no sound from the right output channel on stage?","answerable":true,"must_have_signals":["output","cable","mono/stereo"],"notes":"output debug"}
+{"query_id":"M11","bucket":"troubleshooting","query":"Why does sustain pedal polarity feel reversed and how do I fix it?","answerable":true,"must_have_signals":["pedal polarity","sustain"],"notes":"pedal polarity"}
+{"query_id":"M12","bucket":"troubleshooting","query":"How do I troubleshoot MIDI clock sync drifting between devices?","answerable":true,"must_have_signals":["MIDI clock","sync","drift"],"notes":"clock sync"}
+{"query_id":"M13","bucket":"negative_control","query":"What is the Kubernetes Helm chart for my Nord Stage manual?","answerable":false,"must_have_signals":["not applicable"],"notes":"nonsense control"}
+{"query_id":"M14","bucket":"negative_control","query":"Which Redis shard stores MODX firmware states in this rig?","answerable":false,"must_have_signals":["no redis"],"notes":"dependency hallucination"}

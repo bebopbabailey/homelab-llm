@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.memory-backup-nightly</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd /Users/thestudio/optillm-proxy/layer-data/vector-db &amp;&amp; ./scripts/run_backup.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>4</integer>
+    <key>Minute</key>
+    <integer>5</integer>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MEMORY_DB_HOST</key>
+    <string>127.0.0.1</string>
+    <key>MEMORY_DB_PORT</key>
+    <string>55432</string>
+    <key>MEMORY_DB_USER</key>
+    <string>memory_app</string>
+    <key>MEMORY_DB_NAME</key>
+    <string>memory_main</string>
+    <key>MEMORY_BACKUP_DIR</key>
+    <string>/Users/thestudio/data/memory-main/backups</string>
+    <key>MEMORY_WAL_ARCHIVE_DIR</key>
+    <string>/Users/thestudio/data/memory-main/postgres/wal_archive</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/data/memory-main/logs/memory-backup-nightly.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/data/memory-main/logs/memory-backup-nightly.err</string>
+  <key>UserName</key>
+  <string>thestudio</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>LowPriorityBackgroundIO</key>
+  <true/>
+</dict>
+</plist>

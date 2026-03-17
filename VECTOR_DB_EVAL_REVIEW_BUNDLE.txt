@@ -1,0 +1,1123 @@
+VECTOR DB EVAL REVIEW BUNDLE
+
+Item 1: current harness
+Source: layer-data/vector-db/scripts/eval_memory_quality.py
+```python
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import math
+import statistics
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+
+GRADE_VALUES = {0, 1, 2}
+SUPPORT = "support"
+DISCONFIRM = "disconfirm"
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line_no, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid jsonl at {path}:{line_no}: {exc}") from exc
+            if not isinstance(rec, dict):
+                raise ValueError(f"invalid record type at {path}:{line_no}: expected object")
+            rows.append(rec)
+    return rows
+
+
+def _post_json(url: str, payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url=url,
+        data=body,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+            raw = resp.read().decode("utf-8")
+            if not raw:
+                return {}
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+            return {"data": parsed}
+    except urllib.error.HTTPError as exc:
+        text = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"HTTP {exc.code} POST {url}: {text[:500]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"request failed POST {url}: {exc.reason}") from exc
+
+
+def _normalize_text(value: Any) -> str:
+    return " ".join(str(value or "").lower().split())
+
+
+def _normalize_signals(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    out: list[str] = []
+    for value in values:
+        text = _normalize_text(value)
+        if text:
+            out.append(text)
+    return out
+
+
+def _case_polarity(case: dict[str, Any]) -> str:
+    raw = _normalize_text(case.get("evidence_polarity", ""))
+    if raw in {SUPPORT, DISCONFIRM}:
+        return raw
+    bucket = _normalize_text(case.get("bucket", ""))
+    return DISCONFIRM if bucket == "negative_control" else SUPPORT
+
+
+def _case_match_mode(case: dict[str, Any]) -> str:
+    raw = _normalize_text(case.get("signal_match_mode", ""))
+    return raw if raw in {"all", "min_k"} else "all"
+
+
+def _case_signal_min_k(case: dict[str, Any], signal_count: int) -> int:
+    if signal_count <= 0:
+        return 0
+    raw = case.get("signal_min_k", 0)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        value = signal_count if _case_match_mode(case) == "all" else min(2, signal_count)
+    return max(1, min(value, signal_count))
+
+
+def _case_meta(case: dict[str, Any]) -> dict[str, Any]:
+    signals = _normalize_signals(case.get("must_have_signals", []))
+    return {
+        "bucket": str(case.get("bucket", "")),
+        "polarity": _case_polarity(case),
+        "match_mode": _case_match_mode(case),
+        "signals": signals,
+        "signal_min_k": _case_signal_min_k(case, len(signals)),
+    }
+
+
+def _hit_blob(hit: dict[str, Any]) -> str:
+    parts = [
+        hit.get("title", ""),
+        hit.get("uri", ""),
+        hit.get("text", ""),
+    ]
+    return _normalize_text("\n".join(str(part or "") for part in parts))
+
+
+def _matched_signals(blob: str, signals: list[str]) -> list[str]:
+    return [signal for signal in signals if signal in blob]
+
+
+def _is_strong_match(meta: dict[str, Any], matched_count: int) -> bool:
+    signals = meta.get("signals", [])
+    if not signals:
+        return False
+    if meta.get("match_mode") == "all":
+        return matched_count >= len(signals)
+    return matched_count >= int(meta.get("signal_min_k", 0) or 0)
+
+
+def _grade_hit(hit: dict[str, Any], case: dict[str, Any], mode: str) -> tuple[int, str]:
+    meta = _case_meta(case)
+    blob = _hit_blob(hit)
+    matched = _matched_signals(blob, meta["signals"])
+    matched_count = len(matched)
+    strong = _is_strong_match(meta, matched_count)
+    partial = matched_count > 0
+
+    if mode == "strict_binary":
+        grade = 2 if strong else 0
+    else:
+        if strong:
+            grade = 2
+        elif partial:
+            grade = 1
+        else:
+            grade = 0
+
+    note = (
+        f"auto:{mode};polarity={meta['polarity']};policy={meta['match_mode']}:{meta['signal_min_k']};"
+        f"matched={matched_count}/{len(meta['signals'])};signals={ '|'.join(matched) if matched else '-' }"
+    )
+    return grade, note
+
+
+def _preview(text: str, limit: int = 220) -> str:
+    one_line = " ".join((text or "").split())
+    if len(one_line) <= limit:
+        return one_line
+    return one_line[: limit - 3] + "..."
+
+
+def _load_judgments(path: Path) -> dict[tuple[str, int], int]:
+    labels: dict[tuple[str, int], int] = {}
+    with path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        required = {"query_id", "rank", "grade"}
+        if not required.issubset(set(reader.fieldnames or [])):
+            raise ValueError(f"judgment csv missing required columns: {sorted(required)}")
+        for row in reader:
+            qid = str(row.get("query_id", "")).strip()
+            if not qid:
+                continue
+            try:
+                rank = int(str(row.get("rank", "")).strip())
+                grade = int(str(row.get("grade", "")).strip())
+            except ValueError:
+                continue
+            if rank < 1 or grade not in GRADE_VALUES:
+                continue
+            labels[(qid, rank)] = grade
+    return labels
+
+
+def _load_existing_grades(path: Path) -> dict[tuple[str, int], int]:
+    if not path.exists():
+        return {}
+    try:
+        return _load_judgments(path)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _parse_grade_line(raw: str) -> list[int] | None:
+    parts = raw.strip().split()
+    if len(parts) != 10:
+        return None
+    out: list[int] = []
+    for p in parts:
+        if p not in {"0", "1", "2"}:
+            return None
+        out.append(int(p))
+    return out
+
+
+def _write_judgments_csv(path: Path, rows: list[list[Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["run_id", "query_id", "rank", "chunk_id", "doc_id", "grade", "labeler", "notes"])
+        for row in rows:
+            writer.writerow(row)
+
+
+def _rows_from_cases(cases: list[dict[str, Any]], run_id: str, seed: dict[tuple[str, int], int] | None = None) -> tuple[list[list[Any]], dict[tuple[str, int], int]]:
+    rows: list[list[Any]] = []
+    index: dict[tuple[str, int], int] = {}
+    seeded = seed or {}
+    for case in cases:
+        qid = str(case.get("query_id", ""))
+        hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+        for rank in range(1, 11):
+            hit = hits[rank - 1] if rank <= len(hits) else {}
+            grade = seeded.get((qid, rank), 0)
+            note = "seeded-existing" if (qid, rank) in seeded else "default-0"
+            row = [
+                run_id,
+                qid,
+                rank,
+                hit.get("chunk_id", ""),
+                hit.get("doc_id", ""),
+                grade,
+                "seed",
+                note,
+            ]
+            index[(qid, rank)] = len(rows)
+            rows.append(row)
+    return rows, index
+
+
+def _read_triage_ids(path: Path) -> list[str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    ids = payload.get("flagged_query_ids", [])
+    if not isinstance(ids, list):
+        return []
+    out: list[str] = []
+    for value in ids:
+        qid = str(value).strip()
+        if qid:
+            out.append(qid)
+    return out
+
+
+def _metric_bundle(cases: list[dict[str, Any]], labels: dict[tuple[str, int], int]) -> tuple[dict[str, float], dict[str, float]]:
+    if not cases:
+        return {
+            "hit_at_5": 0.0,
+            "mrr_at_10": 0.0,
+            "ndcg_at_10": 0.0,
+            "bad_hit_rate_at_5": 0.0,
+            "p95_latency_ms": 0.0,
+        }, {}
+
+    hit5_vals: list[float] = []
+    mrr10_vals: list[float] = []
+    ndcg10_vals: list[float] = []
+    bad_rate5_vals: list[float] = []
+    latency_vals: list[float] = []
+    bucket_hit5: dict[str, list[float]] = {}
+
+    for case in cases:
+        qid = str(case.get("query_id", ""))
+        bucket = str(case.get("bucket", ""))
+        latency = float(case.get("latency_ms", 0.0) or 0.0)
+        latency_vals.append(latency)
+
+        grades = [labels.get((qid, rank), 0) for rank in range(1, 11)]
+        top5 = grades[:5]
+
+        hit5 = 1.0 if any(grade == 2 for grade in top5) else 0.0
+        hit5_vals.append(hit5)
+        bucket_hit5.setdefault(bucket, []).append(hit5)
+
+        rr = 0.0
+        for idx, grade in enumerate(grades, start=1):
+            if grade == 2:
+                rr = 1.0 / idx
+                break
+        mrr10_vals.append(rr)
+
+        dcg = _dcg(grades)
+        ideal = sorted(grades, reverse=True)
+        idcg = _dcg(ideal)
+        ndcg10_vals.append((dcg / idcg) if idcg > 0 else 0.0)
+
+        bad_rate5_vals.append(sum(1 for grade in top5 if grade == 0) / 5.0)
+
+    p95_latency = statistics.quantiles(latency_vals, n=100, method="inclusive")[94] if len(latency_vals) > 1 else latency_vals[0]
+    metrics = {
+        "hit_at_5": round(sum(hit5_vals) / len(hit5_vals), 4),
+        "mrr_at_10": round(sum(mrr10_vals) / len(mrr10_vals), 4),
+        "ndcg_at_10": round(sum(ndcg10_vals) / len(ndcg10_vals), 4),
+        "bad_hit_rate_at_5": round(sum(bad_rate5_vals) / len(bad_rate5_vals), 4),
+        "p95_latency_ms": round(p95_latency, 3),
+    }
+    buckets = {bucket: round(sum(values) / len(values), 4) for bucket, values in sorted(bucket_hit5.items()) if values}
+    return metrics, buckets
+
+
+def _dcg(grades: list[int]) -> float:
+    total = 0.0
+    for idx, grade in enumerate(grades, start=1):
+        gain = (2**grade) - 1
+        total += gain / math.log2(idx + 1)
+    return total
+
+
+def _print_pack(pack_path: Path) -> int:
+    pack = _read_jsonl(pack_path)
+    print(f"# Vector DB Quality Query Pack\n# path={pack_path}\n# total={len(pack)}\n")
+    for row in pack:
+        print(f"[{row['query_id']}] ({row['bucket']}) {row['query']}")
+    return 0
+
+
+def _run_pack(args: argparse.Namespace) -> int:
+    pack = _read_jsonl(Path(args.pack))
+    out: list[dict[str, Any]] = []
+    for row in pack:
+        query = str(row.get("query", ""))
+        if not query:
+            continue
+        started = time.perf_counter()
+        response = _post_json(
+            f"{args.api_base.rstrip('/')}/v1/memory/search",
+            {
+                "query": query,
+                "top_k": args.top_k,
+                "lexical_k": args.lexical_k,
+                "vector_k": args.vector_k,
+                "model_space": args.model_space,
+            },
+            timeout_seconds=args.timeout,
+        )
+        latency_ms = round((time.perf_counter() - started) * 1000.0, 3)
+        hits = response.get("hits", [])
+        if not isinstance(hits, list):
+            hits = []
+        meta = _case_meta(row)
+        out.append(
+            {
+                "query_id": row.get("query_id", ""),
+                "bucket": row.get("bucket", ""),
+                "query": query,
+                "answerable": bool(row.get("answerable", True)),
+                "evidence_polarity": meta["polarity"],
+                "must_have_signals": row.get("must_have_signals", []),
+                "signal_match_mode": meta["match_mode"],
+                "signal_min_k": meta["signal_min_k"],
+                "notes": row.get("notes", ""),
+                "latency_ms": latency_ms,
+                "hit_count": len(hits),
+                "hits": hits,
+            }
+        )
+
+    report = {
+        "run_id": args.run_id,
+        "created_unix": int(time.time()),
+        "api_base": args.api_base,
+        "params": {
+            "model_space": args.model_space,
+            "top_k": args.top_k,
+            "lexical_k": args.lexical_k,
+            "vector_k": args.vector_k,
+            "timeout": args.timeout,
+        },
+        "cases_total": len(out),
+        "cases": out,
+    }
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"ok": True, "out": str(out_path), "cases_total": len(out)}, indent=2))
+    return 0
+
+
+def _autolabel(args: argparse.Namespace) -> int:
+    run = json.loads(Path(args.run_json).read_text(encoding="utf-8"))
+    cases = run.get("cases", [])
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("run-json has no cases")
+
+    if args.mode not in {"strict_binary", "conservative_graded"}:
+        raise ValueError("unsupported autolabel mode")
+
+    run_id = str(run.get("run_id", args.run_id or "RUN"))
+    rows: list[list[Any]] = []
+    grade_counts = {0: 0, 1: 0, 2: 0}
+
+    for case in cases:
+        qid = str(case.get("query_id", ""))
+        hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+        for rank in range(1, 11):
+            hit = hits[rank - 1] if rank <= len(hits) else {}
+            grade, note = _grade_hit(hit, case, args.mode)
+            grade_counts[grade] += 1
+            rows.append(
+                [
+                    run_id,
+                    qid,
+                    rank,
+                    hit.get("chunk_id", ""),
+                    hit.get("doc_id", ""),
+                    grade,
+                    args.labeler,
+                    note,
+                ]
+            )
+
+    out_path = Path(args.out_csv)
+    _write_judgments_csv(out_path, rows)
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "out": str(out_path),
+                "rows": len(rows),
+                "mode": args.mode,
+                "graded_2": grade_counts[2],
+                "graded_1": grade_counts[1],
+                "graded_0": grade_counts[0],
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _triage(args: argparse.Namespace) -> int:
+    run = json.loads(Path(args.run_json).read_text(encoding="utf-8"))
+    cases = run.get("cases", [])
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("run-json has no cases")
+    labels = _load_judgments(Path(args.judgments))
+
+    flagged: list[dict[str, Any]] = []
+    flagged_ids: list[str] = []
+    for case in cases:
+        qid = str(case.get("query_id", ""))
+        polarity = _case_polarity(case)
+        bucket = str(case.get("bucket", ""))
+        grades = [labels.get((qid, rank), 0) for rank in range(1, 11)]
+        top5 = grades[:5]
+        reasons: list[str] = []
+
+        if polarity == SUPPORT:
+            if bucket == "exact_lookup" and (not top5 or top5[0] != 2):
+                reasons.append("exact_lookup_top1_not_grade2")
+            if not any(grade == 2 for grade in top5):
+                reasons.append("no_grade2_top5")
+            if any(grade == 1 for grade in top5) and not any(grade == 2 for grade in top5):
+                reasons.append("only_partial_top5")
+            first_two = next((idx for idx, grade in enumerate(grades, start=1) if grade == 2), None)
+            if first_two is not None and first_two > 3 and grades[0] == 0:
+                reasons.append("weak_top1_late_first_grade2")
+        else:
+            if not any(grade == 2 for grade in top5):
+                reasons.append("no_disconfirm_grade2_top5")
+            if any(grade == 1 for grade in top5) and not any(grade == 2 for grade in top5):
+                reasons.append("only_partial_disconfirm_top5")
+
+        if reasons:
+            flagged_ids.append(qid)
+            hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+            flagged.append(
+                {
+                    "query_id": qid,
+                    "bucket": bucket,
+                    "evidence_polarity": polarity,
+                    "reasons": reasons,
+                    "top5": [
+                        {
+                            "rank": rank,
+                            "grade": grades[rank - 1],
+                            "title": str((hits[rank - 1] if rank <= len(hits) else {}).get("title", "")),
+                            "uri": str((hits[rank - 1] if rank <= len(hits) else {}).get("uri", "")),
+                        }
+                        for rank in range(1, 6)
+                    ],
+                }
+            )
+
+    out = {
+        "ok": True,
+        "run_id": run.get("run_id", ""),
+        "flagged_count": len(flagged),
+        "flagged_query_ids": flagged_ids,
+        "flags": flagged,
+    }
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(out, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"ok": True, "out": str(out_path), "flagged_count": len(flagged)}, indent=2))
+    return 0
+
+
+def _label(args: argparse.Namespace) -> int:
+    run = json.loads(Path(args.run_json).read_text(encoding="utf-8"))
+    cases = run.get("cases", [])
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("run-json has no cases")
+
+    out_path = Path(args.out_csv)
+    seed_path = Path(args.seed_judgments) if args.seed_judgments else None
+    if args.triage_json and seed_path is None:
+        raise ValueError("--triage-json requires --seed-judgments so unreviewed rows are preserved")
+
+    existing = _load_existing_grades(seed_path) if seed_path else _load_existing_grades(out_path)
+    run_id = str(run.get("run_id", args.run_id or "RUN"))
+    rows, row_index = _rows_from_cases(cases, run_id, existing)
+
+    case_map = {str(case.get("query_id", "")): case for case in cases}
+    if args.triage_json:
+        qids = _read_triage_ids(Path(args.triage_json))
+        review_cases = [case_map[qid] for qid in qids if qid in case_map]
+        if not review_cases:
+            _write_judgments_csv(out_path, rows)
+            print(json.dumps({"ok": True, "out": str(out_path), "saved_rows": len(rows), "quit_early": False, "reviewed_cases": 0}, indent=2))
+            return 0
+    else:
+        review_cases = cases
+
+    print("\nInteractive grader")
+    print("Enter grades for ranks 1..10 as: 2 1 0 0 0 0 0 0 0 0")
+    print("Commands: 's' = keep existing/skip, 'q' = save and quit\n")
+
+    for idx, case in enumerate(review_cases, start=1):
+        qid = str(case.get("query_id", ""))
+        query = str(case.get("query", ""))
+        polarity = _case_polarity(case)
+        signals = case.get("must_have_signals", [])
+        hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+
+        print("=" * 88)
+        print(f"[{idx}/{len(review_cases)}] {qid}")
+        print(f"Query: {query}")
+        print(f"Polarity: {polarity}")
+        print(f"Signals: {signals}")
+        print("-" * 88)
+
+        for rank in range(1, 11):
+            hit = hits[rank - 1] if rank <= len(hits) else {}
+            title = str(hit.get("title", ""))
+            uri = str(hit.get("uri", ""))
+            text = _preview(str(hit.get("text", "")))
+            existing_grade = rows[row_index[(qid, rank)]][5]
+            print(f"[{rank}] chunk={hit.get('chunk_id', '')} doc={hit.get('doc_id', '')} existing={existing_grade}")
+            if title:
+                print(f"    title: {title}")
+            if uri:
+                print(f"    uri:   {uri}")
+            if text:
+                print(f"    text:  {text}")
+
+        while True:
+            raw = input("\nGrades (10 nums) / s / q: ").strip().lower()
+            if raw == "q":
+                _write_judgments_csv(out_path, rows)
+                print(json.dumps({"ok": True, "out": str(out_path), "saved_rows": len(rows), "quit_early": True}, indent=2))
+                return 0
+            if raw == "s":
+                break
+
+            grades = _parse_grade_line(raw)
+            if grades is None:
+                print("Invalid input. Enter exactly 10 values of 0/1/2, or 's', or 'q'.")
+                continue
+
+            for rank, grade in enumerate(grades, start=1):
+                row = rows[row_index[(qid, rank)]]
+                row[5] = grade
+                row[6] = args.labeler
+                row[7] = "manual-interactive"
+            break
+
+        print()
+
+    _write_judgments_csv(out_path, rows)
+    print(json.dumps({"ok": True, "out": str(out_path), "saved_rows": len(rows), "quit_early": False, "reviewed_cases": len(review_cases)}, indent=2))
+    return 0
+
+
+def _score(args: argparse.Namespace) -> int:
+    run = json.loads(Path(args.run_json).read_text(encoding="utf-8"))
+    cases = run.get("cases", [])
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("run-json has no cases")
+    labels = _load_judgments(Path(args.judgments))
+
+    metrics_all, bucket_all = _metric_bundle(cases, labels)
+    support_cases = [case for case in cases if _case_polarity(case) == SUPPORT]
+    disconfirm_cases = [case for case in cases if _case_polarity(case) == DISCONFIRM]
+    metrics_support, bucket_support = _metric_bundle(support_cases, labels)
+    metrics_disconfirm, bucket_disconfirm = _metric_bundle(disconfirm_cases, labels)
+
+    support_bucket_floor = all(value >= 0.75 for value in bucket_support.values()) if bucket_support else True
+    disconfirm_hit = metrics_disconfirm["hit_at_5"] if disconfirm_cases else 1.0
+    p95_latency = metrics_all["p95_latency_ms"]
+
+    summary = {
+        "run_id": run.get("run_id", ""),
+        "input": {
+            "run_json": args.run_json,
+            "judgments": args.judgments,
+        },
+        "params": run.get("params", {}),
+        "case_counts": {
+            "total": len(cases),
+            "support": len(support_cases),
+            "disconfirm": len(disconfirm_cases),
+        },
+        "metrics": metrics_all,
+        "metrics_legacy": metrics_all,
+        "metrics_support": metrics_support,
+        "metrics_disconfirm": metrics_disconfirm,
+        "bucket_hit_at_5": bucket_all,
+        "bucket_hit_at_5_support": bucket_support,
+        "bucket_hit_at_5_disconfirm": bucket_disconfirm,
+        "diagnostics": {
+            "bad_hit_rate_at_5": metrics_all["bad_hit_rate_at_5"],
+        },
+        "gates": {
+            "hit_at_5": metrics_support["hit_at_5"] >= 0.85,
+            "mrr_at_10": metrics_support["mrr_at_10"] >= 0.65,
+            "ndcg_at_10": metrics_support["ndcg_at_10"] >= 0.70,
+            "bucket_floor": support_bucket_floor,
+            "disconfirm_hit_at_5": disconfirm_hit >= 0.67,
+            "p95_latency_ms": p95_latency <= 800.0,
+        },
+    }
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"ok": True, "out": str(out_path)}, indent=2))
+    return 0
+
+
+def _compare(args: argparse.Namespace) -> int:
+    base = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+    cand = json.loads(Path(args.candidate).read_text(encoding="utf-8"))
+
+    bm_support = base.get("metrics_support") or base.get("metrics", {})
+    cm_support = cand.get("metrics_support") or cand.get("metrics", {})
+    bm_disconfirm = base.get("metrics_disconfirm", {})
+    cm_disconfirm = cand.get("metrics_disconfirm", {})
+
+    def _d(bm: dict[str, Any], cm: dict[str, Any], key: str) -> float:
+        return round(float(cm.get(key, 0.0)) - float(bm.get(key, 0.0)), 4)
+
+    report = {
+        "baseline": args.baseline,
+        "candidate": args.candidate,
+        "delta": {
+            "hit_at_5": _d(bm_support, cm_support, "hit_at_5"),
+            "mrr_at_10": _d(bm_support, cm_support, "mrr_at_10"),
+            "ndcg_at_10": _d(bm_support, cm_support, "ndcg_at_10"),
+            "bad_hit_rate_at_5": _d(base.get("metrics", {}), cand.get("metrics", {}), "bad_hit_rate_at_5"),
+            "p95_latency_ms": _d(base.get("metrics", {}), cand.get("metrics", {}), "p95_latency_ms"),
+            "disconfirm_hit_at_5": _d(bm_disconfirm, cm_disconfirm, "hit_at_5"),
+        },
+    }
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"ok": True, "out": str(out_path)}, indent=2))
+    return 0
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Vector DB retrieval quality evaluation helper")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_print = sub.add_parser("print-pack", help="Print query pack")
+    p_print.add_argument("--pack", required=True)
+
+    p_run = sub.add_parser("run-pack", help="Run query pack against memory API")
+    p_run.add_argument("--pack", required=True)
+    p_run.add_argument("--api-base", default="http://127.0.0.1:55440")
+    p_run.add_argument("--model-space", choices=["qwen", "mxbai"], default="qwen")
+    p_run.add_argument("--top-k", type=int, default=10)
+    p_run.add_argument("--lexical-k", type=int, default=30)
+    p_run.add_argument("--vector-k", type=int, default=30)
+    p_run.add_argument("--timeout", type=int, default=20)
+    p_run.add_argument("--run-id", required=True)
+    p_run.add_argument("--out", required=True)
+
+    p_auto = sub.add_parser("autolabel", help="Auto-label a run JSON using signal rules")
+    p_auto.add_argument("--run-json", required=True)
+    p_auto.add_argument("--out-csv", required=True)
+    p_auto.add_argument("--mode", choices=["strict_binary", "conservative_graded"], default="conservative_graded")
+    p_auto.add_argument("--labeler", default="codex-auto")
+    p_auto.add_argument("--run-id", default=None)
+
+    p_triage = sub.add_parser("triage", help="Flag only the cases that need human review")
+    p_triage.add_argument("--run-json", required=True)
+    p_triage.add_argument("--judgments", required=True)
+    p_triage.add_argument("--out", required=True)
+
+    p_score = sub.add_parser("score", help="Score judged run output")
+    p_score.add_argument("--run-json", required=True)
+    p_score.add_argument("--judgments", required=True)
+    p_score.add_argument("--out", required=True)
+
+    p_compare = sub.add_parser("compare", help="Compare two score summaries")
+    p_compare.add_argument("--baseline", required=True)
+    p_compare.add_argument("--candidate", required=True)
+    p_compare.add_argument("--out", required=True)
+
+    p_label = sub.add_parser("label", help="Interactive 0/1/2 grader for a run JSON")
+    p_label.add_argument("--run-json", required=True)
+    p_label.add_argument("--out-csv", required=True)
+    p_label.add_argument("--labeler", default="human")
+    p_label.add_argument("--run-id", default=None)
+    p_label.add_argument("--seed-judgments", default=None)
+    p_label.add_argument("--triage-json", default=None)
+
+    return parser.parse_args()
+
+
+def main() -> int:
+    try:
+        args = parse_args()
+        if args.cmd == "print-pack":
+            return _print_pack(Path(args.pack))
+        if args.cmd == "run-pack":
+            return _run_pack(args)
+        if args.cmd == "autolabel":
+            return _autolabel(args)
+        if args.cmd == "triage":
+            return _triage(args)
+        if args.cmd == "score":
+            return _score(args)
+        if args.cmd == "compare":
+            return _compare(args)
+        if args.cmd == "label":
+            return _label(args)
+        raise ValueError(f"unknown cmd: {args.cmd}")
+    except Exception as exc:  # noqa: BLE001
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+Item 2: sample D1.run.json output
+Sample scope: query ids D01 and D02 only
+```json
+{
+  "api_base": "http://127.0.0.1:55440",
+  "cases": [
+    {
+      "answerable": true,
+      "bucket": "exact_lookup",
+      "hit_count": 10,
+      "hits": [
+        {
+          "chunk_id": 1,
+          "chunk_index": 0,
+          "doc_id": 1,
+          "model_space": "qwen",
+          "rrf_score": 0.99825603,
+          "source": "repo_docs_pilot",
+          "source_message_id": "a821eb5840dff0c3c1fe0b4d",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Agent Guidance: Vector DB (Studio Main Store)\n\n## Scope\n- Studio-only main memory store for general retrieval over personal/export data.\n- Postgres + pgvector, localhost-only bindings.\n\n## Guardrails\n- Do not expose new LAN ports without explicit plan + approval.\n- Do not mix embedding spaces in one vector index.\n- Keep Mini web-search pipeline out of scope for this service.\n- Keep rollout shadow-first before coupling to production inference flows.\n\n## Runtime ownership\n- Studio launchd labels under `com.bebop.*` only.\n- All owned labels must be allowlisted/audited by Studio scheduling policy.",
+          "timestamp_utc": "2026-03-04T02:08:03.034647+00:00",
+          "title": "AGENTS",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/AGENTS.md"
+        },
+        {
+          "chunk_id": 2,
+          "chunk_index": 0,
+          "doc_id": 2,
+          "model_space": "qwen",
+          "rrf_score": 0.99463046,
+          "source": "repo_docs_pilot",
+          "source_message_id": "8c291692576b5bd283d1cec2",
+          "source_thread_id": "layer-data/vector-db/docs",
+          "text": "# Vector DB docs\n\nService-specific deep references for the Studio main vector store.\n\nPlanned additions:\n- `SCHEMA.md`: table-level contract and migration notes\n- `EMBEDDING_SPACES.md`: dual-index rationale and fallback behavior\n- `RETENTION_AND_BACKUP.md`: base backup, WAL policy, restore drills\n- `QUALITY_GATES.md`: shadow-mode acceptance criteria before inference coupling",
+          "timestamp_utc": "2026-03-04T02:12:58.322539+00:00",
+          "title": "README",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/docs/README.md"
+        },
+        {
+          "chunk_id": 3,
+          "chunk_index": 0,
+          "doc_id": 3,
+          "model_space": "qwen",
+          "rrf_score": 0.9906413,
+          "source": "repo_docs_pilot",
+          "source_message_id": "d9f070ccaebea13835c1b7a4",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Service Spec: Vector DB (Studio Main Store)\n\n## Purpose\nProvide Studio-local durable memory retrieval over personal/export corpora.\n\n## Runtime\n- Host: Studio (macOS)\n- Store: Postgres 16 + pgvector\n- API: FastAPI (Uvicorn)\n- Management: launchd (`com.bebop.*` labels)\n\n## Launchd identity contract\n- Domain: `system`\n- Managed labels:\n  - `com.bebop.pgvector-main`\n  - `com.bebop.memory-api-main`\n  - `com.bebop.memory-ingest-nightly`\n  - `com.bebop.memory-backup-nightly`\n- Plist paths:\n  - `/Library/LaunchDaemons/com.bebop.pgvector-main.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-api-main.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-ingest-nightly.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-backup-nightly.plist`\n- Scheduling/allowlist policy:\n  - `platform/ops/templates/studio_scheduling_policy.json`\n  - `docs/foundation/studio-scheduling-policy.md`\n- Operational wrapper for transient Studio commands:\n  - `platform/ops/scripts/studio_run_utility.sh`\n\n## v1 endpoints\n- `GET /health`\n- `GET /v1/memory/stats`\n- `POST /v1/embeddings`\n- `POST /v1/memory/upsert`\n- `POST /v1/memory/search`\n- `POST /v1/memory/delete`\n\n## Network bindings (v1)\n- Postgres: `127.0.0.1:55432`\n- Memory API: `127.0.0.1:55440`\n\n## Backend modes\n- `MEMORY_BACKEND=legacy|haystack`\n- Default remains `legacy` until cutover.\n- Rollback contract: set `MEMORY_BACKEND=legacy` and restart `com.bebop.memory-api-main`.\n\n## Embedding spaces\n- `qwen` space: `studio-qwen-embed-0.6b` (`Qwen/Qwen3-Embedding-0.6B`)\n- `mxbai` space: `studio-mxbai-embed-large-v1` (`mixedbread-ai/mxbai-embed-large-v1`)\n- Query embeddings use model-specific query prompt/prefix.\n- Document embeddings are unprompted.\n\n## Retrieval contract\n- Hybrid lexical + vector retrieval.\n- Haystack mode components:\n  - `PgvectorKeywordRetriever`\n  - `PgvectorEmbeddingRetriever`\n  - `DocumentJoiner(join_mode=\"reciprocal_rank_fusion\")`\n  - `SentenceTransformersSimilarityRanker` (optional via `MEMORY_RERANK_ENABLED`)\n- `model_space` is strict; no cross-space retrieval fallback.\n\n## Data model (minimum)\n- Legacy tables (unchanged):\n  - `memory_documents`\n  - `memory_chunks`\n  - `memory_vectors_qwen`\n  - `memory_vectors_mxbai`",
+          "timestamp_utc": "2026-03-06T00:30:33.462743+00:00",
+          "title": "SERVICE_SPEC",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/SERVICE_SPEC.md"
+        },
+        {
+          "chunk_id": 4,
+          "chunk_index": 0,
+          "doc_id": 4,
+          "model_space": "qwen",
+          "rrf_score": 0.98832792,
+          "source": "repo_docs_pilot",
+          "source_message_id": "3593d751271d9b49ba22d0c4",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Vector DB (Studio Main Store)\n\nPurpose: Studio-hosted durable memory store for general-use retrieval over\npersonal data exports.\n\nStatus: active v1 baseline, Studio-local only, with internal `legacy|haystack`\nbackend selection via `MEMORY_BACKEND`.\n\n## v1 contract\n- Engine: Postgres 16 + pgvector.\n- Exposure: localhost only (`127.0.0.1`).\n- Scope: personal/export corpus first (no web-search coupling in this service).\n- Retrieval: hybrid lexical + vector.\n- Internal backend mode: `legacy` or `haystack` (API contract unchanged).\n- Embeddings: dual-space indexing:\n  - primary: `studio-qwen-embed-0.6b`\n  - fallback: `studio-mxbai-embed-large-v1`\n\n## Components\n- API service: `app/main.py`\n- Backend implementations: `app/backends/*`\n- Service config/env parser: `app/config.py`\n- DB and schema bootstrap helpers: `app/db.py`, `sql/*.sql`\n- Embedding loader wrappers: `app/embed.py`\n- Legacy hybrid retrieval planner: `app/retrieval.py`\n- Batch ingest runner: `app/ingest.py`\n- Haystack schema bootstrap: `scripts/init_haystack_schema.py`\n- Studio launchd templates: `launchd/*.plist`\n- Studio operational scripts: `scripts/*`\n\n## Source-of-truth docs\n- `SERVICE_SPEC.md`\n- `ARCHITECTURE.md`\n- `RUNBOOK.md`\n- `CONSTRAINTS.md`",
+          "timestamp_utc": "2026-03-06T00:34:52.172630+00:00",
+          "title": "README",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/README.md"
+        },
+        {
+          "chunk_id": 5,
+          "chunk_index": 0,
+          "doc_id": 5,
+          "model_space": "qwen",
+          "rrf_score": 0.98575705,
+          "source": "repo_docs_pilot",
+          "source_message_id": "50dc323d231ddaf083a5ed6b",
+          "source_thread_id": "docs/foundation",
+          "text": "# Topology and Endpoints\n\n## Hosts\n- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, websearch-orch, Ollama.\n- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).\n- Mac Studio (planned): AFM OpenAI-compatible API endpoint.\n- HP DietPi: Home Assistant.\n- Jetson Orin AGX: voice services (STT/TTS via Voice Gateway) and future edge inference/CV.\n\n## Host Dossier (new-agent quickstart)\nEach host entry: role, access path, source-of-truth docs, and safe validation commands.\n\n### Mini (Ubuntu 24.04)\n- Role: gateway + UI + search + orchestration.\n- Access: local repo on Mini.\n- Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.\n- Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires bearer auth for `/v1/*` and `/health`; readiness/liveliness and `/metrics/` are open).\n  LiteLLM `boost` routes to Studio OptiLLM proxy (`:4020`).\n\n### Studio (macOS)\n- Role: MLX inference host.\n- Access: `ssh studio`.\n- Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.\n- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8102/v1/models`.\n  Vector-store checks: `lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'`, `curl http://127.0.0.1:55440/health`.\n\n### Orin AGX\n- Role: voice services (STT/TTS via Voice Gateway) + edge inference + performance experiments.\n- Access: `ssh orin` (final name TBD).\n- Sources of truth: `docs/foundation/orin-agx.md`.\n- Storage offload mount: `/mnt/seagate` from Mini path\n  `christopherbailey@192.168.1.71:/mnt/seagate/orin-offload` (sshfs automount).\n- Safe checks: `findmnt /mnt/seagate -o TARGET,SOURCE,FSTYPE,OPTIONS`.\n\n### OV LLM Server (Mini)\n- Role: OpenVINO server on Mini.\n- Sources of truth: `docs/foundation/ov-llm-server.md`.\n\n## Ports and Endpoints (authoritative)\nPorts are immutable unless a migration is explicitly planned.\nDo not change po",
+          "timestamp_utc": "2026-03-04T02:13:25.109164+00:00",
+          "title": "topology",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/foundation/topology.md"
+        },
+        {
+          "chunk_id": 6,
+          "chunk_index": 0,
+          "doc_id": 6,
+          "model_space": "qwen",
+          "rrf_score": 0.98454446,
+          "source": "repo_docs_pilot",
+          "source_message_id": "f28840439ad4b94cdbec0aac",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Architecture: Studio Main Vector Store (v1)\n\n## High-level flow\n1. Nightly ingest job reads normalized JSONL from configured Studio-local path.\n2. Records are normalized to document/chunk rows with stable provenance keys.\n3. Embeddings are generated for both spaces (`qwen`, `mxbai`).\n4. Lexical and vector indexes are maintained in Postgres + pgvector.\n5. API serves health, upsert, search, delete, and stats endpoints.\n\n## Why dual embedding spaces\nDifferent embedding models map text into different latent spaces.\nDistance comparisons are only meaningful within the same model space.\nTherefore, v1 stores vectors in separate tables and queries one space at a time.\n\n## Retrieval plan (hybrid)\n- Lexical candidate set: Postgres FTS rank.\n- Vector candidate set: cosine distance in selected vector table.\n- Merge strategy: reciprocal-rank fusion (RRF) with deterministic weighting.\n- Output: top-k chunk hits with provenance and score breakdown.\n\n## Data integrity\n- Provenance-first schema for traceability:\n  `source`, `source_thread_id`, `source_message_id`, `timestamp`, `raw_ref`.\n- Idempotent upsert keys prevent duplicate ingest on reruns.\n- Ingest runs are tracked for audit/debug.\n\n## Boundaries\n- This service does not alter MLX lane behavior.\n- This service does not implement Mini web-search retrieval.\n- Cross-host gateway wiring is a separate phase.",
+          "timestamp_utc": "2026-03-04T02:08:28.549242+00:00",
+          "title": "ARCHITECTURE",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/ARCHITECTURE.md"
+        },
+        {
+          "chunk_id": 7,
+          "chunk_index": 0,
+          "doc_id": 7,
+          "model_space": "qwen",
+          "rrf_score": 0.97342885,
+          "source": "repo_docs_pilot",
+          "source_message_id": "32953b81e06e517168f5b7c8",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Runbook: Vector DB (Studio Main Store)\n\n## Scope\nStudio-local operations for Postgres + pgvector and memory API.\n\n## Utility wrapper\nUse the Studio utility wrapper for transient remote commands:\n`platform/ops/scripts/studio_run_utility.sh`.\n\n## Preflight (Mini)\n```bash\nuv run python platform/ops/scripts/validate_studio_policy.py --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json\n```\n\n## Deploy service code to Studio\n```bash\ncd /home/christopherbailey/homelab-llm/layer-data/vector-db\n./scripts/deploy_studio.sh\n```\n\n## Initialize DB on Studio (legacy schema)\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/studio_install.sh\"\n```\n\n## Initialize Haystack schema/tables\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \\\n   PYTHONPATH=. uv run python scripts/init_haystack_schema.py\"\n```\n\n## Start/restart Studio launchd labels\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.pgvector-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.memory-api-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.pgvector-main\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.memory-api-main\"\n```\n\n## Health checks\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/health | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/v1/memory/stats | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'\"\n```\n\n## Docs-first quality gate (canonical)\n\n### 1) Build repo docs pilot JSONL on Mini\n```bash\nmkdi",
+          "timestamp_utc": "2026-03-06T05:41:46.302558+00:00",
+          "title": "RUNBOOK",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/RUNBOOK.md"
+        },
+        {
+          "chunk_id": 8,
+          "chunk_index": 0,
+          "doc_id": 8,
+          "model_space": "qwen",
+          "rrf_score": 0.97208619,
+          "source": "repo_docs_pilot",
+          "source_message_id": "0722852f731f5bfc912a4d66",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Tasks: Vector DB (Studio Main Store)\n\n## Completed\n- [x] Service/API architecture and docs baseline.\n- [x] SQL schema for docs/chunks/vectors/ingest runs.\n- [x] Studio launchd templates + policy wiring for owned labels.\n- [x] Deploy/install scripts and runbook wiring for Studio utility wrapper.\n- [x] Baseline smoke-tested ingest/search/backup path documented.\n- [x] Codex history pilot corpus builder (`build_codex_history_pilot.py`) with deterministic IDs and secret redaction.\n- [x] QG1 evaluation scaffold (fixed query pack, judgment template, scoring helper).\n- [x] Backend abstraction (`legacy|haystack`) with contract-preserving API handlers.\n- [x] Haystack backend core retrieval path (keyword+vector+RRF+optional rerank).\n- [x] Haystack schema bootstrap script (`scripts/init_haystack_schema.py`).\n- [x] Ingest mode split (`jsonl` + `manuals_pdf`) with backend-aware writer path.\n- [x] Docs-first corpus builder (`build_repo_docs_pilot.py`) for deterministic canonical eval corpus.\n- [x] Split eval packs for docs and manuals (`query_pack.docs.v1.jsonl`, `query_pack.manuals.v1.jsonl`).\n\n## Next (active gate path)\n- [ ] Run docs-first gate (`D1`) end-to-end: ingest, run-pack, label, score.\n- [ ] Run manuals gate (`M1`) end-to-end: ingest, run-pack, label, score.\n- [ ] Compare `qwen` vs `mxbai` retrieval quality for D1 and M1.\n- [ ] Lock retrieval defaults only after docs and manuals gates pass independently.\n- [ ] Keep Codex-history corpus out of primary quality-gate decisions.\n\n## Deferred\n- [ ] Implement retention + compaction contract (daily/weekly/monthly windows).\n- [ ] Add restore drill script and parity query checks.",
+          "timestamp_utc": "2026-03-06T05:41:58.028825+00:00",
+          "title": "TASKS",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/TASKS.md"
+        },
+        {
+          "chunk_id": 9,
+          "chunk_index": 0,
+          "doc_id": 9,
+          "model_space": "qwen",
+          "rrf_score": 0.96180207,
+          "source": "repo_docs_pilot",
+          "source_message_id": "99fd4fad1a33df3170a17d54",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Constraints: Vector DB (Studio Main Store)\n\n## Hard constraints\n- Engine is Postgres + pgvector for v1.\n- Bindings are localhost-only for DB and API.\n- Service remains Studio-local in this phase; no cross-host client wiring.\n- Inference/retrieval integration is tool-mediated first (no blind auto-injection).\n- Data retention is explicit snapshots + WAL archival (no implicit TTL deletion).\n\n## Data constraints\n- Message-first chunking with deterministic long-message splitting.\n- Preserve provenance fields required by downstream citation and traceability.\n- Never combine vectors from different embedding models in a single distance space.\n- `model_space` routing is strict (`qwen` or `mxbai`), no cross-space fallback retrieval.\n\n## Retrieval implementation constraints\n- Haystack backend must use framework-native components for retrieval/fusion/rerank/filtering.\n- Do not add custom retrieval SQL in Haystack mode.\n- Do not add custom Haystack table/index DDL; let `PgvectorDocumentStore` manage table/index objects.\n- Allowed bootstrap SQL is limited to schema existence (`CREATE SCHEMA IF NOT EXISTS ...`).\n\n## Operational constraints\n- Launchd labels must be policy-audited in\n  `platform/ops/templates/studio_scheduling_policy.json`.\n- All deploy/restart actions to Studio should use `platform/ops/scripts/studio_run_utility.sh`.\n- Keep scripts idempotent and rollback-friendly.",
+          "timestamp_utc": "2026-03-06T00:30:42.211942+00:00",
+          "title": "CONSTRAINTS",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/CONSTRAINTS.md"
+        },
+        {
+          "chunk_id": 10,
+          "chunk_index": 1,
+          "doc_id": 10,
+          "model_space": "qwen",
+          "rrf_score": 0.76799047,
+          "source": "repo_docs_pilot",
+          "source_message_id": "b315395c07c422ff6ccd8c09",
+          "source_thread_id": "docs/_core",
+          "text": "bed as `mlx_lm.server` default | `mlxctl status --checks` reports `family=vllm-metal`; `mlxctl` source defaults `MLX_BACKEND` to `vllm-metal` | medium | fix_now | Replaced stale `mlx_lm.server` default-runtime wording with `vllm-metal` and marked legacy backends as fallback-only. |\n| CLAIM-OWUI-PERSISTENTCONFIG-2026-03 | `layer-gateway/litellm-orch/docs/openwebui.md` | Config authority | Documented that Open WebUI PersistentConfig stores env values after first start | `systemctl cat open-webui.service` includes drop-in `ENABLE_PERSISTENT_CONFIG=False` | medium | fix_now | Updated docs to state env/drop-ins are authoritative in current deployment. |\n| CLAIM-DATA-LAYER-STATUS-DRIFT-2026-03 | `SYSTEM_OVERVIEW.md`, `layer-data/RUNBOOK.md`, `layer-data/DEPENDENCIES.md`, `TOPOLOGY.md`, `layer-data/vector-db/README.md` | Data layer runtime status | Docs mixed active and future/scaffold-only wording for Studio vector-store and data-layer scope | Active topology and service docs include Studio-local `:55432/:55440` store and policy-managed labels in canonical runtime docs | high | fix_now | Updated wording to active baseline status and removed stale future/scaffold language in layer/root docs. |\n| CLAIM-VECTOR-RUNBOOK-UTILITY-DRIFT-2026-03 | `layer-data/vector-db/RUNBOOK.md` | Studio operations contract | Runbook used direct `ssh studio` commands despite utility-wrapper policy for transient commands | `docs/foundation/studio-scheduling-policy.md` requires transient Studio automation through `platform/ops/scripts/studio_run_utility.sh` | medium | fix_now | Rewrote vector-store runbook commands to use the Studio utility wrapper for remote transient operations. |\n| CLAIM-FOUNDATION-SOURCE-LINK-DRIFT-2026-03 | `docs/foundation/README.md` | Source-of-truth pointers | Referenced non-existent `docs/OPENWEBUI_FEATURES.md` and duplicated `SERVICE_SPEC.md` bullet | Actual file path is `layer-interface/open-webui/docs/OPENWEBUI_FEATURES.md`; duplicate bullet detected in section | low | fix_now | Corrected Open WebUI features path and removed duplicate service-contract bullet entry. |\n| CLAIM-MLX-LABEL-NAME-DRIFT-2026-03 | `docs/foundation/overview.md` | MLX launchd label naming | R",
+          "timestamp_utc": "2026-03-04T16:34:36.759088+00:00",
+          "title": "consistency_audit_2026-03",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/_core/consistency_audit_2026-03.md"
+        }
+      ],
+      "latency_ms": 517.422,
+      "must_have_signals": [
+        "com.bebop.pgvector-main",
+        "com.bebop.memory-api-main"
+      ],
+      "query": "Which Studio labels run the main vector store services?",
+      "query_id": "D01"
+    },
+    {
+      "answerable": true,
+      "bucket": "exact_lookup",
+      "hit_count": 10,
+      "hits": [
+        {
+          "chunk_id": 1,
+          "chunk_index": 0,
+          "doc_id": 1,
+          "model_space": "qwen",
+          "rrf_score": 0.98897576,
+          "source": "repo_docs_pilot",
+          "source_message_id": "a821eb5840dff0c3c1fe0b4d",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Agent Guidance: Vector DB (Studio Main Store)\n\n## Scope\n- Studio-only main memory store for general retrieval over personal/export data.\n- Postgres + pgvector, localhost-only bindings.\n\n## Guardrails\n- Do not expose new LAN ports without explicit plan + approval.\n- Do not mix embedding spaces in one vector index.\n- Keep Mini web-search pipeline out of scope for this service.\n- Keep rollout shadow-first before coupling to production inference flows.\n\n## Runtime ownership\n- Studio launchd labels under `com.bebop.*` only.\n- All owned labels must be allowlisted/audited by Studio scheduling policy.",
+          "timestamp_utc": "2026-03-04T02:08:03.034647+00:00",
+          "title": "AGENTS",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/AGENTS.md"
+        },
+        {
+          "chunk_id": 2,
+          "chunk_index": 2,
+          "doc_id": 2,
+          "model_space": "qwen",
+          "rrf_score": 0.96735954,
+          "source": "repo_docs_pilot",
+          "source_message_id": "50dc323d231ddaf083a5ed6b",
+          "source_thread_id": "docs/foundation",
+          "text": "e transient automation runs with taskpolicy utility clamp\n- strict allowlist policy for owned labels (`com.bebop.*`, `com.deploy.*`)\n- details: `docs/foundation/studio-scheduling-policy.md`\n\nNote: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.\nUse `mlxctl status` as the canonical \u201cwhich mlx-* model is on which port\u201d signal for `8100-8119`.\n\n### OptiLLM local (status)\n- No inference backends are currently deployed on Orin.\n- Voice Gateway (Interface-layer STT/TTS) is planned to run on Orin.\n- Orin offload storage is available at `/mnt/seagate` and persists across reboot.\n- Studio OptiLLM proxy serves LiteLLM `boost`.\n\n## MCP Tools (stdio, no ports)\n- `web.fetch` \u2014 stdio MCP tool on the Mini (no network port).\n- `search.web` \u2014 stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.\n\n## Exposure and Secrets\n- LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,\n  LiteLLM 4000, Open WebUI 3000, MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).\n- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, websearch-orch 8899.\n  Studio local-only: main vector DB 55432, memory API 55440.\n- Internal tailnet transport used by Studio OptiLLM upstream:\n  - `100.69.99.60:4443` (Tailscale TCP forward on Mini -> `127.0.0.1:4000`)\n- OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.\n- Env/secrets live outside the repo:\n  - LiteLLM: `layer-gateway/litellm-orch/config/env.local`\n  - Open WebUI: `/etc/open-webui/env`\n  - OpenVINO: `/etc/homelab-llm/ov-server.env`\n  - SearXNG: `/etc/searxng/env`",
+          "timestamp_utc": "2026-03-04T02:13:25.109164+00:00",
+          "title": "topology",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/foundation/topology.md"
+        },
+        {
+          "chunk_id": 3,
+          "chunk_index": 0,
+          "doc_id": 3,
+          "model_space": "qwen",
+          "rrf_score": 0.88918072,
+          "source": "repo_docs_pilot",
+          "source_message_id": "3593d751271d9b49ba22d0c4",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Vector DB (Studio Main Store)\n\nPurpose: Studio-hosted durable memory store for general-use retrieval over\npersonal data exports.\n\nStatus: active v1 baseline, Studio-local only, with internal `legacy|haystack`\nbackend selection via `MEMORY_BACKEND`.\n\n## v1 contract\n- Engine: Postgres 16 + pgvector.\n- Exposure: localhost only (`127.0.0.1`).\n- Scope: personal/export corpus first (no web-search coupling in this service).\n- Retrieval: hybrid lexical + vector.\n- Internal backend mode: `legacy` or `haystack` (API contract unchanged).\n- Embeddings: dual-space indexing:\n  - primary: `studio-qwen-embed-0.6b`\n  - fallback: `studio-mxbai-embed-large-v1`\n\n## Components\n- API service: `app/main.py`\n- Backend implementations: `app/backends/*`\n- Service config/env parser: `app/config.py`\n- DB and schema bootstrap helpers: `app/db.py`, `sql/*.sql`\n- Embedding loader wrappers: `app/embed.py`\n- Legacy hybrid retrieval planner: `app/retrieval.py`\n- Batch ingest runner: `app/ingest.py`\n- Haystack schema bootstrap: `scripts/init_haystack_schema.py`\n- Studio launchd templates: `launchd/*.plist`\n- Studio operational scripts: `scripts/*`\n\n## Source-of-truth docs\n- `SERVICE_SPEC.md`\n- `ARCHITECTURE.md`\n- `RUNBOOK.md`\n- `CONSTRAINTS.md`",
+          "timestamp_utc": "2026-03-06T00:34:52.172630+00:00",
+          "title": "README",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/README.md"
+        },
+        {
+          "chunk_id": 4,
+          "chunk_index": 4,
+          "doc_id": 4,
+          "model_space": "qwen",
+          "rrf_score": 0.80282307,
+          "source": "repo_docs_pilot",
+          "source_message_id": "185f0d811e5f60f76d5fb6d2",
+          "source_thread_id": "docs",
+          "text": "r general/personal memory.\n  Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)\n  while preserving the same API contract (`/v1/memory/*`). Service remains\n  Studio-local (no LAN exposure) with tool-mediated retrieval boundary.\n\n## Data registries (authoritative)\n- Lexicon registry (term correction): `layer-data/registry/lexicon.jsonl`\n\n## Exposure and secrets (short)\n- LAN-exposed: OpenVINO 9000 (maintenance), Ollama 11434,\n  LiteLLM 4000, Open WebUI 3000, MLX 8100-8119, OptiLLM 4020, Home Assistant 8123, AFM 9999 (planned).\n- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, websearch-orch 8899.\n- Local-only (Studio): main vector DB 55432, memory API 55440.\n- Tailnet HTTPS (Tailscale Serve on Mini):\n  - `https://code.tailfd1400.ts.net/` \u2192 code-server (8080)\n  - `https://chat.tailfd1400.ts.net/` \u2192 Open WebUI (3000)\n  - `https://gateway.tailfd1400.ts.net/` \u2192 LiteLLM (4000)\n  - `https://search.tailfd1400.ts.net/` \u2192 SearXNG (8888)\n- Tailnet TCP forward (Mini):\n  - `100.69.99.60:4443` \u2192 `127.0.0.1:4000` (used by Studio OptiLLM upstream path)\n- OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.\n- Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`.\n- Tailscale ACLs/grants managed in admin (use `svc:*` grants for Services access).\n\n## Decisions (ADR-lite)\n- LiteLLM is the single gateway.\n- Plain logical model names for clients.\n- Ports treated as immutable.",
+          "timestamp_utc": "2026-03-06T05:13:25.600892+00:00",
+          "title": "PLATFORM_DOSSIER",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/PLATFORM_DOSSIER.md"
+        },
+        {
+          "chunk_id": 5,
+          "chunk_index": 0,
+          "doc_id": 5,
+          "model_space": "qwen",
+          "rrf_score": 0.71784669,
+          "source": "repo_docs_pilot",
+          "source_message_id": "185f0d811e5f60f76d5fb6d2",
+          "source_thread_id": "docs",
+          "text": "# PLATFORM_DOSSIER\n\n## Topology (current)\n- Mac Mini: LiteLLM :4000 (LAN + tailnet), Open WebUI :3000 (LAN + tailnet),\n  Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),\n  OpenVINO :9000 (LAN-exposed for maintenance),\n  SearXNG :8888 (localhost-only), websearch-orch :8899 (localhost-only),\n  Ollama :11434\n- Mac Studio: MLX inference host using per-lane launchd labels\n  (`com.bebop.mlx-lane.8100/.8101/.8102`) with `vllm-metal`\n  runtime listeners on `:8100/:8101/:8102`.\n  OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).\n  Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,\n  memory API `:55440`, nightly ingest/backup jobs.\n- Jetson Orin AGX: persistent offload mount `/mnt/seagate`\n  (sshfs to Mini `/mnt/seagate/orin-offload`). No inference backends are currently deployed.\n  Voice Gateway (Interface-layer STT/TTS) is planned to run here.\n- HP DietPi: Home Assistant :8123\n## Topology (planned)\n- Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.\n\n## Ports and endpoints (authoritative)\n\n| service | host | port | bind | base URL | health | evidence |\n| --- | --- | --- | --- | --- | --- | --- |\n| LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |\n| Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |\n| Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |\n| Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |\n| OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |\n| OptiLLM proxy | Studio | 4020 | 0.0.0.0 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/",
+          "timestamp_utc": "2026-03-06T05:13:25.600892+00:00",
+          "title": "PLATFORM_DOSSIER",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/PLATFORM_DOSSIER.md"
+        },
+        {
+          "chunk_id": 6,
+          "chunk_index": 1,
+          "doc_id": 6,
+          "model_space": "qwen",
+          "rrf_score": 0.45401549,
+          "source": "repo_docs_pilot",
+          "source_message_id": "9eb89dde95c996e8249667d1",
+          "source_thread_id": "docs/foundation",
+          "text": "o may return a local filesystem snapshot path\nas the model `id`. Use `mlxctl status` for canonical model/port mapping.\n\nAs of `2026-03-01`, expected production active lanes are `8100`, `8101`, and `8102`.\nAny deviation should be treated as drift and triaged with `mlxctl status --checks`\nand `mlxctl verify`.\n\n```bash\nACTIVE_PORTS=$(ssh studio \"mlxctl status --json | jq -r '.ports[] | select(.status==\\\"listening\\\" or .status==\\\"running\\\") | .port'\")\nfor p in $ACTIVE_PORTS; do\n  ssh studio \"curl -fsS http://127.0.0.1:${p}/v1/models | jq .\"\ndone\n```\n\n## Studio scheduling policy (Mini -> Studio)\nThis section is authoritative for Studio scheduling verification workflow.\n\nPolicy source of truth:\n- `platform/ops/templates/studio_scheduling_policy.json`\n- `docs/foundation/studio-scheduling-policy.md`\n\nQuick path (recommended order):\n1) `uv run python platform/ops/scripts/validate_studio_policy.py --json`\n2) `uv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json`\n3) `uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json`\n4) optional read-only check: `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json`\n5) apply only when needed, in staged order (`optillm-proxy` then `mlx-lane.*`), then rerun strict audit\n\nDeterministic local checks:\n```bash\nuv run python platform/ops/scripts/validate_studio_policy.py --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json\n```\n\nRemote check-only:\n```bash\nuv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json\n```\n\nRobust plist key spot-check (no brittle exit-code presence test):\n```bash\nssh studio \"sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lane.8100.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'\"\nssh studio \"sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lane.8101.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'\"\nssh studio \"sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.mlx-lan",
+          "timestamp_utc": "2026-03-06T03:47:33.122320+00:00",
+          "title": "testing",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/foundation/testing.md"
+        },
+        {
+          "chunk_id": 7,
+          "chunk_index": 3,
+          "doc_id": 7,
+          "model_space": "qwen",
+          "rrf_score": 0.44083598,
+          "source": "repo_docs_pilot",
+          "source_message_id": "185f0d811e5f60f76d5fb6d2",
+          "source_thread_id": "docs",
+          "text": "vice`, env `/etc/searxng/env`, localhost-only.\n- websearch-orch: systemd unit `/etc/systemd/system/websearch-orch.service`,\n  env `/etc/homelab-llm/websearch-orch.env`, localhost-only. Phase 2 size\n  controls use `EXTERNAL_WEB_LOADER_MAX_TEXT_CHARS`,\n  `EXTERNAL_WEB_LOADER_MAX_TOTAL_TEXT_CHARS`,\n  `EXTERNAL_WEB_LOADER_MAX_URLS`, and\n  `EXTERNAL_WEB_LOADER_MIN_PER_DOC_TEXT_CHARS`. Phase 2 tightening adds\n  `QUERY_GUARD_ENABLED` / `QUERY_ENTITY_CONFLICT_ACTION` and trust-tier\n  controls (`TRUST_POLICY_ENABLED`, `TRUST_PRIORITY_DOMAINS`,\n  `TRUST_DEPRIORITIZED_DOMAINS`, `TRUST_DROP_BELOW_SCORE`) to reduce\n  drifted query variants and weak-source over-selection.\n- MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.\n  Current active inference listeners: `8100/8101/8102` (`vllm serve` under `com.bebop.mlx-lane.8100/.8101/.8102`).\n- MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`\n  to `source_path`/`cache_path` for inference.\n  Only models present on Mini/Studio are exposed as LiteLLM handles (Seagate is backroom).\n  Current team-lane runtime command family is `vllm serve` (`vllm-metal`) under per-lane launchd labels.\n  `mlxctl` now compiles per-lane vLLM args from registry (including strict parser\n  capability validation for auto-tool lanes). Current staged default enables\n  auto-tool for `main` (`8101`) only.\n  Scheduling policy contract (strict two-lane + fail-closed allowlist):\n  `docs/foundation/studio-scheduling-policy.md`.\n- Ollama: systemd unit `/etc/systemd/system/ollama.service`.\n- Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).\n- MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and\n  `search.web` are implemented, registry/systemd still pending.\n- AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.\n- Studio main vector store: Postgres+pgvector backend for general/personal memory.\n  Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)\n  while preserving the same API contract (`/v1/memory/*`). Service r",
+          "timestamp_utc": "2026-03-06T05:13:25.600892+00:00",
+          "title": "PLATFORM_DOSSIER",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/PLATFORM_DOSSIER.md"
+        },
+        {
+          "chunk_id": 8,
+          "chunk_index": 1,
+          "doc_id": 8,
+          "model_space": "qwen",
+          "rrf_score": 0.4166505,
+          "source": "repo_docs_pilot",
+          "source_message_id": "50dc323d231ddaf083a5ed6b",
+          "source_thread_id": "docs/foundation",
+          "text": "Mini.\n- Sources of truth: `docs/foundation/ov-llm-server.md`.\n\n## Ports and Endpoints (authoritative)\nPorts are immutable unless a migration is explicitly planned.\nDo not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.\n\n| service | host | port | base URL | health |\n| --- | --- | --- | --- | --- |\n| LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |\n| Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |\n| Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |\n| Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |\n| OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |\n| OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |\n| Studio main vector DB (postgres+pgvector) | Studio | 55432 | http://127.0.0.1:55432 | n/a |\n| Studio main memory API | Studio | 55440 | http://127.0.0.1:55440 | /health |\n| SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |\n| websearch-orch | Mini | 8899 | http://127.0.0.1:8899 | /health |\n| MLX inference lanes (active) | Studio | 8100/8101/8102 | http://192.168.1.72:8100/v1 | /v1/models |\n| AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |\n| Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |\n| Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |\n\n### MLX port management\n- Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.\n- Ports 8120-8139 are reserved for experimental test loads; these ports do not require `mlxctl`.\n- Current active inference listeners:\n  - `8100`: `vllm serve` under `com.bebop.mlx-lane.8100`\n  - `8101`: `vllm serve` under `com.bebop.mlx-lane.8101`\n  - `8102`: `vllm serve` under `com.bebop.mlx-lane.8102`\n\nStudio scheduling contract:\n- inference lane labels: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`, `com.bebop.optillm-proxy`\n- non-inference transient automation runs with taskpolicy utility clamp\n- strict allowlist policy for owned labels (`com.bebop.*`, `com.deploy.*`)\n- details: `docs/foundation/studio-scheduling-p",
+          "timestamp_utc": "2026-03-04T02:13:25.109164+00:00",
+          "title": "topology",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/foundation/topology.md"
+        },
+        {
+          "chunk_id": 9,
+          "chunk_index": 0,
+          "doc_id": 9,
+          "model_space": "qwen",
+          "rrf_score": 0.38387051,
+          "source": "repo_docs_pilot",
+          "source_message_id": "99fd4fad1a33df3170a17d54",
+          "source_thread_id": "layer-data/vector-db",
+          "text": "# Constraints: Vector DB (Studio Main Store)\n\n## Hard constraints\n- Engine is Postgres + pgvector for v1.\n- Bindings are localhost-only for DB and API.\n- Service remains Studio-local in this phase; no cross-host client wiring.\n- Inference/retrieval integration is tool-mediated first (no blind auto-injection).\n- Data retention is explicit snapshots + WAL archival (no implicit TTL deletion).\n\n## Data constraints\n- Message-first chunking with deterministic long-message splitting.\n- Preserve provenance fields required by downstream citation and traceability.\n- Never combine vectors from different embedding models in a single distance space.\n- `model_space` routing is strict (`qwen` or `mxbai`), no cross-space fallback retrieval.\n\n## Retrieval implementation constraints\n- Haystack backend must use framework-native components for retrieval/fusion/rerank/filtering.\n- Do not add custom retrieval SQL in Haystack mode.\n- Do not add custom Haystack table/index DDL; let `PgvectorDocumentStore` manage table/index objects.\n- Allowed bootstrap SQL is limited to schema existence (`CREATE SCHEMA IF NOT EXISTS ...`).\n\n## Operational constraints\n- Launchd labels must be policy-audited in\n  `platform/ops/templates/studio_scheduling_policy.json`.\n- All deploy/restart actions to Studio should use `platform/ops/scripts/studio_run_utility.sh`.\n- Keep scripts idempotent and rollback-friendly.",
+          "timestamp_utc": "2026-03-06T00:30:42.211942+00:00",
+          "title": "CONSTRAINTS",
+          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/CONSTRAINTS.md"
+        },
+        {
+          "chunk_id": 10,
+          "chunk_index": 1,
+          "doc_id": 10,
+          "model_space": "qwen",
+          "rrf_score": 0.36187103,
+          "source": "repo_docs_pilot",
+          "source_message_id": "8f9290a74f8913c5d2a4a8e1",
+          "source_thread_id": "docs/foundation",
+          "text": "io-cli-sha`, `sync-studio-cli`\n\nBackend behavior:\n- Default launch backend is `vllm-metal` (`vllm serve`).\n- Team-lane restart model is per-port launchd `KeepAlive` (lane-local restart).\n- `mlx_lm.server` and `mlx-openai-server` are legacy fallback references only and are not part of the active runtime contract.\n\nSource of truth contract:\n- Runtime and gateway wiring are derived from registry state.\n- Avoid ad-hoc edits to launch scripts for model assignment.\n- Mutating commands are parity-gated against the Studio binary.\n  Run `mlxctl studio-cli-sha` and, when needed, `mlxctl sync-studio-cli`.\n- `mlxctl reconcile` is dry-run by default; mutation requires `--apply`.\n  Stale assignment candidates are only entries with no listener, no runtime\n  process, and no successful local `/v1/models` probe.\n\n## Harmony / Parser Contract\nFor GPT-OSS entries, registry must keep:\n- `tool_call_parser: harmony`\n- `reasoning_parser: harmony`\n- valid `chat_template`\n\nFor Qwen3 entries, registry must keep:\n- `tool_call_parser: qwen3`\n- `reasoning_parser: qwen3`\n- optional discovered `chat_template`\n\nFor `vllm-metal` launch behavior, registry now supports a nested `vllm` block:\n- `vllm.profile` (`qwen3_main|gpt_oss_lane|generic`)\n- `vllm.tool_choice_mode` (`none|auto`)\n- `vllm.tool_call_parser`, `vllm.reasoning_parser`\n- `vllm.max_model_len`, `vllm.memory_fraction`, `vllm.async_scheduling`\n\nRuntime compatibility is resolved at launch time:\n- Registry keeps logical parser values (`qwen3`).\n- `mlxctl` resolves runtime parser enums from current vLLM capabilities\n  (for example `qwen3` -> `qwen3_xml` when required by the installed build).\n- `tool_choice_mode=auto` is fail-closed: launch is blocked if the current vLLM\n  binary lacks `--enable-auto-tool-choice` or a compatible tool parser.\n\nCurrent staged default:\n- `main` (`8101`, qwen3-next-80b) uses `tool_choice_mode=auto`.\n- `deep`/`fast` remain on `tool_choice_mode=none` until explicitly changed.\n\n`mlxctl verify` is read-only by default and catches parser/template drift.\nUse `mlxctl verify --fix-defaults` only when you intentionally want defaults\npersisted into registry entries.\nFor assigned team lanes, `verify` also fails if the lane",
+          "timestamp_utc": "2026-03-03T01:31:45.756719+00:00",
+          "title": "mlx-registry",
+          "uri": "file:///home/christopherbailey/homelab-llm/docs/foundation/mlx-registry.md"
+        }
+      ],
+      "latency_ms": 180.252,
+      "must_have_signals": [
+        "55432",
+        "55440",
+        "127.0.0.1"
+      ],
+      "query": "Which ports are local-only for the Studio memory stack?",
+      "query_id": "D02"
+    }
+  ],
+  "cases_total": 2,
+  "created_unix": 1772995126,
+  "params": {
+    "lexical_k": 30,
+    "model_space": "qwen",
+    "timeout": 20,
+    "top_k": 10,
+    "vector_k": 30
+  },
+  "run_id": "D1"
+}
+```
+
+Item 3: sample D1.judgments.csv
+Sample scope: D01 and D02 rows only; labeler and notes redacted
+```csv
+run_id,query_id,rank,chunk_id,doc_id,grade,labeler,notes
+D1,D01,1,1,1,0,redacted,redacted
+D1,D01,2,2,2,0,redacted,redacted
+D1,D01,3,3,3,2,redacted,redacted
+D1,D01,4,4,4,0,redacted,redacted
+D1,D01,5,5,5,0,redacted,redacted
+D1,D01,6,6,6,0,redacted,redacted
+D1,D01,7,7,7,2,redacted,redacted
+D1,D01,8,8,8,0,redacted,redacted
+D1,D01,9,9,9,0,redacted,redacted
+D1,D01,10,10,10,0,redacted,redacted
+D1,D02,1,1,1,0,redacted,redacted
+D1,D02,2,2,2,2,redacted,redacted
+D1,D02,3,3,3,1,redacted,redacted
+D1,D02,4,4,4,2,redacted,redacted
+D1,D02,5,5,5,2,redacted,redacted
+D1,D02,6,6,6,1,redacted,redacted
+D1,D02,7,7,7,0,redacted,redacted
+D1,D02,8,8,8,2,redacted,redacted
+D1,D02,9,9,9,0,redacted,redacted
+D1,D02,10,10,10,0,redacted,redacted
+```
