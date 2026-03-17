@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "litellm/deep",
+  "small_model": "litellm/fast",
+  "default_agent": "repo-deep",
+  "instructions": [
+    ".opencode/instructions/repo-baseline.md"
+  ],
+  "permission": {
+    "edit": "ask",
+    "webfetch": "ask",
+    "bash": {
+      "*": "ask",
+      "rg *": "allow",
+      "find *": "allow",
+      "sed *": "allow",
+      "cat *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "rm *": "deny",
+      "sudo *": "deny",
+      "git push*": "deny"
+    },
+    "skill": {
+      "*": "deny",
+      "repo-*": "allow"
+    }
+  }
+}

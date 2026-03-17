@@ -19,15 +19,15 @@ bash /home/christopherbailey/homelab-llm/platform/ops/scripts/setup-opencode.sh
 
 Default behavior:
 - auto-select first reachable base URL in this order:
-  1) `https://gateway.tailfd1400.ts.net/v1`
-  2) `http://100.69.99.60:4443/v1`
-  3) `http://127.0.0.1:4000/v1`
-- `model=litellm/boost-plan`
-- `small_model=litellm/boost-fastdraft`
+  1) `http://192.168.1.71:4000/v1`
+  2) `http://127.0.0.1:4000/v1`
+  3) `https://gateway.tailfd1400.ts.net/v1`
+- machine-local default model can be overridden by repo-local `opencode.json`
+- machine-local small-model default can be overridden by repo-local `opencode.json`
 
 Optional override:
 ```bash
-OPENCODE_LITELLM_BASE_URL=http://127.0.0.1:4000/v1 \
+OPENCODE_LITELLM_BASE_URL=http://192.168.1.71:4000/v1 \
   bash /home/christopherbailey/homelab-llm/platform/ops/scripts/setup-opencode.sh
 ```
 
@@ -40,8 +40,21 @@ Key file:
 - Keep this local-only and never commit keys.
 
 Base URL:
-- Mini: `http://127.0.0.1:4000/v1`
-- Tailnet devices (MacBook): `https://gateway.tailfd1400.ts.net/v1`
+- LAN devices: `http://192.168.1.71:4000/v1`
+- Mini on-host: `http://127.0.0.1:4000/v1`
+- Remote operator path: `https://gateway.tailfd1400.ts.net/v1`
+
+## Prerequisite machine-local config
+Before relying on the repo-local OpenCode contract in this repo, the user-global
+OpenCode config must already:
+- define the `litellm` provider
+- expose `litellm/deep`, `litellm/main`, and `litellm/fast`
+- own machine-local provider settings such as base URL, API key, and provider
+  options
+
+Repo-local `opencode.json` overrides defaults and adds repo-shared
+instructions, agents, skills, and permissions. It does not redefine provider
+URLs, API keys, or other machine-local settings.
 
 Minimal config example:
 ```bash
@@ -52,7 +65,7 @@ cat > ~/.config/opencode/opencode.json <<'JSON'
     "litellm": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "https://gateway.tailfd1400.ts.net/v1",
+        "baseURL": "http://192.168.1.71:4000/v1",
         "apiKey": "{file:~/.config/opencode/litellm_api_key}"
       },
       "models": {
@@ -67,8 +80,8 @@ cat > ~/.config/opencode/opencode.json <<'JSON'
       }
     }
   },
-  "model": "litellm/boost-plan",
-  "small_model": "litellm/boost-fastdraft",
+  "model": "litellm/deep",
+  "small_model": "litellm/fast",
   "permission": {
     "bash": "ask",
     "edit": "ask"
@@ -77,9 +90,86 @@ cat > ~/.config/opencode/opencode.json <<'JSON'
 JSON
 ```
 
+## Repo-local control surface
+Repo-shared OpenCode behavior in this repo should live in:
+- `opencode.json`
+- `.opencode/instructions/`
+- `.opencode/agents/`
+- `.opencode/skills/`
+
+These files are the repo-local OpenCode control plane. They are checked into
+git and apply only inside this repo.
+
+## Behavior surfaces
+- `AGENTS.md`: native OpenCode project rules surface
+- `instructions`: explicit extra instruction files loaded through `opencode.json`
+- `agents`: locked model/prompt/permission bundles
+- `skills`: on-demand reusable workflows loaded through the `skill` tool
+- `commands`: thin prompt entrypoints, not the primary policy surface
+
+In this repo, agents and skills are the primary OpenCode control surface.
+
 Lane note:
-- `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed
-  vLLM parser resolution (logical `qwen3` -> runtime `qwen3_xml` on current build).
+- `main` (`llama-3.3-70b`) supports `tool_choice:"auto"` via `mlxctl`-managed
+  vLLM launch settings.
+  The active `8101` runtime uses `--tool-call-parser llama3_json` and no
+  `--reasoning-parser`.
+- `fast` remains the canonical GPT-OSS 20B small-model lane, but it is not a
+  validated tool-calling lane for repo-local OpenCode policy on the current
+  `vllm-metal` stack.
+
+Backend flag tuning for `main` and `deep` is separate from repo-local OpenCode
+hardening.
+
+## Lane policy
+- `deep`: trusted default repo-work lane
+- `main`: canary repo-work lane with a fail-closed repo-evidence rule
+- `fast`: synthesis-only lane
+
+Repo-local OpenCode defaults in this repo:
+- default model: `litellm/deep`
+- small model: `litellm/fast`
+
+## Commands
+Canonical markdown command locations:
+- user-global commands: `~/.config/opencode/commands/`
+- project-local commands: `.opencode/commands/`
+
+Current local convention:
+- user-global custom commands on this machine should be created under `~/.config/opencode/commands/`
+- the older `~/.opencode/commands/` path is treated as legacy compatibility only and should not be used for new commands
+
+Current Phase A command:
+- canonical path: `~/.config/opencode/commands/phase-a.md`
+- deprecated legacy copy: `~/.opencode/commands/phase-a.md.deprecated`
+
+Scope note:
+- command-path normalization is separate from prompt or lane-behavior fixes
+- moving a command into repo-local `.opencode/commands/` would make it a project-shared surface and is a separate decision
+
+## OpenCode Web on Mini
+The browser UI is a separate systemd service:
+- repo-managed unit: `platform/ops/systemd/opencode-web.service`
+- live unit: `/etc/systemd/system/opencode-web.service`
+- bind: `0.0.0.0:4096`
+- tailnet operator URL: `https://codeagent.tailfd1400.ts.net/`
+- Tailscale exposure: dedicated Service `svc:codeagent`
+- auth: HTTP Basic Auth via `/etc/opencode/env`
+- working directory: `/home/christopherbailey/homelab-llm`
+
+Writable sandbox contract:
+- OpenCode approval prompts (`permission.bash=ask`, `permission.edit=ask`) only approve tool execution.
+- Filesystem writeability is enforced separately by the `opencode-web.service` systemd sandbox.
+- The canonical writable workspace for the web service is `/home/christopherbailey/homelab-llm`.
+- OpenCode state/cache dirs remain writable under `~/.local/share/opencode`, `~/.local/state/opencode`, and `~/.cache/opencode`.
+
+Do not commit secrets:
+- local auth env file: `/etc/opencode/env`
+- template only: `platform/ops/templates/opencode.env.example`
+
+Service boundary docs:
+- `layer-interface/opencode-web/SERVICE_SPEC.md`
+- `layer-interface/opencode-web/RUNBOOK.md`
 
 ## Quick checks
 List models:
@@ -89,7 +179,12 @@ opencode models litellm
 
 One-shot run:
 ```bash
-opencode run -m litellm/boost-plan "Reply with exactly: plan-ok"
+opencode run -m litellm/deep "Reply with exactly: plan-ok"
+```
+
+Run a named command:
+```bash
+opencode run --command phase-a "Inspect docs/OPENCODE.md and summarize the commands section."
 ```
 
 Start (TUI):
@@ -97,16 +192,10 @@ Start (TUI):
 opencode
 ```
 
+Web auth check:
+```bash
+curl -i http://127.0.0.1:4096/ | sed -n '1,20p'
+```
+
 ## MCP tools
 MCP parity is out of scope for this simple setup and can be added later.
-
-## Coding-quality profiles (OptiLLM on Studio)
-Use these aliases when high-quality coding plans are the priority:
-- `litellm/boost-plan`: `plansearch` over `deep` lane (default).
-- `litellm/boost-plan-verify`: `self_consistency` over `deep` lane for critique pass.
-- `litellm/boost-ideate`: `moa` over `deep` lane for divergent architecture exploration.
-- `litellm/boost-fastdraft`: `bon` over `fast` lane for lower-cost drafting.
-
-Recommended two-pass workflow:
-1. `opencode run -m litellm/boost-plan "<task>"`
-2. `opencode run -m litellm/boost-plan-verify "Critique and harden this plan: <paste output>"`

@@ -1,0 +1,20 @@
+[Unit]
+Description=OpenCode Web UI
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm
+EnvironmentFile=/etc/opencode/env
+ExecStart=/home/christopherbailey/.opencode/bin/opencode web --hostname 0.0.0.0 --port 4096
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/christopherbailey/.local/share/opencode /home/christopherbailey/.local/state/opencode /home/christopherbailey/.cache/opencode /home/christopherbailey/homelab-llm
+
+[Install]
+WantedBy=multi-user.target
