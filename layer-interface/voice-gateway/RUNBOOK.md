@@ -43,9 +43,22 @@ Repo-canonical model source:
 `/ops` generates shell plans via `POST /ops/api/promotion/plan` but does not
 write root-owned runtime files automatically.
 
+Promotion plan command bundle currently updates:
+- `/etc/voice-gateway/voice-gateway.env` (`VOICE_BACKEND_TTS_MODEL`)
+- `/etc/voice-gateway/voices.json`
+- `voice-gateway.service` restart and readiness checks
+
 ## CLI-first control plane
 Use `voicectl` for boring, scripted operations against the curated registry and
 live gateway APIs.
+
+Install/upgrade prerequisite in the deploy checkout:
+```bash
+cd /home/christopherbailey/voice-gateway-canary
+uv sync --frozen
+```
+
+This ensures `.venv/bin/voicectl` is present after entrypoint changes.
 
 Examples:
 ```bash
@@ -59,6 +72,19 @@ voicectl --base-url http://192.168.1.93:18080 --api-key "$VOICE_GATEWAY_API_KEY"
 Environment defaults:
 - `VOICE_TTS_REGISTRY_PATH` (curated JSONL path)
 - `VOICE_DEPLOY_MANIFEST_PATH` (read-only deploy provenance manifest)
+
+## Deploy provenance manifest
+`/ops/api/state` exposes `deploy_manifest` when the configured manifest exists.
+
+Recommended file:
+- `/home/christopherbailey/voice-gateway-canary/.deploy-manifest.json`
+
+Recommended fields:
+- `repo_commit_sha`
+- `service_path`
+- `deployed_checkout`
+- `deployed_at_utc`
+- `deployed_by`
 
 Apply model/voice promotions manually with `sudo` using generated commands:
 - `/etc/voice-gateway/voice-gateway.env`

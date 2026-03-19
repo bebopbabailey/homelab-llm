@@ -8,12 +8,18 @@ Current canonical role:
 - normalizes external model aliases (`whisper-1`, `tts-1`)
 - normalizes external voice aliases (`default`, `alloy`)
 - emits structured logs for speech requests and readiness checks
+- exposes a CLI-first control plane (`voicectl`) backed by curated repo registry data
 
 Non-goals for the canonical serving path:
 - direct Open WebUI -> Orin speech calls
 - direct LiteLLM -> Speaches calls
-- XTTS serving concerns
 - diarization in the default Open WebUI voice-turn path
+
+Control-plane source of truth:
+- curated TTS registry: `registry/tts_models.jsonl`
+- control-plane CLI: `voicectl`
+- operator dashboard: `GET /ops`
+- deploy provenance manifest: `.deploy-manifest.json` (path configurable)
 
 Start here:
 - `SERVICE_SPEC.md`

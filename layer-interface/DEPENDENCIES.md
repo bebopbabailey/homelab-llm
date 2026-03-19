@@ -13,7 +13,10 @@ and will call LiteLLM over the LAN. In those cases, do not assume localhost for
 `LITELLM_BASE_URL`.
 
 Voice Gateway exception boundary:
-- Voice Gateway may run local STT/TTS engines inside its own service boundary.
+- Voice Gateway runs on Orin and remains an Interface-layer service boundary.
+- It may run local STT/TTS engines inside its own service boundary
+  (current backend: localhost-only Speaches).
+- It exposes the approved LAN speech facade used by LiteLLM.
 - Future LLM calls from Voice Gateway must still go through LiteLLM.
 
 ## Allowed downstream services (read-only)

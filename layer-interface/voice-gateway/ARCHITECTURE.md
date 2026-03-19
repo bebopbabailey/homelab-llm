@@ -10,6 +10,11 @@ the only client-facing gateway. `voice-gateway` owns that boundary.
 - `voice-gateway` calls localhost-only Speaches on the Orin for STT/TTS.
 - Speaches preloads the chosen canary STT and Kokoro TTS models and keeps them warm.
 
+Current deployment baseline:
+- active Orin checkout: `/home/christopherbailey/voice-gateway-canary`
+- active service: `voice-gateway.service`
+- deploy provenance is read from `.deploy-manifest.json` when present
+
 ## Responsibilities
 - `voice-gateway`
   - stable OpenAI-compatible speech facade

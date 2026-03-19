@@ -92,6 +92,56 @@ def _build_promotion_plan(body: OpsPromotionPlanRequest) -> str:
     alias_entries.extend(
         {"id": voice_id, "backend_voice": voice_id, "active": True} for voice_id in normalized_voice_ids
     )
+    voices_json = {
+        "default_voice_policy": "configured_default",
+        "unknown_voice_policy": body.unknown_voice_policy,
+        "fallback_voice_id": body.fallback_voice_id,
+        "voices": alias_entries,
+    }
+    encoded_json = json.dumps(voices_json, indent=2)
+    return "\n".join(
+        [
+            "# 1) set backend TTS model",
+            (
+                "sudo python3 - <<'PY'\n"
+                "from pathlib import Path\n"
+                "path = Path('/etc/voice-gateway/voice-gateway.env')\n"
+                "lines = path.read_text().splitlines()\n"
+                "out = []\n"
+                "updated = False\n"
+                "for line in lines:\n"
+                "    if line.startswith('VOICE_BACKEND_TTS_MODEL='):\n"
+                f"        out.append('VOICE_BACKEND_TTS_MODEL={body.backend_tts_model}')\n"
+                "        updated = True\n"
+                "    else:\n"
+                "        out.append(line)\n"
+                "if not updated:\n"
+                f"    out.append('VOICE_BACKEND_TTS_MODEL={body.backend_tts_model}')\n"
+                "path.write_text('\\n'.join(out) + '\\n')\n"
+                "print('updated', path)\n"
+                "PY"
+            ),
+            "",
+            "# 2) write voice alias config",
+            (
+                "sudo python3 - <<'PY'\n"
+                "from pathlib import Path\n"
+                "path = Path('/etc/voice-gateway/voices.json')\n"
+                f"path.write_text('''{encoded_json}\\n''')\n"
+                "print('updated', path)\n"
+                "PY"
+            ),
+            "",
+            "# 3) restart gateway and verify",
+            "sudo systemctl restart voice-gateway.service",
+            "sudo systemctl is-active voice-gateway.service",
+            "",
+            "# 4) optional: check readiness and speakers",
+            "# export VOICE_GATEWAY_API_KEY=...",
+            "# curl -fsS http://192.168.1.93:18080/health/readiness | jq .",
+            "# curl -fsS http://192.168.1.93:18080/v1/speakers -H \"Authorization: Bearer ${VOICE_GATEWAY_API_KEY}\" | jq .",
+        ]
+    )
 
 
 def _load_curated_payload(settings: Settings) -> dict[str, object]:
@@ -107,35 +157,13 @@ def _load_deploy_manifest(settings: Settings) -> dict[str, object] | None:
     path = settings.deploy_manifest_path
     if not path.exists():
         return None
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
     if not isinstance(raw, dict):
         return None
     return raw
-    voices_json = {
-        "default_voice_policy": "configured_default",
-        "unknown_voice_policy": body.unknown_voice_policy,
-        "fallback_voice_id": body.fallback_voice_id,
-        "voices": alias_entries,
-    }
-    encoded_json = json.dumps(voices_json, indent=2)
-    return "\n".join(
-        [
-            "# 1) set backend TTS model",
-            f"sudo python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/etc/voice-gateway/voice-gateway.env')\nlines = path.read_text().splitlines()\nout = []\nupdated = False\nfor line in lines:\n    if line.startswith('VOICE_BACKEND_TTS_MODEL='):\n        out.append('VOICE_BACKEND_TTS_MODEL={body.backend_tts_model}')\n        updated = True\n    else:\n        out.append(line)\nif not updated:\n    out.append('VOICE_BACKEND_TTS_MODEL={body.backend_tts_model}')\npath.write_text('\\n'.join(out) + '\\n')\nprint('updated', path)\nPY",
-            "",
-            "# 2) write voice alias config",
-            f"sudo python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/etc/voice-gateway/voices.json')\npath.write_text('''{encoded_json}\n''')\nprint('updated', path)\nPY",
-            "",
-            "# 3) restart gateway and verify",
-            "sudo systemctl restart voice-gateway.service",
-            "sudo systemctl is-active voice-gateway.service",
-            "",
-            "# 4) optional: check readiness and speakers",
-            "# export VOICE_GATEWAY_API_KEY=...",
-            "# curl -fsS http://192.168.1.93:18080/health/readiness | jq .",
-            "# curl -fsS http://192.168.1.93:18080/v1/speakers -H \"Authorization: Bearer ${VOICE_GATEWAY_API_KEY}\" | jq .",
-        ]
-    )
 
 
 OPS_HTML = """<!doctype html>

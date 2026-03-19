@@ -2,7 +2,7 @@
 
 ## Status
 - Canonical repo-owned speech boundary for the homelab.
-- Intended serving host: Orin (`192.168.1.93`).
+- Canonical serving host: Orin (`192.168.1.93`).
 - Backend engine: localhost-only Speaches on the same Orin.
 
 ## Purpose
@@ -81,6 +81,11 @@ Current policy:
   - optional `temperature`
   - optional `timestamp_granularities[]`
 
+Current native-STT wrapper response-format behavior:
+- `response_format` unset, `json`, or `verbose_json` -> JSON `{ "text": "..." }`
+- `response_format=text` -> `text/plain`
+- `response_format=srt` or `response_format=vtt` -> HTTP `400` (`unsupported_response_format`)
+
 ## Warm appliance policy
 Speaches must be configured with:
 - `PRELOAD_MODELS` including the chosen canary STT model and Kokoro TTS model
@@ -92,9 +97,8 @@ Initial recommendation:
 - `TTS_MODEL_TTL=-1`
 
 ## Environment variables
-- `VOICE_GATEWAY_HOST`
-- `VOICE_GATEWAY_PORT`
-- `VOICE_GATEWAY_API_KEY` (optional bearer auth for `/v1/*`)
+Gateway service/runtime:
+- `VOICE_GATEWAY_API_KEY` (optional bearer auth for `/v1/*` and `/ops/api/*`)
 - `VOICE_CONFIG_PATH`
 - `VOICE_LOG_PATH`
 - `VOICE_LOG_LEVEL`
@@ -105,9 +109,23 @@ Initial recommendation:
 - `VOICE_PUBLIC_TTS_MODEL` (default `tts-1`)
 - `VOICE_BACKEND_STT_MODEL`
 - `VOICE_BACKEND_TTS_MODEL`
+- `VOICE_STT_BACKEND_API_BASE` (optional STT-only backend override)
 - `VOICE_DEFAULT_LANGUAGE`
+
+Control-plane/runtime metadata:
 - `VOICE_TTS_REGISTRY_PATH` (default `<service-root>/registry/tts_models.jsonl`)
 - `VOICE_DEPLOY_MANIFEST_PATH` (default `<service-root>/.deploy-manifest.json`)
+
+Legacy local XTTS CLI settings (non-canonical for serving path):
+- `VOICE_TTS_MODEL`
+- `VOICE_TTS_DEVICE`
+
+Service bind note:
+- `voice-gateway-service` requires explicit `--host` and `--port` arguments.
+- production bind values are owned by systemd `ExecStart`.
+
+CLI defaults:
+- `voicectl` supports `VOICE_GATEWAY_BASE_URL` and `VOICE_GATEWAY_API_KEY`.
 
 ## Config files
 - voice alias config example: `config/voices.example.json`
@@ -122,6 +140,10 @@ Initial recommendation:
   - `voicectl load <curated-id-or-model-id>`
   - `voicectl unload <curated-id-or-model-id>`
   - `voicectl promotion-plan <curated-id-or-model-id> [--voice-ids ...]`
+
+Deployment prerequisite:
+- after adding/updating project entrypoints, run `uv sync --frozen` in the deploy checkout
+  so `.venv/bin/voicectl` is installed before operator use.
 
 ## Observability fields
 - `ts_utc`

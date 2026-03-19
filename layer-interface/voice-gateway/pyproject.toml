@@ -1,7 +1,7 @@
 [project]
 name = "voice-gateway"
 version = "0.1.0"
-description = "Phase 1 localhost XTTS-v2 TTS wrapper contract for the Orin"
+description = "Repo-owned OpenAI-compatible speech facade and TTS control plane for Orin"
 requires-python = ">=3.10,<3.11"
 dependencies = [
   "fastapi>=0.115,<1.0",

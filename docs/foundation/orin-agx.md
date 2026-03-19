@@ -8,7 +8,7 @@ experiments.
 This file is the canonical Orin host doc for active documentation.
 
 ## Evidence Record
-- Latest dated evidence: `docs/journal/2026-03-10-orin-phase1-preflight-corrections.md`
+- Latest dated evidence: `docs/journal/2026-03-17-voice-gateway-control-plane-doc-hardening.md`
 - Verification commands: `docs/foundation/testing.md`
 
 ## Host Identity Conventions
@@ -21,8 +21,10 @@ This file is the canonical Orin host doc for active documentation.
 
 ## Runtime role (current)
 - No inference backends are currently deployed on Orin.
-- Voice Gateway is designated for this host, but a live deployment is not
-  documented yet.
+- Voice Gateway is the live speech appliance facade on this host:
+  - LAN speech facade: `http://192.168.1.93:18080/v1`
+  - backend: localhost-only Speaches behind `voice-gateway`
+  - operator control plane: `voicectl` + `/ops`
 
 ## Notes
 - Keep volatile host-state observations in the dated journal entry rather than
