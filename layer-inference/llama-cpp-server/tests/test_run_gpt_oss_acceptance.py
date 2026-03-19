@@ -1,0 +1,79 @@
+import importlib.util
+import json
+import unittest
+
+SPEC = importlib.util.spec_from_file_location(
+    "run_gpt_oss_acceptance",
+    "/home/christopherbailey/homelab-llm/layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py",
+)
+mod = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(mod)
+
+
+class RunGptOssAcceptanceTests(unittest.TestCase):
+    def test_object_schema_is_strict(self):
+        schema = mod._object_schema({"value": {"type": "string"}}, ["value"])
+        self.assertEqual(schema["required"], ["value"])
+        self.assertFalse(schema["additionalProperties"])
+
+    def test_extract_responses_text_prefers_output_text(self):
+        text = mod._extract_responses_text({"output_text": "hello"})
+        self.assertEqual(text, "hello")
+
+    def test_extract_responses_text_reads_output_chunks(self):
+        body = {
+            "output": [
+                {
+                    "content": [
+                        {"type": "output_text", "text": "hello"},
+                        {"type": "output_text", "text": "-world"},
+                    ]
+                }
+            ]
+        }
+        self.assertEqual(mod._extract_responses_text(body), "hello-world")
+
+    def test_expect_tool_call_requires_named_function(self):
+        checker = mod._expect_tool_call("noop", "value")
+        good = {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "noop",
+                                    "arguments": json.dumps({"value": "x"}),
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        bad = {
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "name": "noop",
+                                    "arguments": json.dumps({"wrong": "x"}),
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+        self.assertTrue(checker(good))
+        self.assertFalse(checker(bad))
+
+    def test_profile_defaults_infer_deep_from_model_name(self):
+        self.assertEqual(mod._profile_defaults("auto", "llmster-gpt-oss-120b-mxfp4-gguf"), (2, 4))
+        self.assertEqual(mod._profile_defaults("auto", "llmster-gpt-oss-20b-mxfp4-gguf"), (4, 8))
+
+
+if __name__ == "__main__":
+    unittest.main()

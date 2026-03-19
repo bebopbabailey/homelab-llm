@@ -7,7 +7,7 @@ layer. It is the current human‑readable source of truth.
 | Service | Role | Bind | Port | Exposure | Health/Status | Systemd Unit | Env/Config | Notes |
 |---|---|---|---|---|---|---|---|---|
 | LiteLLM (litellm-orch) | Primary gateway/router | 0.0.0.0 | 4000 | LAN canonical at `http://192.168.1.71:4000/v1`; localhost also valid | `/health`, `/health/readiness`, `/health/liveliness` | `/etc/systemd/system/litellm-orch.service` | `layer-gateway/litellm-orch/config/router.yaml`, `layer-gateway/litellm-orch/config/env.local` | Clients must call LiteLLM only. |
-| OptiLLM proxy | Optimization proxy behind LiteLLM | 192.168.1.72 | 4020 | Studio LAN only | none documented | `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist` | `/etc/optillm-proxy/env`, `~/.optillm/proxy_config.yaml` | Upstream is Mini LiteLLM over LAN; avoid routing loops. |
+| OptiLLM proxy | Non-core optimization proxy behind LiteLLM | 192.168.1.72 | 4020 | Studio LAN only | none documented | `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist` | `/etc/optillm-proxy/env`, `~/.optillm/proxy_config.yaml` | Upstream is Mini LiteLLM over LAN; avoid routing loops; not part of the canonical `main` / `fast` / `deep` surface. |
 | System monitor | Health/telemetry aggregator | (planned) | (planned) | Local only | N/A | (planned) | (planned) | Read‑only monitor; escalates via DB bulletin. |
 
 ## Ports (Gateway layer)
@@ -16,7 +16,7 @@ layer. It is the current human‑readable source of truth.
 
 ## Contracts
 - Client → **LiteLLM only** (`http://<mini>:4000/v1`).
-- OptiLLM must not be exposed directly; it may call LiteLLM or MLX upstream depending on config.
+- OptiLLM must not be exposed directly; it is operator/opt-in infrastructure and may call LiteLLM or MLX upstream depending on config.
 - Gateway never runs inference.
 - Showroom/backroom rule: only models present on Mini/Studio get handles.
 - Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` (HF token required for gated pulls).

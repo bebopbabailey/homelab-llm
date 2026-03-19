@@ -71,12 +71,7 @@ cat > ~/.config/opencode/opencode.json <<'JSON'
       "models": {
         "deep": { "name": "Deep" },
         "fast": { "name": "Fast" },
-        "main": { "name": "Main" },
-        "boost": { "name": "Boost" },
-        "boost-plan": { "name": "Boost Plan" },
-        "boost-plan-verify": { "name": "Boost Plan Verify" },
-        "boost-ideate": { "name": "Boost Ideate" },
-        "boost-fastdraft": { "name": "Boost Fastdraft" }
+        "main": { "name": "Main" }
       }
     }
   },
@@ -110,13 +105,17 @@ git and apply only inside this repo.
 In this repo, agents and skills are the primary OpenCode control surface.
 
 Lane note:
-- `main` (`llama-3.3-70b`) supports `tool_choice:"auto"` via `mlxctl`-managed
+- `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed
   vLLM launch settings.
-  The active `8101` runtime uses `--tool-call-parser llama3_json` and no
+  The active `8101` runtime uses `--tool-call-parser hermes` and no
   `--reasoning-parser`.
-- `fast` remains the canonical GPT-OSS 20B small-model lane, but it is not a
-  validated tool-calling lane for repo-local OpenCode policy on the current
-  `vllm-metal` stack.
+- `main` is currently accepted for public repo work on the basis of
+  `tool_choice:"auto"`, long-context sanity, and concurrency validation.
+  Forced-tool semantics remain unsupported on the current build, and
+  structured outputs remain outside the accepted public `main` contract on the
+  current backend path.
+- `fast` remains the canonical small-model alias for repo-local OpenCode policy,
+  and the settled GPT backend family is `llmster`/llama.cpp on shared `8126`.
 
 Backend flag tuning for `main` and `deep` is separate from repo-local OpenCode
 hardening.
@@ -125,6 +124,15 @@ hardening.
 - `deep`: trusted default repo-work lane
 - `main`: canary repo-work lane with a fail-closed repo-evidence rule
 - `fast`: synthesis-only lane
+
+Approved runtime contract:
+- active public LLM aliases are `fast`, `main`, and `deep`
+- `main` is the hardened Qwen3-Next canary on canonical Studio port `8101`
+- MAIN validation is currently satisfied by `tool_choice:"auto"`, long-context
+  sanity, branch-generation suitability, and concurrency posture
+- structured outputs are a known accepted limitation on the current runtime and
+  are not part of the closed public `main` contract
+- MAIN forced-tool semantics are intentionally not part of the accepted baseline
 
 Repo-local OpenCode defaults in this repo:
 - default model: `litellm/deep`

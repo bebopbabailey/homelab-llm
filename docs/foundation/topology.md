@@ -2,10 +2,13 @@
 
 ## Hosts
 - Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
-- Mac Studio: MLX inference host (per-lane launchd labels for `:8100/:8101/:8102` with `vllm-metal` bound to `192.168.1.72`), OptiLLM proxy (`:4020`), and Studio main vector-store services (localhost-only Postgres + memory API).
+- Mac Studio: MLX inference host (`mlxctl`-governed team-lane domain on `:8100-:8119`, with the active public MLX listener now at `:8101`), OptiLLM proxy (`:4020`), the shared `llmster` GPT listener on `:8126`, and Studio main vector-store services (localhost-only Postgres + memory API).
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
+- Mac Studio: active shared `llmster` GPT service on `8126`, with public
+  `fast` and `deep` both routed through `8126`. Shadow ports `8123-8125` are
+  retired.
 - HP DietPi: Home Assistant.
-- Jetson Orin AGX: canonical speech appliance host with LAN-visible `voice-gateway` and localhost-only Speaches behind it. Current runtime status is canonical in `docs/foundation/orin-agx.md`.
+- Jetson Orin AGX: live canonical speech appliance host with LAN-visible `voice-gateway` and localhost-only Speaches behind it. Runtime evidence is canonical in `docs/foundation/orin-agx.md`.
 
 ## Host Dossier (new-agent quickstart)
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
@@ -25,7 +28,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Role: MLX inference host.
 - Access: `ssh studio`.
 - Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.
-- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8100/v1/models`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8102/v1/models`.
+- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8126/v1/models`.
   Vector-store checks: `lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'`, `curl http://127.0.0.1:55440/health`.
   Vector-store labels are background-lane managed labels:
   `com.bebop.pgvector-main`, `com.bebop.memory-api-main`,
@@ -63,7 +66,8 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Studio main vector DB (postgres+pgvector) | Studio | 55432 | http://127.0.0.1:55432 | n/a |
 | Studio main memory API | Studio | 55440 | http://127.0.0.1:55440 | /health |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
-| MLX inference lanes (active) | Studio | 8100/8101/8102 | http://192.168.1.72:8100/v1 | /v1/models |
+| MLX inference lane (active) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
+| llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | http://192.168.1.72:8126/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
 | Home Assistant | DietPi | 8123 | http://192.168.1.70:8123 | not documented |
@@ -71,10 +75,15 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 ### MLX port management
 - Ports 8100-8119 are team slots on the Studio and managed via `platform/ops/scripts/mlxctl`.
 - Ports 8120-8139 are reserved for experimental test loads; these ports do not require `mlxctl`.
-- Current active inference listeners:
-  - `8100`: `vllm serve` under `com.bebop.mlx-lane.8100`
+- Current active public inference listeners:
   - `8101`: `vllm serve` under `com.bebop.mlx-lane.8101`
-  - `8102`: `vllm serve` under `com.bebop.mlx-lane.8102`
+  - `8126`: `llmster` GPT service under `com.bebop.llmster-gpt.8126`
+- Retired GPT rollback MLX slots:
+  - `8100`
+  - `8102`
+- Approved additional owned labels for active service work:
+  - `com.bebop.llmster-gpt.8126`
+  - `com.bebop.optillm-proxy`
 
 Studio scheduling contract:
 - inference lane labels: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`, `com.bebop.optillm-proxy`
@@ -99,7 +108,13 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
 - LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` (localhost remains valid).
-- LAN-only from trusted local hosts: Studio MLX 8100-8102 via `192.168.1.72`.
+- LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
+  `8126` via `192.168.1.72`.
+- `8126` is the active shared `fast` + `deep` `llmster` GPT service.
+- `8123-8125` are retired Studio shadow ports and are not part of the current
+  control-plane target set.
+- There are no active temporary GPT canary aliases in the current LiteLLM
+  surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
   OpenHands Phase A is local on `127.0.0.1:4031` and may be exposed tailnet-only

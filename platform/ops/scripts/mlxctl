@@ -1294,11 +1294,6 @@ def _ensure_defaults(entry: dict):
         if not entry.get("reasoning_parser"):
             entry["reasoning_parser"] = "qwen3"
             changed = True
-        if not entry.get("chat_template"):
-            local_template = _resolve_local_chat_template(entry)
-            if local_template:
-                entry["chat_template"] = local_template
-                changed = True
 
     vllm = _entry_vllm_config(entry)
     if not vllm:
@@ -1321,11 +1316,16 @@ def _ensure_defaults(entry: dict):
         vllm["async_scheduling"] = _default_vllm_async_scheduling(entry)
         changed = True
     if _default_vllm_profile(entry) == "qwen3_main":
-        if not vllm.get("tool_call_parser"):
-            vllm["tool_call_parser"] = "qwen3"
+        desired_tool_parser = _default_vllm_tool_parser(entry)
+        if desired_tool_parser and not vllm.get("tool_call_parser"):
+            vllm["tool_call_parser"] = desired_tool_parser
             changed = True
-        if not vllm.get("reasoning_parser"):
-            vllm["reasoning_parser"] = "qwen3"
+        if "reasoning_parser" not in vllm:
+            vllm["reasoning_parser"] = _default_vllm_reasoning_parser(entry)
+            changed = True
+        generation_config = _default_vllm_generation_config(entry)
+        if generation_config and not vllm.get("generation_config"):
+            vllm["generation_config"] = generation_config
             changed = True
     return changed
 
@@ -1453,6 +1453,17 @@ def _default_vllm_reasoning_parser(entry: dict) -> Optional[str]:
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
     value = _profile_value(entry, "reasoning_parser")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _default_vllm_generation_config(entry: dict) -> Optional[str]:
+    explicit = _entry_vllm_value(entry, "generation_config", "vllm_generation_config")
+    if isinstance(explicit, str):
+        lowered = explicit.strip().lower()
+        if lowered in {"", "none", "null", "unset"}:
+            return None
+        return explicit.strip()
+    value = _profile_value(entry, "generation_config")
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
@@ -1649,6 +1660,9 @@ def _compile_vllm_launch(entry: dict, port: int, host: str, capabilities: dict, 
         "--max-model-len",
         str(_default_vllm_max_model_len(entry)),
     ]
+    generation_config = _default_vllm_generation_config(entry)
+    if generation_config:
+        argv += ["--generation-config", generation_config]
     if trust_remote_code:
         argv += ["--trust-remote-code"]
     if chat_template:

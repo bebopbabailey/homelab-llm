@@ -7,10 +7,10 @@ This layer hosts or controls inference backends. Clients must not call these dir
 
 ## Backends
 - OpenVINO server (Mini): `http://127.0.0.1:9000`
-- Studio MLX lanes:
-  - `http://192.168.1.72:8100/v1`
+- Studio MLX lane:
   - `http://192.168.1.72:8101/v1`
-  - `http://192.168.1.72:8102/v1`
+- Studio llmster GPT service:
+  - `http://192.168.1.72:8126/v1`
 - Orin: currently no active inference services (see `docs/foundation/orin-agx.md`)
 
 ## Source-of-truth pointers

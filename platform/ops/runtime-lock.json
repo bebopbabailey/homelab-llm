@@ -33,7 +33,13 @@
       "fast": [
         "main"
       ]
-    }
+    },
+    "temporary_rollout_aliases": [],
+    "approved_public_aliases": [
+      "fast",
+      "main",
+      "deep"
+    ]
   },
   "mlx": {
     "paged_attention": false,
@@ -44,14 +50,127 @@
     "lane_overrides": {
       "8101": {
         "tool_choice_mode": "auto",
-        "tool_call_parser": "llama3_json",
-        "reasoning_parser": null
+        "tool_call_parser": "hermes",
+        "reasoning_parser": null,
+        "required_tool_choice_supported": false,
+        "named_forced_tool_choice_supported": false
       }
     },
     "lanes": {
       "8100": "com.bebop.mlx-lane.8100",
       "8101": "com.bebop.mlx-lane.8101",
       "8102": "com.bebop.mlx-lane.8102"
+    },
+    "approved_shadow_labels": {},
+    "retired_shadow_labels": {
+      "8123": "com.bebop.mlx-shadow.8123",
+      "8124": "com.bebop.mlx-shadow.8124",
+      "8125": "com.bebop.mlx-shadow.8125"
+    }
+  },
+  "approved_lane_targets": {
+    "main": {
+      "canonical_backend": "vllm-metal",
+      "canonical_model": "mlx-qwen3-next-80b-mxfp4-a3b-instruct",
+      "fallback_backend": "mlx-openai-server",
+      "acceptance_contract": {
+        "structured_outputs": "accepted_out_of_contract_current_runtime",
+        "auto_tool_choice_non_stream": "required",
+        "long_context_sanity": "required",
+        "bounded_concurrency": "required",
+        "branch_concurrency": "required",
+        "required_tool_choice": "unsupported_non_blocking",
+        "named_forced_tool_choice": "unsupported_non_blocking",
+        "litellm_post_call_cleanup": "main_only_strict_tool_block_optional"
+      }
+    },
+    "fast": {
+      "canonical_backend": "llmster",
+      "canonical_model": "llmster-gpt-oss-20b-mxfp4-gguf",
+      "rollout_state": "live_shared_8126_canonical",
+      "shadow_alias": "fast",
+      "rollback_alias": "fast",
+      "acceptance_contract": {
+        "plain_chat": "required",
+        "structured_simple": "required",
+        "structured_nested": "required",
+        "auto_tool_noop": "strong",
+        "auto_tool_arg": "usable_gte_8_of_10",
+        "required_tool_choice": "advisory",
+        "named_forced_tool_choice": "unsupported_backend_400_non_blocking",
+        "responses_api": "advisory"
+      }
+    },
+    "deep": {
+      "canonical_backend": "llmster",
+      "canonical_model": "llmster-gpt-oss-120b-mxfp4-gguf",
+      "rollout_state": "live_shared_8126_canonical",
+      "shadow_alias": "deep",
+      "rollback_alias": "deep",
+      "acceptance_contract": {
+        "plain_chat": "required",
+        "structured_simple": "required",
+        "structured_nested": "required",
+        "auto_tool_noop": "strong",
+        "auto_tool_arg": "usable_gte_8_of_10",
+        "required_tool_choice": "strong",
+        "named_forced_tool_choice": "unsupported_backend_400_non_blocking",
+        "responses_api": "advisory"
+      }
+    }
+  },
+  "llmster": {
+    "label": "com.bebop.llmster-gpt.8126",
+    "port": 8126,
+    "bind_host": "192.168.1.72",
+    "auth_required": true,
+    "jit_loading": false,
+    "auto_evict": false,
+    "lifecycle_mode": "thin_daemon_aware_wrapper",
+    "lms_binary_path": "/Users/thestudio/.lmstudio/llmster/0.0.7-4/.bundle/lms",
+    "stable_residency": {
+      "explicit_load_required": true,
+      "ttl_allowed": false,
+      "proof_required": [
+        "lms_ps_json",
+        "v1_models",
+        "post_load_idle_memory_snapshot",
+        "post_load_idle_memory_snapshot_plus_5m"
+      ]
+    },
+    "loaded_identifiers": [
+      "llmster-gpt-oss-20b-mxfp4-gguf",
+      "llmster-gpt-oss-120b-mxfp4-gguf"
+    ],
+    "post_load_shared_posture": {
+      "estimate_only_required": true,
+      "actual_proof_required_before_public_deep_cutover": true,
+      "fast_regression_required_under_dual_load": true
+    },
+    "artifact_policy": {
+      "required_quantization": "mxfp4-gguf",
+      "shared_listener": true,
+      "raw_mirror_ports": {
+        "fast": 8130,
+        "deep": 8131
+      },
+      "raw_mirror_invariants": {
+        "jinja_required": true,
+        "repetition_penalty_allowed": false,
+        "diagnostic_only": true
+      },
+      "studio_retention": {
+        "policy": "active_runtime_plus_one_staged_next_artifact",
+        "explicit_delete_targets": [
+          "gemma-3-27b-it-qat-4bit",
+          "GLM-4.7-Flash-4bit-mxfp4",
+          "gpt-oss-120b-MXFP4-Q4",
+          "gpt-oss-20b-MXFP4-Q4",
+          "Llama-3.3-70B-Instruct-4bit",
+          "Seed-OSS-36B-Instruct-4bit",
+          "gpt-oss-120b-Derestricted-mxfp4-mlx"
+        ]
+      }
     }
   }
 }

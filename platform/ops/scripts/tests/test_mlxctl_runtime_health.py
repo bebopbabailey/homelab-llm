@@ -148,20 +148,17 @@ class MlxctlRuntimeHealthTests(unittest.TestCase):
         self.assertTrue(mlxctl._chat_probe_accepts(good, "noop_tool_call", "chat_tool_noop"))
         self.assertFalse(mlxctl._chat_probe_accepts(bad, "noop_tool_call", "chat_tool_noop"))
 
-    def test_vllm_render_generic_hermes_override_skips_reasoning_parser(self):
+    def test_vllm_render_qwen3_main_defaults_skip_reasoning_parser(self):
         data = {
             "models": {
                 "mlx-qwen3-next-80b-mxfp4-a3b-instruct": {
                     "model_id": "mlx-qwen3-next-80b-mxfp4-a3b-instruct",
                     "cache_path": __file__,
                     "port": 8101,
-                    "tool_call_parser": "qwen3",
-                    "reasoning_parser": "qwen3",
                     "vllm": {
-                        "profile": "generic",
+                        "profile": "qwen3_main",
                         "tool_choice_mode": "auto",
-                        "tool_call_parser": "hermes",
-                        "reasoning_parser": None,
+                        "generation_config": "vllm",
                     },
                 }
             }
@@ -182,6 +179,8 @@ class MlxctlRuntimeHealthTests(unittest.TestCase):
         self.assertIn("--enable-auto-tool-choice", row["argv"])
         self.assertIn("hermes", row["argv"])
         self.assertNotIn("--reasoning-parser", row["argv"])
+        self.assertNotIn("--chat-template", row["argv"])
+        self.assertIn("--generation-config", row["argv"])
 
     def test_seed_profile_adds_trust_remote_code_and_local_chat_template(self):
         with tempfile.TemporaryDirectory() as tmpdir:

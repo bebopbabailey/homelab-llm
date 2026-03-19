@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.llmster-gpt.8126</string>
+  <key>UserName</key>
+  <string>thestudio</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/thestudio</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/thestudio/bin/llmster_ensure_server.py</string>
+    <string>--lms-bin</string>
+    <string>/Users/thestudio/.lmstudio/llmster/0.0.7-4/.bundle/lms</string>
+    <string>--bind</string>
+    <string>192.168.1.72</string>
+    <string>--port</string>
+    <string>8126</string>
+    <string>--api-key-env</string>
+    <string>LLMSTER_API_KEY</string>
+    <string>--load-spec</string>
+    <string>gpt-oss-20b|llmster-gpt-oss-20b-mxfp4-gguf|32768|4</string>
+    <string>--load-spec</string>
+    <string>gpt-oss-120b|llmster-gpt-oss-120b-mxfp4-gguf|32768|2</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/thestudio</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>KeepAlive</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/Library/Logs/llmster-gpt.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/Library/Logs/llmster-gpt.err</string>
+</dict>
+</plist>

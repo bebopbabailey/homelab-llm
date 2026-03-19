@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Lightweight inference quality gate for Studio MLX lanes.
+Lightweight inference quality gate for active Studio MLX public lanes.
 
 Checks:
 - /v1/models is reachable per lane
@@ -20,9 +20,9 @@ from pathlib import Path
 DEFAULT_FIXTURE = (
     "/home/christopherbailey/homelab-llm/layer-inference/docs/fixtures/inference_golden_smoke.json"
 )
-DEFAULT_PORTS = "8100,8101,8102"
+DEFAULT_PORTS = "8101"
 DEFAULT_HOST = "127.0.0.1"
-LANE_BY_PORT = {8100: "deep", 8101: "main", 8102: "fast"}
+LANE_BY_PORT = {8101: "main"}
 
 
 def _http_json(url: str, method: str = "GET", payload=None, timeout: int = 30):
@@ -146,9 +146,9 @@ def _parse_ports(raw: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Quality gate for Studio MLX lanes.")
+    parser = argparse.ArgumentParser(description="Quality gate for active Studio MLX public lanes.")
     parser.add_argument("--host", default=DEFAULT_HOST, help="Target host (default: 127.0.0.1)")
-    parser.add_argument("--ports", default=DEFAULT_PORTS, help="Comma-separated ports (default: 8100,8101,8102)")
+    parser.add_argument("--ports", default=DEFAULT_PORTS, help="Comma-separated ports (default: 8101)")
     parser.add_argument("--fixture", default=DEFAULT_FIXTURE, help="Fixture JSON path")
     parser.add_argument("--json", action="store_true", help="Emit JSON summary")
     args = parser.parse_args()

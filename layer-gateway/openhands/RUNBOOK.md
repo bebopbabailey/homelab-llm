@@ -102,32 +102,13 @@ curl -fsS "$OPENHANDS_LITELLM_BASE_URL/models" \
 curl -fsS "$OPENHANDS_LITELLM_BASE_URL/model/info" \
   -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" | jq .
 
-curl -fsS "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"main","messages":[{"role":"user","content":"main-should-fail"}],"stream":false,"max_tokens":32}'
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/mcp/tools" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY"
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/responses" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"code-reasoning","input":"route-check"}'
 ```
 
 Expected:
-- `/models` returns only `code-reasoning`.
-- `/model/info` returns exactly one `code-reasoning` record for the worker.
-- `code-reasoning` succeeds.
-- `main` is denied.
-- `/mcp/tools` is denied.
-- `/responses` is denied by route allowlisting.
+- Phase B LiteLLM handoff is currently deferred.
+- Do not expect an OpenHands-specific model alias in the active gateway contract.
+- Re-open this runbook only after a new backend-hardening plan defines the
+  future OpenHands model/worker contract.
 
 ## Optional tailnet-only access
 Enable a dedicated Tailscale Service for OpenHands:

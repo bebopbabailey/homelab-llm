@@ -12,6 +12,7 @@ Only these labels are inference lane:
 - `com.bebop.mlx-lane.8100`
 - `com.bebop.mlx-lane.8101`
 - `com.bebop.mlx-lane.8102`
+- `com.bebop.llmster-gpt.8126`
 - `com.bebop.optillm-proxy`
 
 Required launchd contract:
@@ -82,8 +83,11 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
    - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8100 --json`
    - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8101 --json`
    - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-lane.8102 --json`
-4. Run full strict audit and archive output.
+4. Apply/check `com.bebop.llmster-gpt.8126` when the canonical GPT service
+   contract changes:
+   - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.llmster-gpt.8126 --json`
 5. Optional: enforce retired-label quarantine in apply mode with `--include-retired`.
+6. Run full strict audit and archive output.
 
 ### Rollback
 For each changed managed label:
@@ -106,6 +110,15 @@ For quarantined unmanaged labels:
 4. Run validator + policy-only audit.
 5. Run remote check/apply and strict audit.
 6. Update service docs (`SERVICE_SPEC.md`, `RUNBOOK.md`) and platform docs.
+
+Approved active/persistent inference labels:
+- `com.bebop.llmster-gpt.8126` for the shared GPT `llmster` service
+- `com.bebop.optillm-proxy` for the non-core Studio optimization proxy
+
+Retired shadow labels:
+- `com.bebop.mlx-shadow.8123`
+- `com.bebop.mlx-shadow.8124`
+- `com.bebop.mlx-shadow.8125`
 
 ## Observability checklist
 - `launchctl print-disabled system` for enabled/disabled label state.

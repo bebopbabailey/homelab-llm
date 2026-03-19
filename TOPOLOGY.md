@@ -16,8 +16,15 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 
 ## Studio (macOS, MLX)
 - **MLX launchd labels**: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`
-- **Active inference listeners**: `192.168.1.72:8100/:8101/:8102` served by `vllm serve` under the matching per-lane labels
+- **Active MLX public inference listener**: `192.168.1.72:8101` served by `vllm serve` under `com.bebop.mlx-lane.8101`
+- **Retired GPT rollback MLX slots**: `8100` and `8102` are still `mlxctl`-governed team ports, but they are now unloaded and are not part of the active public stack
 - Team ports: `8100–8119` (`mlxctl`-managed); experimental: `8120–8139` (no `mlxctl` requirement)
+- **Active non-MLX inference labels**:
+  `com.bebop.llmster-gpt.8126`, `com.bebop.optillm-proxy`
+- **Active non-MLX listeners**:
+  `192.168.1.72:4020/:8126`
+  with `8126` live for shared `fast` + `deep`; `4020` remains non-core
+  operator infrastructure
 - **OptiLLM proxy**: `192.168.1.72:4020` (active LiteLLM `boost` path)
 - **Main vector store (active, Studio-local)**:
   - Postgres+pgvector `127.0.0.1:55432` (`com.bebop.pgvector-main`)
@@ -36,6 +43,10 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   directly to the Orin `voice-gateway` LAN `/v1` facade.
 - `voice-gateway` maps external voice aliases `default` and `alloy` to the configured
   Kokoro backend voice and forwards STT/TTS to localhost-only Speaches.
+- Voice control plane is repo-first:
+  - curated registry: `layer-interface/voice-gateway/registry/tts_models.jsonl`
+  - operator CLI: `voicectl`
+  - operator dashboard/API: `/ops` and `/ops/api/*`
 - OpenHands Phase A is a local bring-up exception for worker-mechanics validation only:
   Docker-direct on `127.0.0.1:4031`, optional tailnet-only access on
   `https://hands.tailfd1400.ts.net/`, disposable workspace mount only,
@@ -61,6 +72,13 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM also exposes `/v1/search/searxng-search` backed by SearXNG.
 - MLX team ports (`8100–8119`) are managed via `platform/ops/scripts/mlxctl`.
-- LiteLLM `main` / `deep` / `fast` route to Studio MLX lanes on `192.168.1.72:8100/8101/8102`.
+- LiteLLM `main` routes to the Studio MLX lane on `192.168.1.72:8101`.
+- LiteLLM `fast` and `deep` route to Studio `llmster` on `192.168.1.72:8126`.
+- There are no active temporary GPT rollout aliases in the public LiteLLM
+  surface.
+- GPT lanes are currently Chat Completions-first; `/v1/responses` remains in
+  validation scope but advisory for this rollout.
+- Shadow rollout listeners `8123-8125` are retired and are not part of the
+  active gateway alias surface.
 - Studio OptiLLM upstream currently reaches Mini LiteLLM via the Mini LAN URL `http://192.168.1.71:4000/v1`.
 - Studio scheduling is strict two-lane (inference vs utility); see `docs/foundation/studio-scheduling-policy.md`.

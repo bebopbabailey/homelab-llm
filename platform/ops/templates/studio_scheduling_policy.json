@@ -55,6 +55,10 @@
       "lane": "inference",
       "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-lane.8102.plist"
     },
+    "com.bebop.llmster-gpt.8126": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.llmster-gpt.8126.plist"
+    },
     "com.bebop.optillm-proxy": {
       "lane": "inference",
       "plist_path": "/Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
@@ -91,6 +95,18 @@
     },
     "com.bebop.llama-router.8100": {
       "plist_path": "/Library/LaunchDaemons/com.bebop.llama-router.8100.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.mlx-shadow.8123": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-shadow.8123.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.mlx-shadow.8124": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-shadow.8124.plist",
+      "action": "quarantine"
+    },
+    "com.bebop.mlx-shadow.8125": {
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-shadow.8125.plist",
       "action": "quarantine"
     },
     "com.deploy.mlx.server": {

@@ -21,7 +21,9 @@ class MlxctlVllmFlagsTests(unittest.TestCase):
         entry = {"model_id": "mlx-qwen3-next-80b-mxfp4-a3b-instruct"}
         self.assertEqual(mlxctl._default_vllm_profile(entry), "qwen3_main")
         self.assertEqual(mlxctl._default_vllm_tool_choice_mode(entry), "auto")
-        self.assertEqual(mlxctl._default_vllm_tool_parser(entry), "qwen3")
+        self.assertEqual(mlxctl._default_vllm_tool_parser(entry), "hermes")
+        self.assertIsNone(mlxctl._default_vllm_reasoning_parser(entry))
+        self.assertEqual(mlxctl._default_vllm_generation_config(entry), "vllm")
 
     def test_default_memory_fraction_is_auto(self):
         entry = {
@@ -70,21 +72,29 @@ class MlxctlVllmFlagsTests(unittest.TestCase):
         entry = {
             "model_id": "mlx-qwen3-next-80b-mxfp4-a3b-instruct",
             "cache_path": "/tmp/model",
-            "vllm": {"tool_choice_mode": "auto", "tool_call_parser": "qwen3", "reasoning_parser": "qwen3"},
+            "vllm": {
+                "profile": "qwen3_main",
+                "tool_choice_mode": "auto",
+                "tool_call_parser": "hermes",
+                "reasoning_parser": None,
+                "generation_config": "vllm",
+            },
         }
         caps = {
             "vllm_bin": "/usr/bin/vllm",
             "supports_auto_tool_choice": True,
             "supports_tool_call_parser": True,
             "supports_reasoning_parser": True,
-            "tool_call_parsers": ["qwen3_xml"],
+            "tool_call_parsers": ["hermes", "qwen3_xml"],
             "reasoning_parsers": ["qwen3"],
         }
         compiled = mlxctl._compile_vllm_launch(entry, 8101, "127.0.0.1", caps, validate=True)
         argv = " ".join(compiled["argv"])
         self.assertIn("--enable-auto-tool-choice", argv)
-        self.assertIn("--tool-call-parser qwen3_xml", argv)
-        self.assertIn("--reasoning-parser qwen3", argv)
+        self.assertIn("--tool-call-parser hermes", argv)
+        self.assertNotIn("--reasoning-parser qwen3", argv)
+        self.assertIn("--generation-config vllm", argv)
+        self.assertNotIn("--chat-template", argv)
         self.assertNotIn("--api-key", argv)
         self.assertIn("--no-async-scheduling", argv)
         self.assertEqual(compiled["env"]["VLLM_METAL_MEMORY_FRACTION"], "auto")

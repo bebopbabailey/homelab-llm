@@ -8,10 +8,13 @@
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
-- Mac Studio: MLX inference host using per-lane launchd labels
-  (`com.bebop.mlx-lane.8100/.8101/.8102`) with `vllm-metal`
-  runtime listeners on `192.168.1.72:8100/:8101/:8102`.
-  OptiLLM proxy :4020 (active LiteLLM `boost` + `boost-deep` path).
+- Mac Studio: MLX inference host using the `mlxctl`-governed team-lane domain
+  (`8100-8119`, with active public MLX lane `192.168.1.72:8101`).
+  Retired GPT rollback slots `8100` and `8102` remain in the `mlxctl` domain
+  but are unloaded.
+  Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
+  and `fast` plus `deep` on shared `llmster` at `8126`.
+  OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
 - Jetson Orin AGX: canonical speech appliance host.
@@ -35,11 +38,12 @@
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `layer-interface/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
-| OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, LiteLLM `boost`/`boost-deep` in `router.yaml` |
+| OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
 | Studio main vector DB | Studio | 55432 | 127.0.0.1 | http://127.0.0.1:55432 | n/a | `com.bebop.pgvector-main`, policy-managed launchd |
 | Studio main memory API | Studio | 55440 | 127.0.0.1 | http://127.0.0.1:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
-| MLX inference lanes (active) | Studio | 8100/8101/8102 | 192.168.1.72 | http://192.168.1.72:8100/v1 | /v1/models | `com.bebop.mlx-lane.8100/.8101/.8102`, runtime `vllm serve`, `mlxctl status` |
+| MLX inference lane (active) | Studio | 8101 | 192.168.1.72 | http://192.168.1.72:8101/v1 | /v1/models | `com.bebop.mlx-lane.8101`, runtime `vllm serve`, `mlxctl status` |
+| llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | 192.168.1.72 | http://192.168.1.72:8126/v1 | /v1/models | `com.bebop.llmster-gpt.8126`, runtime `llmster`, `lms ps --json` |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
 | Home Assistant | DietPi | 8123 | 0.0.0.0 (assumed) | http://192.168.1.70:8123 | not documented | `/home/christopherbailey/.ssh/config`, owner confirmation |
@@ -58,8 +62,14 @@ Networking note:
   `/health/liveliness`, and `/metrics/` are currently open.
   Runtime lock baseline: `drop_params=true`, `fast -> main`.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
-  Harmony normalization is canonical at this layer for GPT lanes (`deep`, `fast`,
-  `boost`, `boost-deep`) with strict wire-tag detection.
+  Harmony normalization is canonical at this layer for GPT lanes (`deep`, `fast`)
+  with strict wire-tag detection.
+  GPT lanes remain Chat Completions-first in the current hardening phase;
+  `/v1/responses` stays advisory unless a defect there also matters to the
+  public Chat Completions path.
+  Temporary rollout-only gateway aliases are permitted during GPT cutovers when
+  they do not redefine the public alias surface; current approved example:
+  no active temporary GPT rollout aliases.
   GPT lanes now preserve caller streaming intent by default (no forced `stream=false`).
 - Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
@@ -93,11 +103,9 @@ Networking note:
   Docker sandbox only; mount only a disposable workspace into `/workspace`.
   Temporary provider/API key is entered in the UI only and is not wired through repo
   config, shared host env, or LiteLLM in this phase.
-  LiteLLM Phase B gate is one stable alias (`code-reasoning`) plus one team-owned
-  service-account key (`openhands-worker` under `openhands-workers`) with model
-  scoping, verified MCP denial, enforced route allowlisting, and spend-log attribution.
-  The current app-container-reachable LiteLLM URL for that gate is
-  `http://192.168.1.71:4000/v1`.
+  LiteLLM Phase B is intentionally delayed while backend hardening focuses on
+  the three canonical public lanes `fast`, `main`, and `deep`. There is no
+  active OpenHands-specific model alias in the current gateway contract.
   If the custom host persistence mount is not honored during first smoke,
   fall back to the exact documented `~/.openhands:/.openhands` mount and clean it
   up after the session.
@@ -121,6 +129,9 @@ Networking note:
   Operator control plane is CLI-first (`voicectl`) with dashboard support at `/ops`.
   Canonical TTS candidate set is repo-curated in
   `layer-interface/voice-gateway/registry/tts_models.jsonl`; live Speaches registry is discovery-only.
+  Live deployment evidence is tracked in `docs/foundation/orin-agx.md` and
+  includes deploy provenance surfaced from `/ops/api/state` when
+  `.deploy-manifest.json` is present in the deploy checkout.
   Speaches appliance policy preloads the chosen canary STT and Kokoro TTS models and
   keeps `STT_MODEL_TTL` / `TTS_MODEL_TTL` at `-1` or another intentionally long value.
 - OptiLLM proxy (Studio): managed by launchd.
@@ -130,10 +141,17 @@ Networking note:
   LiteLLM routes `boost` to this proxy via `OPTILLM_API_BASE`.
   Deploy contract is exact-SHA from repo checkout with `uv sync --frozen`.
   Current package baseline is `optillm==0.3.12` from PyPI with no deploy-time patching.
-  Trio canary (`boost-plan-trio`) uses the local `plansearchtrio` plugin.
+  Historical trio canary work used the local `plansearchtrio` plugin.
 - SearXNG: systemd unit `/etc/systemd/system/searxng.service`, env `/etc/searxng/env`, localhost-only.
 - MLX: ports 8100-8119 are team slots managed via `platform/ops/scripts/mlxctl`; 8120-8139 are experimental test ports and do not require `mlxctl`.
-  Current active inference listeners: `8100/8101/8102` (`vllm serve` under `com.bebop.mlx-lane.8100/.8101/.8102`).
+  Current active public MLX inference listener: `8101` (`vllm serve` under
+  `com.bebop.mlx-lane.8101`).
+  Retired GPT rollback MLX slots: `8100` and `8102` are unloaded.
+  Active non-MLX inference labels:
+  `com.bebop.llmster-gpt.8126` and `com.bebop.optillm-proxy`.
+  Retired shadow labels:
+  `com.bebop.mlx-shadow.8123`, `com.bebop.mlx-shadow.8124`,
+  `com.bebop.mlx-shadow.8125`.
 - MLX registry (`/Users/thestudio/models/hf/hub/registry.json`) maps canonical `model_id`
   to `source_path`/`cache_path` for inference.
   Registry version 2 also carries explicit per-lane state:
@@ -146,7 +164,7 @@ Networking note:
   capability validation for auto-tool lanes) plus required family metadata from
   `platform/ops/mlx-runtime-profiles.json`. Current staged default enables
   auto-tool for `main` (`8101`) only, and the locked live `8101` render uses
-  `--tool-call-parser llama3_json` with no `--reasoning-parser`.
+  `--tool-call-parser hermes` with no `--reasoning-parser`.
   GPT-OSS family entries also carry logical chat-template kwargs; `mlxctl`
   compiles those into the `vllm-metal` argv via
   `--default-chat-template-kwargs` when the runtime supports it.
@@ -156,6 +174,12 @@ Networking note:
   restart between them.
   Scheduling policy contract (strict two-lane + fail-closed allowlist):
   `docs/foundation/studio-scheduling-policy.md`.
+- llmster GPT service boundary: canonical public path is LiteLLM on Mini ->
+  `llmster` on Studio -> llama.cpp runtime. Raw standalone `llama-server`
+  mirrors remain loopback-only diagnostic seams and are not the public path.
+  Shared `8126` is the accepted working posture for public `fast` and `deep`,
+  with explicit residency proof and post-load idle memory evidence captured
+  before the `deep` cutover.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
@@ -174,7 +198,8 @@ Networking note:
 ## Exposure and secrets (short)
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
 - LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` with localhost still valid.
-- LAN-only from trusted local hosts: Studio MLX 8100-8102 on `192.168.1.72`.
+- LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
+  `8126` on `192.168.1.72`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
 - Local-only when launched by operator: OpenHands Phase A 4031, with optional tailnet-only access at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): main vector DB 55432, memory API 55440.
@@ -186,6 +211,8 @@ Networking note:
   - `https://hands.tailfd1400.ts.net/` → OpenHands (4031)
   - `https://search.tailfd1400.ts.net/` → SearXNG (8888)
 - Tailnet remains optional/operator-only and is not part of the canonical Mini ↔ Studio service path.
+- Retired shadow ports `8123-8125` are not part of the current live exposure
+  set.
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`, Samba passdb via `smbpasswd` / `pdbedit`.
   OpenHands Phase A intentionally has no shared host env file.
@@ -197,3 +224,6 @@ Networking note:
 - LiteLLM is the single gateway.
 - Plain logical model names for clients.
 - Ports treated as immutable.
+- Approved four-lane rollout keeps public aliases stable while backend families
+  vary behind LiteLLM: MAIN remains on MLX-family backends, FAST/DEEP move
+  through `llmster`/llama.cpp.

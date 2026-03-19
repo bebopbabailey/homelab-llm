@@ -17,8 +17,147 @@ python3 platform/ops/scripts/validate_runtime_lock.py --mode full --host studio 
 Expected:
 - FAST passes in local CI/repo state with no patch artifacts or git-sourced OptiLLM.
 - FULL confirms Studio OptiLLM exact-SHA deploy plus MLX lane `auto`/`--no-async-scheduling` with no backend bearer auth.
-- FULL also confirms the locked `8101` parser override: `--tool-call-parser llama3_json`
+- FULL also confirms the locked `8101` parser override: `--tool-call-parser hermes`
   and no `--reasoning-parser`.
+
+Additional Studio backend checks (not part of the current live FULL gate):
+```bash
+curl -fsS http://192.168.1.72:4020/v1/models | jq .
+curl -fsS http://192.168.1.72:8126/v1/models | jq .
+```
+
+Additional backend interpretation:
+- `4020` is the non-core OptiLLM operator path
+- `8126` is the canonical GPT-family service
+- `8123-8125` are retired shadow ports and should not respond
+
+### GPT `llmster` rollout checks
+Studio retention dry-run:
+```bash
+uv run python layer-inference/llama-cpp-server/scripts/studio_model_retention.py \
+  --host studio \
+  --staged-slug gpt-oss-20b-mxfp4 \
+  --output /tmp/studio-model-retention-fast.json
+```
+
+Raw fast mirror launch:
+```bash
+uv run python layer-inference/llama-cpp-server/scripts/start_raw_llama_mirror.py \
+  --host studio \
+  --port 8130 \
+  --server-bin /Users/thestudio/llama.cpp-releases/current/bin/llama-server \
+  --model-path /Users/thestudio/Library/Caches/llama.cpp/ggml-org_gpt-oss-20b-GGUF_gpt-oss-20b-mxfp4.gguf \
+  --alias llmster-gpt-oss-20b-mxfp4-gguf
+```
+
+Raw launcher invariants:
+- use a versioned raw `llama-server` path when available
+- use `--jinja`
+- do not add repetition penalties for GPT-OSS
+
+Raw/direct acceptance:
+```bash
+uv run python layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+  --base-url http://127.0.0.1:8130/v1 \
+  --model llmster-gpt-oss-20b-mxfp4-gguf
+
+uv run python layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+  --base-url http://192.168.1.72:8126/v1 \
+  --model llmster-gpt-oss-20b-mxfp4-gguf \
+  --api-key "$LLMSTER_API_KEY"
+```
+
+Deep preflight estimate-only:
+```bash
+ssh studio '/Users/thestudio/.lmstudio/bin/lms load gpt-oss-20b \
+  --identifier llmster-gpt-oss-20b-mxfp4-gguf \
+  --context-length 32768 --parallel 4 --estimate-only -y'
+
+ssh studio '/Users/thestudio/.lmstudio/bin/lms load gpt-oss-120b \
+  --identifier llmster-gpt-oss-120b-mxfp4-gguf \
+  --context-length 32768 --parallel 2 --estimate-only -y'
+```
+
+Actual shared-posture proof before any public `deep` cutover:
+```bash
+ssh studio '/Users/thestudio/.lmstudio/bin/lms ps --json'
+ssh studio 'curl -fsS http://192.168.1.72:8126/v1/models | jq .'
+ssh studio 'memory_pressure -Q'
+ssh studio 'vm_stat'
+ssh studio 'top -l 1 -stats pid,command,mem,cpu'
+sleep 300
+ssh studio 'memory_pressure -Q'
+ssh studio 'vm_stat'
+ssh studio 'top -l 1 -stats pid,command,mem,cpu'
+```
+
+Shared-posture interpretation:
+- `estimate-only` is necessary but not sufficient
+- public `deep` may not be cut over until:
+  - both intended models appear in `lms ps --json`
+  - both intended models appear in `/v1/models`
+  - post-load idle memory captures do not show obvious thrash/instability
+  - `fast` still passes its regression gate under the actual dual-load posture
+
+The GPT acceptance harness now reports:
+- `plain_chat`
+- `structured_simple`
+- `structured_nested`
+- `auto_tool_noop`
+- `auto_tool_arg`
+- `required_tool_arg`
+- `named_tool_arg`
+- `large_schema_tool_stress`
+- `responses_smoke`
+- `concurrency_smoke`
+
+Deep usable-success gate:
+- plain chat clean
+- structured simple clean
+- structured nested clean
+- auto noop strong
+- auto arg-bearing usable at `>= 8/10` on direct `llmster` and public LiteLLM
+- at least one constrained mode strong:
+  - `tool_choice="required" >= 9/10`, or
+  - named-tool forcing `>= 9/10`
+- crashes, listener loss, sustained readiness regressions, repeated `5xx`, and
+  repeated timeouts remain blockers
+- Current public `deep` cutover result on shared `8126`:
+  - `plain_chat`: `5/5`
+  - `structured_simple`: `5/5`
+  - `structured_nested`: `5/5`
+  - `auto_tool_noop`: `10/10`
+  - `auto_tool_arg`: `10/10`
+  - `required_tool_arg`: `9/10`
+  - `named_tool_arg`: unsupported on the current backend path, returns
+    backend-visible `400` for object-form `tool_choice`
+
+Raw mirror policy:
+- raw standalone llama.cpp remains diagnostic-first
+- raw divergence alone does not block promotion unless it exposes a crash,
+  gross corruption, or a reproducible defect that also appears on direct
+  `llmster` or public LiteLLM
+
+OpenAI gpt-oss verification:
+- Run the official upstream verification flow described in:
+  `https://developers.openai.com/cookbook/articles/gpt-oss/verifying-implementations`
+- Minimum in this repo:
+  - one pass on refreshed raw deep mirror
+  - one pass on direct `llmster` deep
+  - optional public LiteLLM deep smoke if it adds signal
+
+Accepted cutover order:
+- raw `deep` validation
+- direct `llmster` `deep` validation
+- temporary canary validation through LiteLLM (now retired)
+- only then canonical public `deep`
+
+Raw mirror teardown:
+```bash
+uv run python layer-inference/llama-cpp-server/scripts/stop_raw_llama_mirror.py \
+  --host studio \
+  --port 8130
+```
 
 ## OpenCode Web (Mini)
 Service install/source-of-truth check:
@@ -154,9 +293,10 @@ After reboot or launchd restart, confirm all active `mlxctl` assignments are ser
 Note: `GET /v1/models` on the Studio may return a local filesystem snapshot path
 as the model `id`. Use `mlxctl status` for canonical model/port mapping.
 
-As of `2026-03-01`, expected production active lanes are `8100`, `8101`, and `8102`.
-Any deviation should be treated as drift and triaged with `mlxctl status --checks`
-and `mlxctl verify`.
+As of `2026-03-19`, the expected public MLX lane is `8101`.
+The old GPT rollback slots `8100` and `8102` remain `mlxctl`-governed but are
+expected to be unloaded. Any deviation should be treated as drift and triaged
+with `mlxctl status --checks` and `mlxctl verify`.
 
 Canonical Mini -> Studio transport for active MLX team lanes is the Studio LAN
 IP `192.168.1.72`.
@@ -164,7 +304,7 @@ IP `192.168.1.72`.
 Mini-side reachability check:
 
 ```bash
-for p in 8100 8101 8102; do
+for p in 8101; do
   curl -fsS "http://192.168.1.72:${p}/v1/models" | jq .
 done
 ```
@@ -184,7 +324,7 @@ done
 ssh studio "python3 - <<'PY'
 import json, urllib.request
 payload={
-  'model':'mlx-llama-3-3-70b-4bit-instruct',
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
   'messages':[{'role':'user','content':'Use the noop tool once, then stop.'}],
   'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
   'tool_choice':'auto',
@@ -206,6 +346,151 @@ PY"
 Expected:
 - `tool_calls` is present and names `noop`
 - response `content` does not contain raw `<tool_call>`
+
+Direct backend argument-bearing auto probe:
+```bash
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+payload={
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
+  'messages':[{'role':'user','content':'Use the noop tool exactly once with a short JSON object argument.'}],
+  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{'value':{'type':'string'}},'required':['value'],'additionalProperties':False}}}],
+  'tool_choice':'auto',
+  'stream':False,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0], indent=2))
+PY"
+```
+
+Interpretation:
+- native pass:
+  - `tool_calls` is present and arguments parse as JSON containing `value`
+- semantic but raw/recoverable:
+  - direct backend returns exactly one `<tool_call>...</tool_call>` block with a
+    JSON object payload and no extra prose
+  - this is acceptable only if LiteLLM `main` post-call success-hook validation
+    also passes
+- semantic fail:
+  - malformed JSON, extra prose, ambiguity, `5xx`, or timeout
+
+`tool_choice="required"` and named forced-tool choice are advisory-only on the
+current Qwen main lane and are not part of the public `main` acceptance gate.
+
+`main` structured-output protocol validation (diagnostic only, not a closeout blocker):
+```bash
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+schema={
+  'type':'object',
+  'properties':{'status':{'type':'string'}},
+  'required':['status'],
+  'additionalProperties':False
+}
+payload={
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
+  'messages':[{'role':'user','content':'Return a JSON object that matches the schema exactly.'}],
+  'response_format':{
+    'type':'json_schema',
+    'json_schema':{
+      'name':'status_payload',
+      'schema':schema
+    }
+  },
+  'stream':False,
+  'temperature':0,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY"
+
+ssh studio "python3 - <<'PY'
+import json, urllib.request
+schema={
+  'type':'object',
+  'properties':{'status':{'type':'string'}},
+  'required':['status'],
+  'additionalProperties':False
+}
+payload={
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
+  'messages':[{'role':'user','content':'Return a JSON object that matches the schema exactly.'}],
+  'structured_outputs':{'json':schema},
+  'stream':False,
+  'temperature':0,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:8101/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY"
+
+bash -lc 'set -a && source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local && set +a && python3 - <<'"'"'PY'"'"'
+import json, os, urllib.request
+schema={
+  "type":"object",
+  "properties":{"status":{"type":"string"}},
+  "required":["status"],
+  "additionalProperties":False
+}
+payload={
+  "model":"main",
+  "messages":[{"role":"user","content":"Return a JSON object that matches the schema exactly."}],
+  "response_format":{
+    "type":"json_schema",
+    "json_schema":{
+      "name":"status_payload",
+      "schema":schema
+    }
+  },
+  "stream":False,
+  "temperature":0,
+  "max_tokens":128
+}
+req=urllib.request.Request(
+  "http://127.0.0.1:4000/v1/chat/completions",
+  data=json.dumps(payload).encode(),
+  headers={"Authorization": f"Bearer {os.environ['LITELLM_MASTER_KEY']}", "Content-Type":"application/json"},
+  method="POST"
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body["choices"][0]["message"], indent=2))
+PY'
+```
+
+Expected current truth:
+- direct `8101` exact documented `response_format.json_schema`: semantic FAIL
+- direct `8101` exact `structured_outputs.json`: semantic FAIL
+- LiteLLM `main` exact documented `response_format.json_schema`: semantic FAIL
+- all three currently return HTTP `200` with assistant `content` equal to:
+  `{"error":"No schema provided to match against."}`
+- this is a backend-path structured-output gap on the current `8101` runtime,
+  not a LiteLLM-only transport failure
+- this probe remains useful as backend evidence, but it is not part of the
+  accepted public `main` closeout gate
 
 ## Studio scheduling policy (Mini -> Studio)
 This section is authoritative for Studio scheduling verification workflow.
@@ -369,22 +654,23 @@ Gate thresholds:
 - `bad_hit_rate_at_5` is diagnostic only
 
 Runtime lineage check expectation:
-- ports `8100/8101/8102` listeners are `vllm serve`
-- process ancestry includes `com.bebop.mlx-lane.<port>` lineage
+- port `8101` listener is `vllm serve`
+- process ancestry includes `com.bebop.mlx-lane.8101` lineage
 
-Verify GPT‑OSS content channel is present (requires adequate max_tokens):
+Verify GPT‑OSS content channel is present on the canonical shared `8126` backend
+(requires adequate max_tokens):
 ```bash
-curl -fsS http://127.0.0.1:8102/v1/chat/completions \
+curl -fsS http://192.168.1.72:8126/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"mlx-gpt-oss-20b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":256}' \
+  -d '{"model":"llmster-gpt-oss-20b-mxfp4-gguf","messages":[{"role":"user","content":"ping"}],"reasoning_effort":"low","max_tokens":256}' \
   | jq -r '.choices[0].message | {content, reasoning_content}'
 ```
 
 Smoke check for raw Harmony-tag leakage (should return no `<|channel|>`):
 ```bash
-curl -fsS http://127.0.0.1:8100/v1/chat/completions \
+curl -fsS http://192.168.1.72:8126/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"Return one short sentence about oranges."}],"max_tokens":128}' \
+  -d '{"model":"llmster-gpt-oss-120b-mxfp4-gguf","messages":[{"role":"user","content":"Return one short sentence about oranges."}],"reasoning_effort":"low","max_tokens":128}' \
   | jq -r '.choices[0].message.content'
 ```
 
@@ -419,63 +705,10 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 Note: in the current deployment, unauthenticated `GET /health` may return `401`.
 Prefer `/health/readiness` as the default probe when validating service liveness.
 
-## OpenHands LiteLLM gate (Mini)
-Verify the stable alias and capability path:
-```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-
-curl -fsS http://127.0.0.1:4000/v1/models \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq -r '.data[].id' | rg '^code-reasoning$'
-
-curl -fsS "http://127.0.0.1:4000/v1/model/info" \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY" | jq '.data[] | select(.model_name=="code-reasoning")'
-```
-
-Verify the OpenHands worker key is model-scoped and MCP-denied:
-```bash
-export OPENHANDS_WORKER_KEY='<worker-key>'
-export OPENHANDS_LITELLM_BASE_URL='http://192.168.1.71:4000/v1'
-
-curl -fsS "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/chat/completions" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"main","messages":[{"role":"user","content":"Reply with exactly: main-should-fail"}],"stream":false,"max_tokens":32}'
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/mcp/tools" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY"
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$OPENHANDS_LITELLM_BASE_URL/responses" \
-  -H "Authorization: Bearer $OPENHANDS_WORKER_KEY"
-```
-
-Expected:
-- `code-reasoning` succeeds.
-- `main` is denied for the worker key.
-- MCP listing is denied for the worker key.
-- `/responses` is denied for the worker key.
-
-Attribution check:
-```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-
-curl -fsS -G http://127.0.0.1:4000/spend/logs/v2 \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY" \
-  --data-urlencode key_alias=openhands-worker \
-  --data-urlencode start_date="YYYY-MM-DD 00:00:00" \
-  --data-urlencode end_date="YYYY-MM-DD 23:59:59" \
-  --data-urlencode page=1 \
-  --data-urlencode page_size=20 | jq .
-```
-
-Expected:
-- successful worker calls appear with `key_alias=openhands-worker`
-- `team_id=openhands-workers`
-- `model_group=code-reasoning`
+## OpenHands Phase B note
+OpenHands Phase B is intentionally deferred during the current three-alias
+backend hardening cycle. Do not run OpenHands worker or `code-reasoning`
+gateway checks until a later plan reinstates a dedicated model contract.
 
 ## Documentation predictability sweep (repo)
 Use this when running doc-consistency hardening work for coding-agent safety.
@@ -537,7 +770,7 @@ Direct lane smoke for `tool_choice:\"auto\"`:
 ssh studio "python3 - <<'PY'
 import json, urllib.request
 payload={
-  'model':'mlx-llama-3-3-70b-4bit-instruct',
+  'model':'mlx-qwen3-next-80b-mxfp4-a3b-instruct',
   'messages':[{'role':'user','content':'Reply with exactly: main-tool-ok'}],
   'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
   'tool_choice':'auto',
@@ -709,6 +942,19 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://192.168.1.93:18080/v1/audio/spe
 Expected:
 - `default` and `alloy` resolve to the same initial Kokoro backend voice
 - unknown voices return clean `400` by default, unless config explicitly enables fallback
+
+Control-plane checks:
+```bash
+curl -fsS http://192.168.1.93:18080/ops >/dev/null
+curl -fsS http://192.168.1.93:18080/ops/api/registry/curated -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
+curl -fsS http://192.168.1.93:18080/ops/api/state -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq '.curated_registry, .deploy_manifest'
+
+# deploy checkout CLI smoke (run on Orin)
+PYTHONPATH=/home/christopherbailey/voice-gateway-canary/src \
+  python3 -m voice_gateway.ops_cli registry-list
+PYTHONPATH=/home/christopherbailey/voice-gateway-canary/src \
+  python3 -m voice_gateway.ops_cli --base-url http://192.168.1.93:18080 --api-key "${VOICE_GATEWAY_API_KEY}" status
+```
 
 ## LiteLLM speech canary (Mini)
 ```bash

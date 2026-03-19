@@ -3,7 +3,8 @@
 ## LiteLLM routing
 - Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
-- Upstreams: Studio MLX lanes `http://192.168.1.72:8100|8101|8102/v1`,
+- Upstreams: active Studio MLX lane `http://192.168.1.72:8101/v1`,
+  active `llmster` GPT service on `8126`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: canonical model IDs with prefix `mlx-`.
   Format: `mlx-<family>-<params>-<quant>-<variant>` in that order (dash-only,
@@ -15,11 +16,23 @@
 - Unsupported OpenAI params are dropped at LiteLLM via `litellm_settings.drop_params: true`.
 - Auth: gateway requests currently require bearer auth (`LITELLM_MASTER_KEY` in deployment).
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
-- MLX alias set (current lane mapping):
-  - `deep` -> `8100` (`mlx-gpt-oss-120b-mxfp4-q4`)
-  - `main` -> `8101` (`mlx-llama-3-3-70b-4bit-instruct`)
-  - `fast` -> `8102` (`mlx-gpt-oss-20b-mxfp4-q4`)
-  `8120-8139` remain reserved for experimental canaries (only used when explicitly configured and not required to use `mlxctl`).
+- Current live lane mapping:
+  - `deep` -> `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
+  - `main` -> `8101` (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
+  - `fast` -> `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
+  `8120-8139` remain approved experimental/canary space, with `8126` now
+  active for the shared canonical GPT service carrying `fast` and `deep`.
+- Studio service posture:
+  - `8126` is the active shared GPT-family service lane for public `fast` and `deep`
+  - `8123-8125` are retired shadow ports and are not part of the current control surface
+- Canonical GPT backend identity on `8126` is MXFP4 GGUF:
+  - `llmster-gpt-oss-20b-mxfp4-gguf`
+  - `llmster-gpt-oss-120b-mxfp4-gguf`
+- Raw llama.cpp truth-path mirrors for GPT rollout are loopback-only on Studio:
+  - `fast` mirror -> `127.0.0.1:8130`
+  - `deep` mirror -> `127.0.0.1:8131` (planned)
+  They are not part of the public client path and are diagnostic-first rather
+  than automatic promotion oracles.
 - MLX registry is the canonical link from `model_id` to inference source:
   `model_id` → `registry.json` → `source_path` / `cache_path`.
 - Context defaults: `router.yaml` uses MLX registry fields:
@@ -27,11 +40,36 @@
   These defaults are persisted in the Studio registry and synced via `mlxctl sync-gateway`.
 - **Showroom vs backroom:** only models present on the Mini or Studio are exposed
   as LiteLLM handles. Seagate storage is **backroom only** and never receives handles.
+- Studio GPT retention policy is “active runtime artifacts plus one staged next
+  artifact”; stale model weights should be pruned before GPT cutovers.
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
-- Stable aliases: `main`, `deep`, `fast`.
+- Stable public LLM aliases: `main`, `deep`, `fast`.
+- There are no active temporary GPT rollout aliases in the current gateway
+  contract.
+- `main` is closed as an active backend project and remains accepted for public
+  use with known limitations on forced-tool semantics and structured outputs.
 - Resilience baseline: `fast -> main`.
-- Current experiment aliases: `metal-test-fast`, `metal-test-main`, `metal-test-deep` (temporary).
+- GPT lanes are Chat Completions-first in the current hardening phase.
+- `/v1/responses` remains in validation scope for GPT lanes but is advisory
+  unless it exposes a defect that also matters to the public Chat Completions
+  path.
+- `deep` cutover evidence was:
+  - close `fast` observation on the current live LM Studio stack
+  - refresh raw standalone llama.cpp while live `llmster` remained untouched
+  - refresh LM Studio daemon/runtime
+  - rerun the `fast` regression gate
+  - stage/import `deep`, prove shared posture, validate the temporary canary,
+    and repoint canonical public `deep`
+- Current public `deep` result on shared `8126`:
+  - plain chat clean
+  - structured simple clean
+  - structured nested clean
+  - auto noop `10/10`
+  - auto arg-bearing `10/10`
+  - `required` arg-bearing `9/10`
+  - named forced-tool choice unsupported on the current backend path
+- Experimental aliases are not part of the active gateway contract in the current hardened phase.
 - LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
 
 ### LiteLLM Prometheus metrics (enabled)
@@ -79,13 +117,13 @@ sum(rate(litellm_output_tokens_metric_total[1m]))
 - Prometheus runtime config: `/etc/homelab-llm/prometheus/prometheus.yml` (deployed from repo).
 - Experimental aliases (`x1`–`x4`) are not currently configured in active router config.
 
-### Param support probe (LiteLLM + MLX backends)
+### Param support probe (LiteLLM + canonical backends)
 Run this on the **Mini** to verify which optional params are accepted or ignored:
 ```bash
 curl -sS --max-time 10 http://127.0.0.1:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mlx-gpt-oss-20b-mxfp4-q4",
+    "model": "fast",
     "messages": [{"role": "user", "content": "ping"}],
     "max_tokens": 256,
     "temperature": 0.2,
@@ -188,10 +226,14 @@ if a param is rejected by the backend.
   - canary lane: `main`
   - synthesis-only lane: `fast`
   - approval prompts stay `ask` for `bash` and `edit`
-- Current lane note: `main` (`llama-3.3-70b`) is the validated tool-capable
-  lane under `mlxctl` vLLM arg compilation.
+- Current lane note: `main` (`qwen3-next-80b`) is the validated canary lane under
+  `mlxctl` vLLM arg compilation.
   The locked live `8101` lane uses `tool_choice=auto`,
-  `tool_call_parser=llama3_json`, and `reasoning_parser=null`.
+  `tool_call_parser=hermes`, and `reasoning_parser=null`.
+- Approved rollout note:
+  - MAIN canonical target is `Qwen3-Next-80B-A3B-Instruct` on `vllm-metal` at `8101`
+  - explicit MAIN fallback remains dormant recovery metadata only
+  - FAST and DEEP are now the settled GPT lanes on the shared `llmster`/llama.cpp service at `8126`
 - Repo-shared OpenCode workflow and verification live in `docs/OPENCODE.md` and
   `docs/foundation/testing.md`.
 
@@ -219,17 +261,8 @@ if a param is rejected by the backend.
   `SANDBOX_VOLUMES`; do not mount the live monorepo in Phase A.
 - Model/provider contract in Phase A: temporary provider/API key entered in the
   OpenHands UI only. No repo config, shared host env file, or LiteLLM wiring.
-- Phase B handoff contract, once LiteLLM policy is ready:
-  - Custom model: `litellm_proxy/code-reasoning`
-  - Base URL: `http://192.168.1.71:4000/v1`
-  - API key: LiteLLM team service-account key `openhands-worker`
-- Minimum LiteLLM policy gate for that handoff:
-  - one stable alias only: `code-reasoning`
-  - one team-owned service-account key only: `team_id=openhands-workers`, `key_alias=openhands-worker`
-  - model allowlist restricted to `code-reasoning`
-  - MCP/tool access denied for the worker key
-  - current deployment enforces worker `allowed_routes`; the OpenHands worker is restricted to `/v1/models`, `/v1/model/info`, and `/v1/chat/completions`
-  - worker usage is attributable in LiteLLM spend logs by `key_alias=openhands-worker` and `team_id=openhands-workers`
+- Phase B handoff contract is intentionally deferred during the current
+  three-alias backend hardening cycle.
 - Current runtime note:
   - `http://host.docker.internal:4000/v1` is not the canonical path for OpenHands on this Mini
   - the current canonical infra path to LiteLLM is `http://192.168.1.71:4000/v1`
@@ -237,29 +270,10 @@ if a param is rejected by the backend.
   integration, no deploy rights, no auto-merge, no LAN exposure, tailnet access
   limited to dedicated service `svc:hands`.
 
-## OptiLLM boost lane (opt-in)
-- `boost` routes to the Studio OptiLLM proxy (`http://192.168.1.72:4020/v1`) via `OPTILLM_API_BASE`.
-- `boost-deep` routes to the same Studio OptiLLM proxy and sets `model=deep`.
-- Studio OptiLLM is a single instance; both handles share it.
-- Force a specific approach by sending `optillm_approach` in the request body (e.g., `bon`, `moa`, `plansearch`).
-- Observability: `boost` appears in Studio `optillm-proxy` logs.
-- Studio backend auth is not required for `boost`; network isolation comes from the dedicated Studio LAN bind and the LiteLLM-only caller contract.
-
-Deterministic coding-quality aliases (current):
-- `boost-plan` -> `plansearch-deep`
-- `boost-plan-trio` -> `plansearchtrio-deep` (canary)
-- `boost-plan-verify` -> `self_consistency-deep`
-- `boost-ideate` -> `moa-deep`
-- `boost-fastdraft` -> `bon-fast`
-
-These aliases are valid OptiLLM routing handles, but they are not the default
-repo-local OpenCode control plane.
-
-### OptiLLM validation checklist (router + plugins)
-1) Router is active (log line: `Using approach(es) ['router']`).
-2) `web_search` returns results **without** Chrome errors (SearXNG path).
-3) `deep_research` uses the same SearXNG path (no Selenium dependency).
-4) `boost` returns 200 with non-empty `message.content`.
+## OptiLLM proxy (deployed, not gateway-exposed)
+- The Studio OptiLLM proxy remains deployed on `http://192.168.1.72:4020/v1`.
+- It is not part of the active LiteLLM alias surface during this three-alias
+  backend hardening phase.
 
 ## LiteLLM extension points (summary)
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
@@ -267,7 +281,7 @@ and where this repo uses callbacks vs guardrails.
 
 ### Harmony normalization policy (gateway canonical layer)
 - MLX backend runtime is `vllm-metal` (`vllm serve` under `mlxctl`/launchd); Harmony normalization is done at LiteLLM.
-- Applied to GPT lanes only: `deep`, `fast`, `boost`, `boost-deep`.
+- Applied to GPT lanes only: `deep`, `fast`.
 - Llama lane (`main`) remains passthrough.
 - Guardrail pre-call mutates prior assistant history only when strict Harmony wire
   markers are present (`<|channel|>`, `<|message|>`, plus `analysis|final` channel).
@@ -284,19 +298,16 @@ and where this repo uses callbacks vs guardrails.
 
 ## OptiLLM optimization proxy
 - Studio LAN proxy: `http://192.168.1.72:4020/v1` (binds `192.168.1.72:4020` on the Studio).
-- Current usage: active LiteLLM `boost` path.
+- Current usage: deployed but not exposed through the active LiteLLM alias surface.
 - Requests do not require backend bearer auth on the Studio OptiLLM listener.
 - Current upstream: Mini LiteLLM through the Mini LAN URL `http://192.168.1.71:4000/v1`.
 - Upstream can be LiteLLM or MLX directly; avoid routing loops.
 - Proxy providers config: `~/.optillm/proxy_config.yaml` must point only to
   LiteLLM to avoid cloud fallbacks.
 
-### Boost handle routing (current)
-- LiteLLM `boost*` aliases route to Studio OptiLLM proxy via `OPTILLM_API_BASE`.
-- `boost` / `boost-deep` keep request-body approach override support (`optillm_approach`).
-- `boost-plan-trio` is available as a canary staged orchestrator plugin.
-- `boost-plan` / `boost-plan-verify` / `boost-ideate` / `boost-fastdraft` use
-  model-prefix approach selection for deterministic OpenCode workflows.
+### Gateway exposure note
+- The current backend hardening phase does not expose any `boost*` aliases
+  through LiteLLM.
 
 ### Technique selection (request body)
 Set `optillm_approach` in the request body:
@@ -310,7 +321,7 @@ Local-only (best on opti-local due to multi-sample or decoding-level control):
 
 Example:
 ```json
-{"model":"mlx-gpt-oss-120b-mxfp4-q4","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
+{"model":"deep","messages":[{"role":"user","content":"ping"}],"optillm_approach":"moa"}
 ```
 
 ### Repo-local OpenCode workflow

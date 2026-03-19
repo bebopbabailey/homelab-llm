@@ -4,11 +4,12 @@
 Keep Studio MLX inference stable and repeatable with registry-driven model mapping,
 Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM alias wiring.
 
-## Runtime Reality (2026-03-01)
-- Active Studio inference listeners:
-  - `8100` -> `mlx-gpt-oss-120b-mxfp4-q4` (deep)
-  - `8101` -> `mlx-llama-3-3-70b-4bit-instruct` (main)
-  - `8102` -> `mlx-gpt-oss-20b-mxfp4-q4` (fast)
+## Runtime Reality (2026-03-19)
+- Active public Studio MLX inference listener:
+  - `8101` -> `mlx-qwen3-next-80b-mxfp4-a3b-instruct` (`main`)
+- Retired GPT rollback MLX slots:
+  - `8100` (previous `deep` MLX rollback slot, now unloaded)
+  - `8102` (previous `fast` MLX rollback slot, now unloaded)
 - Canonical Mini -> Studio transport for active team lanes is the Studio LAN IP
   `192.168.1.72`; the MLX lane transport contract no longer depends on Studio
   Tailscale hostnames.
@@ -118,9 +119,10 @@ For GPT-OSS entries, registry must keep:
 - `chat_template_args` aligned with the GPT lane policy (currently
   `{"enable_thinking": false, "reasoning_effort": "low"}`)
 
-For Llama 3.3 entries, registry must keep:
-- `vllm.profile: llama3_json`
+For Qwen3-Next entries on the main lane, registry must keep:
+- `vllm.profile: qwen3-next-80b`
 - `vllm.tool_choice_mode: auto`
+- `vllm.tool_call_parser: hermes`
 - no default reasoning parser
 
 For `vllm-metal` launch behavior, registry now supports a nested `vllm` block:
@@ -154,9 +156,9 @@ Runtime compatibility is resolved at launch time:
   - two consecutive full passes with no restart between them
 
 Current staged default:
-- `main` (`8101`, llama-3.3-70b) uses `tool_choice_mode=auto`.
-- Active `8101` lock render uses `vllm.profile=llama3_json`,
-  `vllm.tool_call_parser=llama3_json`, and `vllm.reasoning_parser=null`.
+- `main` (`8101`, qwen3-next-80b) uses `tool_choice_mode=auto`.
+- Active `8101` lock render uses `vllm.profile=qwen3-next-80b`,
+  `vllm.tool_call_parser=hermes`, and `vllm.reasoning_parser=null`.
 - `deep`/`fast` remain on `tool_choice_mode=none` until explicitly changed.
 - GPT-OSS family defaults now carry chat-template kwargs into the vLLM render so
   direct canaries and future lane reloads do not silently drop the GPT thinking
@@ -183,15 +185,14 @@ Served-set source of truth:
 - Registry data enriches metadata for those served handles.
 
 Current alias intent:
-- `main` -> llama-3.3-70b (`8101`)
-- `deep` -> gpt-oss-120b (`8100`)
-- `fast` -> gpt-oss-20b (`8102`)
-- `boost` / `boost-deep` -> Studio OptiLLM proxy (`4020`)
+- `main` -> qwen3-next-80b (`8101`)
+- public GPT aliases `fast` and `deep` are no longer backed by MLX team lanes;
+  they now route to shared `llmster` on `8126`
 
 ## Port Policy
 - Team ports: `8100-8119`
 - Experimental ports: `8120-8139`
-- Active set currently uses only `8100/8101/8102`.
+- Active public MLX set currently uses only `8101`.
 - Conservative lane defaults when registry fields are missing:
   - `8100` (`gpt-oss-120b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=0.55`, `vllm_async_scheduling=false`
   - `8101` (`llama-3.3-70b`): `vllm_max_model_len=65536`, `vllm_memory_fraction=auto`, `vllm_async_scheduling=false`

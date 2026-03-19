@@ -38,6 +38,5 @@ homelab can validate coding-worker mechanics before LiteLLM integration.
 - Tailscale Serve may expose the same UI at `https://hands.tailfd1400.ts.net/`
 - `docker inspect` shows only the expected binds
 - scratch-repo validation command passes inside the sandbox flow
-- Phase B LiteLLM gate is ready only when the app-container-reachable LiteLLM
-  URL succeeds on `code-reasoning`, denies `main`, denies `/v1/mcp/tools`, and
-  worker traffic is attributable to `key_alias=openhands-worker`
+- Phase B LiteLLM handoff is intentionally delayed while backend hardening
+  focuses on the three active public LLM lanes `fast`, `main`, and `deep`.
