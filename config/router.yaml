@@ -3,186 +3,25 @@ model_list:
 # MLX model entries omitted (aliases-only model_list).
 # Canonical model_ids remain in the MLX registry and env.local.
 # END MLXCTL AUTO
-# 1) Core role aliases: main / deep / fast (+ temporary metal-test aliases)
+# 1) Core role aliases: stable public lanes only
 - model_name: main
   litellm_params:
-    model: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_API_BASE
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
     api_key: dummy
     max_tokens: 16384
-- model_name: code-reasoning
-  litellm_params:
-    # stable OpenHands worker alias; keep the external contract boring even if
-    # we repoint the upstream later
-    model: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-  model_info:
-    mode: chat
-    max_input_tokens: 65536
-    max_output_tokens: 16384
-    supports_function_calling: true
-    supports_tool_choice: true
-    supports_system_messages: true
-    supports_reasoning: true
 - model_name: deep
   litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_120B_MXFP4_Q4_API_BASE
+    model: os.environ/LLMSTER_DEEP_MODEL
+    api_base: os.environ/LLMSTER_DEEP_API_BASE
     api_key: dummy
     max_tokens: 16384
 - model_name: fast
   litellm_params:
-    model: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_MODEL
-    api_base: os.environ/MLX_MLX_GPT_OSS_20B_MXFP4_Q4_API_BASE
+    model: os.environ/LLMSTER_FAST_MODEL
+    api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 16384
-- model_name: metal-test-fast
-  litellm_params:
-    # temporary experimental vllm-metal canaries on Studio 8120-8139
-    model: os.environ/METAL_TEST_FAST_MODEL
-    api_base: os.environ/METAL_TEST_FAST_API_BASE
-    api_key: os.environ/METAL_TEST_FAST_API_KEY
-    max_tokens: 16384
-- model_name: metal-test-main
-  litellm_params:
-    model: os.environ/METAL_TEST_MAIN_MODEL
-    api_base: os.environ/METAL_TEST_MAIN_API_BASE
-    api_key: os.environ/METAL_TEST_MAIN_API_KEY
-    max_tokens: 16384
-- model_name: metal-test-deep
-  litellm_params:
-    model: os.environ/METAL_TEST_DEEP_MODEL
-    api_base: os.environ/METAL_TEST_DEEP_API_BASE
-    api_key: os.environ/METAL_TEST_DEEP_API_KEY
-    max_tokens: 16384
-- model_name: metal-test-gptoss20b-enforce
-  litellm_params:
-    # explicit experimental Responses-only GPT-OSS 20B lane with pre-call
-    # contract normalization guardrail
-    model: os.environ/METAL_TEST_GPTOSS20B_ENFORCE_MODEL
-    api_base: os.environ/METAL_TEST_GPTOSS20B_ENFORCE_API_BASE
-    api_key: os.environ/METAL_TEST_GPTOSS20B_ENFORCE_API_KEY
-    max_tokens: 16384
-    temperature: 0.0
-    stream: false
-
-# 2) OptiLLM boost lane (opt-in)
-- model_name: boost
-  litellm_params:
-    model: main
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-- model_name: boost-deep
-  litellm_params:
-    model: deep
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-# 2b) OptiLLM coding-quality profiles (deterministic aliases)
-- model_name: boost-plan
-  litellm_params:
-    # plansearch + deep lane for high-quality coding plans
-    model: plansearch-deep
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-- model_name: boost-plan-trio
-  litellm_params:
-    # canary trio planner plugin (fast/main/deep staged orchestration)
-    model: plansearchtrio-deep
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-- model_name: boost-plan-verify
-  litellm_params:
-    # self-consistency pass to verify/pressure-test plans
-    model: self_consistency-deep
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-- model_name: boost-ideate
-  litellm_params:
-    # moa for divergent architecture exploration
-    model: moa-deep
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 16384
-
-- model_name: boost-fastdraft
-  litellm_params:
-    # best-of-n for lower-cost drafting passes
-    model: bon-fast
-    custom_llm_provider: openai
-    api_base: os.environ/OPTILLM_API_BASE
-    api_key: dummy
-    max_tokens: 8192
-
-# 3) Task aliases: task-transcribe, task-transcribe-vivid
-- model_name: task-transcribe
-  litellm_params:
-    model: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_API_BASE
-    api_key: dummy
-    temperature: 0.05
-    top_p: 1.0
-    max_tokens: 4096
-    presence_penalty: 0.0
-    frequency_penalty: 0.0
-
-- model_name: task-transcribe-vivid
-  litellm_params:
-    model: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_LLAMA_3_3_70B_4BIT_INSTRUCT_API_BASE
-    api_key: dummy
-    temperature: 0.4
-    top_p: 1.0
-    max_tokens: 4096
-    presence_penalty: 0.0
-    frequency_penalty: 0.2
-
-# 4) Speech aliases: voice-stt/voice-tts (+ canary pair)
-- model_name: voice-stt-canary
-  litellm_params:
-    model: openai/whisper-1
-    api_base: os.environ/VOICE_GATEWAY_API_BASE
-    api_key: os.environ/VOICE_GATEWAY_API_KEY
-  model_info:
-    mode: audio_transcription
-
-- model_name: voice-tts-canary
-  litellm_params:
-    model: openai/tts-1
-    api_base: os.environ/VOICE_GATEWAY_API_BASE
-    api_key: os.environ/VOICE_GATEWAY_API_KEY
-
-- model_name: voice-stt
-  litellm_params:
-    model: openai/whisper-1
-    api_base: os.environ/VOICE_GATEWAY_API_BASE
-    api_key: os.environ/VOICE_GATEWAY_API_KEY
-  model_info:
-    mode: audio_transcription
-
-- model_name: voice-tts
-  litellm_params:
-    model: openai/tts-1
-    api_base: os.environ/VOICE_GATEWAY_API_BASE
-    api_key: os.environ/VOICE_GATEWAY_API_KEY
-
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -219,14 +58,14 @@ guardrails:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-trio,boost-plan-verify,boost-ideate,boost-fastdraft"
+      target_models: "deep,fast"
       coerce_stream_false: false
   - guardrail_name: "harmony-post"
     litellm_params:
       guardrail: "harmony_guardrail.HarmonyGuardrail"
       mode: "post_call"
       default_on: true
-      target_models: "deep,fast,boost,boost-deep,boost-plan,boost-plan-trio,boost-plan-verify,boost-ideate,boost-fastdraft"
+      target_models: "deep,fast"
       coerce_stream_false: false
   - guardrail_name: "transcribe-pre"
     litellm_params:
@@ -238,15 +77,8 @@ guardrails:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
       mode: "post_call"
       default_on: true
-  - guardrail_name: "responses-contract-pre"
+  - guardrail_name: "qwen-toolcall-post"
     litellm_params:
-      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
-      mode: "pre_call"
-      default_on: true
-      target_models: "metal-test-gptoss20b-enforce"
-  - guardrail_name: "responses-contract-post"
-    litellm_params:
-      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
+      guardrail: "qwen_toolcall_posthook.QwenToolcallPostHook"
       mode: "post_call"
       default_on: true
-      target_models: "metal-test-gptoss20b-enforce"

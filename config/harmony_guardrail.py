@@ -153,6 +153,23 @@ def _message_content_setter(response: Any, content: str) -> Any:
     return response
 
 
+def _strip_reasoning_fields(response: Any) -> Any:
+    if hasattr(response, "model_dump"):
+        try:
+            response = response.model_dump()
+        except Exception:
+            pass
+    if isinstance(response, dict):
+        choices = response.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            message = choices[0].get("message")
+            if isinstance(message, dict):
+                message.pop("reasoning", None)
+                message.pop("reasoning_content", None)
+                message.pop("provider_specific_fields", None)
+    return response
+
+
 class HarmonyGuardrail(CustomGuardrail):
     """Normalize GPT-OSS Harmony and Qwen think-tag output for downstream clients."""
 
@@ -179,6 +196,9 @@ class HarmonyGuardrail(CustomGuardrail):
             return data
         if not _is_target_model(model, self.target_models):
             return data
+
+        if not data.get("reasoning_effort"):
+            data["reasoning_effort"] = "low"
 
         if self.coerce_stream_false and data.get("stream") is True:
             data["stream"] = False
@@ -216,13 +236,13 @@ class HarmonyGuardrail(CustomGuardrail):
 
         content = _message_content_getter(response)
         if not content:
-            return response
+            return _strip_reasoning_fields(response)
 
         normalized, changed = normalize_assistant_text(content)
         if changed:
-            return _message_content_setter(response, normalized)
+            return _strip_reasoning_fields(_message_content_setter(response, normalized))
 
-        return response
+        return _strip_reasoning_fields(response)
 
     async def async_post_call_streaming_iterator_hook(
         self,

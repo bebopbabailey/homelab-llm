@@ -118,6 +118,7 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
             call_type="acompletion",
         )
         self.assertTrue(out["stream"])
+        self.assertEqual(out["reasoning_effort"], "low")
 
     async def test_pre_call_can_force_stream_false_when_explicitly_enabled(self):
         guardrail = HarmonyGuardrail(
@@ -157,6 +158,7 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
             call_type="acompletion",
         )
         self.assertTrue(out["stream"])
+        self.assertNotIn("reasoning_effort", out)
 
     async def test_post_call_normalizes_harmony_for_gpt_lanes(self):
         guardrail = HarmonyGuardrail(
@@ -184,6 +186,37 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
             response=response,
         )
         self.assertEqual(out["choices"][0]["message"]["content"], "PONG")
+
+    async def test_post_call_strips_reasoning_fields_for_gpt_lanes(self):
+        guardrail = HarmonyGuardrail(
+            guardrail_name="harmony-post",
+            event_hook="post_call",
+            default_on=True,
+        )
+        data = {
+            "model": "fast",
+            "messages": [{"role": "user", "content": "Ping"}],
+        }
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "pong",
+                        "reasoning": "hidden",
+                        "reasoning_content": "hidden",
+                    }
+                }
+            ]
+        }
+        out = await guardrail.async_post_call_success_hook(
+            data=data,
+            user_api_key_dict=None,
+            response=response,
+        )
+        self.assertEqual(out["choices"][0]["message"]["content"], "pong")
+        self.assertNotIn("reasoning", out["choices"][0]["message"])
+        self.assertNotIn("reasoning_content", out["choices"][0]["message"])
 
     async def test_post_call_passthrough_for_main_lane(self):
         guardrail = HarmonyGuardrail(

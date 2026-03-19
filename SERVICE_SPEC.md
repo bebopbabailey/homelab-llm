@@ -30,16 +30,24 @@ implement inference or web-search business logic.
 - Example envs live in `config/env.example`.
 - For long-running service use, load env vars explicitly (for example systemd `EnvironmentFile=config/env.local`).
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
-- Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them.
+- Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them, but canonical `main` on the current Qwen backend is still failing both current non-stream direct `8101` structured-output request paths:
+  - exact documented OpenAI-compatible `response_format.json_schema`
+  - exact vLLM-native `structured_outputs.json`
+  LiteLLM currently reproduces the same backend-visible failure text for the
+  exact documented `response_format` path.
 - LiteLLM does not inject web-search schemas, repair loops, or citation rendering.
 - `drop_params=true` is part of the current runtime baseline.
 - Active router fallback baseline is `fast -> main`.
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
-- **MLX Studio lanes** on the Studio: OpenAI-compatible per-port `vllm-metal` (`vllm serve`)
-  endpoints on **8100/8101/8102** bound to the Studio LAN IP
-  (`http://192.168.1.72:<port>/v1`).
+- **MLX Studio lane** on the Studio: OpenAI-compatible `vllm-metal` (`vllm serve`)
+  endpoint on **8101** bound to the Studio LAN IP
+  (`http://192.168.1.72:8101/v1`) for public `main`.
+- **Studio llmster GPT service** on the Studio: OpenAI-compatible shared GPT
+  listener on **8126** (`http://192.168.1.72:8126/v1`) for public `fast` and `deep`.
+- **Additional Studio operator infrastructure** on the Studio:
+  non-core OptiLLM proxy on `4020` and the settled GPT-family service on `8126`.
 - **Voice Gateway** on the Orin: OpenAI-compatible LAN speech facade at the configured
   `VOICE_GATEWAY_API_BASE`; Speaches stays localhost-only behind that facade.
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
@@ -47,10 +55,8 @@ implement inference or web-search business logic.
 
 ## Default Logical Models
 - `main` -> MLX Studio lane `8101`
-- `code-reasoning` -> MLX Studio lane `8101` (stable OpenHands worker alias)
-- `deep` -> MLX Studio lane `8100`
-- `fast` -> MLX Studio lane `8102`
-- `boost` -> Studio OptiLLM proxy on `:4020` (optimization lane)
+- `deep` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
+- `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
 - `voice-tts-canary` -> Orin `voice-gateway` facade (`tts-1`)
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -60,10 +66,28 @@ implement inference or web-search business logic.
 - Pushcut MCP integration is not active in the main LiteLLM runtime.
 - Repo-local OpenCode default behavior is the direct `deep` lane as documented
   in `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
-- `boost*` aliases remain gateway-exposed OptiLLM routes, but they are not the
-  default repo-local OpenCode control plane.
 - `main` routes to Studio lane `8101`, where the locked vLLM runtime keeps
-  `tool_choice=auto`, `tool_call_parser=llama3_json`, and no reasoning parser.
+  `tool_choice=auto`, `tool_call_parser=hermes`, and no reasoning parser.
+- `main` is currently hardened around non-stream `tool_choice=auto`,
+  long-context sanity, and concurrency. Forced-tool semantics are currently
+  unsupported and non-blocking for public `main`, and structured outputs remain
+  outside the accepted public `main` contract on the current `8101` runtime.
+- `8126` is active for canonical `fast` plus public `deep`.
+- `8123-8125` are retired shadow ports and are outside the active gateway alias
+  surface.
+- `4020` remains deployed for non-core operator use and is not part of the
+  canonical public alias surface.
+- There are no active temporary GPT canary aliases in the current gateway
+  contract.
+- GPT lanes remain Chat Completions-first in the current hardening phase.
+- `/v1/responses` remains in validation scope for GPT lanes but is advisory
+  unless a defect there also matters to the public Chat Completions path.
+- Current public `deep` contract on the live shared `8126` backend:
+  - plain chat / structured simple / structured nested clean
+  - auto noop strong
+  - auto arg-bearing strong on the present cutover run
+  - `required` strong enough to satisfy constrained-mode acceptance
+  - named forced-tool choice unsupported on the current backend path
 
 ## Logging (Planned)
 - Request logging: JSONL via LiteLLM (`json_logs: true`) for ingestion (model, upstream, latency, status, error).
@@ -75,18 +99,28 @@ implement inference or web-search business logic.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
   They are not audio STT endpoints and must not be reused for Open WebUI speech wiring.
 - `harmony-guardrail` is enabled in both `pre_call` and `post_call` for GPT lanes only
-  (`deep`, `fast`, `boost`, `boost-deep`, `boost-plan`, `boost-plan-trio`,
-  `boost-plan-verify`, `boost-ideate`, `boost-fastdraft`):
+  (`deep`, `fast`):
   - `pre_call`: sanitizes prior `assistant` history turns by extracting Harmony `final`
-    content when strict Harmony wire blocks are detected.
+    content when strict Harmony wire blocks are detected, and injects
+    `reasoning_effort=low` when the caller did not provide one.
   - `post_call`: converts Harmony wire output to `final` only for client-visible response
-    content.
+    content and strips provider reasoning fields from GPT lane responses.
   - strict detection guard: no mutation unless real Harmony wire shape is present
     (`<|channel|>` + `<|message|>` + `analysis|final` channel).
   - streaming is pass-through by default; the guardrail does not coerce `stream=false`.
   - streaming iterator hook currently passes chunks through without post-normalization.
     strict Harmony final-content normalization remains strongest on non-stream responses.
   - Qwen lane (`main`) is passthrough for Harmony normalization.
+  - GPT public-lane hardening currently assumes `reasoning_effort=low` unless
+    the caller explicitly sets a different supported value.
+- LiteLLM also carries a narrow Qwen `main` post-call success hook:
+  - target: `main` only
+  - non-stream only
+  - `tool_choice=auto` only
+  - activates only when the backend returns a single strict raw
+    `<tool_call>...</tool_call>` block with no structured `tool_calls`
+  - purpose: lossless conversion of a semantically correct raw tool block into
+    a client-visible OpenAI-style `tool_calls` payload
 - No web-search-specific pre-call or post-call guardrails are active in LiteLLM.
 
 ## Search Ownership Boundary
@@ -102,15 +136,8 @@ implement inference or web-search business logic.
 - `/health/readiness`, `/health/liveliness`, and `/metrics/` are currently open.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
-- OpenHands Phase B must use a team-owned service-account key, not a human key.
-- Verified OpenHands capability discovery path is `GET /v1/model/info`.
-- Current live build returns filterable single-model data by `litellm_model_id`;
-  `?model=code-reasoning` is not a single-model filter in the deployed proxy.
-- Current deployment enforces `allowed_routes` for service-account keys, and the
-  validated OpenHands worker is limited to `/v1/models`, `/v1/model/info`, and
-  `/v1/chat/completions`.
-- Minimum OpenHands worker policy is one model allowlist (`code-reasoning`) plus
-  verified MCP denial.
+- OpenHands Phase B remains delayed while backend hardening focuses on the three
+  active public LLM lanes.
 - Current LAN-reachable infra gateway path is `http://192.168.1.71:4000/v1`.
 - Internal Studio MLX and Studio OptiLLM backends do not require backend bearer auth.
 

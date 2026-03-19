@@ -41,6 +41,10 @@ LiteLLM supports sending standard logging payloads to external endpoints via
 `success_callback` / `failure_callback` (Enterprise feature).
 
 ## Where we use these
+- `config/qwen_toolcall_posthook.py` → `post_call` guardrail using the
+  `async_post_call_success_hook` path to normalize strict raw Qwen tool blocks
+  on `main` when the backend is semantically correct but still returns a single
+  raw `<tool_call>...</tool_call>` block.
 - `config/transcribe_guardrail.py` → post-call wrapper stripping (task-transcribe* only).
 - `config/harmony_guardrail.py` → post-call normalization for GPT-OSS Harmony
   and tag-based reasoning outputs.

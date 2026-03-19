@@ -20,15 +20,14 @@ only; it does not implement inference.
 
 ## Backends
 - MLX `vllm-metal` lanes on the Studio: `deep`, `main`, and `fast`
-- Studio OptiLLM proxy via LiteLLM `boost*` aliases when explicitly requested
 - Voice Gateway on the Orin for speech aliases
 - SearXNG on the Mini for generic search tooling
 
 ## OpenCode Note
 - Repo-local OpenCode defaults and agent/skill behavior are documented in
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
-- Do not treat OptiLLM `boost*` aliases as the default repo-local OpenCode
-  workflow from this service README.
+- The active public LLM alias set is intentionally limited to `fast`, `main`,
+  and `deep`.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.

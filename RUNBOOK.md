@@ -25,50 +25,13 @@ curl http://127.0.0.1:4000/metrics/
 - Studio `8100-8119`: team lanes managed by `mlxctl`.
 - Studio `8120-8139`: experimental lanes (no `mlxctl` requirement).
 - Active canonical Mini -> Studio MLX transport uses the Studio LAN IP
-  `192.168.1.72` for `8100/8101/8102`.
+  `192.168.1.72` for `8101` (public `main`) and `8126` (public `fast` + `deep`).
 
-## Direct Studio MLX reachability (Mini)
+## Direct Studio backend reachability (Mini)
 ```bash
-for p in 8100 8101 8102; do
+for p in 8101 8126; do
   curl -fsS "http://192.168.1.72:${p}/v1/models" | jq .
 done
-```
-
-## Experimental alias checks
-```bash
-rg -n "metal-test-fast|metal-test-main|metal-test-deep|metal-test-gptoss20b-enforce" \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-```
-
-## GPT-OSS 20B enforced lane checks
-`metal-test-gptoss20b-enforce` is a Responses-only experimental lane for GPT-OSS
-20B. It normalizes `stream=false` and `temperature=0.0`, rejects
-chat/completions calls, and must not rewrite tool schemas or response content.
-
-Durable observability source of truth for the kept lane:
-- `journalctl -u litellm-orch.service | rg 'responses_contract_guardrail|policy_(decision|result|summary)'`
-
-Convenience trace for ad hoc debugging during experiments:
-- `/tmp/litellm_responses_contract_guardrail.jsonl`
-
-Quick checks:
-```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-
-journalctl -u litellm-orch.service -n 100 --no-pager | \
-  rg 'responses_contract_guardrail|policy_(decision|result|summary)'
-
-curl -sS -o /tmp/gptoss20b-enforce.reject.json -w "%{http_code}\n" \
-  http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"metal-test-gptoss20b-enforce","messages":[{"role":"user","content":"Reply with exactly: reject-ok"}],"stream":true,"max_tokens":32}'
-
-curl -fsS http://127.0.0.1:4000/v1/responses \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"metal-test-gptoss20b-enforce","input":"Reply with exactly: lane-ok","stream":true}' | jq .
 ```
 
 ## Harmony normalization checks (GPT lanes)
@@ -96,6 +59,26 @@ curl -sS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -d '{"model":"fast","stream":false,"messages":[{"role":"user","content":"Reply with exactly: nonstream-ok"}],"max_tokens":32}' | jq .
 ```
 
+## GPT acceptance harness (public lanes)
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+uv run python /home/christopherbailey/homelab-llm/layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+  --base-url http://127.0.0.1:4000/v1 \
+  --model fast \
+  --api-key "$LITELLM_MASTER_KEY" \
+  --profile fast
+```
+
+Current GPT public-lane posture:
+- Chat Completions-first
+- `/v1/responses` remains advisory
+- `fast` is now canonical on shared `8126`
+- `deep` is now live on shared `8126` under the usable-success contract
+
+Temporary GPT canary alias:
+- no temporary GPT canary alias is active in the current gateway contract
+
 ## Fallback validation
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
@@ -117,8 +100,6 @@ curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
 
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  "http://127.0.0.1:4000/v1/model/info" | jq '.data[] | select(.model_name=="code-reasoning")'
-
 rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
   /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml \
   /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/SERVICE_SPEC.md \
@@ -126,12 +107,27 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 ```
 
 Expected:
-- `code-reasoning`, `fast`, `main`, `deep`, and `boost*` aliases appear in `/v1/models`.
+- `fast`, `main`, and `deep` aliases appear in `/v1/models`.
 - `voice-stt-canary`, `voice-tts-canary`, `voice-stt`, and `voice-tts` appear in `/v1/models`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
 - Current resilience baseline keeps `fast -> main`.
-- `code-reasoning` model info reports explicit capability metadata for OpenHands discovery.
+- `code-reasoning`, `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
+
+Historical cutover order:
+- raw `deep`
+- direct `llmster` `deep`
+- temporary canary alias (now retired)
+- only then canonical public `deep`
+
+Current public `deep` cutover result:
+- plain chat `5/5`
+- structured simple `5/5`
+- structured nested `5/5`
+- auto noop `10/10`
+- auto arg-bearing `10/10`
+- required arg-bearing `9/10`
+- named forced-tool choice unsupported on current backend path
 
 ## Speech canary checks
 ```bash
@@ -184,60 +180,90 @@ PY
 Expected:
 - `tool_calls` is present and names `noop`
 - `content` does not contain raw `<tool_call>`
-- LiteLLM returns the structured tool call unchanged from the `8101` backend
+- LiteLLM returns the structured tool call either natively from the `8101`
+  backend or from the narrow `main` post-call cleanup path
 
-## OpenHands worker policy validation
-Verify the live capability path first:
+Argument-bearing `main` tool-calling validation:
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
 
-curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  "http://127.0.0.1:4000/v1/model/info" | jq '.data[] | select(.model_name=="code-reasoning")'
-```
-
-Verify the worker key can only use the stable coding alias and cannot reach MCP:
-```bash
-export OPENHANDS_WORKER_KEY='<worker-key>'
-export OPENHANDS_LITELLM_BASE_URL='http://192.168.1.71:4000/v1'
-
-curl -fsS -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
-  "${OPENHANDS_LITELLM_BASE_URL}/models" | jq .
-
-curl -fsS -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
-  "${OPENHANDS_LITELLM_BASE_URL}/model/info" | jq .
-
-curl -fsS "${OPENHANDS_LITELLM_BASE_URL}/chat/completions" \
-  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
-
-curl -sS -o /dev/null -w "%{http_code}\n" "${OPENHANDS_LITELLM_BASE_URL}/chat/completions" \
-  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"main","messages":[{"role":"user","content":"Reply with exactly: main-should-fail"}],"stream":false,"max_tokens":32}'
-
-curl -sS -o /dev/null -w "%{http_code}\n" "${OPENHANDS_LITELLM_BASE_URL}/mcp/tools" \
-  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}"
-
-curl -sS -o /dev/null -w "%{http_code}\n" "${OPENHANDS_LITELLM_BASE_URL}/model/info" \
-  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}"
-
-curl -sS -o /dev/null -w "%{http_code}\n" "${OPENHANDS_LITELLM_BASE_URL}/responses" \
-  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"code-reasoning","input":"route-check"}'
+python3 - <<'PY'
+import json, os, urllib.request
+payload={
+  'model':'main',
+  'messages':[{'role':'user','content':'Use the noop tool exactly once with a short JSON object argument.'}],
+  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{'value':{'type':'string'}},'required':['value'],'additionalProperties':False}}}],
+  'tool_choice':'auto',
+  'stream':False,
+  'max_tokens':128
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:4000/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Authorization': f"Bearer {os.environ['LITELLM_MASTER_KEY']}", 'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY
 ```
 
 Expected:
-- `/v1/models` returns only `code-reasoning`.
-- `/model/info` returns exactly one `code-reasoning` record for the worker key.
-- `code-reasoning` succeeds.
-- direct `main` access is rejected.
-- MCP tool listing is rejected for the worker key.
-- `/responses` is rejected by route allowlisting.
-- If `code-reasoning` returns upstream `404` for missing served model identity,
-  triage Studio lane drift first with `mlxctl status --json` and
-  `ssh studio "curl -fsS http://127.0.0.1:8101/v1/models | jq ."`.
+- `tool_calls` is present and names `noop`
+- parsed `tool_calls[0].function.arguments` contains a JSON object with key `value`
+- `content` does not contain raw `<tool_call>`
+- this may be produced either natively by the backend or by the narrow `main`
+  post-call cleanup path
+
+Structured-output reality check:
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+python3 - <<'PY'
+import json, os, urllib.request
+payload={
+  'model':'main',
+  'messages':[{'role':'user','content':'Return JSON matching the schema.'}],
+  'response_format':{
+    'type':'json_schema',
+    'json_schema':{
+      'name':'status_payload',
+      'schema':{
+        'type':'object',
+        'properties':{'status':{'type':'string'}},
+        'required':['status'],
+        'additionalProperties':False
+      },
+      'strict':True
+    }
+  },
+  'max_tokens':64,
+  'temperature':0
+}
+req=urllib.request.Request(
+  'http://127.0.0.1:4000/v1/chat/completions',
+  data=json.dumps(payload).encode(),
+  headers={'Authorization': f"Bearer {os.environ['LITELLM_MASTER_KEY']}", 'Content-Type':'application/json'},
+  method='POST'
+)
+with urllib.request.urlopen(req, timeout=60) as r:
+  body=json.loads(r.read().decode())
+print(json.dumps(body['choices'][0]['message'], indent=2))
+PY
+```
+
+Current expected result:
+- this exact `response_format.json_schema` shape is still failing on the current
+  Qwen `main` path and returns a backend-produced error payload
+- do not treat `main` structured outputs as fully hardened until that exact
+  request shape is repaired
+  post-call success hook if the backend returns the strict recoverable raw form
+
+## OpenHands Phase B note
+OpenHands Phase B is intentionally deferred during the current three-alias
+backend hardening cycle. Do not expect a dedicated OpenHands alias in the
+active gateway surface.
 
 ## Readiness callback check
 ```bash
