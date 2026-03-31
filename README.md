@@ -20,6 +20,8 @@ only; it does not implement inference.
 
 ## Backends
 - MLX `vllm-metal` lanes on the Studio: `deep`, `main`, and `fast`
+- `task-transcribe` and `task-transcribe-vivid` reuse the same `8101` MLX lane
+  as text-cleanup aliases
 - Voice Gateway on the Orin for speech aliases
 - SearXNG on the Mini for generic search tooling
 
@@ -28,6 +30,8 @@ only; it does not implement inference.
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The active public LLM alias set is intentionally limited to `fast`, `main`,
   and `deep`.
+- `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
+  not part of the public human chat-lane trio.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.

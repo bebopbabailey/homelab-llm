@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 import importlib.util
 import sys
@@ -28,6 +29,53 @@ strip_punct_outside_words = transcribe_utils.strip_punct_outside_words
 
 
 class TestTranscribeBaseline(unittest.TestCase):
+    def test_pre_call_task_transcribe_renders_provider_model_and_defaults(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "messages": [{"role": "user", "content": "um i i think this should probably work maybe yes"}],
+                    "prompt_variables": {},
+                },
+                "chat.completions",
+            )
+        )
+
+        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertFalse(result["stream"])
+        self.assertEqual(result["temperature"], 0.05)
+        self.assertEqual(result["max_tokens"], 4096)
+        self.assertNotIn("prompt_variables", result)
+        self.assertEqual(result["messages"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
+
+    def test_pre_call_task_transcribe_vivid_accepts_optional_prompt_variables(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe-vivid",
+                    "messages": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
+                    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+                },
+                "chat.completions",
+            )
+        )
+
+        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertFalse(result["stream"])
+        self.assertEqual(result["temperature"], 0.4)
+        self.assertEqual(result["frequency_penalty"], 0.2)
+        self.assertNotIn("prompt_variables", result)
+        self.assertEqual(
+            result["messages"][-1]["content"],
+            "Transcript:\nuh okay this is kind of sudden but it matters a lot actually",
+        )
+
     def test_preprocess_preserves_internal_apostrophes_and_hyphens(self):
         raw = "it's a well-known thing — right? wow!"
         stripped = strip_punct_outside_words(raw)

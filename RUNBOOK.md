@@ -19,6 +19,7 @@ curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/heal
 curl http://127.0.0.1:4000/health/readiness
 curl http://127.0.0.1:4000/health/liveliness
 curl http://127.0.0.1:4000/metrics/
+curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/v1/mcp/tools | jq .
 ```
 
 ## Port policy
@@ -34,15 +35,16 @@ for p in 8101 8126; do
 done
 ```
 
-## Harmony normalization checks (GPT lanes)
+## GPT request-default checks
 ```bash
-rg -n "modify_params|target_models|coerce_stream_false" \
+rg -n "gpt-request-defaults|target_models|reasoning_effort" \
   /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml
 ```
 
 Expected:
-- Harmony guardrails still target GPT lanes.
+- `gpt-request-defaults` targets `deep`, `fast`, and `code-reasoning`.
 - No web-search-specific pre-call or post-call guardrails remain.
+- No GPT-lane post-call formatting guardrail remains active.
 
 ## GPT streaming checks (pass-through)
 ```bash
@@ -75,6 +77,9 @@ Current GPT public-lane posture:
 - `/v1/responses` remains advisory
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
+- GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
+  `deep`; LiteLLM only injects omitted `reasoning_effort=low` for GPT `llmster`
+  lanes
 
 Temporary GPT canary alias:
 - no temporary GPT canary alias is active in the current gateway contract
@@ -99,7 +104,6 @@ source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
 
-curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
 rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
   /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml \
   /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/SERVICE_SPEC.md \
@@ -107,12 +111,12 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 ```
 
 Expected:
-- `fast`, `main`, and `deep` aliases appear in `/v1/models`.
-- `voice-stt-canary`, `voice-tts-canary`, `voice-stt`, and `voice-tts` appear in `/v1/models`.
+- `/v1/models` includes `main`, `deep`, `fast`, and `code-reasoning`.
+- `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
 - Current resilience baseline keeps `fast -> main`.
-- `code-reasoning`, `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
+- `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
 Historical cutover order:
 - raw `deep`
@@ -151,6 +155,26 @@ Expected:
 - the Orin `voice-gateway` LAN `api_base` is used directly
 - `task-transcribe*` remains untouched
 
+## Transcript alias checks
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe-vivid","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
+```
+
+Expected:
+- both aliases succeed through `POST /v1/chat/completions`
+- outputs are plain cleaned transcript text with no wrapper label or commentary
+- `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
+
 ## Main tool-calling validation
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
@@ -180,8 +204,7 @@ PY
 Expected:
 - `tool_calls` is present and names `noop`
 - `content` does not contain raw `<tool_call>`
-- LiteLLM returns the structured tool call either natively from the `8101`
-  backend or from the narrow `main` post-call cleanup path
+- LiteLLM returns the structured tool call natively from the `8101` backend
 
 Argument-bearing `main` tool-calling validation:
 ```bash
@@ -213,8 +236,7 @@ Expected:
 - `tool_calls` is present and names `noop`
 - parsed `tool_calls[0].function.arguments` contains a JSON object with key `value`
 - `content` does not contain raw `<tool_call>`
-- this may be produced either natively by the backend or by the narrow `main`
-  post-call cleanup path
+- this is produced natively by the locked `8101` backend render
 
 Structured-output reality check:
 ```bash
@@ -260,18 +282,105 @@ Current expected result:
   request shape is repaired
   post-call success hook if the backend returns the strict recoverable raw form
 
-## OpenHands Phase B note
-OpenHands Phase B is intentionally deferred during the current three-alias
-backend hardening cycle. Do not expect a dedicated OpenHands alias in the
-active gateway surface.
+## OpenHands worker contract
+OpenHands Phase B is gated by one reserved internal worker alias only:
+- alias: `code-reasoning`
+- backend target: `deep`
+- contract shape: Chat Completions-first ordinary tool use
+- unsupported/out of contract:
+  - named/object-form forced-tool choice
+  - strict structured-output/schema guarantees
+  - MCP access
+  - `/v1/responses`
+
+Worker-key verification:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/model/info \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/model/info \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
+
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/mcp/tools \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}"
+
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"code-reasoning","input":"hello"}'
+```
+
+Expected:
+- `/v1/models` returns `code-reasoning`
+- `/v1/model/info` and `/model/info` both succeed for the worker key
+- `/v1/chat/completions` succeeds for `code-reasoning`
+- `/v1/mcp/tools` returns `403`
+- `/v1/responses` returns `403`
+
+Unsupported-feature probes:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"code-reasoning",
+    "messages":[{"role":"user","content":"Call noop once with {\"value\":\"x\"}."}],
+    "tools":[{"type":"function","function":{"name":"noop","description":"noop","parameters":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}}}],
+    "tool_choice":{"type":"function","function":{"name":"noop"}},
+    "stream":false,
+    "max_tokens":128
+  }' | jq .
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"code-reasoning",
+    "messages":[{"role":"user","content":"Return JSON matching the schema exactly."}],
+    "response_format":{
+      "type":"json_schema",
+      "json_schema":{
+        "name":"status_payload",
+        "schema":{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false},
+        "strict":true
+      }
+    },
+    "stream":false,
+    "max_tokens":128,
+    "temperature":0
+  }' | jq .
+```
+
+Expected:
+- named/object-form forced tool choice is rejected or backend-visible unsupported
+- strict structured-output/schema guarantee is rejected, ignored, or otherwise
+  not boring enough to advertise for `code-reasoning`
 
 ## Readiness callback check
 ```bash
 curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]'
+
+journalctl -u litellm-orch.service -n 200 --no-pager | rg 'GPTRequestDefaults|TranscribeGuardrail'
 ```
 
 Expected:
-- `PromptGuardrail`, `HarmonyGuardrail`, and `TranscribeGuardrail` remain.
+- `/health/readiness` currently reports `sync_deployment_callback_on_success`
+  and `PrometheusLogger`.
+- journald shows `GPTRequestDefaults` and `TranscribeGuardrail` loading at startup.
 - `WebsearchSchemaGuardrail` is absent.
 
 ## Search tool checks

@@ -57,6 +57,12 @@ implement inference or web-search business logic.
 - `main` -> MLX Studio lane `8101`
 - `deep` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
 - `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
+- `code-reasoning` -> reserved internal OpenHands worker alias on the same
+  `deep` backend lane (`llmster-gpt-oss-120b-mxfp4-gguf`)
+- `task-transcribe` -> MLX Studio lane `8101`
+  (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
+- `task-transcribe-vivid` -> MLX Studio lane `8101`
+  (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the vivid transcript-cleanup prompt
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
 - `voice-tts-canary` -> Orin `voice-gateway` facade (`tts-1`)
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -97,30 +103,32 @@ implement inference or web-search business logic.
 - `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
   It strips wrappers/labels and removes reasoning fields from transcript outputs.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
-  They are not audio STT endpoints and must not be reused for Open WebUI speech wiring.
-- `harmony-guardrail` is enabled in both `pre_call` and `post_call` for GPT lanes only
-  (`deep`, `fast`):
-  - `pre_call`: sanitizes prior `assistant` history turns by extracting Harmony `final`
-    content when strict Harmony wire blocks are detected, and injects
-    `reasoning_effort=low` when the caller did not provide one.
-  - `post_call`: converts Harmony wire output to `final` only for client-visible response
-    content and strips provider reasoning fields from GPT lane responses.
-  - strict detection guard: no mutation unless real Harmony wire shape is present
-    (`<|channel|>` + `<|message|>` + `analysis|final` channel).
-  - streaming is pass-through by default; the guardrail does not coerce `stream=false`.
-  - streaming iterator hook currently passes chunks through without post-normalization.
-    strict Harmony final-content normalization remains strongest on non-stream responses.
-  - Qwen lane (`main`) is passthrough for Harmony normalization.
-  - GPT public-lane hardening currently assumes `reasoning_effort=low` unless
-    the caller explicitly sets a different supported value.
-- LiteLLM also carries a narrow Qwen `main` post-call success hook:
-  - target: `main` only
-  - non-stream only
-  - `tool_choice=auto` only
-  - activates only when the backend returns a single strict raw
-    `<tool_call>...</tool_call>` block with no structured `tool_calls`
-  - purpose: lossless conversion of a semantically correct raw tool block into
-    a client-visible OpenAI-style `tool_calls` payload
+  They are invoked through `POST /v1/chat/completions`, not `POST /v1/audio/transcriptions`,
+  and must not be reused for Open WebUI speech wiring.
+- `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
+  `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
+- GPT formatting ownership is upstream-first:
+  - `main` keeps the locked upstream parser render on `8101`
+    (`tool_choice=auto`, `tool_call_parser=hermes`, no reasoning parser).
+  - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
+    `llmster` / llama.cpp response formatting and tool-call structure as the
+    canonical truth path.
+  - LiteLLM does not own GPT response rewriting for these lanes.
+- LiteLLM retains one narrow GPT request-default shim only:
+  - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`, and
+    `code-reasoning`
+  - behavior: inject `reasoning_effort=low` only when the caller omitted it
+  - no assistant-history rewriting
+  - no post-call content extraction
+  - no provider reasoning-field stripping
+  - no forced `stream=false`
+- `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
+- Current supported GPT contract remains Chat Completions-first:
+  - ordinary tool calling is supported
+  - named/object-form forced-tool choice is unsupported on the current GPT
+    backend family
+  - strict structured-output guarantees are not part of the supported GPT or
+    OpenHands worker contract
 - No web-search-specific pre-call or post-call guardrails are active in LiteLLM.
 
 ## Search Ownership Boundary
@@ -136,9 +144,30 @@ implement inference or web-search business logic.
 - `/health/readiness`, `/health/liveliness`, and `/metrics/` are currently open.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
-- OpenHands Phase B remains delayed while backend hardening focuses on the three
-  active public LLM lanes.
+- OpenHands Phase B uses one reserved internal worker alias only:
+  `code-reasoning`.
+- `code-reasoning` is not a public human lane. It is the governed OpenHands
+  worker alias and tracks the current `deep` backend lane behind LiteLLM.
+- Current worker-key contract for OpenHands is:
+  - service-account key only
+  - models allowlist: `code-reasoning`
+  - allowed routes:
+    - `/v1/models`
+    - `/v1/model/info`
+    - `/model/info`
+    - `/v1/chat/completions`
+  - denied by route policy:
+    - `/v1/mcp/*`
+    - `/v1/responses`
+- General-purpose terminal MCP access must be granted with a separate approved
+  key/team mapped to access group `terminal_readonly`; do not reuse the
+  OpenHands worker key for terminal MCP.
+- Same-host direct access to `127.0.0.1:8011/mcp` is not part of the client
+  contract; LiteLLM is the canonical authenticated surface.
 - Current LAN-reachable infra gateway path is `http://192.168.1.71:4000/v1`.
+- Current OpenHands container contract is `http://host.docker.internal:4000/v1`,
+  with `http://192.168.1.71:4000/v1` retained as the verified fallback/reference
+  path.
 - Internal Studio MLX and Studio OptiLLM backends do not require backend bearer auth.
 
 ## Orchestration (Planned)

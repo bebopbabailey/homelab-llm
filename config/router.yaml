@@ -16,12 +16,48 @@ model_list:
     api_base: os.environ/LLMSTER_DEEP_API_BASE
     api_key: dummy
     max_tokens: 16384
+- model_name: code-reasoning
+  litellm_params:
+    model: os.environ/LLMSTER_DEEP_MODEL
+    api_base: os.environ/LLMSTER_DEEP_API_BASE
+    api_key: dummy
+    max_tokens: 16384
+  model_info:
+    mode: chat
+    max_input_tokens: 32768
+    max_output_tokens: 16384
+    supports_function_calling: true
+    supports_system_messages: true
 - model_name: fast
   litellm_params:
     model: os.environ/LLMSTER_FAST_MODEL
     api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 16384
+# 2) Task completion aliases below
+- model_name: task-transcribe
+  litellm_params:
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    api_key: dummy
+    max_tokens: 4096
+  model_info:
+    mode: chat
+    max_output_tokens: 4096
+    supports_function_calling: false
+    supports_system_messages: true
+
+- model_name: task-transcribe-vivid
+  litellm_params:
+    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
+    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    api_key: dummy
+    max_tokens: 4096
+  model_info:
+    mode: chat
+    max_output_tokens: 4096
+    supports_function_calling: false
+    supports_system_messages: true
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -53,20 +89,12 @@ guardrails:
       guardrail: "prompt_guardrail.PromptGuardrail"
       mode: "pre_call"
       default_on: true
-  - guardrail_name: "harmony-pre"
+  - guardrail_name: "gpt-request-defaults"
     litellm_params:
-      guardrail: "harmony_guardrail.HarmonyGuardrail"
+      guardrail: "gpt_request_defaults.GPTRequestDefaults"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast"
-      coerce_stream_false: false
-  - guardrail_name: "harmony-post"
-    litellm_params:
-      guardrail: "harmony_guardrail.HarmonyGuardrail"
-      mode: "post_call"
-      default_on: true
-      target_models: "deep,fast"
-      coerce_stream_false: false
+      target_models: "deep,fast,code-reasoning"
   - guardrail_name: "transcribe-pre"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
@@ -75,10 +103,5 @@ guardrails:
   - guardrail_name: "transcribe-post"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
-      mode: "post_call"
-      default_on: true
-  - guardrail_name: "qwen-toolcall-post"
-    litellm_params:
-      guardrail: "qwen_toolcall_posthook.QwenToolcallPostHook"
       mode: "post_call"
       default_on: true
