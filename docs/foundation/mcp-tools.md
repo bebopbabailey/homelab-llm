@@ -9,7 +9,9 @@ TinyAgents is the default MCP client for the MVP.
 
 ## Current Status
 - MCP stdio tools are implemented (`web.fetch`, `search.web`) and run locally on the Mini.
-- MCP registry and systemd wiring are MVP work items.
+- The TinyAgents-facing runtime registry exists at `/etc/homelab-llm/mcp-registry.json`.
+- Open Terminal MCP is a separate localhost-only HTTP backend and is exposed
+  canonically through LiteLLM rather than the runtime registry.
 
 ## How LLMs Use MCP
 LLMs do not talk to MCP servers directly.
@@ -17,7 +19,7 @@ An agent runtime (e.g., TinyAgents) interprets the model output, selects tools,
 and calls MCP servers, then feeds results back to the LLM via the same
 conversation.
 
-## MCP Server Inventory (pending registry)
+## MCP Server Inventory
 Maintain a simple registry of MCP servers with:
 - Name and purpose
 - Transport (stdio vs HTTP/SSE)
@@ -63,3 +65,6 @@ Provide trimmed, relevant HTML or clean text to improve extraction fidelity.
 ### MCP server note
 `web.fetch` and `search.web` are implemented as a stdio MCP tool server under
 `layer-tools/mcp-tools/web-fetch` and are launched by the agent runtime.
+
+Open Terminal MCP is intentionally not listed in the TinyAgents registry in the
+first slice; its canonical shared client path is LiteLLM MCP.

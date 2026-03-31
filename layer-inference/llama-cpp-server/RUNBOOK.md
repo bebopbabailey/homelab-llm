@@ -89,6 +89,8 @@ Acceptance focus:
 - large-schema tool-call integrity as a diagnostic seam
 - concurrency / parallel serving behavior
 - OpenAI-compatible serving behavior
+- raw Harmony-tag leakage must stay absent on the accepted direct `llmster`
+  path
 
 Evidence order used for the accepted `deep` cutover:
 1. close `fast` observation on the current live LM Studio stack
@@ -149,6 +151,9 @@ Current locked shared-`8126` result:
 - public `deep` auto arg-bearing `10/10`
 - public `deep` required arg-bearing `9/10`
 - named forced-tool choice unsupported on current backend path
+- direct `llmster` responses are treated as the canonical GPT formatting truth
+  path unless a supported client break is reproduced and upstream controls are
+  exhausted
 
 ## Rollback
 - Repoint `fast` / `deep` back to their current MLX upstreams.

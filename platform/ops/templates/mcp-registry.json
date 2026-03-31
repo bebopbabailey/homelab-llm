@@ -5,8 +5,15 @@
       "name": "web-fetch",
       "purpose": "fetch + clean HTML",
       "transport": "stdio",
-      "command": "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch/web_fetch_mcp.py",
-      "args": [],
+      "command": "/home/christopherbailey/.local/bin/uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch",
+        "python",
+        "-m",
+        "web_fetch_mcp"
+      ],
       "env": [
         "LITELLM_SEARCH_API_BASE",
         "LITELLM_SEARCH_API_KEY",

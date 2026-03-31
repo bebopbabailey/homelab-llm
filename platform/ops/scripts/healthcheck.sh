@@ -71,6 +71,8 @@ check_studio_mlx_lanes() {
 
 check_port 4000
 check_port 3000
+check_port 4031
+check_port 8011
 
 if [[ -z "${LITELLM_API_KEY}" ]]; then
   echo "missing LITELLM_API_KEY (set env or update ${LITELLM_ENV_LOCAL})" >&2
@@ -79,6 +81,8 @@ fi
 
 check_http "http://127.0.0.1:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"
+check_http "http://127.0.0.1:4000/v1/mcp/tools" -H "Authorization: Bearer ${LITELLM_API_KEY}"
+check_http "http://127.0.0.1:4031/"
 check_http "http://${MINI_LAN_HOST}:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://${MINI_LAN_HOST}:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 

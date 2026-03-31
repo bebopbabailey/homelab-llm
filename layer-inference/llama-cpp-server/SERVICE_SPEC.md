@@ -55,6 +55,8 @@ to a separate public Studio port in a later slice.
 - `mcp.json` calling disabled
 - no repetition penalties for GPT-OSS
 - raw standalone launchers must use `--jinja`
+- upstream GPT formatting ownership stays at this boundary unless a defect is
+  reproduced directly here and cannot be fixed in the current runtime family
 
 ## Acceptance criteria
 - plain chat correctness
@@ -81,6 +83,8 @@ to a separate public Studio port in a later slice.
   - auto arg-bearing `10/10`
   - `required` arg-bearing `9/10`
   - named forced-tool choice unsupported on the current backend path
+  - no raw Harmony wire tags in client-visible content on the accepted direct
+    `llmster` path
 
 ## Non-goals
 - MAIN replacement

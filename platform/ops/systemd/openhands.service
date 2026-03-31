@@ -1,0 +1,37 @@
+[Unit]
+Description=OpenHands UI (Mini Phase A, managed Docker runtime)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=christopherbailey
+SupplementaryGroups=docker
+WorkingDirectory=/home/christopherbailey/homelab-llm/layer-gateway/openhands
+EnvironmentFile=/etc/openhands/env
+ExecStartPre=-/usr/bin/docker rm -f ${OPENHANDS_CONTAINER_NAME}
+ExecStartPre=/usr/bin/install -d -m 0755 ${OPENHANDS_WORKSPACE_DIR}
+ExecStartPre=/usr/bin/install -d -m 0755 ${OPENHANDS_PERSISTENCE_DIR}
+ExecStart=/usr/bin/docker run --rm \
+  --name ${OPENHANDS_CONTAINER_NAME} \
+  --pull never \
+  -p 127.0.0.1:${OPENHANDS_HOST_PORT}:3000 \
+  -e OPENHANDS_PERSISTENCE_DIR=/.openhands \
+  -e SANDBOX_RUNTIME_CONTAINER_IMAGE=${OPENHANDS_RUNTIME_IMAGE} \
+  -e AGENT_SERVER_IMAGE_REPOSITORY=${OPENHANDS_AGENT_SERVER_IMAGE_REPOSITORY} \
+  -e AGENT_SERVER_IMAGE_TAG=${OPENHANDS_AGENT_SERVER_IMAGE_TAG} \
+  -e LOG_ALL_EVENTS=${OPENHANDS_LOG_ALL_EVENTS} \
+  -e SANDBOX_VOLUMES=${OPENHANDS_WORKSPACE_DIR}:/workspace:rw \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v ${OPENHANDS_PERSISTENCE_DIR}:/.openhands \
+  --add-host host.docker.internal:host-gateway \
+  ${OPENHANDS_APP_IMAGE}
+ExecStop=-/usr/bin/docker stop ${OPENHANDS_CONTAINER_NAME}
+Restart=always
+RestartSec=5
+TimeoutStartSec=180
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

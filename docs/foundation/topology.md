@@ -19,8 +19,8 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.
 - Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires bearer auth for `/v1/*` and `/health`; readiness/liveliness and `/metrics/` are open).
   LiteLLM `boost` routes to Studio OptiLLM proxy (`:4020`).
-  OpenHands Phase A, when launched, is local Docker-direct on `127.0.0.1:4031`
-  with optional tailnet-only access at `https://hands.tailfd1400.ts.net/`.
+  OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
+  operator access at `https://hands.tailfd1400.ts.net/`.
   OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
@@ -55,8 +55,10 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
+| Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
+| Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
 | OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
-| OpenHands (Phase A, operator-local) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
+| OpenHands (Phase A, managed operator UI) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
 | Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
 | Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
@@ -101,9 +103,12 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 - Open WebUI must use LiteLLM for STT/TTS and must not call the Orin directly.
 - Studio OptiLLM proxy serves LiteLLM `boost` and is unrelated to the speech appliance path.
 
-## MCP Tools (stdio, no ports)
+## MCP Tools
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
 - `search.web` — stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.
+- Open Terminal MCP — HTTP MCP backend on the Mini at `127.0.0.1:8011/mcp`,
+  currently localhost-only. A shared LiteLLM read-only alias is follow-on
+  work and is not part of the current live runtime.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
@@ -116,9 +121,10 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 - There are no active temporary GPT canary aliases in the current LiteLLM
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
-  OpenHands Phase A is local on `127.0.0.1:4031` and may be exposed tailnet-only
-  at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
+- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
+  8010, Open Terminal MCP 8011.
+  OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
+  operator access at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
   Studio local-only: main vector DB 55432, memory API 55440.
 - Internal tailnet transport used by Studio OptiLLM upstream:
   - `http://192.168.1.71:4000/v1`
@@ -130,7 +136,8 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   - OpenVINO: `/etc/homelab-llm/ov-server.env`
   - SearXNG: `/etc/searxng/env`
   - Samba passdb: `smbpasswd -a christopherbailey` / `pdbedit`
-  OpenHands Phase A intentionally has no shared host env file in this phase.
+  `/etc/openhands/env` carries non-secret runtime vars only; provider/API keys
+  stay UI-entered in Phase A.
 
 ## Web Search Contract
 - Open WebUI owns web-search UX plus provider/loader configuration.

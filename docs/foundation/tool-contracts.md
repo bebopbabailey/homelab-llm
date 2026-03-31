@@ -44,7 +44,7 @@ Format:
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["title", "url", "snippet"],
+        "required": ["title", "url", "snippet", "date"],
         "additionalProperties": false,
         "properties": {
           "title": { "type": "string" },
@@ -67,7 +67,7 @@ Format:
 ```
 
 ## web.fetch
-- status: planned
+- status: active
 - transport: mcp (stdio)
 - endpoint: `web-fetch` (MCP server name)
 - input_schema:
@@ -78,29 +78,114 @@ Format:
   "additionalProperties": false,
   "properties": {
     "url": { "type": "string", "format": "uri" },
-    "include_raw_html": { "type": "boolean", "default": false }
+    "include_raw_html": { "type": "boolean", "default": false },
+    "output_mode": { "type": "string", "enum": ["text", "evidence"], "default": "text" }
   }
 }
 ```
 - output_schema:
 ```json
 {
-  "type": "object",
-  "required": ["final_url", "clean_text"],
-  "additionalProperties": false,
-  "properties": {
-    "final_url": { "type": "string", "format": "uri" },
-    "title": { "type": ["string", "null"] },
-    "byline": { "type": ["string", "null"] },
-    "published_at": { "type": ["string", "null"] },
-    "lang": { "type": ["string", "null"] },
-    "clean_text": { "type": "string", "minLength": 1 },
-    "raw_html": { "type": "string" }
-  },
-  "allOf": [
+  "oneOf": [
     {
-      "if": { "properties": { "raw_html": { "type": "string" } } },
-      "then": { "required": ["raw_html"] }
+      "type": "object",
+      "required": [
+        "final_url",
+        "title",
+        "byline",
+        "published_at",
+        "lang",
+        "clean_text",
+        "extractor_used",
+        "content_type",
+        "http_status",
+        "content_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "final_url": { "type": "string", "format": "uri" },
+        "title": { "type": ["string", "null"] },
+        "byline": { "type": ["string", "null"] },
+        "published_at": { "type": ["string", "null"] },
+        "lang": { "type": ["string", "null"] },
+        "clean_text": { "type": "string", "minLength": 1 },
+        "extractor_used": { "type": "string", "enum": ["trafilatura", "readability", "plain_text"] },
+        "content_type": { "type": "string", "enum": ["text/html", "application/xhtml+xml", "text/plain"] },
+        "http_status": { "type": "integer", "minimum": 200, "maximum": 299 },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "raw_html": { "type": "string" }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "final_url",
+        "title",
+        "byline",
+        "published_at",
+        "lang",
+        "clean_text",
+        "extractor_used",
+        "content_type",
+        "http_status",
+        "content_sha256",
+        "markdown",
+        "canonical_url",
+        "site_name",
+        "description",
+        "links",
+        "quality_label",
+        "quality_flags",
+        "content_stats"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "final_url": { "type": "string", "format": "uri" },
+        "title": { "type": ["string", "null"] },
+        "byline": { "type": ["string", "null"] },
+        "published_at": { "type": ["string", "null"] },
+        "lang": { "type": ["string", "null"] },
+        "clean_text": { "type": "string", "minLength": 1 },
+        "extractor_used": { "type": "string", "enum": ["trafilatura", "readability", "plain_text"] },
+        "content_type": { "type": "string", "enum": ["text/html", "application/xhtml+xml", "text/plain"] },
+        "http_status": { "type": "integer", "minimum": 200, "maximum": 299 },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "raw_html": { "type": "string" },
+        "markdown": { "type": "string", "minLength": 1 },
+        "canonical_url": { "type": ["string", "null"], "format": "uri" },
+        "site_name": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text", "url"],
+            "additionalProperties": false,
+            "properties": {
+              "text": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "quality_label": { "type": "string", "enum": ["high", "medium", "low"] },
+        "quality_flags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "content_stats": {
+          "type": "object",
+          "required": ["chars", "words", "heading_count", "list_count", "code_block_count", "link_count"],
+          "additionalProperties": false,
+          "properties": {
+            "chars": { "type": "integer", "minimum": 0 },
+            "words": { "type": "integer", "minimum": 0 },
+            "heading_count": { "type": "integer", "minimum": 0 },
+            "list_count": { "type": "integer", "minimum": 0 },
+            "code_block_count": { "type": "integer", "minimum": 0 },
+            "link_count": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
     }
   ]
 }
@@ -108,7 +193,13 @@ Format:
 - errors:
 ```json
 [
-  { "code": "fetch_failed", "http_status": 502 },
+  { "code": "invalid_url", "http_status": 400 },
+  { "code": "url_not_allowed", "http_status": 403 },
+  { "code": "redirect_not_allowed", "http_status": 403 },
+  { "code": "redirect_limit_exceeded", "http_status": 508 },
+  { "code": "mime_not_allowed", "http_status": 415 },
+  { "code": "body_too_large", "http_status": 413 },
+  { "code": "upstream_failure", "http_status": 502 },
   { "code": "parse_failed", "http_status": 422 },
   { "code": "timeout", "http_status": 504 }
 ]
@@ -146,6 +237,100 @@ Format:
   { "code": "model_error", "http_status": 502 },
   { "code": "timeout", "http_status": 504 }
 ]
+```
+
+## health_check
+- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
+- transport: mcp (http via `127.0.0.1:8011/mcp`)
+- endpoint: direct backend
+- input_schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}
+```
+- output_schema:
+```json
+{
+  "type": "object"
+}
+```
+
+## list_files
+- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
+- transport: mcp (http via `127.0.0.1:8011/mcp`)
+- endpoint: direct backend
+- input_schema:
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "directory": { "type": "string", "default": "." }
+  }
+}
+```
+
+## read_file
+- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
+- transport: mcp (http via `127.0.0.1:8011/mcp`)
+- endpoint: direct backend
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["path"],
+  "additionalProperties": false,
+  "properties": {
+    "path": { "type": "string", "minLength": 1 },
+    "start_line": { "type": "integer", "minimum": 1 },
+    "end_line": { "type": "integer", "minimum": 1 }
+  }
+}
+```
+
+## grep_search
+- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
+- transport: mcp (http via `127.0.0.1:8011/mcp`)
+- endpoint: direct backend
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["query"],
+  "additionalProperties": false,
+  "properties": {
+    "query": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "default": "." },
+    "regex": { "type": "boolean", "default": false },
+    "case_insensitive": { "type": "boolean", "default": false },
+    "include": { "type": "string" },
+    "match_per_line": { "type": "boolean", "default": false },
+    "max_results": { "type": "integer", "minimum": 1 }
+  }
+}
+```
+
+## glob_search
+- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
+- transport: mcp (http via `127.0.0.1:8011/mcp`)
+- endpoint: direct backend
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["pattern"],
+  "additionalProperties": false,
+  "properties": {
+    "pattern": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "default": "." },
+    "exclude": { "type": "string" },
+    "type": { "type": "string", "enum": ["file", "directory", "all"] },
+    "max_results": { "type": "integer", "minimum": 1 }
+  }
+}
 ```
 
 ## mlx.load

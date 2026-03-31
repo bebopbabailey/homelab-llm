@@ -29,6 +29,12 @@
     "port": 4000,
     "canonical_lan_base_url": "http://192.168.1.71:4000/v1",
     "drop_params": true,
+    "gpt_formatting_owner": "upstream",
+    "gpt_request_defaults_only": [
+      "fast",
+      "deep",
+      "code-reasoning"
+    ],
     "fallbacks": {
       "fast": [
         "main"
@@ -72,6 +78,7 @@
     "main": {
       "canonical_backend": "vllm-metal",
       "canonical_model": "mlx-qwen3-next-80b-mxfp4-a3b-instruct",
+      "formatting_owner": "upstream",
       "fallback_backend": "mlx-openai-server",
       "acceptance_contract": {
         "structured_outputs": "accepted_out_of_contract_current_runtime",
@@ -81,12 +88,13 @@
         "branch_concurrency": "required",
         "required_tool_choice": "unsupported_non_blocking",
         "named_forced_tool_choice": "unsupported_non_blocking",
-        "litellm_post_call_cleanup": "main_only_strict_tool_block_optional"
+        "litellm_post_call_cleanup": "inactive"
       }
     },
     "fast": {
       "canonical_backend": "llmster",
       "canonical_model": "llmster-gpt-oss-20b-mxfp4-gguf",
+      "formatting_owner": "upstream",
       "rollout_state": "live_shared_8126_canonical",
       "shadow_alias": "fast",
       "rollback_alias": "fast",
@@ -104,6 +112,7 @@
     "deep": {
       "canonical_backend": "llmster",
       "canonical_model": "llmster-gpt-oss-120b-mxfp4-gguf",
+      "formatting_owner": "upstream",
       "rollout_state": "live_shared_8126_canonical",
       "shadow_alias": "deep",
       "rollback_alias": "deep",
@@ -117,6 +126,13 @@
         "named_forced_tool_choice": "unsupported_backend_400_non_blocking",
         "responses_api": "advisory"
       }
+    }
+  },
+  "internal_worker_aliases": {
+    "code-reasoning": {
+      "canonical_backend": "llmster",
+      "inherits_from": "deep",
+      "formatting_owner": "upstream"
     }
   },
   "llmster": {

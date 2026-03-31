@@ -5,8 +5,10 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 ## Mini (Ubuntu, always-on)
 - **LiteLLM (gateway)**: `0.0.0.0:4000` (canonical infra path `http://192.168.1.71:4000/v1`; localhost still valid)
 - **Open WebUI**: `0.0.0.0:3000` (tailnet via Tailscale Serve)
+- **Open Terminal API**: `127.0.0.1:8010` (optional native Open WebUI human UX path)
+- **Open Terminal MCP**: `127.0.0.1:8011` (`/mcp`, canonical shared repo-inspection backend through LiteLLM)
 - **OpenCode Web**: `0.0.0.0:4096` (Basic Auth; writable workspace limited to `~/homelab-llm`)
-- **OpenHands (Phase A, operator-local)**: `127.0.0.1:4031` (manual Docker-direct session; optional tailnet-only access at `https://hands.tailfd1400.ts.net/`)
+- **OpenHands (Phase A, managed operator UI)**: `127.0.0.1:4031` (systemd-managed Docker service; tailnet-only access at `https://hands.tailfd1400.ts.net/`)
 - **Samba SMB**: `127.0.0.1,192.168.1.71:139/445` (LAN-only; Finder shares `mini-root` and `seagate`)
 - **Prometheus**: `127.0.0.1:9090` (localhost only)
 - **Grafana**: `127.0.0.1:3001` (localhost only)
@@ -47,8 +49,8 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   - curated registry: `layer-interface/voice-gateway/registry/tts_models.jsonl`
   - operator CLI: `voicectl`
   - operator dashboard/API: `/ops` and `/ops/api/*`
-- OpenHands Phase A is a local bring-up exception for worker-mechanics validation only:
-  Docker-direct on `127.0.0.1:4031`, optional tailnet-only access on
+- OpenHands Phase A is a managed bring-up exception for worker-mechanics validation only:
+  systemd-managed Docker on `127.0.0.1:4031`, tailnet-only access on
   `https://hands.tailfd1400.ts.net/`, disposable workspace mount only,
   temporary provider key entered in the UI, no LiteLLM wiring yet.
 - OpenCode Web uses a hardened systemd sandbox. Approval prompts do not override
@@ -71,6 +73,11 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM also exposes `/v1/search/searxng-search` backed by SearXNG.
+- Open Terminal MCP currently remains a localhost-only direct backend at
+  `127.0.0.1:8011/mcp`; a shared LiteLLM MCP alias is follow-on work and is
+  not part of the current live runtime.
+- Open WebUI may keep the native Open Terminal API path on `127.0.0.1:8010`
+  for human UX; it remains intentionally separate from the MCP backend.
 - MLX team ports (`8100–8119`) are managed via `platform/ops/scripts/mlxctl`.
 - LiteLLM `main` routes to the Studio MLX lane on `192.168.1.72:8101`.
 - LiteLLM `fast` and `deep` route to Studio `llmster` on `192.168.1.72:8126`.

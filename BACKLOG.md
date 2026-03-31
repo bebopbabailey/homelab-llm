@@ -8,6 +8,22 @@ Short list of future work not active right now.
   - Generate a single review packet so manual scoring does not require digging through raw JSON artifacts.
   - Keep the work limited to evaluation/review surfaces; no runtime config or provider changes.
 
+## Networking follow-ups
+- Separate `/codex` tailnet exposure:
+  - Design a dedicated Service/grant/doc contract for a future `codex` share instead of reusing the node-root `themini` hostname.
+  - Keep the restored `svc:code/chat/codeagent/gateway/hands/search` surface unchanged until that contract exists.
+- Mini-local MagicDNS / Tailscale health follow-up:
+  - Investigate why the Mini still returns NXDOMAIN for its own `svc:*` hostnames even after remote tailnet clients resolve and reach them.
+  - Re-check the persistent Tailscale `ts-input` / IPv6 health warning only after the Serve recovery evidence is journaled.
+
+## OpenHands follow-ups
+- OpenHands first sandboxed task loop:
+  - Run the first provider-backed scratch-repo `plan -> patch -> validate -> summarize` loop after the managed UI baseline is settled.
+  - Cache and validate the runtime sandbox image only when you explicitly want task execution, not just UI availability.
+- OpenHands auth hardening review:
+  - Revisit whether tailnet-grants-only access for `svc:hands` is sufficient once the managed service has proven stable.
+  - Keep any stronger auth layer separate from the managed-runtime promotion.
+
 ## Docs cleanup waves (deferred)
 - Wave B: canonical boundary tightening (summary docs point to canon, reduce duplication).
 - Wave C: temporal relocation/lifecycle policy (snapshot-style docs moved to proper historical buckets).

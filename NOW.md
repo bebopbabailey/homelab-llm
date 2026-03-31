@@ -1,14 +1,14 @@
 # NOW
 
 Active
-- The permanent public stack is:
-  `main` on MLX `8101`, `fast` + `deep` on shared `llmster` `8126`
-- Shadow rollout ports `8123-8125` are retired and are not part of the active
-  Studio service contract
-- Studio model retention is aligned to active runtime reality:
-  the active `main` MLX artifact plus the active LM Studio GPT 20B and 120B
-  GGUF artifacts
+- Run the first provider-backed OpenHands scratch-repo task loop through the
+  managed Mini service on `127.0.0.1:4031`
+- Validate `plan -> patch -> validate -> summarize` on the disposable workspace
+  without widening Phase A network or sandbox scope
+- Keep the operator path anchored to the governed LiteLLM worker contract for
+  the later Phase B handoff
+
 
 NEXT UP
-- Optional follow-on cleanup only if desired: resolve the unrelated OptiLLM
-  runtime-lock drift.
+- Resume the transcribe alias/doc cleanup after the first OpenHands task-loop
+  validation is closed.

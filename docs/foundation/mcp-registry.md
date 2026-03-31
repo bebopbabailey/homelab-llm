@@ -5,8 +5,11 @@ intended to be the single source of truth for tool endpoints and transports.
 
 ## Recommended Location
 - `/etc/homelab-llm/mcp-registry.json` (runtime, not in repo)
-- Status: not created yet; MVP will write this file.
+- Status: exists on the Mini and should match the repo template.
 - Template: `platform/ops/templates/mcp-registry.json`.
+- Current scope: TinyAgents-facing stdio tools only.
+- Open Terminal MCP is intentionally excluded in the first slice; it stays
+  LiteLLM-managed at `http://127.0.0.1:8011/mcp`.
 
 ## JSON Schema (v1)
 ```json
@@ -17,8 +20,15 @@ intended to be the single source of truth for tool endpoints and transports.
       "name": "web-fetch",
       "purpose": "fetch + clean HTML",
       "transport": "stdio",
-      "command": "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch/web_fetch_mcp.py",
-      "args": [],
+      "command": "/home/christopherbailey/.local/bin/uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch",
+        "python",
+        "-m",
+        "web_fetch_mcp"
+      ],
       "env": [
         "LITELLM_SEARCH_API_BASE",
         "LITELLM_SEARCH_API_KEY",
@@ -39,6 +49,8 @@ intended to be the single source of truth for tool endpoints and transports.
 - `endpoint`: URL for HTTP/SSE servers; command for stdio servers can be stored
   in `command` and `args`.
 - `tools`: human-readable tool identifiers exposed by the server.
+- For stdio tools, `command` must be directly executable by the MCP client; do
+  not point the registry at a non-executable source file.
 - Consider a future `python.run` tool only with strict sandboxing and
   confirmation prompts for untrusted code.
 

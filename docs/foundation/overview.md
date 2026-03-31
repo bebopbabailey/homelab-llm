@@ -43,7 +43,10 @@ while allowing backend models to evolve independently.
 
 ## MCP Status (current)
 - `web.fetch` and `search.web` are implemented as stdio MCP tools.
-- MCP registry and systemd wiring are MVP work items.
+- The TinyAgents-facing MCP registry exists at `/etc/homelab-llm/mcp-registry.json`.
+- Open Terminal MCP is live as a localhost-only systemd-backed service on Mini
+  and remains separate from the TinyAgents registry; a shared LiteLLM MCP alias
+  is follow-on work, not current runtime truth.
 
 ## Repo Layout (high-level)
 - `docs/` — platform-wide architecture, constraints, topology.

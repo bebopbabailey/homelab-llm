@@ -3,7 +3,7 @@
 ## Topology (current)
 - Mac Mini: LiteLLM :4000 (LAN + localhost; tailnet optional for remote operator access), Open WebUI :3000 (LAN + tailnet),
   OpenCode Web :4096 (LAN + tailnet-reachable if network policy allows, Basic Auth at app layer),
-  OpenHands Phase A :4031 (localhost + optional tailnet via `hands`, operator-launched Docker session),
+  OpenHands Phase A :4031 (localhost + tailnet via `hands`, systemd-managed Docker service),
   Samba SMB :139/:445 (LAN-only authenticated Finder access to `mini-root` and `seagate`),
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
@@ -32,7 +32,7 @@
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
 | OpenCode Web | Mini | 4096 | 0.0.0.0 | http://127.0.0.1:4096 | UI root (401 unauthenticated) | `/etc/systemd/system/opencode-web.service`, `systemctl show opencode-web.service -p ExecStart`, `ss -ltnp` |
-| OpenHands (Phase A, operator-local) | Mini | 4031 | 127.0.0.1 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root | `layer-gateway/openhands/RUNBOOK.md`, `docker ps`, `ss -ltnp`, `tailscale serve status --json` |
+| OpenHands (Phase A, managed operator UI) | Mini | 4031 | 127.0.0.1 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root | `/etc/systemd/system/openhands.service`, `systemctl show openhands.service -p ExecStart`, `ss -ltnp`, `tailscale serve status --json` |
 | Samba SMB | Mini | 139/445 | `127.0.0.1` + `192.168.1.71` | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth | `/etc/samba/smb.conf`, `systemctl status smbd.service nmbd.service`, `pdbedit -L` |
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
@@ -61,9 +61,13 @@ Networking note:
   Health/auth behavior: `/v1/*` and `/health` are auth-gated; `/health/readiness`,
   `/health/liveliness`, and `/metrics/` are currently open.
   Runtime lock baseline: `drop_params=true`, `fast -> main`.
+  Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
+  to the current `8101` Qwen lane for transcript cleanup through
+  `POST /v1/chat/completions`; they are not speech STT endpoints.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
-  Harmony normalization is canonical at this layer for GPT lanes (`deep`, `fast`)
-  with strict wire-tag detection.
+  GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
+  `deep`; LiteLLM retains only a narrow request-default shim for omitted
+  `reasoning_effort` on `fast`/`deep`.
   GPT lanes remain Chat Completions-first in the current hardening phase;
   `/v1/responses` stays advisory unless a defect there also matters to the
   public Chat Completions path.
@@ -89,23 +93,38 @@ Networking note:
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
   `ENABLE_PERSISTENT_CONFIG=False` makes env/drop-ins authoritative; Admin UI changes are non-persistent after restart.
   Speech canary promotion requires a post-restart check that no stale Admin UI audio state overrides the env-backed audio settings.
+- Open Terminal:
+  - native human-UX API container remains on `127.0.0.1:8010`
+  - canonical shared MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
+  - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
+  - first slice mount scope is repo-root only:
+    `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
+  - terminal/notebook features are disabled for the MCP lane
+  - LiteLLM exposes only `health_check`, `list_files`, `read_file`,
+    `grep_search`, and `glob_search`
+  - OpenHands remains denied for `/v1/mcp/*`
 - OpenCode Web: systemd unit `/etc/systemd/system/opencode-web.service`, env `/etc/opencode/env`.
   Repo-managed source of truth: `platform/ops/systemd/opencode-web.service`.
   Runtime bind is `0.0.0.0:4096` with HTTP Basic Auth.
   Hardening stays enabled (`ProtectSystem=strict`, `ProtectHome=read-only`).
   Writable allowlist is limited to OpenCode state/cache dirs plus `/home/christopherbailey/homelab-llm`.
   OpenCode approval prompts do not override the systemd sandbox.
-- OpenHands (Phase A): operator-launched Docker-direct session on `127.0.0.1:4031`.
-  Optional remote operator path is tailnet-only via `https://hands.tailfd1400.ts.net/`
+- OpenHands (Phase A): repo-managed `systemd` + Docker service on `127.0.0.1:4031`.
+  Tailnet operator path is `https://hands.tailfd1400.ts.net/`
   backed by `tailscale serve --service=svc:hands`.
-  Install path: `uv tool install openhands --python 3.12`.
-  Primary launch contract: `docker run ... -p 127.0.0.1:4031:3000 ...`.
+  Host runtime files are `/etc/systemd/system/openhands.service` and `/etc/openhands/env`.
+  Primary launch contract is the repo-managed unit `platform/ops/systemd/openhands.service`.
   Docker sandbox only; mount only a disposable workspace into `/workspace`.
   Temporary provider/API key is entered in the UI only and is not wired through repo
-  config, shared host env, or LiteLLM in this phase.
-  LiteLLM Phase B is intentionally delayed while backend hardening focuses on
-  the three canonical public lanes `fast`, `main`, and `deep`. There is no
-  active OpenHands-specific model alias in the current gateway contract.
+  config or LiteLLM in this phase. `/etc/openhands/env` is limited to non-secret
+  runtime vars only.
+  LiteLLM Phase B uses one reserved/internal worker alias only:
+  `code-reasoning -> deep`.
+  The governed Phase B contract is:
+  `litellm_proxy/code-reasoning` + OpenHands service-account key only.
+  Canonical container path is `http://host.docker.internal:4000/v1`.
+  `http://192.168.1.71:4000/v1` remains the verified fallback/reference path.
+  MCP and `/v1/responses` remain denied for the worker key.
   If the custom host persistence mount is not honored during first smoke,
   fall back to the exact documented `~/.openhands:/.openhands` mount and clean it
   up after the session.
@@ -182,8 +201,10 @@ Networking note:
   before the `deep` cutover.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
-- MCP tools: stdio tools (no ports) invoked by an MCP client; `web.fetch` and
-  `search.web` are implemented, registry/systemd still pending.
+- MCP tools:
+  - stdio: `web.fetch`, `search.web`
+  - HTTP backend on Mini: Open Terminal MCP at `127.0.0.1:8011/mcp`
+    (localhost-only direct backend; shared LiteLLM alias remains follow-on)
 - AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
 - Studio main vector store: Postgres+pgvector backend for general/personal memory.
   Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
@@ -200,8 +221,9 @@ Networking note:
 - LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` with localhost still valid.
 - LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
   `8126` on `192.168.1.72`.
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888.
-- Local-only when launched by operator: OpenHands Phase A 4031, with optional tailnet-only access at `https://hands.tailfd1400.ts.net/`.
+- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
+  8010, Open Terminal MCP 8011.
+- Local-only bind with tailnet-only operator access: OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): main vector DB 55432, memory API 55440.
 - Tailnet HTTPS (Tailscale Serve on Mini):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
@@ -215,7 +237,7 @@ Networking note:
   set.
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`, Samba passdb via `smbpasswd` / `pdbedit`.
-  OpenHands Phase A intentionally has no shared host env file.
+  OpenHands Phase A uses `/etc/openhands/env` for non-secret runtime vars only.
   OpenHands Phase B should not reuse a human LiteLLM key; it uses a team
   service-account key stored outside git.
 - Tailscale ACLs/grants managed in admin (use `svc:*` grants for Services access).

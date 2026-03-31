@@ -1,4 +1,8 @@
 # Journal Index
+- [2026-03-31 — OpenHands managed tailnet service promotion](2026-03-31-openhands-managed-tailnet-service-promotion.md)
+- [2026-03-30 — Mini Tailscale Serve recovery and SSH triage](2026-03-30-mini-tailnet-serve-recovery-and-ssh-triage.md)
+- [2026-03-25 — Open Terminal MCP reality snapshot](2026-03-25-open-terminal-mcp-reality-snapshot.md)
+- [2026-03-20 — GPT formatting ownership pushed upstream](2026-03-20-gpt-formatting-ownership-pushed-upstream.md)
 - [2026-03-19 — Shadow ports retired and docs hardened](2026-03-19-shadow-ports-retired-and-docs-hardened.md)
 - [2026-03-19 — GPT stack permanentized and legacy MLX rollback retired](2026-03-19-gpt-stack-permanentized-and-legacy-mlx-retired.md)
 - [2026-03-19 — Shared `8126` GPT stack canonicalized](2026-03-19-shared-8126-gpt-stack-canonicalized.md)

@@ -1,0 +1,30 @@
+[Unit]
+Description=Open Terminal MCP (Mini, read-only repo slice)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/open-terminal-mcp/env
+ExecStartPre=-/usr/bin/docker rm -f ${OPEN_TERMINAL_MCP_CONTAINER_NAME}
+ExecStart=/usr/bin/docker run --rm \
+  --name ${OPEN_TERMINAL_MCP_CONTAINER_NAME} \
+  --pull never \
+  --cpus ${OPEN_TERMINAL_MCP_CPUS} \
+  --memory ${OPEN_TERMINAL_MCP_MEMORY} \
+  -p 127.0.0.1:${OPEN_TERMINAL_MCP_HOST_PORT}:8000 \
+  -e OPEN_TERMINAL_ENABLE_TERMINAL=false \
+  -e OPEN_TERMINAL_ENABLE_NOTEBOOKS=false \
+  -v ${OPEN_TERMINAL_MCP_REPO_PATH}:/lab/homelab-llm:ro \
+  -v ${OPEN_TERMINAL_MCP_HOME_VOLUME}:/home/user \
+  ${OPEN_TERMINAL_MCP_IMAGE} \
+  mcp --transport streamable-http --host 0.0.0.0 --port 8000 --cwd /lab/homelab-llm
+ExecStop=-/usr/bin/docker stop ${OPEN_TERMINAL_MCP_CONTAINER_NAME}
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

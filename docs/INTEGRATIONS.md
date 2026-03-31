@@ -146,7 +146,12 @@ if a param is rejected by the backend.
 - LiteLLM speech aliases:
   - canary: `voice-stt-canary`, `voice-tts-canary`
   - stable: `voice-stt`, `voice-tts`
-- LiteLLM routes those aliases directly to the Orin `voice-gateway` LAN `/v1`
+- LiteLLM transcript-cleanup aliases:
+  - standard: `task-transcribe`
+  - vivid: `task-transcribe-vivid`
+- `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
+  It is not part of the Open WebUI `AUDIO_STT_*` speech path.
+- LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
 - Result and loader policy is explicit in documented Open WebUI env vars:
@@ -252,20 +257,28 @@ if a param is rejected by the backend.
   - `~/.cache/opencode`
 - Approval prompts inside OpenCode do not override the service sandbox. Repo editability depends on `ReadWritePaths=` in the systemd unit.
 
-## OpenHands (Mini, Phase A local bring-up)
+## OpenHands (Mini, Phase A managed service)
 - Service boundary: `layer-gateway/openhands`.
-- Primary launch path: Docker-direct on the Mini, published locally to `127.0.0.1:4031`.
-- Optional remote operator path: `https://hands.tailfd1400.ts.net/` through `tailscale serve --service=svc:hands`.
-- Install path: `uv tool install openhands --python 3.12`.
+- Primary launch path: repo-managed `systemd` + Docker on the Mini, published locally to `127.0.0.1:4031`.
+- Repo-managed unit: `platform/ops/systemd/openhands.service`.
+- Host runtime files: `/etc/systemd/system/openhands.service`, `/etc/openhands/env`.
+- Tailnet operator path: `https://hands.tailfd1400.ts.net/` through `tailscale serve --service=svc:hands`.
 - Workspace contract: mount only a disposable host path into `/workspace` via
   `SANDBOX_VOLUMES`; do not mount the live monorepo in Phase A.
 - Model/provider contract in Phase A: temporary provider/API key entered in the
-  OpenHands UI only. No repo config, shared host env file, or LiteLLM wiring.
-- Phase B handoff contract is intentionally deferred during the current
-  three-alias backend hardening cycle.
+  OpenHands UI only. No repo config or LiteLLM wiring. `/etc/openhands/env`
+  is limited to non-secret runtime vars only.
+- Phase B worker contract is intentionally narrow:
+  - reserved/internal alias only: `code-reasoning`
+  - backend target behind LiteLLM: `deep`
+  - OpenHands model string: `litellm_proxy/code-reasoning`
+  - non-human service-account key only: `openhands-worker`
+  - Chat Completions-first
+  - MCP denied
+  - `/v1/responses` denied
 - Current runtime note:
-  - `http://host.docker.internal:4000/v1` is not the canonical path for OpenHands on this Mini
-  - the current canonical infra path to LiteLLM is `http://192.168.1.71:4000/v1`
+  - canonical OpenHands container path is `http://host.docker.internal:4000/v1`
+  - verified fallback/reference path is `http://192.168.1.71:4000/v1`
 - Security posture: Docker sandbox only, operator-supervised, no GitHub
   integration, no deploy rights, no auto-merge, no LAN exposure, tailnet access
   limited to dedicated service `svc:hands`.
@@ -279,15 +292,23 @@ if a param is rejected by the backend.
 See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
 and where this repo uses callbacks vs guardrails.
 
-### Harmony normalization policy (gateway canonical layer)
-- MLX backend runtime is `vllm-metal` (`vllm serve` under `mlxctl`/launchd); Harmony normalization is done at LiteLLM.
-- Applied to GPT lanes only: `deep`, `fast`.
-- Llama lane (`main`) remains passthrough.
-- Guardrail pre-call mutates prior assistant history only when strict Harmony wire
-  markers are present (`<|channel|>`, `<|message|>`, plus `analysis|final` channel).
-- Guardrail post-call returns `final` channel content only for client-visible text.
-- Streaming is pass-through by default; callers can still force non-streaming
-  by setting `stream: false` per request.
+### GPT formatting ownership policy
+- GPT formatting/tool-call parsing is upstream-first.
+- `main` keeps the locked upstream `vllm-metal` parser render on `8101`
+  (`tool_call_parser=hermes`, no reasoning parser).
+- `fast`, `deep`, and reserved/internal worker alias `code-reasoning` keep the
+  direct `llmster` / llama.cpp response shape as the canonical truth path.
+- LiteLLM is no longer the canonical GPT response normalizer for these lanes.
+- The one current LiteLLM exception is a small GPT request-default shim:
+  when callers omit `reasoning_effort`, LiteLLM injects `reasoning_effort=low`
+  for `fast`, `deep`, and `code-reasoning` because the current `llmster`
+  service contract does not expose a server-side default knob for it.
+- LiteLLM does not currently rewrite GPT response content, strip provider
+  reasoning fields, or repair named/object-form forced-tool semantics.
+- Current GPT contract remains Chat Completions-first:
+  - ordinary tool calling supported
+  - named/object-form forced-tool choice unsupported
+  - strict structured-output guarantees not part of the supported contract
 
 ## OpenVINO backend (not wired in LiteLLM)
 - Systemd unit: `/etc/systemd/system/ov-server.service` (binds `0.0.0.0` for maintenance).
@@ -345,11 +366,35 @@ Example:
 
 ## MCP tools (implemented locally)
 - MCP servers provide tool access; TinyAgents is the MCP client (MVP).
-- MCP registry lives at `/etc/homelab-llm/mcp-registry.json` (pending creation).
+- MCP registry lives at `/etc/homelab-llm/mcp-registry.json`.
 - Template: `platform/ops/templates/mcp-registry.json`.
+- Current registry scope is TinyAgents-facing stdio tools only.
 - Keep tool calls separate from LiteLLM model calls.
 - Plan a sandboxed `python.run` tool for future workflows; avoid unsandboxed
   execution by default.
+
+## Open Terminal MCP (implemented locally)
+- Current live path for terminal-style repo inspection is the localhost-only
+  Open Terminal MCP backend.
+- Runtime:
+  - backend: `http://127.0.0.1:8011/mcp`
+  - transport: MCP streamable HTTP
+- Scope:
+  - bind mount only `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
+  - no whole-host bind
+  - no `docker.sock`
+  - no write tools in slice 1
+- Explicitly separate role:
+  - Open WebUI native Open Terminal on `127.0.0.1:8010` may remain for human UX
+  - Open WebUI should not also register this same terminal capability as an MCP
+    External Tool in the first slice
+  - Open Terminal MCP is intentionally not added to the TinyAgents MCP registry
+    in this slice
+  - a shared LiteLLM MCP alias for the read-only subset remains follow-on work,
+    not current runtime truth
+- OpenHands remains excluded:
+  - worker alias `code-reasoning` stays MCP-denied
+  - `/v1/responses` stays denied for the worker key
 
 ## Client base URL recommendation
 - Prefer LAN when local: `http://192.168.1.71:4000/v1`.

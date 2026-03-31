@@ -16,6 +16,10 @@ contract for the active LiteLLM + OptiLLM + vLLM-metal stack.
 - Studio OptiLLM binds `192.168.1.72:4020` and points upstream at `http://192.168.1.71:4000/v1`.
 - LiteLLM keeps `drop_params: true`.
 - LiteLLM fallbacks include `fast -> main`.
+- LiteLLM no longer owns canonical GPT response formatting for `main`, `fast`,
+  or `deep`; it keeps only a narrow request-default shim that injects
+  `reasoning_effort=low` when omitted for `fast`, `deep`, and internal worker
+  alias `code-reasoning`.
 - The remaining active public MLX lane `8101` renders `VLLM_METAL_MEMORY_FRACTION=auto`.
 - The remaining active public MLX lane `8101` renders `--host 192.168.1.72`.
 - The remaining active public MLX lane does not use backend bearer auth.
@@ -34,10 +38,8 @@ contract for the active LiteLLM + OptiLLM + vLLM-metal stack.
   concurrency.
 - The repo-standard noop `tool_choice=auto` probe must pass natively on direct
   `8101`.
-- The stricter single-tool argument-bearing `tool_choice=auto` probe may be
-  satisfied either natively on direct `8101` or through the narrow LiteLLM
-  `main` post-call cleanup hook, if and only if the backend output is a strict
-  losslessly recoverable single `<tool_call>...</tool_call>` block.
+- The stricter single-tool argument-bearing `tool_choice=auto` probe must pass
+  natively on direct `8101`.
 - Structured outputs are outside the accepted public `main` contract on the
   current runtime because both of the current non-stream direct `8101` paths
   are failing on the present backend path:
@@ -124,6 +126,8 @@ contract for the active LiteLLM + OptiLLM + vLLM-metal stack.
   - `required` strong and accepted as the constrained-mode success path
   - named forced-tool choice unsupported and non-blocking on the current GPT
     backend family
+- Internal worker alias `code-reasoning` is not a public lane and inherits the
+  current `deep` backend and formatting contract.
 - `8126` is the only active canonical GPT listener in the `812x` range.
 - `8123/8124/8125` are retired shadow ports and are no longer approved rollout
   targets.

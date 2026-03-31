@@ -1,0 +1,5 @@
+FROM ghcr.io/open-webui/open-terminal@sha256:2edd68f62221a99275675af5109c39441624a42b4b45cbf6c1dfc5a9216ed00a
+
+USER root
+RUN python -m pip install --no-cache-dir "open-terminal[mcp]==0.11.29"
+USER user

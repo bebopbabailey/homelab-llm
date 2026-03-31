@@ -26,7 +26,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HEALTHCHECK="$REPO_ROOT/platform/ops/scripts/healthcheck.sh"
 
 # Services we know how to manage.
-KNOWN_SERVICES=("litellm-orch" "open-webui" "ov-server" "optillm-proxy")
+KNOWN_SERVICES=("litellm-orch" "open-webui" "openhands" "ov-server" "optillm-proxy")
 
 log() { printf "\n[%s] %s\n" "$(date +'%F %T')" "$*"; }
 die() { printf "\nERROR: %s\n" "$*" >&2; exit 1; }
@@ -47,6 +47,7 @@ service_dir() {
   local svc="$1"
   case "$svc" in
     litellm-orch) echo "$REPO_ROOT/layer-gateway/litellm-orch" ;;
+    openhands) echo "$REPO_ROOT/layer-gateway/openhands" ;;
     optillm-proxy) echo "$REPO_ROOT/layer-gateway/optillm-proxy" ;;
     open-webui) echo "$REPO_ROOT/layer-interface/open-webui" ;;
     ov-server) echo "$REPO_ROOT/layer-inference/ov-llm-server" ;;

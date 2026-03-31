@@ -705,10 +705,193 @@ curl -fsS http://127.0.0.1:4000/v1/models \
 Note: in the current deployment, unauthenticated `GET /health` may return `401`.
 Prefer `/health/readiness` as the default probe when validating service liveness.
 
+## OpenHands managed runtime (Mini)
+```bash
+systemctl is-enabled openhands.service
+systemctl is-active openhands.service
+ss -ltnp | rg ':4031'
+curl -fsSI http://127.0.0.1:4031/
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | rg 'openhands-app'
+docker inspect openhands-app --format '{{json .HostConfig.Binds}}'
+docker inspect openhands-app --format '{{json .Config.Env}}' | jq -r '.[]' | rg '^SANDBOX_VOLUMES='
+tailscale serve status --json | jq '.Services["svc:hands"]'
+ssh orin 'curl -kI --max-time 10 https://hands.tailfd1400.ts.net/'
+```
+
+Expected:
+- `openhands.service` is enabled and active
+- `127.0.0.1:4031` is listening
+- local root returns `200`
+- `openhands-app` is running
+- `docker inspect` shows only Docker socket and persistence binds
+- `SANDBOX_VOLUMES` carries the disposable workspace contract
+- `svc:hands` still proxies to `http://127.0.0.1:4031`
+- remote tailnet root returns `HTTP/2 200`
+
 ## OpenHands Phase B note
-OpenHands Phase B is intentionally deferred during the current three-alias
-backend hardening cycle. Do not run OpenHands worker or `code-reasoning`
-gateway checks until a later plan reinstates a dedicated model contract.
+OpenHands Phase B now has one governed worker contract only:
+- alias: `code-reasoning`
+- backend target: `deep`
+- non-human service-account key only
+- Chat Completions-first
+- MCP denied
+- `/v1/responses` denied
+
+Worker-gate verification:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/model/info \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/model/info \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly: code-reasoning-ok"}],"stream":false,"max_tokens":32}' | jq .
+
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/mcp/tools \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}"
+
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"code-reasoning","input":"hello"}'
+```
+
+Expected:
+- models path returns only `code-reasoning`
+- both model-info paths succeed
+- chat completions succeeds on `code-reasoning`
+- MCP returns `403`
+- `/v1/responses` returns `403`
+
+Inside-container authenticated OpenHands contract check:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+docker exec -e OPENHANDS_WORKER_KEY="$OPENHANDS_WORKER_KEY" openhands-app sh -lc '
+python3 - <<\"PY\"
+import json, os, urllib.request, urllib.error
+key=os.environ["OPENHANDS_WORKER_KEY"]
+bases=["http://host.docker.internal:4000/v1","http://192.168.1.71:4000/v1"]
+tests={
+  "models":("GET","/models",None),
+  "model_info":("GET","/model/info",None),
+  "chat_ok":("POST","/chat/completions",{"model":"code-reasoning","messages":[{"role":"user","content":"Reply with exactly code-reasoning-ok"}],"stream":False,"max_tokens":32}),
+  "mcp_denied":("GET","/mcp/tools",None),
+  "responses_denied":("POST","/responses",{"model":"code-reasoning","input":"hello"})
+}
+out={}
+for base in bases:
+  out[base]={}
+  for name,(method,path,payload) in tests.items():
+    req=urllib.request.Request(base+path,data=(json.dumps(payload).encode() if payload is not None else None),headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"},method=method)
+    try:
+      with urllib.request.urlopen(req, timeout=30) as r:
+        out[base][name]={"status":r.status,"body":r.read().decode()[:600]}
+    except urllib.error.HTTPError as e:
+      out[base][name]={"status":e.code,"body":e.read().decode()[:600]}
+print(json.dumps(out, indent=2, sort_keys=True))
+PY'
+```
+
+Expected:
+- both paths return `200` for `/v1/models`
+- both paths return `200` for `/v1/model/info`
+- both paths return `200` for `/v1/chat/completions`
+- `host.docker.internal` is promoted to canonical only after this authenticated
+  inside-container check passes
+- both paths return `403` for `/v1/mcp/tools`
+- both paths return `403` for `/v1/responses`
+
+Unsupported-feature probes:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"code-reasoning",
+    "messages":[{"role":"user","content":"Call noop once with {\"value\":\"x\"}."}],
+    "tools":[{"type":"function","function":{"name":"noop","description":"noop","parameters":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}}}],
+    "tool_choice":{"type":"function","function":{"name":"noop"}},
+    "stream":false,
+    "max_tokens":128
+  }' | jq .
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"code-reasoning",
+    "messages":[{"role":"user","content":"Return JSON matching the schema exactly."}],
+    "response_format":{
+      "type":"json_schema",
+      "json_schema":{
+        "name":"status_payload",
+        "schema":{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false},
+        "strict":true
+      }
+    },
+    "stream":false,
+    "max_tokens":128,
+    "temperature":0
+  }' | jq .
+```
+
+Expected:
+- named/object-form forced-tool choice is rejected or backend-visible unsupported
+- strict structured-output/schema guarantee is rejected, ignored, or otherwise
+  not part of the supported worker contract
+
+## Open Terminal MCP read-only slice
+Direct backend smoke:
+```bash
+layer-interface/open-webui/.venv/bin/python - <<'PY'
+import asyncio
+from open_webui.utils.mcp.client import MCPClient
+
+async def main():
+    client = MCPClient()
+    await client.connect("http://127.0.0.1:8011/mcp")
+    tools = await client.list_tool_specs()
+    print(sorted(tool["name"] for tool in tools))
+    await client.disconnect()
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- connection succeeds
+- raw backend exposes the 13-tool Open Terminal MCP surface
+- direct backend remains localhost-only and should not be treated as the
+  canonical authenticated client path
+
+Shared LiteLLM exposure for the Open Terminal read-only subset is follow-on
+work and is not part of the current live runtime. Validate only the direct
+localhost MCP backend on `127.0.0.1:8011/mcp` in this slice.
+
+OpenHands denial proof must still hold:
+```bash
+OPENHANDS_WORKER_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key)
+
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/mcp/tools \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_KEY}"
+```
+
+Expected:
+- returns `403`
 
 ## Documentation predictability sweep (repo)
 Use this when running doc-consistency hardening work for coding-agent safety.
@@ -1341,6 +1524,32 @@ Pass guidance:
 - `/v1/models` does not include `fast-research`.
 - `/v1/search/searxng-search` still works for direct callers and MCP tools.
 
+## LiteLLM Transcript Cleanup Alias Checks (Mini)
+```bash
+set -a
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+set +a
+
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe-vivid","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
+```
+
+Pass guidance:
+- `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
+- both aliases succeed through `POST /v1/chat/completions`
+- outputs are plain cleaned transcript text with no wrapper heading, label, or commentary
+- `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
+
 ## Legacy Path Removal Checks (Mini)
 Service removal and active-surface grep:
 ```bash
@@ -1387,7 +1596,14 @@ response.
 ```bash
 sudo cp /home/christopherbailey/homelab-llm/platform/ops/templates/mcp-registry.json /etc/homelab-llm/mcp-registry.json
 sudo cp /home/christopherbailey/homelab-llm/platform/ops/templates/tiny-agents.env /etc/homelab-llm/tiny-agents.env
+diff -u /home/christopherbailey/homelab-llm/platform/ops/templates/mcp-registry.json /etc/homelab-llm/mcp-registry.json
 ```
+
+Expected:
+- runtime registry matches the repo template exactly
+- registry currently contains TinyAgents-facing stdio tools only
+- Open Terminal MCP remains LiteLLM-managed and is intentionally absent from
+  the TinyAgents registry in this slice
 
 ## OpenVINO model control (ovctl)
 ```bash
