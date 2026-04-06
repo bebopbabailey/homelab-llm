@@ -1,0 +1,33 @@
+{
+  "allowed_root_files": [
+    ".gitignore",
+    ".gitmodules",
+    "AGENTS.md",
+    "BACKLOG.md",
+    "CONSTRAINTS.md",
+    "DIAGNOSTICS.md",
+    "DOCS_CONTRACT.md",
+    "INCIDENT_FLOW.md",
+    "NOW.md",
+    "README.md",
+    "SANDBOX_PERMISSIONS.md",
+    "SCRATCH_PAD.md",
+    "SYSTEM_OVERVIEW.md",
+    "TOPOLOGY.md",
+    "opencode.json"
+  ],
+  "journal": {
+    "entry_regex": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9][a-z0-9-]*\\.md$",
+    "non_entry_files": [
+      "README.md",
+      "index.md"
+    ]
+  },
+  "archive": {
+    "top_level_rollup_regex": "^\\d{4}-\\d{2}-[a-z0-9][a-z0-9-]*\\.md$",
+    "allowed_top_level_files": [
+      "README.md"
+    ],
+    "legacy_subdir": "legacy"
+  }
+}

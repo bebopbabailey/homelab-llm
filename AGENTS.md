@@ -11,6 +11,17 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - No new LAN exposure, port changes, or host-binding changes without an explicit plan and approval.
 - No dependency or lockfile churn unless the task explicitly asks for it.
 - No unrelated refactors, renames, or drive-by cleanups.
+- Repo-root markdown is allowlisted. Keep only stable root control-surface files
+  at repo root; dated reports, review packs, one-off specs, and bulky plans go
+  to `docs/journal/`, `docs/archive/`, or `next-projects/`.
+- Concurrent `Build`/`Verify` efforts must use separate worktrees. Do not run
+  multiple implementation passes in one dirty worktree.
+- `Build`/`Verify` work must pass local worktree-effort preflight before repo
+  writes: `uv run python scripts/worktree_effort.py preflight --stage <stage>`.
+- If a dirty worktree is holding context only while another worktree builds or
+  verifies, park it locally first with `uv run python scripts/worktree_effort.py park`.
+- Local effort metadata must stay outside repo-tracked files; `NOW.md` is
+  project-level status only, not a concurrent-effort registry.
 - **MLX control:** Ports `8100-8119` are `mlxctl`-managed and MUST use `mlxctl`
   (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
   require `mlxctl`.
@@ -53,6 +64,10 @@ If any are missing, state that and proceed with the least risky interpretation.
 - Prefer working within a single service boundary per task.
 - Only change shared docs/registries when required by the change.
 - If a change triggers doc obligations, follow `docs/_core/CHANGE_RULES.md`.
+- When cleaning or adding repo-root docs, preserve the root markdown allowlist
+  in `DOCS_CONTRACT.md`.
+- For concurrent implementation work, prefer one worktree per effort and keep
+  effort scope explicit and narrow.
 
 ## Verification modes
 - FAST: per-touched-service quick checks (lint/smoke/unit where they exist).

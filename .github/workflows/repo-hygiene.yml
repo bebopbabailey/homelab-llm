@@ -1,0 +1,81 @@
+name: repo-hygiene
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  repo-hygiene:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Repo hygiene unit tests
+        run: |
+          python -m unittest discover -s scripts/tests -p 'test_repo_hygiene_audit.py'
+          python -m unittest discover -s scripts/tests -p 'test_control_plane_sync_audit.py'
+          python -m unittest discover -s scripts/tests -p 'test_worktree_effort.py'
+
+      - name: Root hygiene hard-fail audit
+        run: python scripts/repo_hygiene_audit.py --scope root --strict --json > /tmp/repo_hygiene_root.json
+
+      - name: Journal hygiene advisory audit
+        run: python scripts/repo_hygiene_audit.py --scope journal --json > /tmp/repo_hygiene_journal.json
+
+      - name: Archive hygiene advisory audit
+        run: python scripts/repo_hygiene_audit.py --scope archive --json > /tmp/repo_hygiene_archive.json
+
+      - name: Control-plane sync advisory audit
+        run: python scripts/control_plane_sync_audit.py --json > /tmp/control_plane_sync.json
+
+      - name: Report advisory findings
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root_payload = json.loads(Path("/tmp/repo_hygiene_root.json").read_text())
+          journal_payload = json.loads(Path("/tmp/repo_hygiene_journal.json").read_text())
+          archive_payload = json.loads(Path("/tmp/repo_hygiene_archive.json").read_text())
+          sync_payload = json.loads(Path("/tmp/control_plane_sync.json").read_text())
+          summary_lines = [
+              "## Repo Hygiene Audit",
+              f"- root_ok: `{root_payload['root_ok']}`",
+              f"- journal_index_ok: `{journal_payload['journal_index_ok']}`",
+              f"- archive_ok: `{archive_payload['archive_ok']}`",
+              f"- control_plane_sync_ok: `{sync_payload['overall_ok']}`",
+          ]
+          if journal_payload["journal_missing_from_index"]:
+              print(f"::warning::Journal entries missing from index: {', '.join(journal_payload['journal_missing_from_index'])}")
+              summary_lines.append("- journal_missing_from_index:")
+              summary_lines.extend([f"  - `{name}`" for name in journal_payload["journal_missing_from_index"]])
+          if journal_payload["journal_noncanonical_index_lines"]:
+              print("::warning::Journal index contains noncanonical lines")
+              summary_lines.append("- journal_noncanonical_index_lines:")
+              summary_lines.extend([f"  - `{line}`" for line in journal_payload["journal_noncanonical_index_lines"]])
+          if archive_payload["archive_non_rollup_top_level_files"]:
+              print(f"::warning::Archive top-level non-rollup files: {', '.join(archive_payload['archive_non_rollup_top_level_files'])}")
+              summary_lines.append("- archive_non_rollup_top_level_files:")
+              summary_lines.extend([f"  - `{name}`" for name in archive_payload["archive_non_rollup_top_level_files"]])
+          if sync_payload["repo_hygiene_sync_missing"]:
+              print("::warning::Repo hygiene sync gaps detected")
+              summary_lines.append("- repo_hygiene_sync_missing:")
+              summary_lines.extend([f"  - `{path}`: {', '.join(tokens)}" for path, tokens in sync_payload["repo_hygiene_sync_missing"].items()])
+          if sync_payload["skill_sync_missing"]:
+              print("::warning::Skill sync gaps detected")
+              summary_lines.append("- skill_sync_missing:")
+              summary_lines.extend([f"  - `{path}`: {', '.join(tokens)}" for path, tokens in sync_payload["skill_sync_missing"].items()])
+          summary_path = Path(__import__("os").environ["GITHUB_STEP_SUMMARY"])
+          summary_path.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
+          PY

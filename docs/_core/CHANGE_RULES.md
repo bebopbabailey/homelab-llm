@@ -75,6 +75,37 @@ If drift is discovered:
   - `scripts/validate_handles.py` (implementation)
   - Example: adding a new handle validation rule should also add a corresponding test step in testing docs.
 
+## Root Hygiene
+- If the repo-root allowlist or root/journal/archive placement rules change, update:
+  - `DOCS_CONTRACT.md`
+  - `docs/_core/root_hygiene_manifest.json`
+  - `scripts/repo_hygiene_audit.py`
+  - `docs/foundation/testing.md`
+  - `.github/workflows/repo-hygiene.yml`
+  - `scripts/README.md`
+
+## Control-Plane Sync
+- If repo-local OpenCode behavior, skill aliases, or repo-hygiene validator
+  contracts change, update:
+  - `.codex/skills/homelab-durability/SKILL.md`
+  - `docs/OPENCODE.md`
+  - `docs/INTEGRATIONS.md`
+  - `docs/foundation/testing.md`
+  - `scripts/README.md`
+  - `scripts/control_plane_sync_audit.py`
+  - `.github/workflows/repo-hygiene.yml`
+
+## Concurrent Efforts
+- If local concurrent-effort rules, worktree preflight behavior, or effort
+  metadata shape change, update:
+  - `AGENTS.md`
+  - `.codex/skills/homelab-durability/SKILL.md`
+  - `docs/_core/CONCURRENT_EFFORTS.md`
+  - `docs/OPENCODE.md`
+  - `docs/foundation/testing.md`
+  - `scripts/worktree_effort.py`
+  - `scripts/README.md`
+
 ## Runtime Lock
 - If locked Studio runtime args, LiteLLM resilience settings, MLX lane auth/memory defaults,
   or pinned `optillm` provenance change, update:

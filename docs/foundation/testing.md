@@ -709,22 +709,26 @@ Prefer `/health/readiness` as the default probe when validating service liveness
 ```bash
 systemctl is-enabled openhands.service
 systemctl is-active openhands.service
+systemctl show openhands.service -p EnvironmentFiles
 ss -ltnp | rg ':4031'
 curl -fsSI http://127.0.0.1:4031/
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | rg 'openhands-app'
 docker inspect openhands-app --format '{{json .HostConfig.Binds}}'
 docker inspect openhands-app --format '{{json .Config.Env}}' | jq -r '.[]' | rg '^SANDBOX_VOLUMES='
+docker exec openhands-app python3 -c 'import os; print("present" if os.getenv("OH_SECRET_KEY") else "missing")'
 tailscale serve status --json | jq '.Services["svc:hands"]'
 ssh orin 'curl -kI --max-time 10 https://hands.tailfd1400.ts.net/'
 ```
 
 Expected:
 - `openhands.service` is enabled and active
+- `EnvironmentFiles=` includes both `/etc/openhands/env` and `/etc/openhands/secret.env`
 - `127.0.0.1:4031` is listening
 - local root returns `200`
 - `openhands-app` is running
 - `docker inspect` shows only Docker socket and persistence binds
 - `SANDBOX_VOLUMES` carries the disposable workspace contract
+- the container presence check prints `present`
 - `svc:hands` still proxies to `http://127.0.0.1:4031`
 - remote tailnet root returns `HTTP/2 200`
 
@@ -877,9 +881,34 @@ Expected:
 - direct backend remains localhost-only and should not be treated as the
   canonical authenticated client path
 
-Shared LiteLLM exposure for the Open Terminal read-only subset is follow-on
-work and is not part of the current live runtime. Validate only the direct
-localhost MCP backend on `127.0.0.1:8011/mcp` in this slice.
+LiteLLM read-only gate:
+```bash
+set -a
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+set +a
+
+layer-interface/open-webui/.venv/bin/python - <<'PY'
+import asyncio
+import os
+from open_webui.utils.mcp.client import MCPClient
+
+async def main():
+    client = MCPClient()
+    await client.connect(
+        "http://127.0.0.1:4000/open_terminal_repo_ro/mcp",
+        headers={"x-litellm-api-key": f"Bearer {os.environ['LITELLM_MASTER_KEY']}"},
+    )
+    tools = await client.list_tool_specs()
+    print(sorted(tool["name"] for tool in tools))
+    await client.disconnect()
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- only `health_check`, `list_files`, `read_file`, `grep_search`, and
+  `glob_search` are returned
 
 OpenHands denial proof must still hold:
 ```bash
@@ -899,6 +928,10 @@ Use this when running doc-consistency hardening work for coding-agent safety.
 ```bash
 cd /home/christopherbailey/homelab-llm
 uv run python scripts/docs_contract_audit.py --strict --json
+uv run python scripts/repo_hygiene_audit.py --scope root --strict --json
+uv run python scripts/repo_hygiene_audit.py --scope journal --json
+uv run python scripts/repo_hygiene_audit.py --scope archive --json
+uv run python scripts/control_plane_sync_audit.py --json
 uv run python scripts/validate_handles.py
 ```
 
@@ -906,7 +939,43 @@ Expected:
 - `docs_contract_audit.py` returns `ok: true` with `services_with_gaps: 0`.
 - `docs_contract_audit.py` also returns `layers_ok: true` and `overall_ok: true`
   with `layers_with_gaps: 0`.
+- root strict mode returns `root_ok: true` and `overall_ok: true`.
+- journal advisory mode returns `journal_index_ok: true`.
+- archive advisory mode returns `archive_ok: true`.
+- `control_plane_sync_audit.py` returns `repo_hygiene_sync_ok: true`,
+  `skill_sync_ok: true`, and `overall_ok: true`.
+- treat root failures as blocking because they change the repo entry surface
+  agents see before descending into layers and services.
+- treat journal/archive/control-plane findings as advisory until those contracts
+  stay quiet through at least one cleanup cycle.
 - `validate_handles.py` returns `ok`.
+
+## Concurrent implementation preflight (local only)
+Use this before `Build` or `Verify` work when multiple agent efforts may be
+active.
+
+```bash
+cd /home/christopherbailey/homelab-llm
+uv run python scripts/worktree_effort.py status --json
+uv run python scripts/worktree_effort.py park --notes "holding context" --json
+uv run python scripts/worktree_effort.py preflight --stage build --json
+uv run python scripts/worktree_effort.py preflight --stage verify --json
+uv run python scripts/worktree_effort.py close --json
+```
+
+Expected:
+- `status --json` identifies the current worktree, branch, gitdir, and local
+  effort metadata when present.
+- `park --notes ... --json` marks a dirty context worktree as parked without
+  making it an implementation effort.
+- `preflight --stage build --json` returns `overall_ok: true` before any
+  repo-mutating implementation work.
+- `preflight --stage verify --json` returns `overall_ok: true` before
+  verification-stage mutations.
+- `close --json` removes local metadata and returns the worktree to a null
+  state.
+- these checks are local-only and are not CI-backed, because CI cannot see your
+  live worktree topology.
 
 ## OpenCode repo-local control-plane smoke
 Use your local `~/.config/opencode/opencode.json` together with the repo-local

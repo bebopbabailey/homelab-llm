@@ -16,6 +16,32 @@ Must include:
 - **INCIDENT_FLOW.md** — escalation rules and when to dispatch layer/service agents
 - **DIAGNOSTICS.md** — safe read-only scripts and how to interpret output
 
+Allowed repo-root files:
+- `.gitignore`
+- `.gitmodules`
+- `AGENTS.md`
+- `README.md`
+- `DOCS_CONTRACT.md`
+- `CONSTRAINTS.md`
+- `SYSTEM_OVERVIEW.md`
+- `TOPOLOGY.md`
+- `DIAGNOSTICS.md`
+- `INCIDENT_FLOW.md`
+- `SANDBOX_PERMISSIONS.md`
+- `NOW.md`
+- `BACKLOG.md`
+- `SCRATCH_PAD.md`
+- `opencode.json`
+
+Placement rules:
+- root: stable monorepo orientation and live control files only
+- `docs/journal/`: dated narrative, closeouts, and decisions
+- `docs/archive/`: rollup-oriented historical archive surface only
+- `next-projects/`: future-looking plans that are not root canon
+- layer/service docs: active operational truth for a specific boundary
+- canonical enforcement manifest: `docs/_core/root_hygiene_manifest.json`
+- enforced by `scripts/repo_hygiene_audit.py`
+
 ## Layer (layer-*) — “Regional manager” agent
 Purpose: define what the layer is allowed to do and its contracts.
 
@@ -50,3 +76,8 @@ Must include:
 - Avoid duplicating global constraints in every service; reference root docs when possible.
 - Prefer facts over aspirations. If a service is not active, say so explicitly.
 - If this contract conflicts with root constraints or source hierarchy, update this file to align with canon.
+- Do not leave dated reports, review packs, or speculative design packets at
+  repo root once their durable home is known.
+- Do not leave one-file-per-packet historical copies at the top level of
+  `docs/archive/`; use dated rollups there and quarantine legacy leftovers
+  under `docs/archive/legacy/` during migration.

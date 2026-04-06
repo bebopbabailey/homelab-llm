@@ -104,6 +104,24 @@ git and apply only inside this repo.
 
 In this repo, agents and skills are the primary OpenCode control surface.
 
+Repo-local durability posture:
+- use `homelab-durability` or `homelab_durability` for repo-local durable work
+- stages are `Discover`, `Design`, `Build`, and `Verify`
+- the startup declaration is conditional, not universal: require it before
+  proposing commands or file edits, not for every read-only turn
+- rollback is conditional, not universal: require it for restarts,
+  running-system config changes, destructive operations, and host-level
+  mutations
+- concurrent implementation work should use a separate worktree per agent/effort
+- dirty context-only worktrees should use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json`
+- local `Build`/`Verify` passes should run
+  `uv run python scripts/worktree_effort.py preflight --stage <stage> --json`
+  before repo writes
+- concurrent-effort metadata is local to each worktree; `NOW.md` is not the
+  effort registry
+- root/doc placement hygiene is enforced separately by
+  `scripts/repo_hygiene_audit.py`
+
 Lane note:
 - `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed
   vLLM launch settings.

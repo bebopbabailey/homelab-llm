@@ -9,6 +9,15 @@ Repository utility scripts.
   (`README`, `AGENTS`, `CONSTRAINTS`, `DEPENDENCIES`, `RUNBOOK`) and
   service-level docs contract completeness (`README`, `SERVICE_SPEC`,
   `ARCHITECTURE`, `AGENTS`, `CONSTRAINTS`, `RUNBOOK`, `TASKS`).
+- `repo_hygiene_audit.py` — audits root-file allowlist, journal index/link
+  shape, and top-level archive shape against
+  `docs/_core/root_hygiene_manifest.json`.
+- `control_plane_sync_audit.py` — audits that repo-local skill/validator
+  contracts are reflected across the docs and workflow surfaces that describe
+  them.
+- `worktree_effort.py` — manages local per-worktree effort metadata and blocks
+  unsafe `Build`/`Verify` work when concurrent implementation scopes overlap or
+  the current dirty tree exceeds its declared effort scope.
 - `repo_snapshot_zip.py` — packages the current repo filesystem snapshot as it
   exists on disk, including submodule contents automatically, while excluding
   obvious local heavyweight junk such as `.git`, `.venv*`, caches, and build
@@ -40,6 +49,30 @@ Repository utility scripts.
   - `--json` preserves the existing service keys and appends layer audit keys:
     `required_layer_files`, `layer_count`, `layers`, `layers_with_gaps`,
     `layers_ok`, `overall_ok`
+- Repo hygiene audit:
+  - `uv run python scripts/repo_hygiene_audit.py`
+  - `uv run python scripts/repo_hygiene_audit.py --json`
+  - `uv run python scripts/repo_hygiene_audit.py --scope root --strict --json`
+  - `uv run python scripts/repo_hygiene_audit.py --scope journal --json`
+  - `uv run python scripts/repo_hygiene_audit.py --scope archive --json`
+  - checks root-file allowlist drift, journal index/link drift, and top-level archive shape
+- Control-plane sync audit:
+  - `uv run python scripts/control_plane_sync_audit.py`
+  - `uv run python scripts/control_plane_sync_audit.py --json`
+  - `uv run python scripts/control_plane_sync_audit.py --strict --json`
+  - checks that repo-local durability and hygiene contracts are reflected in the
+    docs/workflow surfaces that describe them
+- Worktree effort preflight:
+  - `uv run python scripts/worktree_effort.py park --notes "holding context" --json`
+  - `uv run python scripts/worktree_effort.py register --effort-id <id> --stage build --scope <repo-path>`
+  - `uv run python scripts/worktree_effort.py status --json`
+  - `uv run python scripts/worktree_effort.py preflight --stage build --json`
+  - `uv run python scripts/worktree_effort.py preflight --stage verify --json`
+  - `uv run python scripts/worktree_effort.py close --json`
+  - use `park` for dirty context-only worktrees and `register` for active
+    `build`/`verify` work
+  - `close` removes the local metadata file and returns the worktree to a null state
+  - keeps concurrent implementation state local to each worktree and out of repo-tracked files
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
   - filesystem-based and Git-independent at runtime
