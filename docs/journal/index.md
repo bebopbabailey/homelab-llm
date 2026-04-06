@@ -1,4 +1,8 @@
 # Journal Index
+- [2026-04-02 — Root allowlist and root artifact cleanup](2026-04-02-root-allowlist-and-root-artifact-cleanup.md)
+- [2026-04-02 — Homelab durability evaluation loop after hygiene hardening](2026-04-02-homelab-durability-eval-loop.md)
+- [2026-04-01 — HP Home Assistant DietPi pyenv repair](2026-04-01-hp-home-assistant-dietpi-pyenv-repair.md)
+- [2026-04-01 — OpenHands secret-key persistence wiring](2026-04-01-openhands-secret-key-persistence-wiring.md)
 - [2026-03-31 — OpenHands managed tailnet service promotion](2026-03-31-openhands-managed-tailnet-service-promotion.md)
 - [2026-03-30 — Mini Tailscale Serve recovery and SSH triage](2026-03-30-mini-tailnet-serve-recovery-and-ssh-triage.md)
 - [2026-03-25 — Open Terminal MCP reality snapshot](2026-03-25-open-terminal-mcp-reality-snapshot.md)
@@ -87,9 +91,10 @@
 - [2026-02-18 — MLX-LM server Harmony stabilization (backend + gateway)](2026-02-18-mlx-lm-server-harmony-stabilization.md)
 - [2026-02-18 — MLX runtime backend loop and revert (Omni/llama.cpp -> mlx-openai-server)](2026-02-18-mlx-runtime-backend-loop-and-revert.md)
 - [2026-02-18 — Tailnet + OptiLLM connectivity recovery](2026-02-18-tailnet-optillm-connectivity-recovery.md)
+- [2026-02-15 — Reality snapshot (Mini + Studio + Orin + HP)](2026-02-15-reality-snapshot-mini-studio-orin-hp.md)
 - [2026-02-11 - MLX runtime/boot single-contract on Studio](2026-02-11-mlx-runtime-single-contract.md)
 - [2026-02-11 - MLXCTL GPT-OSS auto-harmony defaults](2026-02-11-mlxctl-gpt-oss-auto-harmony.md)
-- 2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)
+- [2026-02-09 — OptiLLM proxy deploy workflow (Mini → Studio)](2026-02-09-optillm-proxy-deploy.md)
 - [2026-02-09 — Reality snapshot (Mini + Studio)](2026-02-09-reality-snapshot-mini-studio.md)
 
 - [2026-02-08 — Lexicon registry (data layer)](2026-02-08-lexicon-registry.md)
@@ -115,12 +120,13 @@
 - [2026-01-15 — Registries, Entity IDs, and JSONL Plan](2026-01-15-registries-and-ids.md)
 - [2026-01-16 — Benny deprecation + ov-* alias alignment](2026-01-16-benny-deprecation.md)
 - [2026-01-16 — Gateway handles registry v0](2026-01-16-gateway-handles-registry.md)
+- [2026-01-18 — MLX Port Policy + Gateway Sync](2026-01-18-mlx-sync-gateway.md)
 - [2026-01-19 — MLX context defaults (all models)](2026-01-19-mlx-context-defaults.md)
 - [2026-01-19 — OptiLLM features + quality matrix](2026-01-19-optillm-features-and-quality-matrix.md)
 
-- `2026-01-13-docs-afm.md` — Doc sweep + AFM wiring plan.
-- `2026-01-13-openvino-strengths-plan.md` — OpenVINO strengths plan + device mode evaluation.
-- `2026-01-13-openvino-nonllm-plan.md` — OpenVINO LLM follow-up + non-LLM plan.
-- `2026-01-12-openvino-cleaning.md` — OpenVINO cleaning performance + fidelity, int8/int4 tests.
-- `2026-01-12-onnx-route-summarize.md` — ONNX route + summarize pilot.
-- `2026-01-12-onnx-cleaner.md` — ONNX punctuation/casing cleaner pilot.
+- [2026-01-13 — Doc sweep + AFM wiring plan](2026-01-13-docs-afm.md)
+- [2026-01-13 — OpenVINO strengths plan + device mode evaluation](2026-01-13-openvino-strengths-plan.md)
+- [2026-01-13 — OpenVINO LLM follow-up + non-LLM plan](2026-01-13-openvino-nonllm-plan.md)
+- [2026-01-12 — OpenVINO cleaning performance + fidelity, int8/int4 tests](2026-01-12-openvino-cleaning.md)
+- [2026-01-12 — ONNX route + summarize pilot](2026-01-12-onnx-route-summarize.md)
+- [2026-01-12 — ONNX punctuation/casing cleaner pilot](2026-01-12-onnx-cleaner.md)
