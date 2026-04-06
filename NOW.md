@@ -1,14 +1,10 @@
 # NOW
 
 Active
-- Run the first provider-backed OpenHands scratch-repo task loop through the
-  managed Mini service on `127.0.0.1:4031`
-- Validate `plan -> patch -> validate -> summarize` on the disposable workspace
-  without widening Phase A network or sandbox scope
-- Keep the operator path anchored to the governed LiteLLM worker contract for
-  the later Phase B handoff
+- Stabilize repo hygiene from a clean baseline worktree
+- Land the local concurrency, root/archive/journal, and control-plane contracts as one coherent cleanup train
+- Keep the parked main worktree as context only until feature deltas are rehomed into separate worktrees
 
 
 NEXT UP
-- Resume the transcribe alias/doc cleanup after the first OpenHands task-loop
-  validation is closed.
+- Resume `task-json` and OpenHands validation from separate clean worktrees after the hygiene baseline is clean.

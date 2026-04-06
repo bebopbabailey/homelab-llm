@@ -240,9 +240,9 @@ Format:
 ```
 
 ## health_check
-- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
-- transport: mcp (http via `127.0.0.1:8011/mcp`)
-- endpoint: direct backend
+- status: active
+- transport: mcp (http via LiteLLM `open_terminal_repo_ro`)
+- endpoint: `open_terminal_repo_ro`
 - input_schema:
 ```json
 {
@@ -259,9 +259,9 @@ Format:
 ```
 
 ## list_files
-- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
-- transport: mcp (http via `127.0.0.1:8011/mcp`)
-- endpoint: direct backend
+- status: active
+- transport: mcp (http via LiteLLM `open_terminal_repo_ro`)
+- endpoint: `open_terminal_repo_ro`
 - input_schema:
 ```json
 {
@@ -274,9 +274,9 @@ Format:
 ```
 
 ## read_file
-- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
-- transport: mcp (http via `127.0.0.1:8011/mcp`)
-- endpoint: direct backend
+- status: active
+- transport: mcp (http via LiteLLM `open_terminal_repo_ro`)
+- endpoint: `open_terminal_repo_ro`
 - input_schema:
 ```json
 {
@@ -292,9 +292,9 @@ Format:
 ```
 
 ## grep_search
-- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
-- transport: mcp (http via `127.0.0.1:8011/mcp`)
-- endpoint: direct backend
+- status: active
+- transport: mcp (http via LiteLLM `open_terminal_repo_ro`)
+- endpoint: `open_terminal_repo_ro`
 - input_schema:
 ```json
 {
@@ -314,9 +314,9 @@ Format:
 ```
 
 ## glob_search
-- status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
-- transport: mcp (http via `127.0.0.1:8011/mcp`)
-- endpoint: direct backend
+- status: active
+- transport: mcp (http via LiteLLM `open_terminal_repo_ro`)
+- endpoint: `open_terminal_repo_ro`
 - input_schema:
 ```json
 {

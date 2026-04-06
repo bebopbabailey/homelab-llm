@@ -106,9 +106,9 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 ## MCP Tools
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
 - `search.web` — stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.
-- Open Terminal MCP — HTTP MCP backend on the Mini at `127.0.0.1:8011/mcp`,
-  currently localhost-only. A shared LiteLLM read-only alias is follow-on
-  work and is not part of the current live runtime.
+- `open_terminal_repo_ro` — HTTP MCP backend on the Mini at
+  `127.0.0.1:8011/mcp`, exposed canonically through LiteLLM with a read-only
+  repo-inspection allowlist.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
@@ -136,8 +136,9 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   - OpenVINO: `/etc/homelab-llm/ov-server.env`
   - SearXNG: `/etc/searxng/env`
   - Samba passdb: `smbpasswd -a christopherbailey` / `pdbedit`
-  `/etc/openhands/env` carries non-secret runtime vars only; provider/API keys
-  stay UI-entered in Phase A.
+  `/etc/openhands/env` carries non-secret runtime vars only; the dedicated
+  root-only companion file `/etc/openhands/secret.env` carries only
+  `OH_SECRET_KEY`. Provider/API keys stay UI-entered in Phase A.
 
 ## Web Search Contract
 - Open WebUI owns web-search UX plus provider/loader configuration.

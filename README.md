@@ -25,6 +25,8 @@ use-case. Hopes of branching into enterprise-land later.
 - Check `docs/INTEGRATIONS.md` before wiring new services into LiteLLM.
 - Treat `NOW.md` as the active plan and update it before and after changes.
 - See `/next-projects`for documentation of software development plans, upcoming features.
+- Treat repo root as a narrow control surface. Historical campaigns live under
+  `docs/journal/` and `docs/archive/`, not at repo root.
 
 ## Service Conventions
 - Target convention: each service should include `SERVICE_SPEC.md`, `ARCHITECTURE.md`, and `AGENTS.md`.
@@ -71,6 +73,7 @@ Planned services (endpoints):
 ## Documentation Hygiene
 - Keep service docs, topology, and integrations in sync with changes.
 - Update `NOW.md` before and after implementing new features.
+- Keep repo-root markdown on the allowlist defined in `DOCS_CONTRACT.md`.
 
 
 ## Agent Expectations

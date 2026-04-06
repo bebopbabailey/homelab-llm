@@ -73,11 +73,10 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM also exposes `/v1/search/searxng-search` backed by SearXNG.
-- Open Terminal MCP currently remains a localhost-only direct backend at
-  `127.0.0.1:8011/mcp`; a shared LiteLLM MCP alias is follow-on work and is
-  not part of the current live runtime.
+- LiteLLM also exposes the canonical terminal MCP path for approved keys via
+  `open_terminal_repo_ro`, backed by Open Terminal MCP on `127.0.0.1:8011/mcp`.
 - Open WebUI may keep the native Open Terminal API path on `127.0.0.1:8010`
-  for human UX; it remains intentionally separate from the MCP backend.
+  for human UX, but that is intentionally separate from the LiteLLM MCP path.
 - MLX team ports (`8100–8119`) are managed via `platform/ops/scripts/mlxctl`.
 - LiteLLM `main` routes to the Studio MLX lane on `192.168.1.72:8101`.
 - LiteLLM `fast` and `deep` route to Studio `llmster` on `192.168.1.72:8126`.

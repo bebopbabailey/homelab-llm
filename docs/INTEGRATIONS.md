@@ -151,6 +151,11 @@ if a param is rejected by the backend.
   - vivid: `task-transcribe-vivid`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path.
+- LiteLLM transcript-to-JSON utility alias:
+  - `task-json`
+- `task-json` is also a `POST /v1/chat/completions` utility contract only.
+  It returns canonical JSON extraction output and is not part of the Open WebUI
+  `AUDIO_STT_*` speech path.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
@@ -241,6 +246,17 @@ if a param is rejected by the backend.
   - FAST and DEEP are now the settled GPT lanes on the shared `llmster`/llama.cpp service at `8126`
 - Repo-shared OpenCode workflow and verification live in `docs/OPENCODE.md` and
   `docs/foundation/testing.md`.
+- Repo-local durability workflow is stage-aware rather than universally
+  ceremonial:
+  - `Discover` and `Design` stay low-friction and read-only first
+  - `Build` and `Verify` require the startup declaration before proposed edits
+    or commands
+  - `homelab-durability` and `homelab_durability` are equivalent invocation
+    names
+  - rollback is conditional to runtime risk, not universal for docs/discovery
+- Root/doc placement hygiene is enforced separately by
+  `scripts/repo_hygiene_audit.py`, with root-entry violations treated as the
+  first blocking hygiene class.
 
 ## OpenCode Web (Mini)
 - Service boundary: `layer-interface/opencode-web`.
@@ -261,13 +277,18 @@ if a param is rejected by the backend.
 - Service boundary: `layer-gateway/openhands`.
 - Primary launch path: repo-managed `systemd` + Docker on the Mini, published locally to `127.0.0.1:4031`.
 - Repo-managed unit: `platform/ops/systemd/openhands.service`.
-- Host runtime files: `/etc/systemd/system/openhands.service`, `/etc/openhands/env`.
+- Host runtime files:
+  - `/etc/systemd/system/openhands.service`
+  - `/etc/openhands/env`
+  - `/etc/openhands/secret.env`
 - Tailnet operator path: `https://hands.tailfd1400.ts.net/` through `tailscale serve --service=svc:hands`.
 - Workspace contract: mount only a disposable host path into `/workspace` via
   `SANDBOX_VOLUMES`; do not mount the live monorepo in Phase A.
 - Model/provider contract in Phase A: temporary provider/API key entered in the
   OpenHands UI only. No repo config or LiteLLM wiring. `/etc/openhands/env`
-  is limited to non-secret runtime vars only.
+  is limited to non-secret runtime vars only. `OH_SECRET_KEY` lives only in the
+  root-only companion file `/etc/openhands/secret.env` and is used strictly for
+  restart-persistent secret-state encryption inside OpenHands.
 - Phase B worker contract is intentionally narrow:
   - reserved/internal alias only: `code-reasoning`
   - backend target behind LiteLLM: `deep`
@@ -373,25 +394,31 @@ Example:
 - Plan a sandboxed `python.run` tool for future workflows; avoid unsandboxed
   execution by default.
 
-## Open Terminal MCP (implemented locally)
-- Current live path for terminal-style repo inspection is the localhost-only
-  Open Terminal MCP backend.
+## Open Terminal MCP (implemented, LiteLLM-backed)
+- Canonical shared path for terminal-style repo inspection is:
+  `Open Terminal MCP -> LiteLLM MCP`.
 - Runtime:
   - backend: `http://127.0.0.1:8011/mcp`
+  - LiteLLM alias: `open_terminal_repo_ro`
   - transport: MCP streamable HTTP
 - Scope:
   - bind mount only `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
   - no whole-host bind
   - no `docker.sock`
   - no write tools in slice 1
+- Allowed LiteLLM tools:
+  - `health_check`
+  - `list_files`
+  - `read_file`
+  - `grep_search`
+  - `glob_search`
 - Explicitly separate role:
   - Open WebUI native Open Terminal on `127.0.0.1:8010` may remain for human UX
   - Open WebUI should not also register this same terminal capability as an MCP
     External Tool in the first slice
+  - local agents should use LiteLLM MCP, not direct `127.0.0.1:8011/mcp`
   - Open Terminal MCP is intentionally not added to the TinyAgents MCP registry
-    in this slice
-  - a shared LiteLLM MCP alias for the read-only subset remains follow-on work,
-    not current runtime truth
+    in this slice; the canonical shared path remains LiteLLM MCP
 - OpenHands remains excluded:
   - worker alias `code-reasoning` stays MCP-denied
   - `/v1/responses` stays denied for the worker key
