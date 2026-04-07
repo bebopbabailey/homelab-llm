@@ -64,6 +64,8 @@ Networking note:
   Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
   to the current `8101` Qwen lane for transcript cleanup through
   `POST /v1/chat/completions`; they are not speech STT endpoints.
+  Utility alias: `task-json` routes to the current `fast` backend through
+  `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted

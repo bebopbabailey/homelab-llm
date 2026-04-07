@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Stabilize repo hygiene from a clean baseline worktree
-- Land the local concurrency, root/archive/journal, and control-plane contracts as one coherent cleanup train
-- Keep the parked main worktree as context only until feature deltas are rehomed into separate worktrees
+- Resume the LiteLLM `task-json` primitive in `layer-gateway/litellm-orch` from the hygiene baseline
+- Keep it pinned to the existing `fast` backend with the task-guardrail pattern
+- Align the LiteLLM service docs and minimal shared canon to the transcript-to-JSON alias contract
 
 
 NEXT UP
-- Resume parked feature work from separate clean worktrees after the hygiene baseline lands.
+- Resume the first provider-backed OpenHands scratch-repo task-loop validation.

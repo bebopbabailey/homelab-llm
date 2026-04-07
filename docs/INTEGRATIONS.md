@@ -151,6 +151,11 @@ if a param is rejected by the backend.
   - vivid: `task-transcribe-vivid`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path.
+- LiteLLM transcript-to-JSON utility alias:
+  - `task-json`
+- `task-json` is also a `POST /v1/chat/completions` utility contract only.
+  It returns canonical JSON extraction output and is not part of the Open WebUI
+  `AUDIO_STT_*` speech path.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
