@@ -29,6 +29,7 @@ implement inference or web-search business logic.
 - Environment variables supply upstream base URLs and runtime options.
 - Example envs live in `config/env.example`.
 - For long-running service use, load env vars explicitly (for example systemd `EnvironmentFile=config/env.local`).
+- Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them, but canonical `main` on the current Qwen backend is still failing both current non-stream direct `8101` structured-output request paths:
   - exact documented OpenAI-compatible `response_format.json_schema`
@@ -59,6 +60,10 @@ implement inference or web-search business logic.
 - `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
 - `code-reasoning` -> reserved internal OpenHands worker alias on the same
   `deep` backend lane (`llmster-gpt-oss-120b-mxfp4-gguf`)
+- `chatgpt-5` -> LiteLLM ChatGPT Subscription provider route
+  (`chatgpt/gpt-5.4`) as an additive experimental cloud lane
+- `chatgpt-5-thinking` -> LiteLLM ChatGPT Subscription provider route
+  (`chatgpt/gpt-5.4-pro`) as an additive experimental cloud lane
 - `task-transcribe` -> MLX Studio lane `8101`
   (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
 - `task-transcribe-vivid` -> MLX Studio lane `8101`
@@ -87,6 +92,9 @@ implement inference or web-search business logic.
   canonical public alias surface.
 - There are no active temporary GPT canary aliases in the current gateway
   contract.
+- The local canonical public trio remains `main`, `deep`, and `fast`.
+- `chatgpt-5` and `chatgpt-5-thinking` are additive experimental cloud aliases.
+- No automatic fallback from local lanes to ChatGPT aliases is configured.
 - GPT lanes remain Chat Completions-first in the current hardening phase.
 - `/v1/responses` remains in validation scope for GPT lanes but is advisory
   unless a defect there also matters to the public Chat Completions path.
@@ -140,6 +148,8 @@ implement inference or web-search business logic.
   - strict structured-output guarantees are not part of the supported GPT or
     OpenHands worker contract
 - No web-search-specific pre-call or post-call guardrails are active in LiteLLM.
+- The ChatGPT provider follows LiteLLM's own device-code/OAuth login flow on
+  first use.
 
 ## Search Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -153,6 +163,9 @@ implement inference or web-search business logic.
 - API key enforcement is enabled for `/v1/*` and `/health`.
 - `/health/readiness`, `/health/liveliness`, and `/metrics/` are currently open.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
+- ChatGPT auth state must stay out of git. By default LiteLLM stores it at
+  `~/.config/litellm/chatgpt/auth.json` for the service user. Runtime-only
+  overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.

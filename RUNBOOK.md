@@ -2,6 +2,9 @@
 
 ## Start/stop
 ```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch
+uv sync --frozen
+
 sudo systemctl start litellm-orch.service
 sudo systemctl stop litellm-orch.service
 sudo systemctl restart litellm-orch.service
@@ -43,6 +46,7 @@ rg -n "gpt-request-defaults|target_models|reasoning_effort" \
 
 Expected:
 - `gpt-request-defaults` targets `deep`, `fast`, and `code-reasoning`.
+- `gpt-request-defaults` does not target `chatgpt-5` or `chatgpt-5-thinking`.
 - No web-search-specific pre-call or post-call guardrails remain.
 - No GPT-lane post-call formatting guardrail remains active.
 
@@ -112,11 +116,34 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 
 Expected:
 - `/v1/models` includes `main`, `deep`, `fast`, and `code-reasoning`.
+- `/v1/models` includes `chatgpt-5` and `chatgpt-5-thinking`.
 - `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
+- `/v1/models` includes `task-json`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
 - Current resilience baseline keeps `fast -> main`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
+
+## ChatGPT alias smoke checks
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: chatgpt-5-ok"}],"stream":false}' | jq .
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatgpt-5-thinking","messages":[{"role":"user","content":"Reply with exactly: chatgpt-5-thinking-ok"}],"stream":false}' | jq .
+```
+
+Expected:
+- the first call may trigger LiteLLM's ChatGPT device-code auth flow
+- `journalctl -u litellm-orch.service -f` shows the verification URL and device code when auth is required
+- successful follow-up calls return the expected exact text
+- no base URL change is required in Open WebUI
 
 Historical cutover order:
 - raw `deep`

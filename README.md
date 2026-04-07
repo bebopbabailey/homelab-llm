@@ -28,10 +28,13 @@ only; it does not implement inference.
 ## OpenCode Note
 - Repo-local OpenCode defaults and agent/skill behavior are documented in
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
-- The active public LLM alias set is intentionally limited to `fast`, `main`,
-  and `deep`.
+- The local canonical public LLM trio remains `fast`, `main`, and `deep`.
+- Additive experimental cloud aliases are `chatgpt-5` and
+  `chatgpt-5-thinking`.
 - `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
   not part of the public human chat-lane trio.
+- `task-json` is an additional utility alias, not part of the public human
+  chat-lane trio.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.
