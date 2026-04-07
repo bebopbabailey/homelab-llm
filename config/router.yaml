@@ -58,6 +58,18 @@ model_list:
     max_output_tokens: 4096
     supports_function_calling: false
     supports_system_messages: true
+
+- model_name: task-json
+  litellm_params:
+    model: os.environ/LLMSTER_FAST_MODEL
+    api_base: os.environ/LLMSTER_FAST_API_BASE
+    api_key: dummy
+    max_tokens: 1024
+  model_info:
+    mode: chat
+    max_output_tokens: 1024
+    supports_function_calling: false
+    supports_system_messages: true
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -103,5 +115,15 @@ guardrails:
   - guardrail_name: "transcribe-post"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
+      mode: "post_call"
+      default_on: true
+  - guardrail_name: "task-json-pre"
+    litellm_params:
+      guardrail: "task_json_guardrail.TaskJsonGuardrail"
+      mode: "pre_call"
+      default_on: true
+  - guardrail_name: "task-json-post"
+    litellm_params:
+      guardrail: "task_json_guardrail.TaskJsonGuardrail"
       mode: "post_call"
       default_on: true

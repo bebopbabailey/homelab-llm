@@ -175,6 +175,23 @@ Expected:
 - outputs are plain cleaned transcript text with no wrapper label or commentary
 - `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
 
+## Task JSON alias check
+```bash
+source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-json","stream":false,"messages":[{"role":"user","content":"call mom tomorrow at 3, buy milk, and pick up paper towels"}]}' \
+  | jq '.choices[0].message.content | fromjson'
+```
+
+Expected:
+- the call succeeds through `POST /v1/chat/completions`
+- `message.content` parses as JSON
+- the parsed object has exact top-level keys `todo`, `grocery`, `purchase`, and `other`
+- `other` contains only `items` and `attributes`
+
 ## Main tool-calling validation
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local

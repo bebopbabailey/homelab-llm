@@ -63,6 +63,8 @@ implement inference or web-search business logic.
   (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
 - `task-transcribe-vivid` -> MLX Studio lane `8101`
   (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the vivid transcript-cleanup prompt
+- `task-json` -> Studio `llmster` fast lane `8126`
+  (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
 - `voice-tts-canary` -> Orin `voice-gateway` facade (`tts-1`)
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -107,6 +109,14 @@ implement inference or web-search business logic.
   and must not be reused for Open WebUI speech wiring.
 - `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
   `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
+- `task-json` is a transcript-to-JSON utility alias only.
+  It is invoked through `POST /v1/chat/completions`, forces non-streaming,
+  removes tool-calling fields, and returns minified JSON with exact top-level keys
+  `todo`, `grocery`, `purchase`, and `other`.
+- `task-json` uses LiteLLM-owned pre-call and post-call guardrails to inject a
+  fixed strict `json_schema`, normalize malformed/provider-sloppy payloads,
+  salvage unknown categories into `other`, and fall back once to the canonical
+  empty payload with `other.attributes.guardrail_status="repair_failed"` if repair fails.
 - GPT formatting ownership is upstream-first:
   - `main` keeps the locked upstream parser render on `8101`
     (`tool_choice=auto`, `tool_call_parser=hermes`, no reasoning parser).
