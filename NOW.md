@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Resume the LiteLLM `task-json` primitive in `layer-gateway/litellm-orch` from the hygiene baseline
-- Keep it pinned to the existing `fast` backend with the task-guardrail pattern
-- Align the LiteLLM service docs and minimal shared canon to the transcript-to-JSON alias contract
+- Add an additive LiteLLM ChatGPT subscription lane for Open WebUI through the existing LiteLLM `/v1` gateway
+- Keep the local canonical trio `fast`, `main`, and `deep` unchanged while exposing opt-in cloud aliases
+- Upgrade `layer-gateway/litellm-orch` to a LiteLLM release that supports the `chatgpt/...` provider route
 
 
 NEXT UP
-- Resume the first provider-backed OpenHands scratch-repo task-loop validation.
+- Validate the new ChatGPT aliases in the dedicated worktree, then promote and smoke-test them on the live Mini runtime.

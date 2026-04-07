@@ -44,7 +44,8 @@
   artifact”; stale model weights should be pruned before GPT cutovers.
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
-- Stable public LLM aliases: `main`, `deep`, `fast`.
+- Stable local public LLM aliases: `main`, `deep`, `fast`.
+- Additive experimental cloud aliases: `chatgpt-5`, `chatgpt-5-thinking`.
 - There are no active temporary GPT rollout aliases in the current gateway
   contract.
 - `main` is closed as an active backend project and remains accepted for public
@@ -69,7 +70,8 @@
   - auto arg-bearing `10/10`
   - `required` arg-bearing `9/10`
   - named forced-tool choice unsupported on the current backend path
-- Experimental aliases are not part of the active gateway contract in the current hardened phase.
+- Experimental aliases remain opt-in and additive. They do not replace the
+  stable local alias contract and are not used as automatic fallback targets.
 - LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
 
 ### LiteLLM Prometheus metrics (enabled)
@@ -140,6 +142,8 @@ if a param is rejected by the backend.
 
 ## Open WebUI -> LiteLLM
 - Env: `/etc/open-webui/env` uses `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`.
+- Open WebUI continues to talk only to LiteLLM; no upstream provider rewrite is
+  required for ChatGPT-backed aliases.
 - Health: `/health` on port 3000.
 - Canonical voice path uses dedicated Open WebUI `AUDIO_STT_*` and `AUDIO_TTS_*`
   settings pointed at LiteLLM, not direct Orin URLs.
@@ -149,6 +153,9 @@ if a param is rejected by the backend.
 - LiteLLM transcript-cleanup aliases:
   - standard: `task-transcribe`
   - vivid: `task-transcribe-vivid`
+- LiteLLM experimental ChatGPT aliases:
+  - `chatgpt-5`
+  - `chatgpt-5-thinking`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path.
 - LiteLLM transcript-to-JSON utility alias:
@@ -156,6 +163,8 @@ if a param is rejected by the backend.
 - `task-json` is also a `POST /v1/chat/completions` utility contract only.
   It returns canonical JSON extraction output and is not part of the Open WebUI
   `AUDIO_STT_*` speech path.
+- First-use ChatGPT auth is handled by LiteLLM's provider device-code/OAuth
+  flow, not by Open WebUI settings.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.

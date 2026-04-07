@@ -14,6 +14,9 @@
   but are unloaded.
   Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
   and `fast` plus `deep` on shared `llmster` at `8126`.
+  Additive experimental cloud aliases `chatgpt-5` and `chatgpt-5-thinking`
+  are exposed through the same Mini LiteLLM gateway without changing the local
+  public canon.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
@@ -61,9 +64,17 @@ Networking note:
   Health/auth behavior: `/v1/*` and `/health` are auth-gated; `/health/readiness`,
   `/health/liveliness`, and `/metrics/` are currently open.
   Runtime lock baseline: `drop_params=true`, `fast -> main`.
+  Current package baseline: `litellm[proxy]==1.83.4`.
+  Additive experimental ChatGPT aliases: `chatgpt-5` -> `chatgpt/gpt-5.4`,
+  `chatgpt-5-thinking` -> `chatgpt/gpt-5.4-pro`.
   Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
   to the current `8101` Qwen lane for transcript cleanup through
   `POST /v1/chat/completions`; they are not speech STT endpoints.
+  Utility alias: `task-json` routes to the current `fast` backend through
+  `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
+  ChatGPT aliases are opt-in only, are not part of `fast -> main` fallback, and
+  use LiteLLM's first-use device-code/OAuth auth flow with default auth state
+  stored outside git at `~/.config/litellm/chatgpt/auth.json`.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
