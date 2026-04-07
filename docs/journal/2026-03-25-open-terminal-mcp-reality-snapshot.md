@@ -8,8 +8,7 @@ LiteLLM path.
 ## Runtime facts
 - Native Open Terminal API is listening on `127.0.0.1:8010`.
 - Open Terminal MCP is listening on `127.0.0.1:8011/mcp`.
-- LiteLLM does not currently expose the planned namespaced read-only MCP lane
-  `open_terminal_repo_ro-*`.
+- LiteLLM does not currently expose the planned namespaced read-only MCP lane.
 - OpenHands worker access to `/v1/mcp/tools` remains denied with `403`.
 - The runtime MCP registry exists at `/etc/homelab-llm/mcp-registry.json`
   and still needed reconciliation with the repo template during this sweep.
@@ -35,6 +34,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 ## Observed signals
 - `GET /mcp` on `8011` returned `406 Not Acceptable`, which is the expected
   Streamable HTTP MCP handshake hint.
-- LiteLLM MCP visibility did not include any `open_terminal_repo_ro-*` tools in
-  this snapshot; the shared read-only lane remained planned rather than live.
+- LiteLLM MCP visibility did not include any planned read-only shared-lane
+  tools in this snapshot; the shared read-only lane remained planned rather
+  than live.
 - OpenHands worker probe returned `403`.

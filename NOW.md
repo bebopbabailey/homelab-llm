@@ -7,4 +7,4 @@ Active
 
 
 NEXT UP
-- Resume `task-json` and OpenHands validation from separate clean worktrees after the hygiene baseline is clean.
+- Resume parked feature work from separate clean worktrees after the hygiene baseline lands.

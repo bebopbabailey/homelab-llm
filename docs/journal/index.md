@@ -2,7 +2,6 @@
 - [2026-04-02 — Root allowlist and root artifact cleanup](2026-04-02-root-allowlist-and-root-artifact-cleanup.md)
 - [2026-04-02 — Homelab durability evaluation loop after hygiene hardening](2026-04-02-homelab-durability-eval-loop.md)
 - [2026-04-01 — HP Home Assistant DietPi pyenv repair](2026-04-01-hp-home-assistant-dietpi-pyenv-repair.md)
-- [2026-04-01 — OpenHands secret-key persistence wiring](2026-04-01-openhands-secret-key-persistence-wiring.md)
 - [2026-03-31 — OpenHands managed tailnet service promotion](2026-03-31-openhands-managed-tailnet-service-promotion.md)
 - [2026-03-30 — Mini Tailscale Serve recovery and SSH triage](2026-03-30-mini-tailnet-serve-recovery-and-ssh-triage.md)
 - [2026-03-25 — Open Terminal MCP reality snapshot](2026-03-25-open-terminal-mcp-reality-snapshot.md)
