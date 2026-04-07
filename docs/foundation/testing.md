@@ -709,26 +709,22 @@ Prefer `/health/readiness` as the default probe when validating service liveness
 ```bash
 systemctl is-enabled openhands.service
 systemctl is-active openhands.service
-systemctl show openhands.service -p EnvironmentFiles
 ss -ltnp | rg ':4031'
 curl -fsSI http://127.0.0.1:4031/
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | rg 'openhands-app'
 docker inspect openhands-app --format '{{json .HostConfig.Binds}}'
 docker inspect openhands-app --format '{{json .Config.Env}}' | jq -r '.[]' | rg '^SANDBOX_VOLUMES='
-docker exec openhands-app python3 -c 'import os; print("present" if os.getenv("OH_SECRET_KEY") else "missing")'
 tailscale serve status --json | jq '.Services["svc:hands"]'
 ssh orin 'curl -kI --max-time 10 https://hands.tailfd1400.ts.net/'
 ```
 
 Expected:
 - `openhands.service` is enabled and active
-- `EnvironmentFiles=` includes both `/etc/openhands/env` and `/etc/openhands/secret.env`
 - `127.0.0.1:4031` is listening
 - local root returns `200`
 - `openhands-app` is running
 - `docker inspect` shows only Docker socket and persistence binds
 - `SANDBOX_VOLUMES` carries the disposable workspace contract
-- the container presence check prints `present`
 - `svc:hands` still proxies to `http://127.0.0.1:4031`
 - remote tailnet root returns `HTTP/2 200`
 
@@ -881,34 +877,9 @@ Expected:
 - direct backend remains localhost-only and should not be treated as the
   canonical authenticated client path
 
-LiteLLM read-only gate:
-```bash
-set -a
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-set +a
-
-layer-interface/open-webui/.venv/bin/python - <<'PY'
-import asyncio
-import os
-from open_webui.utils.mcp.client import MCPClient
-
-async def main():
-    client = MCPClient()
-    await client.connect(
-        "http://127.0.0.1:4000/open_terminal_repo_ro/mcp",
-        headers={"x-litellm-api-key": f"Bearer {os.environ['LITELLM_MASTER_KEY']}"},
-    )
-    tools = await client.list_tool_specs()
-    print(sorted(tool["name"] for tool in tools))
-    await client.disconnect()
-
-asyncio.run(main())
-PY
-```
-
-Expected:
-- only `health_check`, `list_files`, `read_file`, `grep_search`, and
-  `glob_search` are returned
+Shared LiteLLM exposure for the Open Terminal read-only subset is follow-on
+work and is not part of the current live runtime. Validate only the direct
+localhost MCP backend on `127.0.0.1:8011/mcp` in this slice.
 
 OpenHands denial proof must still hold:
 ```bash

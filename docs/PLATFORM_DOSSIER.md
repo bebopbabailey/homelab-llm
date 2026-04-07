@@ -64,8 +64,6 @@ Networking note:
   Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
   to the current `8101` Qwen lane for transcript cleanup through
   `POST /v1/chat/completions`; they are not speech STT endpoints.
-  Utility alias: `task-json` routes to the current `fast` backend through
-  `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
@@ -114,15 +112,12 @@ Networking note:
 - OpenHands (Phase A): repo-managed `systemd` + Docker service on `127.0.0.1:4031`.
   Tailnet operator path is `https://hands.tailfd1400.ts.net/`
   backed by `tailscale serve --service=svc:hands`.
-  Host runtime files are `/etc/systemd/system/openhands.service`,
-  `/etc/openhands/env`, and the root-only companion file
-  `/etc/openhands/secret.env`.
+  Host runtime files are `/etc/systemd/system/openhands.service` and `/etc/openhands/env`.
   Primary launch contract is the repo-managed unit `platform/ops/systemd/openhands.service`.
   Docker sandbox only; mount only a disposable workspace into `/workspace`.
   Temporary provider/API key is entered in the UI only and is not wired through repo
   config or LiteLLM in this phase. `/etc/openhands/env` is limited to non-secret
-  runtime vars only. `OH_SECRET_KEY` lives only in `/etc/openhands/secret.env`
-  so OpenHands can preserve sensitive state across restarts.
+  runtime vars only.
   LiteLLM Phase B uses one reserved/internal worker alias only:
   `code-reasoning -> deep`.
   The governed Phase B contract is:
@@ -208,8 +203,8 @@ Networking note:
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools:
   - stdio: `web.fetch`, `search.web`
-  - HTTP backend on Mini: Open Terminal MCP at `127.0.0.1:8011/mcp`, consumed
-    canonically through LiteLLM as `open_terminal_repo_ro`
+  - HTTP backend on Mini: Open Terminal MCP at `127.0.0.1:8011/mcp`
+    (localhost-only direct backend; shared LiteLLM alias remains follow-on)
 - AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
 - Studio main vector store: Postgres+pgvector backend for general/personal memory.
   Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
@@ -243,8 +238,6 @@ Networking note:
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Secrets/envs: `config/env.local`, `/etc/open-webui/env`, `/etc/homelab-llm/ov-server.env`, `/etc/searxng/env`, Samba passdb via `smbpasswd` / `pdbedit`.
   OpenHands Phase A uses `/etc/openhands/env` for non-secret runtime vars only.
-  The dedicated root-only companion file `/etc/openhands/secret.env` carries
-  only `OH_SECRET_KEY`.
   OpenHands Phase B should not reuse a human LiteLLM key; it uses a team
   service-account key stored outside git.
 - Tailscale ACLs/grants managed in admin (use `svc:*` grants for Services access).
