@@ -23,7 +23,51 @@ curl http://127.0.0.1:4000/health/readiness
 curl http://127.0.0.1:4000/health/liveliness
 curl http://127.0.0.1:4000/metrics/
 curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/v1/mcp/tools | jq .
+curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/v1/mcp/server | jq .
 ```
+
+## Prisma schema repair (Mini)
+Use this only when LiteLLM is healthy enough to start but runtime features such
+as `/key/generate` or `/v1/mcp/*` fail with Prisma client/schema drift.
+
+Symptoms seen on the broken Mini runtime:
+- `/key/generate` returned `500`
+- MCP routes raised missing-model errors such as `litellm_tooltable` or
+  `litellm_configoverrides`
+- journald showed `AttributeError` against Prisma client attributes that exist
+  in the shipped LiteLLM schema but not in the generated client / DB
+
+Supported repair path used on Mini:
+```bash
+cd /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch
+set -a
+source config/env.local >/dev/null 2>&1
+
+uv run litellm --config config/router.yaml \
+  --skip_server_startup \
+  --enforce_prisma_migration_check \
+  --use_prisma_db_push
+
+uv run prisma py generate \
+  --schema .venv/lib/python3.12/site-packages/litellm_proxy_extras/schema.prisma
+
+sudo systemctl restart litellm-orch.service
+journalctl -u litellm-orch.service -n 120 --no-pager
+```
+
+Mini-specific ownership repair that was required before `db push` could finish:
+```bash
+sudo -u postgres psql -d litellm -v ON_ERROR_STOP=1 <<'SQL'
+REASSIGN OWNED BY litellm TO bebopbabailey;
+ALTER DATABASE litellm OWNER TO bebopbabailey;
+SQL
+```
+
+Expected post-repair checks:
+- `curl http://127.0.0.1:4000/health/readiness` returns healthy
+- `POST /key/generate` succeeds
+- `GET /v1/models` succeeds
+- `GET /v1/mcp/server` succeeds
 
 ## Port policy
 - Studio `8100-8119`: team lanes managed by `mlxctl`.
@@ -46,7 +90,6 @@ rg -n "gpt-request-defaults|target_models|reasoning_effort" \
 
 Expected:
 - `gpt-request-defaults` targets `deep`, `fast`, and `code-reasoning`.
-- `gpt-request-defaults` does not target `chatgpt-5` or `chatgpt-5-thinking`.
 - No web-search-specific pre-call or post-call guardrails remain.
 - No GPT-lane post-call formatting guardrail remains active.
 
@@ -116,7 +159,6 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 
 Expected:
 - `/v1/models` includes `main`, `deep`, `fast`, and `code-reasoning`.
-- `/v1/models` includes `chatgpt-5` and `chatgpt-5-thinking`.
 - `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
 - `/v1/models` includes `task-json`.
 - `fast-research` is absent.
@@ -124,26 +166,13 @@ Expected:
 - Current resilience baseline keeps `fast -> main`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
-## ChatGPT alias smoke checks
-```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
-
-curl -sS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: chatgpt-5-ok"}],"stream":false}' | jq .
-
-curl -sS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"chatgpt-5-thinking","messages":[{"role":"user","content":"Reply with exactly: chatgpt-5-thinking-ok"}],"stream":false}' | jq .
-```
-
-Expected:
-- the first call may trigger LiteLLM's ChatGPT device-code auth flow
-- `journalctl -u litellm-orch.service -f` shows the verification URL and device code when auth is required
-- successful follow-up calls return the expected exact text
-- no base URL change is required in Open WebUI
+ChatGPT validation note on stable `1.83.4`:
+- device auth succeeded on Mini and the aliases appeared in `/v1/models`
+- real `chatgpt/...` inference still failed with
+  `ChatgptException - Unknown items in responses API response: []`
+- do not re-add ChatGPT aliases to the active router contract until both
+  `/v1/chat/completions` and `/v1/responses` succeed on a supported LiteLLM
+  baseline
 
 Historical cutover order:
 - raw `deep`

@@ -73,39 +73,3 @@ class TestGPTRequestDefaults(unittest.IsolatedAsyncioTestCase):
             call_type="acompletion",
         )
         self.assertNotIn("reasoning_effort", out)
-
-    async def test_passthrough_for_chatgpt_alias(self):
-        guardrail = GPTRequestDefaults(
-            guardrail_name="gpt-request-defaults",
-            event_hook="pre_call",
-            default_on=True,
-        )
-        data = {
-            "model": "chatgpt-5",
-            "messages": [{"role": "user", "content": "Ping"}],
-        }
-        out = await guardrail.async_pre_call_hook(
-            user_api_key_dict=None,
-            cache=None,
-            data=data,
-            call_type="acompletion",
-        )
-        self.assertNotIn("reasoning_effort", out)
-
-    async def test_passthrough_for_chatgpt_thinking_alias(self):
-        guardrail = GPTRequestDefaults(
-            guardrail_name="gpt-request-defaults",
-            event_hook="pre_call",
-            default_on=True,
-        )
-        data = {
-            "model": "chatgpt-5-thinking",
-            "messages": [{"role": "user", "content": "Ping"}],
-        }
-        out = await guardrail.async_pre_call_hook(
-            user_api_key_dict=None,
-            cache=None,
-            data=data,
-            call_type="acompletion",
-        )
-        self.assertNotIn("reasoning_effort", out)

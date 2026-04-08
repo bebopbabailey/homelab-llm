@@ -34,16 +34,6 @@ model_list:
     api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 16384
-- model_name: chatgpt-5
-  litellm_params:
-    model: chatgpt/gpt-5.4
-  model_info:
-    mode: responses
-- model_name: chatgpt-5-thinking
-  litellm_params:
-    model: chatgpt/gpt-5.4-pro
-  model_info:
-    mode: responses
 # 2) Task completion aliases below
 - model_name: task-transcribe
   litellm_params:

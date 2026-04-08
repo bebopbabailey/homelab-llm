@@ -18,9 +18,6 @@ sudo systemctl restart open-webui
 Open WebUI uses OpenAI-compatible settings and plain model names from LiteLLM:
 - `OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1`
 - `OPENAI_API_KEY=dummy`
-- ChatGPT-backed experimental model aliases:
-  - `chatgpt-5`
-  - `chatgpt-5-thinking`
 
 ## Config Authority Warning
 This deployment sets `ENABLE_PERSISTENT_CONFIG=False`.
@@ -54,9 +51,11 @@ LiteLLM prompt-shape/schema middleware for default web search.
 - `fast` is the default weaker local lane.
 - `fast` does not imply agentic or schema-enforced web-search behavior.
 - LiteLLM structured output support remains available only when the caller explicitly requests it.
-- `chatgpt-5` and `chatgpt-5-thinking` are additive experimental cloud lanes.
-- First-use ChatGPT auth is handled by LiteLLM's provider flow, not by changing
-  Open WebUI's upstream settings.
+- Keep Open WebUI pointed at LiteLLM; do not rewrite providers away from the
+  existing `OPENAI_API_BASE_URL` contract.
+- ChatGPT-backed aliases are not part of the accepted Open WebUI contract on the
+  current stable LiteLLM runtime. Mini-side auth can succeed, but real
+  `chatgpt/...` inference still fails after auth on stable `1.83.4`.
 
 ## Generic LiteLLM Search Tool
 LiteLLM still exposes `/v1/search/<tool_name>` for direct callers and MCP tools.

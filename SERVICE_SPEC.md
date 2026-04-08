@@ -60,10 +60,6 @@ implement inference or web-search business logic.
 - `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
 - `code-reasoning` -> reserved internal OpenHands worker alias on the same
   `deep` backend lane (`llmster-gpt-oss-120b-mxfp4-gguf`)
-- `chatgpt-5` -> LiteLLM ChatGPT Subscription provider route
-  (`chatgpt/gpt-5.4`) as an additive experimental cloud lane
-- `chatgpt-5-thinking` -> LiteLLM ChatGPT Subscription provider route
-  (`chatgpt/gpt-5.4-pro`) as an additive experimental cloud lane
 - `task-transcribe` -> MLX Studio lane `8101`
   (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
 - `task-transcribe-vivid` -> MLX Studio lane `8101`
@@ -93,8 +89,8 @@ implement inference or web-search business logic.
 - There are no active temporary GPT canary aliases in the current gateway
   contract.
 - The local canonical public trio remains `main`, `deep`, and `fast`.
-- `chatgpt-5` and `chatgpt-5-thinking` are additive experimental cloud aliases.
-- No automatic fallback from local lanes to ChatGPT aliases is configured.
+- No ChatGPT-backed public aliases are part of the accepted gateway contract on
+  the current stable LiteLLM runtime.
 - GPT lanes remain Chat Completions-first in the current hardening phase.
 - `/v1/responses` remains in validation scope for GPT lanes but is advisory
   unless a defect there also matters to the public Chat Completions path.
@@ -148,8 +144,20 @@ implement inference or web-search business logic.
   - strict structured-output guarantees are not part of the supported GPT or
     OpenHands worker contract
 - No web-search-specific pre-call or post-call guardrails are active in LiteLLM.
-- The ChatGPT provider follows LiteLLM's own device-code/OAuth login flow on
-  first use.
+- A Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
+  deployment because the deployed Postgres schema had drifted behind the shipped
+  Prisma client. `_prisma_migrations`, `LiteLLM_ToolTable`,
+  `LiteLLM_ConfigOverrides`, and `LiteLLM_VerificationToken.agent_id` /
+  `.project_id` were restored by running LiteLLM's own startup DB setup path and
+  then regenerating Prisma Client Python in the service venv.
+- The repo-managed systemd unit must keep
+  `ENFORCE_PRISMA_MIGRATION_CHECK=true` so future drift fails fast at startup
+  instead of surfacing later as partial MCP/key-management breakage.
+- ChatGPT provider auth uses LiteLLM's own device-code/OAuth login flow on first
+  use, but the current stable 1.83.4 Mini runtime still fails real
+  `chatgpt/...` inference after auth with `ChatgptException - Unknown items in
+  responses API response: []`. Do not treat ChatGPT aliases as an accepted
+  Open WebUI contract on this baseline.
 
 ## Search Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -165,7 +173,9 @@ implement inference or web-search business logic.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
 - ChatGPT auth state must stay out of git. By default LiteLLM stores it at
   `~/.config/litellm/chatgpt/auth.json` for the service user. Runtime-only
-  overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`.
+  overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`, but that auth
+  state alone does not make ChatGPT aliases production-ready on the current
+  stable runtime.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.
@@ -182,11 +192,9 @@ implement inference or web-search business logic.
   - denied by route policy:
     - `/v1/mcp/*`
     - `/v1/responses`
-- General-purpose terminal MCP access must be granted with a separate approved
-  key/team mapped to access group `terminal_readonly`; do not reuse the
-  OpenHands worker key for terminal MCP.
 - Same-host direct access to `127.0.0.1:8011/mcp` is not part of the client
-  contract; LiteLLM is the canonical authenticated surface.
+  contract; LiteLLM remains the canonical authenticated surface once the shared
+  MCP lane is validated on a stable runtime.
 - Current LAN-reachable infra gateway path is `http://192.168.1.71:4000/v1`.
 - Current OpenHands container contract is `http://host.docker.internal:4000/v1`,
   with `http://192.168.1.71:4000/v1` retained as the verified fallback/reference
