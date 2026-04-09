@@ -1,63 +1,38 @@
-# Foundation Docs (for future service additions)
+# Foundation Docs
 
-These documents are the durable, agent-focused reference for extending this repo
-with new services under each `layer-*` directory. They summarize the current topology, routing,
-and constraints so new work stays compatible with the existing platform.
+These documents are the durable, agent-focused reference for current platform
+truth plus future service additions under each `layer-*` directory.
+
+## Read Order
+1. `AGENTS.md`
+2. `docs/_core/README.md`
+3. `docs/_core/SOURCES_OF_TRUTH.md`
+4. `docs/PLATFORM_DOSSIER.md`
+5. `docs/foundation/topology.md`
+6. `docs/INTEGRATIONS.md`
 
 ## Contents
-- `autonomy-roadmap.md` — phased strategy for safe, scalable local autonomy.
 - `overview.md` — system architecture, data flow, and key roles.
 - `topology.md` — authoritative ports/endpoints and host mapping.
-- `service-additions.md` — step-by-step process for adding services/backends.
 - `constraints-and-decisions.md` — guardrails and non-negotiable decisions.
-- `mcp-tools.md` — MCP tool usage and adoption guidance.
-- `mcp-101.md` — analogy and system fit for MCP + tools.
-- `mcp-registry.md` — MCP registry template and schema.
-- `tool-contracts.md` — tool input/output contracts (living doc).
-- `mlx-registry.md` — MLX registry and controller overview.
-- `ov-model-onboarding.md` — OpenVINO model onboarding + ov-* naming.
+- `service-additions.md` — step-by-step process for adding services/backends.
 - `testing.md` — verification steps and smoke tests.
 - `node-toolchain.md` — Node/Volta global CLI policy for agent hosts.
-- (archived) `docs/archive/2026-02-onnx-evaluation.md` — OpenVINO/ONNX evaluation plan (deprecated direction).
-- `git-submodules.md` — how to work with submodules in this repo.
-- `git-submodules-intellij.md` — IntelliJ workflow for submodules.
-- `docs/journal/index.md` — experiment journal index.
+- `mlx-registry.md` — MLX registry and controller overview.
+- `mcp-registry.md` — MCP registry template and schema.
+- `tool-contracts.md` — tool input/output contracts.
 
-## Sources of Truth
-- `docs/PLATFORM_DOSSIER.md` — current topology, ports, inventory, exposure.
-- `docs/foundation/topology.md` — authoritative port map for this repo.
-- `docs/foundation/constraints-and-decisions.md` — immutable constraints.
-- `docs/INTEGRATIONS.md` — LiteLLM routing + Open WebUI/OpenVINO/OptiLLM linkage.
-- `docs/OPENCODE.md` — OpenCode client setup + LiteLLM presets + MCP tooling.
-- `layer-interface/open-webui/docs/OPENWEBUI_FEATURES.md` — Open WebUI feature map + Admin settings guide.
-- `docs/foundation/home-assistant-mcp.md` — official HA MCP server/client notes.
-- `docs/foundation/optillm-techniques.md` — OptiLLM technique prefixes + use cases.
-- `/etc/homelab-llm/mcp-registry.json` — MCP server/tool registry (runtime).
-- `layer-*/<service>/SERVICE_SPEC.md` — per-service runtime contract and env locations.
-- `layer-gateway/litellm-orch/ARCHITECTURE.md` and `layer-inference/ov-llm-server/ARCHITECTURE.md`
-  — layered architecture framing.
-- `docs/foundation/tool-contracts.md` — tool interfaces and expectations.
-- Tool contracts should include both OpenAPI (HTTP transport) and MCP tool
-  schemas (tool-level interface) where applicable.
+## Sources Of Truth
+- `docs/PLATFORM_DOSSIER.md`
+- `docs/foundation/topology.md`
+- `docs/foundation/constraints-and-decisions.md`
+- `docs/INTEGRATIONS.md`
+- `docs/OPENCODE.md`
+- `layer-*/<service>/SERVICE_SPEC.md`
 
-## Agent Expectations (global)
+## Agent Expectations
 - Repo-root descent rules live in root `AGENTS.md` and `docs/_core/README.md`.
-- Update `NOW.md` and service `AGENTS.md` before implementing new features.
-- Prefer small, reversible changes; ask before large refactors.
+- Update `NOW.md` when the active work changes.
+- Prefer small, reversible changes.
 - Keep docs current; avoid backlog drift.
-- List non-negotiables early (stack, tools, services not to touch).
-- Do not change global/system settings unless requested.
-- Favor simple, deterministic naming and file layout.
-- Put evolving details in metadata or config, not filenames.
-- State test expectations explicitly, even if no tests exist.
-- When unsure, ask before adding new test frameworks.
-- Keep a single source of truth (env vars + one registry file).
-- MLX registry is canonical for `model_id` → `source_path`/`cache_path`.
-- Avoid duplicate or conflicting configuration sources.
-
-## MCP Adoption Checklist (MVP)
-- Status: MCP tools implemented; registry/systemd wiring pending.
-- Define the MCP server (stdio vs HTTP/SSE) and where it runs.
-- Document tool contracts and versions.
-- Add server to the MCP tool registry and include health checks.
-- Keep tool calls separate from LiteLLM model calls.
+- Keep a single source of truth where possible.

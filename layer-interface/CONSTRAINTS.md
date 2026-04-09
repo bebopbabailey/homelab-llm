@@ -10,8 +10,10 @@
 
 ## Sandbox permissions
 - Read: `layer-interface/*`
-- Write: `layer-interface/*` docs and configs only
-- Execute: restart interface services only (e.g., Open WebUI)
+- Write: interface docs/configs by default; service-local docs/code/configs only
+  when the service bundle explicitly allows them
+- Execute: service-local diagnostics and restarts only when the service runbook
+  explicitly allows them
 - Forbidden: changes to gateway/inference/tools/data layers
 
 Respect global constraints: `/home/christopherbailey/homelab-llm/CONSTRAINTS.md`.

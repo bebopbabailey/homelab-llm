@@ -1,7 +1,12 @@
 # Agent Guidance: Open WebUI
 
 ## Scope
-Keep changes minimal; this directory primarily hosts the venv and service wiring.
+Maintain the Open WebUI service boundary only.
+
+## Read First
+- `SERVICE_SPEC.md`
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`
 
 ## Key files
 - Systemd unit: `/etc/systemd/system/open-webui.service`

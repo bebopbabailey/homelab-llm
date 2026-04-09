@@ -125,6 +125,7 @@ Repo-local durability posture:
   effort registry
 - root/doc placement hygiene is enforced separately by
   `scripts/repo_hygiene_audit.py`
+- internal markdown-link integrity is enforced by `scripts/docs_link_audit.py`
 
 Lane note:
 - `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed

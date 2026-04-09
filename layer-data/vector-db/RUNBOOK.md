@@ -172,14 +172,15 @@ platform/ops/scripts/studio_run_utility.sh --host studio -- \
 
 Review only flagged cases when triage output is non-empty:
 ```bash
-ssh -t studio "cd /Users/thestudio/optillm-proxy && \
-  uv run python layer-data/vector-db/scripts/eval_memory_quality.py label \
-    --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
-    --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
-    --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
-    --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
-    --labeler chris \
-    --run-id D1"
+platform/ops/scripts/studio_run_utility.sh --host studio --tty -- \
+  "cd /Users/thestudio/optillm-proxy && \
+   uv run python layer-data/vector-db/scripts/eval_memory_quality.py label \
+     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
+     --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
+     --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
+     --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
+     --labeler chris \
+     --run-id D1"
 ```
 
 If there are no triage flags, promote auto labels directly:

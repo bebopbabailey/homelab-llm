@@ -1,18 +1,16 @@
-# AGENTS — system-monitor (placeholder)
+# AGENTS — system-monitor
 
 ## Role & Scope
 Maintain the system-monitor service only. Do not modify other services unless
 explicitly requested.
 
-## Non‑Negotiables
-- Monitoring remains separate from user memory/RAG.
-- Use the System Documentation DB as the canonical source.
-
 ## Start Here
 - `SERVICE_SPEC.md`
 - `ARCHITECTURE.md`
-- `DESIGN_STATUS.md`
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`
 
 ## Expected Behavior
 - Produce status snapshots and incident summaries.
-- Do not alter system configuration without explicit approval.
+- Do not alter system configuration.
+- Do not perform direct repairs or restarts.

@@ -27,7 +27,8 @@
 ## Evidence chain
 - [2026-03-18-qwen-main-acceptance-codified-with-posthook.md](2026-03-18-qwen-main-acceptance-codified-with-posthook.md)
 - [2026-03-18-main-8101-structured-output-protocol-validation.md](2026-03-18-main-8101-structured-output-protocol-validation.md)
-- [MAIN_8101_STRUCTURED_OUTPUT_PROTOCOL_VALIDATION_REPORT_2026-03-18.md](/home/christopherbailey/homelab-llm/MAIN_8101_STRUCTURED_OUTPUT_PROTOCOL_VALIDATION_REPORT_2026-03-18.md)
+- retired root-level validation report reference; see
+  `docs/_core/consistency_audit_2026-04.md`
 
 ## Active work after closeout
 - `fast` remains the live GPT-family `llmster` lane on `8126`.

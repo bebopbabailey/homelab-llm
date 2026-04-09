@@ -1,4 +1,10 @@
-# Agent Guidance: optillm-local (placeholder)
+# AGENTS — optillm-local
 
-Do not implement or deploy from this directory without an explicit plan.
+Read first:
+- `README.md`
+- `SERVICE_SPEC.md`
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`
 
+This service is experimental and should not be mistaken for the active
+production OptiLLM proxy path.

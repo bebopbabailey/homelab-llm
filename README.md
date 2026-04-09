@@ -1,85 +1,41 @@
 # homelab-llm
 
-Monorepo for a home LLM platform connecting multiple small models, tools, and
-utility services behind a single LiteLLM gateway. The goal is to create a very capable personal 
-AI assistant platform for personal use, but to learn implementation of agent pipelines, tool use, etc. 
-The variety of hardware in the lab allows testing various use cases, minimum hardware requirements by 
-use-case. Hopes of branching into enterprise-land later.
+Monorepo for a home LLM platform built around a single LiteLLM gateway plus
+specialized inference, interface, tool, and data services.
 
 ## Start Here
-- Architecture overview: `docs/foundation/README.md`
-- Current topology and ports: `docs/foundation/topology.md`
-- System constraints and decisions: `docs/foundation/constraints-and-decisions.md`
-- Platform dossier (authoritative): `docs/PLATFORM_DOSSIER.md`
-- Integration details: `docs/INTEGRATIONS.md`
-- OpenCode setup: `docs/OPENCODE.md`
-- Experiment journal: `docs/journal/index.md`
-- Active delivery plan: `NOW.md`
-- Submodule workflow: `docs/foundation/git-submodules.md`
-- System architecture: `docs/ARCHITECTURE.md`
-- Node toolchain policy: `docs/foundation/node-toolchain.md`
+- Root agent contract: `AGENTS.md`
+- Documentation hub: `docs/_core/README.md`
+- Active work: `NOW.md`
 
 ## How to Read This Repo
-- Read `docs/foundation/README.md` first; it points to the canonical sources of truth.
-- Use `docs/PLATFORM_DOSSIER.md` for the latest topology and exposure details.
-- Check `docs/INTEGRATIONS.md` before wiring new services into LiteLLM.
-- Treat `NOW.md` as the active plan and update it before and after changes.
-- See `/next-projects`for documentation of software development plans, upcoming features.
+- Start with root `AGENTS.md`, then follow `docs/_core/README.md`.
+- Use `docs/PLATFORM_DOSSIER.md` and `docs/foundation/topology.md` for current
+  runtime truth.
+- Use `docs/INTEGRATIONS.md` for gateway and service-boundary wiring.
+- Use `docs/OPENCODE.md` for the repo-local coding-agent control plane.
+- Treat `NOW.md` as project status only, not as a concurrent-effort registry.
+- See `next-projects/` for future-looking work that is not current canon.
 - Treat repo root as a narrow control surface. Historical campaigns live under
   `docs/journal/` and `docs/archive/`, not at repo root.
 
 ## Service Conventions
-- Target convention: each service should include `SERVICE_SPEC.md`, `ARCHITECTURE.md`, and `AGENTS.md`.
-- Runtime configs and secrets live outside the repo; see `docs/foundation/topology.md`.
+- Service bundle convention:
+  `README.md`, `SERVICE_SPEC.md`, `ARCHITECTURE.md`, `AGENTS.md`,
+  `CONSTRAINTS.md`, `RUNBOOK.md`, `TASKS.md`.
+- Runtime configs and secrets live outside the repo; see
+  `docs/foundation/topology.md`.
 - Use `uv` for Python services; avoid system Python changes.
-- Naming: registry keys use `snake_case`; registry values use `kebab-case` where applicable.
-- Showroom/backroom rule: only models present on the Mini or Studio are exposed as
-  LiteLLM handles; Seagate storage is backroom-only.
-- OpenVINO backend is available as a standalone service and is not currently wired as active LiteLLM handles.
-- OptiLLM router targets suppress background health checks to avoid false negatives when downstream MLX is cold.
-- OptiLLM techniques are selected per-request via `optillm_approach` (no alias explosion).
-- Health policy: use LiteLLM `/health/readiness` as the default health signal; `/health`
-  is a deep probe that can flag offline backends.
-- Stable client-facing roles are `main`, `deep`, and `fast`.
-- `metal-test-*` aliases are temporary experimental labels; `swap*` aliases are deprecated.
-- Transcribe tasks: `task-transcribe`, `task-transcribe-vivid` (server-side cleaning).
-- OptiLLM router classifier is internal to the OptiLLM service (not a LiteLLM handle); see
-  `layer-gateway/optillm-proxy/README.md`.
-- Studio OptiLLM local uses HF cache at `/Users/thestudio/models/hf/hub` and pins
-  `transformers<5` for router compatibility.
-
-## Service Index
-Stable services:
-- LiteLLM gateway — `layer-gateway/litellm-orch`
-- OpenVINO LLM server — `layer-inference/ov-llm-server`
-- OptiLLM proxy — `layer-gateway/optillm-proxy`
-- OptiLLM local (Studio) — `layer-gateway/optillm-local`
-- TinyAgents — `layer-gateway/tiny-agents`
-- SearXNG — `layer-tools/searxng`
-- Open WebUI — documented in `docs/PLATFORM_DOSSIER.md`
-- MLX OpenAI servers — documented in `docs/PLATFORM_DOSSIER.md`
-- Ollama — documented in `docs/PLATFORM_DOSSIER.md`
-- Home Assistant — documented in `docs/PLATFORM_DOSSIER.md`
-
-Planned services (endpoints):
-- System monitor (planned, gateway layer)
-- AFM (planned OpenAI-compatible API on the Studio, routed via LiteLLM)
-
-## Ops Scripts (core)
-- `platform/ops/scripts/healthcheck.sh`
-- `platform/ops/scripts/restart-all.sh`
-- `platform/ops/scripts/redeploy.sh`
-
-## Documentation Hygiene
-- Keep service docs, topology, and integrations in sync with changes.
-- Update `NOW.md` before and after implementing new features.
-- Keep repo-root markdown on the allowlist defined in `DOCS_CONTRACT.md`.
-
+- Naming: registry keys use `snake_case`; registry values use `kebab-case`
+  where applicable.
+- Showroom/backroom rule: only models present on the Mini or Studio are exposed
+  as LiteLLM handles; Seagate storage is backroom-only.
 
 ## Agent Expectations
-See `docs/foundation/README.md` for the canonical agent expectations.
+- Follow root `AGENTS.md` and `docs/_core/SOURCES_OF_TRUTH.md`.
 - Follow constraints in `docs/foundation/constraints-and-decisions.md`.
-- Keep LiteLLM as the single gateway; do not bypass it.
+- Keep LiteLLM as the single client-facing model/API gateway unless a service
+  document explicitly marks a path as operator-only or internal.
 - Do not change or reuse ports without an explicit migration plan.
 - Do not expose new LAN-facing services without approval.
 - Use `uv` for Python dependency management; avoid system Python changes.

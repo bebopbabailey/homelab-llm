@@ -12,7 +12,9 @@ point for all model requests; backends are never called directly by clients.
 - **Data**: future vector/memory storage
 
 ## Principle
-- **Everything goes through LiteLLM** unless explicitly documented otherwise (for example, direct localhost OptiLLM optimization calls).
+- **Everything goes through LiteLLM** for client-facing model/API traffic.
+  Direct backend URLs are allowed only when a service runbook explicitly marks
+  them as operator-only or service-to-service validation paths.
 - **New network exposure is opt-in**, never the default.
 - **Services are independently serviceable** (submodules where active).
 

@@ -60,6 +60,7 @@ Must include:
 - **SERVICE_SPEC.md** — interface, ports, dependencies
 - **ARCHITECTURE.md** — internal shape
 - **AGENTS.md** — service-specific constraints + sandbox boundaries
+- **CONSTRAINTS.md** — service-specific non-negotiables
 - **RUNBOOK.md** — start/stop, logs, health, common failures
 - **TASKS.md** — local TODOs
 - `docs/README.md` — optional deep-dive entrypoint

@@ -8,15 +8,22 @@ This is a short navigation guide. Details live in the foundation docs:
 - `docs/foundation/testing.md`
 
 ## Stage Loop
-Inventory → Constraints → Minimal contract → Wire → Validate → Codify → Prune
+Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Prune
 
-- Inventory: enumerate services, ports, and registries from `docs/PLATFORM_DOSSIER.md` and `docs/foundation/topology.md`.
-- Constraints: apply non-negotiables from `docs/foundation/constraints-and-decisions.md`.
-- Minimal contract: define the smallest viable `SERVICE_SPEC.md` and tool contracts; see `docs/foundation/service-additions.md` and `docs/foundation/tool-contracts.md`.
-- Wire: connect routing and integrations; see `docs/INTEGRATIONS.md` and `docs/foundation/mlx-registry.md`.
+- Inventory: enumerate services, ports, and registries from
+  `docs/PLATFORM_DOSSIER.md` and `docs/foundation/topology.md`.
+- Constraints: apply non-negotiables from
+  `docs/foundation/constraints-and-decisions.md`.
+- Minimal contract: define the smallest viable `SERVICE_SPEC.md` and tool
+  contracts; see `docs/foundation/service-additions.md` and
+  `docs/foundation/tool-contracts.md`.
+- Wire: connect routing and integrations; see `docs/INTEGRATIONS.md` and
+  `docs/foundation/mlx-registry.md`.
 - Validate: run smoke tests and checks from `docs/foundation/testing.md`.
-- Codify: update canonical docs and registries in place; see `docs/PLATFORM_DOSSIER.md` and `docs/_core/CHANGE_RULES.md`.
-- Prune: remove stale plans or deprecated notes; see `docs/archive` and `docs/deprecated`.
+- Codify: update canonical docs and registries in place; see
+  `docs/PLATFORM_DOSSIER.md` and `docs/_core/CHANGE_RULES.md`.
+- Prune: remove stale plans or deprecated notes; see `docs/archive` and
+  `docs/deprecated`.
 
 ## Agent Modes
 ### Discover
@@ -30,11 +37,20 @@ Inventory → Constraints → Minimal contract → Wire → Validate → Codify 
 - Identify required registry updates (MLX, MCP, handles).
 
 ### Build
+- Build work must happen in a linked worktree, not the primary baseline
+  worktree.
+- Run `uv run python scripts/worktree_effort.py preflight --stage build --json`
+  before repo writes.
 - Implement only what the minimal contract requires.
-- Keep routing and registry sync steps aligned with `docs/foundation/mlx-registry.md`.
+- Keep routing and registry sync steps aligned with
+  `docs/foundation/mlx-registry.md`.
 - Avoid moving files; update docs in place per `docs/_core/CHANGE_RULES.md`.
 
 ### Verify
+- Verify work must happen in a linked worktree, not the primary baseline
+  worktree.
+- Run `uv run python scripts/worktree_effort.py preflight --stage verify --json`
+  before verification-stage mutation.
 - Execute the verification steps in `docs/foundation/testing.md`.
 - Re-check ports/endpoints against `docs/foundation/topology.md`.
 - Confirm integrations reflect `docs/INTEGRATIONS.md`.

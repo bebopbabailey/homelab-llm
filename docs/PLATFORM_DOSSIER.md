@@ -111,8 +111,10 @@ Networking note:
   - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
   - first slice mount scope is repo-root only:
     `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
-  - terminal/notebook features are disabled for the MCP lane
+  - current live caller path is the localhost-only direct backend
   - shared LiteLLM exposure is still blocked on current stable runtime
+  - any future shared LiteLLM path may expose only an explicitly filtered
+    read-only subset, not the full direct backend surface
   - OpenHands remains denied for `/v1/mcp/*`
 - OpenCode Web: systemd unit `/etc/systemd/system/opencode-web.service`, env `/etc/opencode/env`.
   Repo-managed source of truth: `platform/ops/systemd/opencode-web.service`.

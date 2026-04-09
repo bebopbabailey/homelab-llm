@@ -1,5 +1,12 @@
 # Tools Layer Runbook
 
+## Prometheus (Mini)
+```bash
+sudo systemctl restart prometheus.service
+journalctl -u prometheus.service -n 200 --no-pager
+curl -fsS http://127.0.0.1:9090/-/ready
+```
+
 ## SearXNG (Mini)
 ```bash
 sudo systemctl restart searxng.service
@@ -18,9 +25,7 @@ Expected:
 - service is active
 - direct `GET /mcp` returns `406 Not Acceptable` unless the client accepts
   `text/event-stream`
+- the current live path is the localhost direct backend, not a LiteLLM alias
 
 ## MCP stdio tools (Mini)
 Registry-managed stdio tools are invoked by a client and do not bind a port.
-See:
-- `layer-tools/mcp-tools/web-fetch`
-- `docs/INTEGRATIONS.md`

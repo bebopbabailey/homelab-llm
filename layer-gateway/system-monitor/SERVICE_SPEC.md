@@ -1,21 +1,18 @@
-# Service Spec: system-monitor (placeholder)
+# Service Spec: system-monitor
 
 ## Purpose
 Gateway-layer monitoring and repair coordination. Consumes health data from
-LiteLLM and backend services, emits status snapshots and (later) repair actions.
+LiteLLM and backend services, and emits status snapshots and incident records.
 
 ## Host & Runtime
-- Host: Mini (gateway host)
-- Runtime: TBD (lightweight service)
+- Host: Mini
+- Runtime: TBD
 
 ## Endpoints (planned)
 - `GET /health`
 - `GET /status`
 - `GET /incidents`
 
-## Data
-- Uses the System Documentation DB (SQLite-first).
-- Monitoring views derived from canonical tables.
-
 ## Notes
 This is a placeholder until a dedicated repo exists.
+Direct repair execution is out of scope for the current service.

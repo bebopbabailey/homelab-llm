@@ -1,4 +1,4 @@
-# Diagnostics (Read‑Only)
+# Diagnostics (Read-Only)
 
 Use these to gather facts without changing system state.
 
@@ -24,7 +24,7 @@ curl -sS http://127.0.0.1:3000/health
 curl -sS http://127.0.0.1:9000/health
 ```
 
-## Ports  
+## Ports
 ```bash
 ss -lntp
 ```
@@ -36,7 +36,7 @@ uv run python platform/ops/scripts/validate_studio_policy.py --json
 uv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json
 ```
 
-Remote read-only audit:
+Remote policy inspection:
 ```bash
 uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --json
 uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json
@@ -44,7 +44,13 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 
 References:
 - `docs/foundation/studio-scheduling-policy.md`
-- `docs/foundation/testing.md` (Studio scheduling policy section)
+- `docs/foundation/testing.md`
+
+Notes:
+- Treat these commands as policy inspection only. Do not use them as a restart
+  or repair surface.
+- If a command name suggests enforcement, read the referenced runbook/testing
+  docs before using it in a mutating workflow.
 
 ## MLXCTL parity (Mini -> Studio)
 ```bash

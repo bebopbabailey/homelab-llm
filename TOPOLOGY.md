@@ -6,7 +6,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - **LiteLLM (gateway)**: `0.0.0.0:4000` (canonical infra path `http://192.168.1.71:4000/v1`; localhost still valid)
 - **Open WebUI**: `0.0.0.0:3000` (tailnet via Tailscale Serve)
 - **Open Terminal API**: `127.0.0.1:8010` (optional native Open WebUI human UX path)
-- **Open Terminal MCP**: `127.0.0.1:8011` (`/mcp`, canonical shared repo-inspection backend through LiteLLM)
+- **Open Terminal MCP**: `127.0.0.1:8011` (`/mcp`, localhost-only direct backend; shared LiteLLM alias is future work)
 - **OpenCode Web**: `0.0.0.0:4096` (Basic Auth; writable workspace limited to `~/homelab-llm`)
 - **OpenHands (Phase A, managed operator UI)**: `127.0.0.1:4031` (systemd-managed Docker service; tailnet-only access at `https://hands.tailfd1400.ts.net/`)
 - **Samba SMB**: `127.0.0.1,192.168.1.71:139/445` (LAN-only; Finder shares `mini-root` and `seagate`)
@@ -40,6 +40,8 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 
 ## Contracts
 - Clients call **LiteLLM** only (`http://192.168.1.71:4000/v1` on LAN, `http://127.0.0.1:4000/v1` on Mini, tailnet optional for remote operator access).
+- Direct backend URLs in this document are operator-only validation or
+  service-to-service paths, not approved client entrypoints.
 - Open WebUI voice uses dedicated `AUDIO_STT_*` / `AUDIO_TTS_*` settings pointed at LiteLLM only.
 - LiteLLM routes `voice-stt-canary`, `voice-tts-canary`, `voice-stt`, and `voice-tts`
   directly to the Orin `voice-gateway` LAN `/v1` facade.

@@ -2,6 +2,7 @@
 
 Grafana UI for observability dashboards (LiteLLM + Prometheus).
 
-Source of truth:
+Read first:
 - `SERVICE_SPEC.md`
-
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`

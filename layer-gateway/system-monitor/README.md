@@ -1,6 +1,13 @@
 # system-monitor
 
-Placeholder service for system monitoring at the gateway layer.
-This will evolve into a standalone monitoring/repair service.
+Placeholder gateway-layer monitoring surface.
 
-See `SERVICE_SPEC.md` for the intended scope.
+Current contract:
+- read-only monitoring and incident summaries only
+- no direct repair execution
+- no restart or config mutation authority
+
+Read first:
+- `SERVICE_SPEC.md`
+- `CONSTRAINTS.md`
+- `RUNBOOK.md`

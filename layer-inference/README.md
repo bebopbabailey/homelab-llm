@@ -1,10 +1,9 @@
 # Inference Layer
 
-Mission: model backends and runtime model serving. This layer is never called
-directly by clients; all requests come through LiteLLM.
+Mission: model-serving backends consumed by the gateway.
 
-See root docs: `/home/christopherbailey/homelab-llm/SYSTEM_OVERVIEW.md`.
-Use `docs/` for deeper inference notes.
-
-Key references:
-- `docs/ENSEMBLE_PARAMETER_SUPPORT.md` (MLX ensemble parameter surface)
+Current service boundaries in this layer:
+- `ov-llm-server`
+- `llama-cpp-server`
+- `optillm-local` (experimental)
+- `orin-llm-server` (inactive placeholder)

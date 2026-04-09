@@ -7,8 +7,8 @@
 
 ## Sandbox permissions
 - Read: `layer-inference/*`
-- Write: inference configs + docs only
-- Execute: restart inference services only (OpenVINO, MLX/Studio via ops)
+- Write: inference docs/configs by default; service-local docs/code/configs only
+  when the service bundle explicitly allows them
+- Execute: service-local diagnostics and restarts only when the service runbook
+  explicitly allows them
 - Forbidden: system driver installs, global pip, touching ollama
-
-Respect global constraints: `/home/christopherbailey/homelab-llm/CONSTRAINTS.md`.
