@@ -928,7 +928,9 @@ active.
 ```bash
 cd /home/christopherbailey/homelab-llm
 uv run python scripts/worktree_effort.py status --json
+uv run python scripts/start_effort.py --id demo --scope docs --json
 uv run python scripts/worktree_effort.py park --notes "holding context" --json
+uv run python scripts/worktree_effort.py register --effort-id bad --stage build --scope docs --json
 uv run python scripts/worktree_effort.py preflight --stage build --json
 uv run python scripts/worktree_effort.py preflight --stage verify --json
 uv run python scripts/worktree_effort.py close --json
@@ -936,13 +938,21 @@ uv run python scripts/worktree_effort.py close --json
 
 Expected:
 - `status --json` identifies the current worktree, branch, gitdir, and local
-  effort metadata when present.
+  effort metadata when present, and reports whether the primary worktree
+  baseline is healthy.
+- `start_effort.py` succeeds only from a clean primary worktree on `master` and
+  creates the linked worktree that will own the implementation effort.
 - `park --notes ... --json` marks a dirty context worktree as parked without
-  making it an implementation effort.
+  making it an implementation effort; a parked primary worktree is still a
+  degraded baseline state.
+- `register --stage build` in the primary worktree fails because the primary
+  worktree is baseline-only.
 - `preflight --stage build --json` returns `overall_ok: true` before any
-  repo-mutating implementation work.
+  repo-mutating implementation work in a linked worktree, and fails in the
+  primary worktree.
 - `preflight --stage verify --json` returns `overall_ok: true` before
-  verification-stage mutations.
+  verification-stage mutations in a linked worktree, and fails in the primary
+  worktree.
 - `close --json` removes local metadata and returns the worktree to a null
   state.
 - these checks are local-only and are not CI-backed, because CI cannot see your

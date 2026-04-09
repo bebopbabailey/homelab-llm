@@ -42,17 +42,18 @@ class WorktreeEffortTests(unittest.TestCase):
 
     def test_register_status_and_close(self) -> None:
         _, repo = self.make_repo()
-        result = self.run_script(repo, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "README.md", "--json")
+        other = self.add_worktree(Path(repo).parent, repo, "feature-a")
+        result = self.run_script(other, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "README.md", "--json")
         self.assertEqual(result.returncode, 0, msg=result.stderr)
-        status = self.run_script(repo, "status", "--json")
+        status = self.run_script(other, "status", "--json")
         payload = json.loads(status.stdout)
         self.assertEqual(payload["current_effort"]["effort_id"], "effort-a")
-        closed = self.run_script(repo, "close", "--json")
+        closed = self.run_script(other, "close", "--json")
         self.assertEqual(closed.returncode, 0, msg=closed.stderr)
         payload = json.loads(closed.stdout)
         self.assertTrue(payload["removed"])
         self.assertEqual(payload["removed_effort"]["effort_id"], "effort-a")
-        status = self.run_script(repo, "status", "--json")
+        status = self.run_script(other, "status", "--json")
         payload = json.loads(status.stdout)
         self.assertIsNone(payload["current_effort"])
 
@@ -70,29 +71,32 @@ class WorktreeEffortTests(unittest.TestCase):
         self.assertEqual(status_payload["parked_worktrees"], [str(repo)])
 
     def test_build_preflight_passes_with_in_scope_dirty_file(self) -> None:
-        _, repo = self.make_repo()
-        self.run_script(repo, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
-        (repo / "docs" / "a.md").write_text("dirty\n", encoding="utf-8")
-        result = self.run_script(repo, "preflight", "--stage", "build", "--json")
+        root, repo = self.make_repo()
+        other = self.add_worktree(root, repo, "feature-in-scope")
+        self.run_script(other, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
+        (other / "docs" / "a.md").write_text("dirty\n", encoding="utf-8")
+        result = self.run_script(other, "preflight", "--stage", "build", "--json")
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         payload = json.loads(result.stdout)
         self.assertTrue(payload["overall_ok"])
 
     def test_build_preflight_fails_for_out_of_scope_dirty_file(self) -> None:
-        _, repo = self.make_repo()
-        self.run_script(repo, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
-        (repo / "README.md").write_text("dirty\n", encoding="utf-8")
-        result = self.run_script(repo, "preflight", "--stage", "build", "--json")
+        root, repo = self.make_repo()
+        other = self.add_worktree(root, repo, "feature-out-of-scope")
+        self.run_script(other, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
+        (other / "README.md").write_text("dirty\n", encoding="utf-8")
+        result = self.run_script(other, "preflight", "--stage", "build", "--json")
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["out_of_scope_dirty_paths"], ["README.md"])
 
     def test_overlap_across_active_worktrees_fails_preflight(self) -> None:
         root, repo = self.make_repo()
+        left = self.add_worktree(root, repo, "feature-a")
         other = self.add_worktree(root, repo, "feature-b")
-        self.run_script(repo, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
+        self.run_script(left, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
         self.run_script(other, "register", "--effort-id", "effort-b", "--stage", "build", "--scope", "docs/a.md", "--json")
-        result = self.run_script(repo, "preflight", "--stage", "build", "--json")
+        result = self.run_script(left, "preflight", "--stage", "build", "--json")
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertTrue(payload["overlaps"])
@@ -128,13 +132,65 @@ class WorktreeEffortTests(unittest.TestCase):
 
     def test_duplicate_effort_id_fails_preflight(self) -> None:
         root, repo = self.make_repo()
+        left = self.add_worktree(root, repo, "feature-c-left")
         other = self.add_worktree(root, repo, "feature-c")
-        self.run_script(repo, "register", "--effort-id", "shared", "--stage", "build", "--scope", "README.md", "--json")
+        self.run_script(left, "register", "--effort-id", "shared", "--stage", "build", "--scope", "README.md", "--json")
         self.run_script(other, "register", "--effort-id", "shared", "--stage", "build", "--scope", "docs", "--json")
-        result = self.run_script(repo, "preflight", "--stage", "build", "--json")
+        result = self.run_script(left, "preflight", "--stage", "build", "--json")
         self.assertNotEqual(result.returncode, 0)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["duplicate_effort_ids"], ["shared"])
+
+    def test_primary_worktree_rejects_build_registration(self) -> None:
+        _, repo = self.make_repo()
+        result = self.run_script(repo, "register", "--effort-id", "effort-a", "--stage", "build", "--scope", "docs", "--json")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("primary worktree is baseline-only", result.stderr)
+
+    def test_primary_worktree_build_preflight_fails_even_with_active_metadata(self) -> None:
+        _, repo = self.make_repo()
+        effort_file = repo / ".git" / "codex-effort.json"
+        effort_file.write_text(
+            json.dumps(
+                {
+                    "effort_id": "effort-a",
+                    "owner": "codex",
+                    "stage": "build",
+                    "scope_paths": ["docs"],
+                    "status": "active",
+                    "created_at": "2026-04-09T00:00:00Z",
+                    "updated_at": "2026-04-09T00:00:00Z",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result = self.run_script(repo, "preflight", "--stage", "build", "--json")
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertIn(
+            "primary worktree is baseline-only; start or move this effort to a linked worktree",
+            payload["blocking_issues"],
+        )
+
+    def test_status_reports_clean_primary_baseline(self) -> None:
+        _, repo = self.make_repo()
+        result = self.run_script(repo, "status", "--json")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["is_primary_worktree"])
+        self.assertEqual(payload["primary_worktree_branch"], "master")
+        self.assertTrue(payload["primary_worktree_baseline_ok"])
+        self.assertEqual(payload["baseline_issues"], [])
+
+    def test_status_reports_dirty_primary_baseline_issue(self) -> None:
+        _, repo = self.make_repo()
+        (repo / "README.md").write_text("dirty\n", encoding="utf-8")
+        result = self.run_script(repo, "status", "--json")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["overall_ok"])
+        self.assertIn("primary worktree is dirty", payload["baseline_issues"])
 
     def test_close_without_metadata_fails(self) -> None:
         _, repo = self.make_repo()

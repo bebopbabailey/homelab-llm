@@ -5,9 +5,11 @@ the same time.
 
 ## Core rule
 - One implementation effort per worktree.
+- The primary worktree is baseline-only.
 - `Build` and `Verify` work must not share a dirty worktree.
 - `NOW.md is project-level status`, not the effort registry.
 - If a dirty worktree is holding context only while another worktree builds or verifies, park it locally first.
+- Start new implementation work from the primary worktree with `uv run python scripts/start_effort.py ...`, then mutate only in the linked worktree it creates.
 
 ## Local-only effort metadata
 Concurrent effort state is local to each worktree and must not be tracked in
@@ -40,6 +42,14 @@ uv run python scripts/worktree_effort.py park --notes "holding dirty context" --
 ```
 
 2. Register the local effort before `Build` or `Verify` work:
+
+Normal path:
+
+```bash
+uv run python scripts/start_effort.py --id <effort-id> --scope <repo-relative-path>
+```
+
+Manual fallback:
 
 ```bash
 uv run python scripts/worktree_effort.py register \
@@ -78,6 +88,7 @@ Examples:
 
 ## Preflight meaning
 `Build` or `Verify` preflight fails when:
+- the current worktree is the primary worktree
 - there is no active local effort
 - the current worktree is parked
 - the local effort has no declared scope
@@ -87,6 +98,12 @@ Examples:
 - another dirty worktree has no active effort metadata
 - `master` hosts more than one active implementation effort
 
+Primary baseline health also degrades when:
+- the primary worktree is not on `master`
+- the primary worktree is dirty
+- the primary worktree is parked
+- the primary worktree has an active implementation effort
+
 `Discover` and `Design` do not hard-fail by default, but should warn when the
 local worktree is not registered or other dirty worktrees exist without effort
 metadata.
@@ -95,6 +112,7 @@ metadata.
 - Use `NOW.md` for project-level active work and next-up status.
 - Use local worktree effort metadata for concurrent implementation ownership.
 - Do not add a repo-tracked active-effort registry.
+- Treat the primary worktree as baseline-only, not as a fallback implementation lane.
 
 ## Two-agent example
 - Agent A:

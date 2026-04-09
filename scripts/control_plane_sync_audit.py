@@ -15,9 +15,9 @@ from pathlib import Path
 
 
 REPO_HYGIENE_REQUIRED = {
-    "docs/foundation/testing.md": ["repo_hygiene_audit.py", "root_ok", "journal_index_ok", "worktree_effort.py", "park", "close"],
-    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "CONCURRENT_EFFORTS.md"],
-    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "worktree_effort.py", "preflight", "park", "close"],
+    "docs/foundation/testing.md": ["repo_hygiene_audit.py", "root_ok", "journal_index_ok", "worktree_effort.py", "start_effort.py", "primary worktree", "park", "close"],
+    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "start_effort.py", "CONCURRENT_EFFORTS.md"],
+    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "worktree_effort.py", "start_effort.py", "preflight", "park", "close"],
     "DOCS_CONTRACT.md": ["root_hygiene_manifest.json", "repo_hygiene_audit.py"],
     ".github/workflows/repo-hygiene.yml": ["repo_hygiene_audit.py", "--scope root --strict", "control_plane_sync_audit.py"],
 }
@@ -34,6 +34,9 @@ SKILL_REQUIRED = {
         "Rollback is required",
         "Rollback is not required",
         "worktree_effort.py",
+        "primary worktree",
+        "baseline-only",
+        "start_effort.py",
         "park",
     ],
     "docs/OPENCODE.md": [
@@ -46,6 +49,9 @@ SKILL_REQUIRED = {
         "startup declaration",
         "rollback",
         "worktree_effort.py",
+        "primary worktree",
+        "baseline-only",
+        "start_effort.py",
         "separate worktree",
         "park",
     ],
@@ -62,6 +68,9 @@ SKILL_REQUIRED = {
     "docs/_core/CONCURRENT_EFFORTS.md": [
         "One implementation effort per worktree",
         "worktree_effort.py",
+        "primary worktree",
+        "baseline-only",
+        "start_effort.py",
         "NOW.md is project-level status",
         "park",
         "parked",

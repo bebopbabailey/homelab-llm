@@ -1,14 +1,14 @@
 # NOW
 
 Active
-- Repair Mini LiteLLM Prisma/schema drift so `/key/generate` and `/v1/mcp/*`
-  work again on the stable `1.83.4` runtime
-- Keep the accepted gateway contract aligned to verified stable runtime truth:
-  local canonical trio only, no broken ChatGPT public aliases
-- Fail fast on future LiteLLM schema drift through the repo-managed systemd unit
+- Harden the repo so the primary worktree stays baseline-only and all
+  `Build`/`Verify` work starts in linked worktrees
+- Add a thin, deterministic `start_effort.py` bootstrap over the existing local
+  worktree-effort contract
+- Keep the coding-agent docs, tests, and repo-hygiene workflow aligned to the
+  new primary-worktree rule
 
 
 NEXT UP
-- Re-test ChatGPT and shared LiteLLM MCP behavior on a LiteLLM build that
-  actually passes Mini runtime validation, then decide whether those lanes can
-  re-enter the public Open WebUI contract.
+- Resume the LiteLLM ChatGPT/Open Terminal lane from a linked worktree once the
+  primary-worktree hardening lands.

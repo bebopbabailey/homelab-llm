@@ -16,6 +16,9 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   to `docs/journal/`, `docs/archive/`, or `next-projects/`.
 - Concurrent `Build`/`Verify` efforts must use separate worktrees. Do not run
   multiple implementation passes in one dirty worktree.
+- The primary worktree is baseline-only. Do not run `Build` or `Verify` there;
+  start a linked worktree first with `uv run python scripts/start_effort.py ...`
+  or an equivalent linked-worktree flow.
 - `Build`/`Verify` work must pass local worktree-effort preflight before repo
   writes: `uv run python scripts/worktree_effort.py preflight --stage <stage>`.
 - If a dirty worktree is holding context only while another worktree builds or

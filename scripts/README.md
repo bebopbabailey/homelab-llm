@@ -17,7 +17,11 @@ Repository utility scripts.
   them.
 - `worktree_effort.py` — manages local per-worktree effort metadata and blocks
   unsafe `Build`/`Verify` work when concurrent implementation scopes overlap or
-  the current dirty tree exceeds its declared effort scope.
+  the current dirty tree exceeds its declared effort scope. The primary
+  worktree is baseline-only and cannot host `Build`/`Verify` work.
+- `start_effort.py` — creates a linked worktree from a clean primary `master`
+  baseline, initializes only scoped submodules, registers the effort, and runs
+  preflight before implementation starts.
 - `repo_snapshot_zip.py` — packages the current repo filesystem snapshot as it
   exists on disk, including submodule contents automatically, while excluding
   obvious local heavyweight junk such as `.git`, `.venv*`, caches, and build
@@ -63,12 +67,16 @@ Repository utility scripts.
   - checks that repo-local durability and hygiene contracts are reflected in the
     docs/workflow surfaces that describe them
 - Worktree effort preflight:
+  - `uv run python scripts/start_effort.py --id <id> --scope <repo-path> --json`
   - `uv run python scripts/worktree_effort.py park --notes "holding context" --json`
   - `uv run python scripts/worktree_effort.py register --effort-id <id> --stage build --scope <repo-path>`
   - `uv run python scripts/worktree_effort.py status --json`
   - `uv run python scripts/worktree_effort.py preflight --stage build --json`
   - `uv run python scripts/worktree_effort.py preflight --stage verify --json`
   - `uv run python scripts/worktree_effort.py close --json`
+  - `start_effort.py` is the normal bootstrap path from the primary worktree
+  - the primary worktree is baseline-only, so `register --stage build|verify`
+    and implementation preflight must run in the linked worktree
   - use `park` for dirty context-only worktrees and `register` for active
     `build`/`verify` work
   - `close` removes the local metadata file and returns the worktree to a null state

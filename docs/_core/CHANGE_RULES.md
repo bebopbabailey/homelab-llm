@@ -104,7 +104,12 @@ If drift is discovered:
   - `docs/OPENCODE.md`
   - `docs/foundation/testing.md`
   - `scripts/worktree_effort.py`
+  - `scripts/start_effort.py`
   - `scripts/README.md`
+  - `scripts/control_plane_sync_audit.py`
+  - `scripts/tests/test_worktree_effort.py`
+  - `scripts/tests/test_start_effort.py`
+  - `scripts/tests/test_control_plane_sync_audit.py`
 
 ## Runtime Lock
 - If locked Studio runtime args, LiteLLM resilience settings, MLX lane auth/memory defaults,

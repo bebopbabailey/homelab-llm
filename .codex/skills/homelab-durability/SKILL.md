@@ -31,11 +31,14 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Design` may proceed in a dirty tree, but should call out when existing changes reduce confidence.
 - `Build` or `Verify` should not proceed with writes blindly in a dirty tree.
 - If unrelated changes are present, prefer one of: commit the current work, stash it, or move the new effort to a separate branch or worktree.
-- If multiple chats or efforts are active, prefer a separate worktree per effort.
+- The primary worktree is baseline-only: `Build` and `Verify` must not mutate it.
+- If multiple chats or efforts are active, use a separate worktree per effort.
 - For concurrent implementation work, use local worktree-effort metadata rather
   than `NOW.md` as the coordinator.
 - If another worktree is dirty but context-only, park it locally before
   mutating elsewhere.
+- Default bootstrap path for new implementation worktrees is
+  `uv run python scripts/start_effort.py ...`.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
 - Do not mix opportunistic cleanup with the requested change unless explicitly approved.
 
@@ -43,9 +46,11 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Discover`: read-only, low-friction, broad inspection within scope, no formal startup header unless commands are being proposed.
 - `Design`: choose an approach, state assumptions, and surface candidate files or confidence risks without forcing rollback language.
 - `Build`: strict on writes and mutations. Require the startup declaration before commands or edits. Keep the hard blocks below in force.
+- `Build`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Build`: if another worktree is only holding dirty context, use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json` there instead of relying on ad hoc `design` registration.
 - `Build`: before proposing file edits or mutation commands, run or propose `uv run python scripts/worktree_effort.py preflight --stage build --json`.
 - `Verify`: strict on validation reporting. State verification mode and results. Require rollback only when the action class needs it.
+- `Verify`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Verify`: before proposing verification-stage mutations, run or propose `uv run python scripts/worktree_effort.py preflight --stage verify --json`.
 - Operating rhythm: `Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Prune`.
 

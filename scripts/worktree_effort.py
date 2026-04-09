@@ -37,6 +37,10 @@ def get_git_dir(repo_path: Path) -> Path:
     return Path(run_git(repo_path, "rev-parse", "--absolute-git-dir"))
 
 
+def get_git_common_dir(repo_path: Path) -> Path:
+    return Path(run_git(repo_path, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+
+
 def get_current_branch(repo_path: Path) -> str:
     branch = run_git(repo_path, "branch", "--show-current")
     return branch or "(detached)"
@@ -170,6 +174,18 @@ def load_worktree_info(repo_root: Path) -> list[dict[str, object]]:
     return infos
 
 
+def get_primary_worktree_info(repo_root: Path, worktrees: list[dict[str, object]]) -> dict[str, object]:
+    common_git_dir = str(get_git_common_dir(repo_root))
+    for worktree in worktrees:
+        if worktree["git_dir"] == common_git_dir:
+            return worktree
+    raise RuntimeError(f"could not locate primary worktree for common git dir {common_git_dir}")
+
+
+def is_primary_worktree(repo_root: Path) -> bool:
+    return get_git_dir(repo_root) == get_git_common_dir(repo_root)
+
+
 def find_scope_overlaps(current_effort: dict[str, object] | None, current_path: str, worktrees: list[dict[str, object]]) -> list[dict[str, object]]:
     if not current_effort or current_effort.get("status") != "active":
         return []
@@ -212,6 +228,7 @@ def gather_state(repo_root: Path) -> dict[str, object]:
     current_path = str(repo_root)
     worktrees = load_worktree_info(repo_root)
     current_worktree = next(item for item in worktrees if item["path"] == current_path)
+    primary_worktree = get_primary_worktree_info(repo_root, worktrees)
     current_effort = current_worktree["effort"]
     scope_paths = [str(item) for item in current_effort.get("scope_paths", [])] if isinstance(current_effort, dict) else []
     overlaps = find_scope_overlaps(current_effort, current_path, worktrees)
@@ -249,10 +266,23 @@ def gather_state(repo_root: Path) -> dict[str, object]:
         }
     )
     current_out_of_scope_dirty = out_of_scope_dirty_paths(current_worktree["dirty_paths"], scope_paths)
+    baseline_issues: list[str] = []
+    primary_effort = primary_worktree["effort"]
+    if str(primary_worktree["branch"]) != "master":
+        baseline_issues.append("primary worktree is not on master")
+    if primary_worktree["dirty_paths"]:
+        baseline_issues.append("primary worktree is dirty")
+    if isinstance(primary_effort, dict) and str(primary_effort.get("stage")) == "parked":
+        baseline_issues.append("primary worktree is parked")
+    if isinstance(primary_effort, dict) and str(primary_effort.get("stage")) in IMPLEMENTATION_STAGES:
+        baseline_issues.append("primary worktree has active implementation effort")
     return {
         "current_worktree": current_path,
         "current_branch": get_current_branch(repo_root),
         "current_git_dir": str(current_git_dir),
+        "primary_worktree_path": str(primary_worktree["path"]),
+        "primary_worktree_branch": str(primary_worktree["branch"]),
+        "is_primary_worktree": current_worktree["path"] == primary_worktree["path"],
         "current_effort": current_effort,
         "active_worktrees": worktrees,
         "active_effort_count": len(active_efforts),
@@ -263,6 +293,8 @@ def gather_state(repo_root: Path) -> dict[str, object]:
         "dirty_missing_effort_metadata": dirty_missing_metadata,
         "duplicate_effort_ids": duplicate_effort_ids,
         "out_of_scope_dirty_paths": current_out_of_scope_dirty,
+        "baseline_issues": baseline_issues,
+        "primary_worktree_baseline_ok": not baseline_issues,
     }
 
 
@@ -273,6 +305,8 @@ def build_preflight_payload(repo_root: Path, stage: str) -> dict[str, object]:
     current_effort = state["current_effort"]
 
     if stage in IMPLEMENTATION_STAGES:
+        if bool(state["is_primary_worktree"]):
+            blocking_issues.append("primary worktree is baseline-only; start or move this effort to a linked worktree")
         if not isinstance(current_effort, dict):
             blocking_issues.append("no active local effort metadata registered for this worktree")
         else:
@@ -315,6 +349,8 @@ def build_preflight_payload(repo_root: Path, stage: str) -> dict[str, object]:
 
 def cmd_register(args: argparse.Namespace) -> int:
     repo_root = get_repo_root(Path.cwd())
+    if args.stage in IMPLEMENTATION_STAGES and is_primary_worktree(repo_root):
+        raise SystemExit("primary worktree is baseline-only; register build/verify efforts in a linked worktree")
     git_dir = get_git_dir(repo_root)
     scope_paths = sorted({normalize_scope_path(item) for item in args.scope})
     if args.stage in IMPLEMENTATION_STAGES and not scope_paths:
@@ -370,7 +406,11 @@ def cmd_status(args: argparse.Namespace) -> int:
     payload = gather_state(get_repo_root(Path.cwd()))
     payload["warnings"] = []
     payload["blocking_issues"] = []
-    payload["overall_ok"] = not payload["overlaps"] and not payload["dirty_missing_effort_metadata"]
+    payload["overall_ok"] = (
+        not payload["overlaps"]
+        and not payload["dirty_missing_effort_metadata"]
+        and not payload["baseline_issues"]
+    )
     if args.json:
         print(json.dumps(payload, indent=2))
     else:

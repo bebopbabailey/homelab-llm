@@ -113,6 +113,10 @@ Repo-local durability posture:
   running-system config changes, destructive operations, and host-level
   mutations
 - concurrent implementation work should use a separate worktree per agent/effort
+- the primary worktree is baseline-only and must not host `Build`/`Verify`
+  mutations
+- start new implementation work from the clean primary worktree with
+  `uv run python scripts/start_effort.py --id <effort-id> --scope <repo-path>`
 - dirty context-only worktrees should use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json`
 - local `Build`/`Verify` passes should run
   `uv run python scripts/worktree_effort.py preflight --stage <stage> --json`
