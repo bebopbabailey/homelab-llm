@@ -934,6 +934,8 @@ uv run python scripts/worktree_effort.py register --effort-id bad --stage build 
 uv run python scripts/worktree_effort.py preflight --stage build --json
 uv run python scripts/worktree_effort.py preflight --stage verify --json
 uv run python scripts/worktree_effort.py close --json
+uv run python scripts/submodule_pin_audit.py --ref master --scope layer-gateway/litellm-orch --json
+uv run python scripts/closeout_effort.py --worktree /home/christopherbailey/homelab-llm-demo --json
 ```
 
 Expected:
@@ -941,7 +943,10 @@ Expected:
   effort metadata when present, and reports whether the primary worktree
   baseline is healthy.
 - `start_effort.py` succeeds only from a clean primary worktree on `master` and
-  creates the linked worktree that will own the implementation effort.
+  creates the linked worktree that will own the implementation effort. It also
+  fails before leaving a blocked placeholder lane behind.
+- broad parallel docs/layer scopes are rejected while another implementation
+  lane is active.
 - `park --notes ... --json` marks a dirty context worktree as parked without
   making it an implementation effort; a parked primary worktree is still a
   degraded baseline state.
@@ -954,7 +959,14 @@ Expected:
   verification-stage mutations in a linked worktree, and fails in the primary
   worktree.
 - `close --json` removes local metadata and returns the worktree to a null
-  state.
+  state, but is metadata-only.
+- `submodule_pin_audit.py` reports whether a submodule gitlink commit is
+  present locally and remotely reachable; local-only pins are a closeout
+  blocker.
+- `closeout_effort.py` stages scoped lane changes, commits if needed,
+  fast-forward merges to `master`, closes metadata, removes the linked
+  worktree, and deletes the local branch.
+- `closeout_effort.py` does not auto-rebase and does not update `NOW.md`.
 - these checks are local-only and are not CI-backed, because CI cannot see your
   live worktree topology.
 

@@ -105,10 +105,14 @@ If drift is discovered:
   - `docs/foundation/testing.md`
   - `scripts/worktree_effort.py`
   - `scripts/start_effort.py`
+  - `scripts/submodule_pin_audit.py`
+  - `scripts/closeout_effort.py`
   - `scripts/README.md`
   - `scripts/control_plane_sync_audit.py`
   - `scripts/tests/test_worktree_effort.py`
   - `scripts/tests/test_start_effort.py`
+  - `scripts/tests/test_submodule_pin_audit.py`
+  - `scripts/tests/test_closeout_effort.py`
   - `scripts/tests/test_control_plane_sync_audit.py`
 
 ## Runtime Lock

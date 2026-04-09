@@ -22,6 +22,13 @@ Repository utility scripts.
 - `start_effort.py` — creates a linked worktree from a clean primary `master`
   baseline, initializes only scoped submodules, registers the effort, and runs
   preflight before implementation starts.
+- `submodule_pin_audit.py` — checks whether scoped submodule gitlink commits
+  are present locally and remotely reachable; local-only pins are a hygiene
+  failure.
+- `closeout_effort.py` — lands a linked worktree locally by committing scoped
+  work if needed, running repo audits, fast-forward merging to `master`,
+  closing local metadata, removing the linked worktree, and deleting the local
+  branch.
 - `repo_snapshot_zip.py` — packages the current repo filesystem snapshot as it
   exists on disk, including submodule contents automatically, while excluding
   obvious local heavyweight junk such as `.git`, `.venv*`, caches, and build
@@ -74,12 +81,20 @@ Repository utility scripts.
   - `uv run python scripts/worktree_effort.py preflight --stage build --json`
   - `uv run python scripts/worktree_effort.py preflight --stage verify --json`
   - `uv run python scripts/worktree_effort.py close --json`
+  - `uv run python scripts/submodule_pin_audit.py --ref master --scope <submodule-path> --json`
+  - `uv run python scripts/closeout_effort.py --worktree <linked-worktree-path> --json`
   - `start_effort.py` is the normal bootstrap path from the primary worktree
+  - `start_effort.py` rejects broad parallel docs/layer scopes and cleans up a
+    partially created lane automatically on bootstrap failure
   - the primary worktree is baseline-only, so `register --stage build|verify`
     and implementation preflight must run in the linked worktree
   - use `park` for dirty context-only worktrees and `register` for active
     `build`/`verify` work
   - `close` removes the local metadata file and returns the worktree to a null state
+  - `close` is metadata-only; use `closeout_effort.py` when you want to land a
+    finished lane and restore the boring baseline
+  - `closeout_effort.py` is local-only and deterministic: no auto-rebase, no
+    push, and no automatic `NOW.md` edits
   - keeps concurrent implementation state local to each worktree and out of repo-tracked files
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
