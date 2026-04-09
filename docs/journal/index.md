@@ -1,4 +1,5 @@
 # Journal Index
+- [2026-04-08 — LiteLLM upstream MCP toolset evaluation (`NO-GO`, rolled back)](2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md)
 - [2026-04-02 — Root allowlist and root artifact cleanup](2026-04-02-root-allowlist-and-root-artifact-cleanup.md)
 - [2026-04-02 — Homelab durability evaluation loop after hygiene hardening](2026-04-02-homelab-durability-eval-loop.md)
 - [2026-04-01 — HP Home Assistant DietPi pyenv repair](2026-04-01-hp-home-assistant-dietpi-pyenv-repair.md)
