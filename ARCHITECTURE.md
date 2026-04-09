@@ -1,4 +1,5 @@
 # Architecture: OptiLLM Proxy
 
-OptiLLM runs as a localhost-only proxy that can be routed to by LiteLLM. It wraps
-requests to apply optimization/strategy plugins before forwarding upstream.
+OptiLLM runs as a Studio LAN-bound proxy at `192.168.1.72:4020` and is reached
+by LiteLLM as an upstream. It applies optimization and strategy plugins before
+forwarding upstream to Mini LiteLLM.
