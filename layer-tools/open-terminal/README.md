@@ -1,8 +1,8 @@
 # Open Terminal
 
 ## Purpose
-Provide a durable terminal-inspection surface on the Mini without changing the
-current LiteLLM-centered model contract.
+Provide a boring, durable terminal-inspection surface on the Mini without
+changing the current LiteLLM-centered model contract for LLM calls.
 
 ## Runtime shape
 - Native API container for Open WebUI human UX: `127.0.0.1:8010`
@@ -11,18 +11,38 @@ current LiteLLM-centered model contract.
 
 ## First-slice scope
 - Bind mount: `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
-- Current live MCP path is the localhost-only direct backend on
-  `127.0.0.1:8011/mcp`
-- A shared LiteLLM MCP alias for a filtered read-only subset remains follow-on
-  work
-- The direct backend may expose more upstream tools, but that must not be
-  mistaken for an approved shared LiteLLM surface
+- Current live MCP path is the localhost-only direct backend on `127.0.0.1:8011/mcp`.
+- Open WebUI now consumes this MCP backend directly as a separate read-only tool
+  lane while keeping the native `127.0.0.1:8010` terminal path for interactive
+  UX.
+- A shared LiteLLM MCP alias for the read-only subset remains follow-on work.
+- Explicitly not exposed in slice 1:
+  - `display_file`
+  - `write_file`
+  - `replace_file_content`
+  - `list_processes`
+  - `run_command`
+  - `get_process_status`
+  - `send_process_input`
+  - `kill_process`
+- The direct backend may expose more upstream tools locally, but that must not
+  be mistaken for an approved shared LiteLLM surface.
 
 ## Security posture
 - No `docker.sock`
 - No whole-host bind mounts
 - No write mount for the repo
 - No LAN exposure
+- Direct backend remains localhost-only; current Open WebUI policy is enforced
+  through tool filtering and Open WebUI access control, and any future shared
+  LiteLLM MCP path would become a separate auth/policy boundary
+
+## Build
+```bash
+docker build -t local/open-terminal-mcp:0.11.29 \
+  -f /home/christopherbailey/homelab-llm/layer-tools/open-terminal/Dockerfile.mcp \
+  /home/christopherbailey/homelab-llm
+```
 
 ## Validate
 See `RUNBOOK.md`.

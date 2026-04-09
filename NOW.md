@@ -1,13 +1,12 @@
 # NOW
 
 Active
-- Complete a repo-wide documentation hardening pass for root, layer, and
-  service docs
-- Remove contradictory runtime guidance, stale paths, and weak entrypoints that
-  can mislead future coding and maintenance agents
-- Add lightweight internal link validation to the repo-hygiene workflow
-
+- Maintain a clean merged baseline after the documentation hardening closeout.
+- Keep repo documentation and control-plane validation surfaces green from
+  `master`.
+- Treat follow-on work as new linked efforts rather than implicit continuation
+  of this pass.
 
 NEXT UP
-- Resume the LiteLLM ChatGPT/Open Terminal lane once the documentation
-  hardening pass and link-integrity guardrail land.
+- Resume the LiteLLM ChatGPT/Open Terminal lane now that the documentation
+  hardening and link-integrity guardrail are landed.

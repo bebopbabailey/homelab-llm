@@ -8,6 +8,19 @@ import json
 import subprocess
 from pathlib import Path, PurePosixPath
 
+from submodule_pin_audit import audit_submodule, filter_submodules, list_submodules
+from worktree_effort import IMPLEMENTATION_STAGES, build_preflight_payload, gather_state
+
+
+BROAD_PARALLEL_PATHS = {
+    "docs",
+    "layer-gateway",
+    "layer-inference",
+    "layer-interface",
+    "layer-tools",
+    "layer-data",
+}
+
 
 def run_git(repo_path: Path, *args: str) -> str:
     result = subprocess.run(
@@ -114,22 +127,7 @@ def branch_exists(repo_root: Path, branch: str) -> bool:
 
 
 def list_submodule_paths(repo_root: Path) -> list[str]:
-    gitmodules = repo_root / ".gitmodules"
-    if not gitmodules.is_file():
-        return []
-    result = subprocess.run(
-        ["git", "-C", str(repo_root), "config", "-f", str(gitmodules), "--get-regexp", r"^submodule\..*\.path$"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode not in {0, 1}:
-        raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
-    paths: list[str] = []
-    for line in result.stdout.splitlines():
-        _, value = line.split(" ", 1)
-        paths.append(normalize_scope_path(value))
-    return sorted(paths)
+    return [item["path"] for item in list_submodules(repo_root)]
 
 
 def submodules_overlapping_scope(submodule_paths: list[str], scope_paths: list[str]) -> list[str]:
@@ -156,6 +154,73 @@ def init_scoped_submodules(worktree_path: Path, submodule_paths: list[str]) -> N
         capture_output=True,
         text=True,
     )
+
+
+def failure_payload(message: str, **extra: object) -> dict[str, object]:
+    payload = {
+        "overall_ok": False,
+        "message": message,
+    }
+    payload.update(extra)
+    return payload
+
+
+def print_payload(payload: dict[str, object], as_json: bool) -> None:
+    print(json.dumps(payload, indent=2))
+
+
+def cleanup_created_lane(repo_root: Path, branch: str, worktree_path: Path) -> tuple[bool, list[str]]:
+    errors: list[str] = []
+    if worktree_path.exists():
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "worktree", "remove", "--force", str(worktree_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            errors.append(result.stderr.strip() or result.stdout.strip() or "failed to remove created worktree")
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "branch", "-D", branch],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip()
+        if "not found" not in stderr and "branch named" not in stderr:
+            errors.append(stderr or "failed to delete created branch")
+    return (not errors, errors)
+
+
+def find_prospective_overlaps(repo_root: Path, scope_paths: list[str]) -> list[dict[str, object]]:
+    state = gather_state(repo_root)
+    active_implementations = [
+        item
+        for item in state["active_worktrees"]
+        if isinstance(item.get("effort"), dict) and str(item["effort"].get("stage")) in IMPLEMENTATION_STAGES
+    ]
+    overlaps = []
+    for item in active_implementations:
+        other_scopes = [str(scope) for scope in item["effort"].get("scope_paths", [])]
+        matched = sorted(
+            {
+                f"{left} <-> {right}"
+                for left in scope_paths
+                for right in other_scopes
+                if paths_overlap(left, right)
+            }
+        )
+        if matched:
+            overlaps.append({"path": item["path"], "effort_id": item["effort"].get("effort_id"), "overlaps": matched})
+    return overlaps
+
+
+def broad_parallel_issues(repo_root: Path, scope_paths: list[str]) -> list[str]:
+    state = gather_state(repo_root)
+    if int(state["active_implementation_effort_count"]) == 0:
+        return []
+    return sorted(path for path in scope_paths if path in BROAD_PARALLEL_PATHS)
 
 
 def run_local_script(worktree_path: Path, script_name: str, *args: str) -> dict[str, object]:
@@ -201,34 +266,96 @@ def main() -> int:
         raise SystemExit(f"target branch already exists: {branch}")
     if worktree_path.exists():
         raise SystemExit(f"target worktree path already exists: {worktree_path}")
+    state = gather_state(repo_root)
+    if state["dirty_missing_effort_metadata"]:
+        payload = failure_payload(
+            "another dirty worktree has no active effort metadata",
+            failure_stage="precheck",
+            blocking_issues=["another dirty worktree has no active effort metadata"],
+            cleanup_attempted=False,
+            cleanup_ok=True,
+            cleanup_errors=[],
+        )
+        print_payload(payload, args.json)
+        return 1
+    overlap_issues = find_prospective_overlaps(repo_root, scope_paths)
+    if overlap_issues:
+        payload = failure_payload(
+            "another active worktree has overlapping scope_paths",
+            failure_stage="precheck",
+            blocking_issues=["another active worktree has overlapping scope_paths"],
+            overlaps=overlap_issues,
+            cleanup_attempted=False,
+            cleanup_ok=True,
+            cleanup_errors=[],
+        )
+        print_payload(payload, args.json)
+        return 1
+    broad_issues = broad_parallel_issues(repo_root, scope_paths)
+    if broad_issues:
+        payload = failure_payload(
+            "broad parallel docs/layer scopes are not allowed while another implementation effort is active",
+            failure_stage="precheck",
+            blocking_issues=["broad parallel docs/layer scopes are not allowed while another implementation effort is active"],
+            broad_parallel_scope_paths=broad_issues,
+            cleanup_attempted=False,
+            cleanup_ok=True,
+            cleanup_errors=[],
+        )
+        print_payload(payload, args.json)
+        return 1
 
-    create_worktree(repo_root, args.base, branch, worktree_path)
     overlapping_submodules = submodules_overlapping_scope(list_submodule_paths(repo_root), scope_paths)
-    init_scoped_submodules(worktree_path, overlapping_submodules)
+    created = False
+    try:
+        create_worktree(repo_root, args.base, branch, worktree_path)
+        created = True
+        init_scoped_submodules(worktree_path, overlapping_submodules)
 
-    register_args = [
-        "register",
-        "--effort-id",
-        args.effort_id,
-        "--stage",
-        args.stage,
-        "--owner",
-        args.owner,
-        "--json",
-    ]
-    for scope in scope_paths:
-        register_args.extend(["--scope", scope])
-    if args.notes:
-        register_args.extend(["--notes", args.notes])
-    register_payload = run_local_script(worktree_path, "worktree_effort.py", *register_args)
-    preflight_payload = run_local_script(
-        worktree_path,
-        "worktree_effort.py",
-        "preflight",
-        "--stage",
-        args.stage,
-        "--json",
-    )
+        register_args = [
+            "register",
+            "--effort-id",
+            args.effort_id,
+            "--stage",
+            args.stage,
+            "--owner",
+            args.owner,
+            "--json",
+        ]
+        for scope in scope_paths:
+            register_args.extend(["--scope", scope])
+        if args.notes:
+            register_args.extend(["--notes", args.notes])
+        run_local_script(worktree_path, "worktree_effort.py", *register_args)
+        preflight_payload = run_local_script(
+            worktree_path,
+            "worktree_effort.py",
+            "preflight",
+            "--stage",
+            args.stage,
+            "--json",
+        )
+    except (subprocess.CalledProcessError, SystemExit) as error:
+        submodule_diagnostics = []
+        if created and overlapping_submodules:
+            scoped_submodules = filter_submodules(list_submodules(repo_root), overlapping_submodules)
+            for item in scoped_submodules:
+                expected_commit = run_git(worktree_path, "ls-files", "--stage", "--", item["path"]).split()[1]
+                submodule_diagnostics.append(
+                    audit_submodule(repo_root, item["path"], item["url"], expected_commit, worktree_path)
+                )
+        cleanup_ok, cleanup_errors = cleanup_created_lane(repo_root, branch, worktree_path) if created else (True, [])
+        payload = failure_payload(
+            str(error),
+            failure_stage="post-create" if created else "create-worktree",
+            cleanup_attempted=created,
+            cleanup_ok=cleanup_ok,
+            cleanup_errors=cleanup_errors,
+            blocking_issues=[str(error)],
+            submodule_diagnostics=submodule_diagnostics,
+        )
+        print_payload(payload, args.json)
+        return 1
 
     payload = {
         "primary_worktree": str(repo_root),
@@ -242,10 +369,7 @@ def main() -> int:
         "preflight_ok": bool(preflight_payload.get("overall_ok")),
         "overall_ok": bool(preflight_payload.get("overall_ok")),
     }
-    if args.json:
-        print(json.dumps(payload, indent=2))
-    else:
-        print(json.dumps(payload, indent=2))
+    print_payload(payload, args.json)
     return 0 if payload["overall_ok"] else 1
 
 

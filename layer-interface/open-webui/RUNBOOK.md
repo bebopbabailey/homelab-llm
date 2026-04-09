@@ -13,8 +13,9 @@ journalctl -u open-webui.service -f
 ```
 
 ## Config authority
-`ENABLE_PERSISTENT_CONFIG=False` makes systemd env/drop-ins authoritative.
-Admin UI edits to env-backed audio settings are session-only and must not survive restart.
+Audio env still comes from `/etc/open-webui/env`.
+Terminal/tool server registrations currently come from the Open WebUI config
+API and persist in Open WebUI state.
 
 ## Canonical speech canary env
 ```dotenv
@@ -33,11 +34,30 @@ AUDIO_TTS_OPENAI_PARAMS={}
 
 Keep the global LiteLLM OpenAI settings unchanged.
 
+## Open Terminal registrations
+Open WebUI currently uses:
+- native terminal server: `http://127.0.0.1:8010`
+- read-only MCP tool server: `http://127.0.0.1:8011/mcp`
+
+Admin API checks:
+```bash
+python3 - <<'PY'
+import sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+headers = {'Authorization': f'Bearer {api_key}'}
+for path in ['api/v1/configs/terminal_servers', 'api/v1/configs/tool_servers', 'api/v1/terminals/', 'api/v1/tools/']:
+    req = urllib.request.Request(f'http://127.0.0.1:3000/{path}', headers=headers)
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        print(path, resp.read().decode())
+PY
+```
+
 ## Post-restart UI-state verification
 Run this after every Open WebUI restart during canary and before promotion:
 
 ```bash
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_STT_'
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_TTS_'
 curl -fsS http://127.0.0.1:3000/health | jq .

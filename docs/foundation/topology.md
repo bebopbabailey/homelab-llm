@@ -107,8 +107,10 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
 - `web.fetch` — stdio MCP tool on the Mini (no network port).
 - `search.web` — stdio MCP tool that calls LiteLLM `/v1/search`, backed by SearXNG.
 - Open Terminal MCP — HTTP MCP backend on the Mini at `127.0.0.1:8011/mcp`,
-  currently localhost-only. A shared LiteLLM read-only alias is follow-on
-  work and is not part of the current live runtime.
+  currently localhost-only. Open WebUI registers this backend directly as a
+  read-only MCP tool server while preserving the native Open Terminal UI path
+  on `127.0.0.1:8010`. A shared LiteLLM read-only alias is follow-on work and
+  is not part of the current live runtime.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.

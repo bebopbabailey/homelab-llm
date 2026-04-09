@@ -15,9 +15,9 @@ from pathlib import Path
 
 
 REPO_HYGIENE_REQUIRED = {
-    "docs/foundation/testing.md": ["repo_hygiene_audit.py", "root_ok", "journal_index_ok", "worktree_effort.py", "start_effort.py", "primary worktree", "park", "close"],
-    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "start_effort.py", "CONCURRENT_EFFORTS.md"],
-    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "worktree_effort.py", "start_effort.py", "preflight", "park", "close"],
+    "docs/foundation/testing.md": ["repo_hygiene_audit.py", "root_ok", "journal_index_ok", "worktree_effort.py", "start_effort.py", "closeout_effort.py", "submodule_pin_audit.py", "primary worktree", "park", "close", "metadata-only", "NOW.md"],
+    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "start_effort.py", "submodule_pin_audit.py", "closeout_effort.py", "CONCURRENT_EFFORTS.md"],
+    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "worktree_effort.py", "start_effort.py", "submodule_pin_audit.py", "closeout_effort.py", "preflight", "park", "close", "metadata-only", "NOW.md", "auto-rebase"],
     "DOCS_CONTRACT.md": ["root_hygiene_manifest.json", "repo_hygiene_audit.py"],
     ".github/workflows/repo-hygiene.yml": ["repo_hygiene_audit.py", "--scope root --strict", "control_plane_sync_audit.py"],
 }
@@ -38,6 +38,9 @@ SKILL_REQUIRED = {
         "baseline-only",
         "start_effort.py",
         "park",
+        "closeout_effort.py",
+        "no auto-rebase",
+        "NOW.md",
     ],
     "docs/OPENCODE.md": [
         "homelab-durability",
@@ -54,6 +57,10 @@ SKILL_REQUIRED = {
         "start_effort.py",
         "separate worktree",
         "park",
+        "closeout_effort.py",
+        "submodule_pin_audit.py",
+        "NOW.md",
+        "auto-rebase",
     ],
     "docs/INTEGRATIONS.md": [
         "homelab-durability",
@@ -75,6 +82,9 @@ SKILL_REQUIRED = {
         "park",
         "parked",
         "close",
+        "closeout_effort.py",
+        "metadata-only",
+        "broad parallel",
     ],
 }
 

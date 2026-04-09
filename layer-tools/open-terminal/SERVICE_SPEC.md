@@ -3,7 +3,7 @@
 ## Purpose
 Read-only Open Terminal MCP backend on the Mini for repo inspection. This
 service is live as a localhost-only direct MCP backend and does not replace the
-native Open WebUI Open Terminal integration.
+native Open WebUI Open Terminal integration on `127.0.0.1:8010`.
 
 ## Host & Runtime
 - **Host**: Mini
@@ -40,13 +40,16 @@ Open Terminal `0.11.29` exposes:
 - `send_process_input`
 - `kill_process`
 
-## Planned LiteLLM-exposed subset
-If a shared LiteLLM MCP lane is added later, only these tools should be exposed:
+## Current Open WebUI-exposed subset
+Open WebUI currently registers this backend directly and only exposes:
 - `health_check`
 - `list_files`
 - `read_file`
 - `grep_search`
 - `glob_search`
+
+## Planned LiteLLM-exposed subset
+If a shared LiteLLM MCP lane is added later, it should expose the same subset.
 
 ## Auth and policy
 - Open Terminal MCP remains localhost-only and is not treated as the primary
@@ -55,5 +58,8 @@ If a shared LiteLLM MCP lane is added later, only these tools should be exposed:
   `OPEN_TERMINAL_API_KEY`.
 - In validation on the current `0.11.29` build, that key did not block
   anonymous MCP access on `/mcp`, so it is not relied on for this lane.
+- Current Open WebUI connection therefore uses `auth_type=none` for the MCP
+  backend and relies on localhost bind plus Open WebUI access control and tool
+  filtering.
 - A shared LiteLLM MCP alias is not part of the current live runtime.
 - OpenHands worker keys remain denied for `/v1/mcp/*`.
