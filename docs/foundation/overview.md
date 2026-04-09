@@ -37,6 +37,9 @@ while allowing backend models to evolve independently.
 
 ## Guiding Principles
 - LiteLLM is the single gateway; clients must not call backends directly.
+- Tool calls are a separate plane from LLM calls; localhost-only Open WebUI
+  tool connections are allowed when they use a documented MCP or terminal
+  server, not a model backend.
 - Ports are treated as immutable without a migration plan.
 - No new inference backends or LAN-exposed services without explicit approval.
 - Use `uv` for Python dependency management; avoid system Python changes.
@@ -45,8 +48,12 @@ while allowing backend models to evolve independently.
 - `web.fetch` and `search.web` are implemented as stdio MCP tools.
 - The TinyAgents-facing MCP registry exists at `/etc/homelab-llm/mcp-registry.json`.
 - Open Terminal MCP is live as a localhost-only systemd-backed service on Mini
-  and remains separate from the TinyAgents registry; a shared LiteLLM MCP alias
-  is follow-on work, not current runtime truth.
+  and remains separate from the TinyAgents registry.
+- Open WebUI directly uses the local Open Terminal surfaces on Mini:
+  native terminal on `127.0.0.1:8010` plus a read-only MCP tool server on
+  `127.0.0.1:8011/mcp`.
+- A shared LiteLLM MCP alias for the read-only subset is still follow-on work,
+  not current runtime truth.
 
 ## Repo Layout (high-level)
 - `docs/` — platform-wide architecture, constraints, topology.

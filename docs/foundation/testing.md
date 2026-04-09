@@ -875,11 +875,66 @@ Expected:
 - connection succeeds
 - raw backend exposes the 13-tool Open Terminal MCP surface
 - direct backend remains localhost-only and should not be treated as the
-  canonical authenticated client path
+  primary durable auth boundary
+
+Open WebUI direct registration smoke:
+```bash
+python3 - <<'PY'
+import sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+headers = {'Authorization': f'Bearer {api_key}'}
+for path in ['api/v1/terminals/', 'api/v1/tools/']:
+    req = urllib.request.Request(f'http://127.0.0.1:3000/{path}', headers=headers)
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        print(path, resp.read().decode())
+PY
+```
+
+Expected:
+- `/api/v1/terminals/` lists `open-terminal`
+- `/api/v1/tools/` lists `server:mcp:open-terminal-mcp-ro`
+
+Open WebUI MCP verify smoke:
+```bash
+python3 - <<'PY'
+import sqlite3, json, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+payload = {
+    "url": "http://127.0.0.1:8011/mcp",
+    "path": "",
+    "type": "mcp",
+    "auth_type": "none",
+    "key": "",
+    "config": {
+        "enable": True,
+        "function_name_filter_list": "health_check,list_files,read_file,grep_search,glob_search",
+        "access_grants": []
+    },
+    "info": {"id": "open-terminal-mcp-ro", "name": "Open Terminal MCP (Read Only)"}
+}
+req = urllib.request.Request(
+    'http://127.0.0.1:3000/api/v1/configs/tool_servers/verify',
+    data=json.dumps(payload).encode(),
+    headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+)
+with urllib.request.urlopen(req, timeout=20) as resp:
+    print(resp.read().decode())
+PY
+```
+
+Expected:
+- verify succeeds against `127.0.0.1:8011/mcp`
+- Open WebUI is configured to filter tool use down to `health_check`,
+  `list_files`, `read_file`, `grep_search`, and `glob_search`
 
 Shared LiteLLM exposure for the Open Terminal read-only subset is follow-on
-work and is not part of the current live runtime. Validate only the direct
-localhost MCP backend on `127.0.0.1:8011/mcp` in this slice.
+work and is not part of the current live runtime. Validate the direct localhost
+MCP backend on `127.0.0.1:8011/mcp` and the direct Open WebUI registration on
+the Mini in this slice.
 
 OpenHands denial proof must still hold:
 ```bash
@@ -1212,7 +1267,6 @@ AUDIO_TTS_VOICE=alloy
 
 Post-restart verification is required:
 ```bash
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_STT_'
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_TTS_'
 curl -fsS http://127.0.0.1:3000/health | jq .
@@ -1333,7 +1387,7 @@ If pass criteria fail, fix retrieval/extraction baseline first and re-run Phase 
 Config authority checks:
 ```bash
 systemctl show -p Environment open-webui.service --no-pager | rg -n \
-  'ENABLE_PERSISTENT_CONFIG=False|ENABLE_WEB_SEARCH=True|WEB_SEARCH_ENGINE=searxng|SEARXNG_QUERY_URL=http://127.0.0.1:8888/search\\?q=<query>&format=json|WEB_SEARCH_RESULT_COUNT=6|WEB_SEARCH_CONCURRENT_REQUESTS=1|WEB_LOADER_ENGINE=safe_web|WEB_LOADER_TIMEOUT=15|WEB_LOADER_CONCURRENT_REQUESTS=2|WEB_FETCH_FILTER_LIST=|WEB_SEARCH_DOMAIN_FILTER_LIST='
+  'ENABLE_WEB_SEARCH=True|WEB_SEARCH_ENGINE=searxng|SEARXNG_QUERY_URL=http://127.0.0.1:8888/search\\?q=<query>&format=json|WEB_SEARCH_RESULT_COUNT=6|WEB_SEARCH_CONCURRENT_REQUESTS=1|WEB_LOADER_ENGINE=safe_web|WEB_LOADER_TIMEOUT=15|WEB_LOADER_CONCURRENT_REQUESTS=2|WEB_FETCH_FILTER_LIST=|WEB_SEARCH_DOMAIN_FILTER_LIST='
 
 systemctl show -p Environment open-webui.service --no-pager | rg -n \
   'EXTERNAL_WEB_LOADER_URL|SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>|WEB_LOADER_ENGINE=external'
@@ -1363,12 +1417,14 @@ rg -n '"content"|"delta"' /tmp/owui-websearch-smoke.ndjson | tail -n 40
 ```
 
 Pass guidance:
-- `ENABLE_PERSISTENT_CONFIG=False` is present so env/drop-ins are authoritative.
 - `WEB_SEARCH_ENGINE=searxng` and `WEB_LOADER_ENGINE=safe_web` are present.
 - Result count, concurrency, and filter-list controls are visible in the service environment.
 - No `EXTERNAL_WEB_LOADER_URL`, `WEB_LOADER_ENGINE=external`, or `:8899/search` reference remains.
 - The SearXNG smoke returns at least one result.
 - The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.
+- If this host is not running `ENABLE_PERSISTENT_CONFIG=False`, treat any
+  drop-in-based web-search tuning as a separate migration task rather than an
+  assumed supported path.
 
 ## Promptfoo Web Search Eval Baseline (Mini)
 Purpose:
@@ -1467,15 +1523,13 @@ Required slices for every candidate on the winning lane:
 Preflight before writing `25-websearch-tuning.conf`:
 ```bash
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
-' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
 ' | rg '^"?WEB_SEARCH_DOMAIN_FILTER_LIST='
 curl -fsS http://127.0.0.1:3000/health | jq .
 ```
 
 Reason:
 - `WEB_SEARCH_DOMAIN_FILTER_LIST` is a PersistentConfig-backed variable
-- if `ENABLE_PERSISTENT_CONFIG=False` is not active, the systemd drop-in may not control the effective value
+- if `ENABLE_PERSISTENT_CONFIG=False` is not active, the systemd drop-in may not control the effective value and this tuning flow should not be used as-is
 
 Temporary tuning override for one variable at a time:
 ```bash
@@ -1489,8 +1543,6 @@ sudo systemctl restart open-webui.service
 
 Post-restart env verification:
 ```bash
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
-' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
 ' | rg '^"?WEB_SEARCH_DOMAIN_FILTER_LIST='
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
@@ -1537,7 +1589,7 @@ sudo rm -f /etc/systemd/system/open-webui.service.d/25-websearch-tuning.conf
 sudo systemctl daemon-reload
 sudo systemctl restart open-webui.service
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '
-' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$|^"?WEB_SEARCH_DOMAIN_FILTER_LIST=|^"?WEB_FETCH_FILTER_LIST='
+' | rg '^"?WEB_SEARCH_DOMAIN_FILTER_LIST=|^"?WEB_FETCH_FILTER_LIST='
 curl -fsS http://127.0.0.1:3000/health | jq .
 ```
 

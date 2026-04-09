@@ -13,5 +13,5 @@ for repo inspection only.
 ## Runtime
 - MCP service: `mcp --transport streamable-http`
 - Bind: `127.0.0.1:8011` on the Mini
-- Canonical client path: LiteLLM MCP
+- Canonical current client path: Open WebUI direct MCP on the Mini
 - Optional separate human UX path: native Open Terminal API on `127.0.0.1:8010`

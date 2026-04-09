@@ -6,7 +6,7 @@ This layer hosts tool services (search, MCP tools) used by orchestrators/agents.
 - LiteLLM (gateway) calls tool backends where applicable (e.g., `/v1/search`).
 - MCP stdio tools are invoked by a client.
 - Open Terminal MCP is a long-running localhost-only HTTP service consumed
-  canonically through LiteLLM.
+  directly by Open WebUI on the Mini.
 
 ## Services
 - SearXNG (Mini): `http://127.0.0.1:8888`

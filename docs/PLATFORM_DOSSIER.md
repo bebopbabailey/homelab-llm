@@ -103,8 +103,9 @@ Networking note:
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
-  `ENABLE_PERSISTENT_CONFIG=False` makes env/drop-ins authoritative; Admin UI changes are non-persistent after restart.
-  Speech canary promotion requires a post-restart check that no stale Admin UI audio state overrides the env-backed audio settings.
+  Audio env/drop-ins remain authoritative for the speech path in current
+  practice. Speech canary promotion requires a post-restart check that no stale
+  Admin UI audio state overrides the env-backed audio settings.
 - Open Terminal:
   - native human-UX API container remains on `127.0.0.1:8010`
   - canonical shared MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
@@ -112,6 +113,14 @@ Networking note:
   - first slice mount scope is repo-root only:
     `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
   - terminal/notebook features are disabled for the MCP lane
+  - Open WebUI now uses both localhost lanes directly on the Mini:
+    `8010` for native interactive terminal UX and `8011/mcp` for read-only MCP
+    model tools
+  - the Open WebUI MCP registration currently filters to `health_check`,
+    `list_files`, `read_file`, `grep_search`, and `glob_search`
+  - Open WebUI terminal/tool server connections are currently stored through its
+    supported persistent-config API; this lane does not currently rely on
+    `ENABLE_PERSISTENT_CONFIG=False`
   - shared LiteLLM exposure is still blocked on current stable runtime
   - OpenHands remains denied for `/v1/mcp/*`
 - OpenCode Web: systemd unit `/etc/systemd/system/opencode-web.service`, env `/etc/opencode/env`.
@@ -255,7 +264,9 @@ Networking note:
 - Tailscale ACLs/grants managed in admin (use `svc:*` grants for Services access).
 
 ## Decisions (ADR-lite)
-- LiteLLM is the single gateway.
+- LiteLLM remains the single gateway for LLM, STT, and TTS traffic.
+- Open WebUI direct localhost tool connections are allowed for Open Terminal and
+  remain separate from LiteLLM model calls.
 - Plain logical model names for clients.
 - Ports treated as immutable.
 - Approved four-lane rollout keeps public aliases stable while backend families

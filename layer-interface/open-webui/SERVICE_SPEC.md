@@ -14,11 +14,16 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
   - LiteLLM -> Orin `voice-gateway` only
   - Open WebUI must not call the Orin directly for STT or TTS
 - Local SearXNG JSON endpoint via documented Open WebUI config
+- Local Open Terminal integrations on the Mini:
+  - native terminal server at `http://127.0.0.1:8010`
+  - read-only MCP tool server at `http://127.0.0.1:8011/mcp`
 
 ## Configuration
 - `/etc/open-webui/env` (systemd `EnvironmentFile`)
 - `/etc/systemd/system/open-webui.service.d/*.conf` (service overrides)
 - data stored in `/home/christopherbailey/.open-webui`
+- terminal/tool server registrations are currently persisted through the Open
+  WebUI admin config API, not env-only authority
 
 ## Audio configuration surface
 - `AUDIO_STT_ENGINE`
@@ -43,12 +48,14 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - `AUDIO_TTS_VOICE=alloy`
 
 ## Config authority
-- `ENABLE_PERSISTENT_CONFIG=False` is required for this path.
-- systemd env/drop-ins are authoritative across restart.
-- canary promotion requires post-restart verification that no stale Admin UI audio
-  state is overriding the expected env-driven values.
+- Audio env in `/etc/open-webui/env` remains the authority for the speech path.
+- Terminal/tool server registrations currently use Open WebUI persistent config.
+- Do not flip `ENABLE_PERSISTENT_CONFIG=False` for this service without a
+  separate migration of existing DB-backed settings.
 
 ## Ownership boundary
 - Open WebUI owns the human UI and audio UX.
+- Open WebUI also owns the direct localhost Open Terminal tool/terminal
+  registrations on the Mini.
 - LiteLLM remains the single client-facing gateway for LLM, STT, and TTS.
 - `voice-gateway` remains the repo-owned speech boundary on the Orin.

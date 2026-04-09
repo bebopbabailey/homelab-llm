@@ -1,14 +1,13 @@
 # NOW
 
 Active
-- Harden the repo so the primary worktree stays baseline-only and all
-  `Build`/`Verify` work starts in linked worktrees
-- Add a thin, deterministic `start_effort.py` bootstrap over the existing local
-  worktree-effort contract
-- Keep the coding-agent docs, tests, and repo-hygiene workflow aligned to the
-  new primary-worktree rule
+- Wire Open WebUI directly to the local Open Terminal surfaces on the Mini:
+  native terminal UX on `127.0.0.1:8010` plus read-only MCP tools on
+  `127.0.0.1:8011/mcp`
+- Update the Open WebUI and Open Terminal service docs/canon to reflect the
+  supported direct localhost wiring and the current persistent-config behavior
 
 
 NEXT UP
-- Resume the LiteLLM ChatGPT/Open Terminal lane from a linked worktree once the
-  primary-worktree hardening lands.
+- Revisit the LiteLLM ChatGPT/Open Terminal gateway lane only after the direct
+  Open WebUI path has been stabilized and documented.

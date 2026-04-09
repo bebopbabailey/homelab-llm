@@ -174,8 +174,9 @@ if a param is rejected by the backend.
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
 - LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
-- `ENABLE_PERSISTENT_CONFIG=False` is active in deployment, so systemd env/drop-ins
-  are authoritative and Admin UI changes to these settings do not persist across restart.
+- Open WebUI audio settings for this path still come from systemd env/drop-ins,
+  but the deployment currently uses persistent config for other settings such as
+  terminal/tool server registrations.
 - Speech canary promotion requires a post-restart verification that the effective
   `AUDIO_*` settings still match the env values and are not being overridden by stale
   Admin UI state.
@@ -399,7 +400,7 @@ Example:
 
 ## Open Terminal MCP (implemented locally)
 - Current live path for terminal-style repo inspection is the localhost-only
-  Open Terminal MCP backend.
+  Open Terminal MCP backend, with direct Open WebUI registration on the Mini.
 - Runtime:
   - backend: `http://127.0.0.1:8011/mcp`
   - transport: MCP streamable HTTP
@@ -409,13 +410,18 @@ Example:
   - no `docker.sock`
   - no write tools in slice 1
 - Explicitly separate role:
-  - Open WebUI native Open Terminal on `127.0.0.1:8010` may remain for human UX
-  - Open WebUI should not also register this same terminal capability as an MCP
-    External Tool in the first slice
+  - Open WebUI native Open Terminal on `127.0.0.1:8010` is the interactive
+    terminal path
+  - Open WebUI also registers the localhost-only `127.0.0.1:8011/mcp` backend
+    as a separate read-only MCP tool server for model tool use
+  - current Open WebUI filter allowlist: `health_check`, `list_files`,
+    `read_file`, `grep_search`, `glob_search`
+  - current Open WebUI audience default is admin-only because the connection has
+    no explicit access grants and the service still uses admin-bypass defaults
   - Open Terminal MCP is intentionally not added to the TinyAgents MCP registry
     in this slice
-  - a shared LiteLLM MCP alias for the read-only subset remains follow-on work,
-    not current runtime truth
+  - a shared LiteLLM MCP alias for the read-only subset remains follow-on work;
+    direct Open WebUI wiring is current runtime truth
 - OpenHands remains excluded:
   - worker alias `code-reasoning` stays MCP-denied
   - `/v1/responses` stays denied for the worker key
