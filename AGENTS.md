@@ -19,12 +19,20 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - The primary worktree is baseline-only. Do not run `Build` or `Verify` there;
   start a linked worktree first with `uv run python scripts/start_effort.py ...`
   or an equivalent linked-worktree flow.
+- Finish linked implementation lanes from the primary worktree with
+  `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - `Build`/`Verify` work must pass local worktree-effort preflight before repo
   writes: `uv run python scripts/worktree_effort.py preflight --stage <stage>`.
 - If a dirty worktree is holding context only while another worktree builds or
   verifies, park it locally first with `uv run python scripts/worktree_effort.py park`.
+- `uv run python scripts/worktree_effort.py close --json` is metadata-only; it
+  does not commit, merge, or clean up the linked lane.
 - Local effort metadata must stay outside repo-tracked files; `NOW.md` is
   project-level status only, not a concurrent-effort registry.
+- Broad parallel docs/layer lanes are not allowed. If a docs pass would claim
+  `docs`, `layer-gateway`, `layer-inference`, `layer-interface`, `layer-tools`,
+  or `layer-data` while another implementation lane is active, narrow the scope
+  first.
 - **MLX control:** Ports `8100-8119` are `mlxctl`-managed and MUST use `mlxctl`
   (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
   require `mlxctl`.

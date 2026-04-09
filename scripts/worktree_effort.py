@@ -46,6 +46,21 @@ def get_current_branch(repo_path: Path) -> str:
     return branch or "(detached)"
 
 
+def get_branch_divergence(repo_path: Path, branch: str, base_ref: str = "master") -> tuple[int, int]:
+    if branch == "(detached)":
+        return (0, 0)
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-list", "--left-right", "--count", f"{base_ref}...{branch}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return (0, 0)
+    left, right = result.stdout.strip().split()
+    return (int(left), int(right))
+
+
 def sanitize_label(value: str) -> str:
     lowered = value.strip().lower()
     cleaned = "".join(ch if ch.isalnum() else "-" for ch in lowered)
@@ -161,14 +176,18 @@ def load_worktree_info(repo_root: Path) -> list[dict[str, object]]:
     for entry in parse_worktree_list(repo_root):
         worktree_path = Path(str(entry["path"]))
         git_dir = get_git_dir(worktree_path)
+        branch = get_current_branch(worktree_path)
+        behind_master_count, ahead_of_master_count = get_branch_divergence(worktree_path, branch)
         effort = read_effort_file(git_dir)
         infos.append(
             {
                 "path": str(worktree_path),
-                "branch": get_current_branch(worktree_path),
+                "branch": branch,
                 "git_dir": str(git_dir),
                 "effort": effort,
                 "dirty_paths": collect_dirty_paths(worktree_path),
+                "behind_master_count": behind_master_count,
+                "ahead_of_master_count": ahead_of_master_count,
             }
         )
     return infos
@@ -276,6 +295,26 @@ def gather_state(repo_root: Path) -> dict[str, object]:
         baseline_issues.append("primary worktree is parked")
     if isinstance(primary_effort, dict) and str(primary_effort.get("stage")) in IMPLEMENTATION_STAGES:
         baseline_issues.append("primary worktree has active implementation effort")
+    closeout_candidates = [
+        {
+            "path": str(item["path"]),
+            "branch": str(item["branch"]),
+            "ahead_of_master_count": int(item["ahead_of_master_count"]),
+        }
+        for item in sorted(worktrees, key=lambda item: str(item["path"]))
+        if item["path"] != current_path
+        and not item["dirty_paths"]
+        and int(item["ahead_of_master_count"]) > 0
+    ]
+    stale_active_efforts = [
+        {
+            "path": str(item["path"]),
+            "branch": str(item["branch"]),
+            "effort_id": str(item["effort"].get("effort_id")),
+        }
+        for item in sorted(active_implementation_efforts, key=lambda item: str(item["path"]))
+        if not item["dirty_paths"] and int(item["ahead_of_master_count"]) == 0
+    ]
     return {
         "current_worktree": current_path,
         "current_branch": get_current_branch(repo_root),
@@ -293,6 +332,8 @@ def gather_state(repo_root: Path) -> dict[str, object]:
         "dirty_missing_effort_metadata": dirty_missing_metadata,
         "duplicate_effort_ids": duplicate_effort_ids,
         "out_of_scope_dirty_paths": current_out_of_scope_dirty,
+        "closeout_candidates": closeout_candidates,
+        "stale_active_efforts": stale_active_efforts,
         "baseline_issues": baseline_issues,
         "primary_worktree_baseline_ok": not baseline_issues,
     }

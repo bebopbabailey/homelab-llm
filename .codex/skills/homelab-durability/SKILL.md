@@ -39,8 +39,12 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   mutating elsewhere.
 - Default bootstrap path for new implementation worktrees is
   `uv run python scripts/start_effort.py ...`.
+- Default landing path for a finished linked lane is
+  `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
 - Do not mix opportunistic cleanup with the requested change unless explicitly approved.
+- Broad parallel docs/layer lanes are not allowed while another implementation
+  effort is active; narrow the scope first.
 
 ## Modes / stages
 - `Discover`: read-only, low-friction, broad inspection within scope, no formal startup header unless commands are being proposed.
@@ -49,9 +53,15 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Build`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Build`: if another worktree is only holding dirty context, use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json` there instead of relying on ad hoc `design` registration.
 - `Build`: before proposing file edits or mutation commands, run or propose `uv run python scripts/worktree_effort.py preflight --stage build --json`.
+- `Build`: if scoped submodule bootstrap fails, stop and repair the submodule
+  pin drift; do not rely on local-only seeded state.
 - `Verify`: strict on validation reporting. State verification mode and results. Require rollback only when the action class needs it.
 - `Verify`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Verify`: before proposing verification-stage mutations, run or propose `uv run python scripts/worktree_effort.py preflight --stage verify --json`.
+- `Verify`: `uv run python scripts/worktree_effort.py close --json` is
+  metadata-only. Use `uv run python scripts/closeout_effort.py --worktree <path> ...`
+  from the primary worktree to commit, fast-forward merge, and restore the
+  baseline.
 - Operating rhythm: `Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Prune`.
 
 ## Sources of truth
@@ -88,6 +98,8 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   registry; use local worktree-effort metadata and preflight instead.
 - `close` should return a worktree to a null state by removing the local
   metadata file.
+- Closeout must stay deterministic: no auto-rebase, no auto-push, no auto-merge
+  of diverged history, and no automatic `NOW.md` edits.
 
 ## Invocation aliases
 - Invoke by name: `homelab-durability` or `homelab_durability`.

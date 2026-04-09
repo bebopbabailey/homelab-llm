@@ -1,13 +1,15 @@
 # NOW
 
 Active
-- Wire Open WebUI directly to the local Open Terminal surfaces on the Mini:
-  native terminal UX on `127.0.0.1:8010` plus read-only MCP tools on
-  `127.0.0.1:8011/mcp`
-- Update the Open WebUI and Open Terminal service docs/canon to reflect the
-  supported direct localhost wiring and the current persistent-config behavior
+- Harden repo lane lifecycle so `start_effort.py` is transactional,
+  `closeout_effort.py` can land a finished lane, and stale metadata becomes
+  visible
+- Add deterministic submodule pin diagnostics so local-only gitlink pins fail
+  cleanly instead of leaving half-broken linked worktrees
+- Align the coding-agent docs, tests, and repo-hygiene workflow with the full
+  start/closeout lifecycle
 
 
 NEXT UP
-- Revisit the LiteLLM ChatGPT/Open Terminal gateway lane only after the direct
-  Open WebUI path has been stabilized and documented.
+- Re-test the docs hardening workflow from a freshly scoped linked worktree
+  after the lifecycle hardening lands.

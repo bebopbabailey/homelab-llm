@@ -121,8 +121,17 @@ Repo-local durability posture:
 - local `Build`/`Verify` passes should run
   `uv run python scripts/worktree_effort.py preflight --stage <stage> --json`
   before repo writes
+- land a finished linked lane from the clean primary worktree with
+  `uv run python scripts/closeout_effort.py --worktree <path> --json`
 - concurrent-effort metadata is local to each worktree; `NOW.md` is not the
   effort registry
+- `uv run python scripts/worktree_effort.py close --json` is metadata-only
+- broad parallel docs/layer lanes are not allowed while another implementation
+  lane is active; narrow them first
+- submodule pin drift is a local hygiene blocker and should be diagnosed with
+  `scripts/submodule_pin_audit.py`
+- closeout is local-only and deterministic: no auto-rebase, no push, and no
+  automatic `NOW.md` edits
 - root/doc placement hygiene is enforced separately by
   `scripts/repo_hygiene_audit.py`
 

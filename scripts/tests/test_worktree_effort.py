@@ -197,6 +197,23 @@ class WorktreeEffortTests(unittest.TestCase):
         result = self.run_script(repo, "close", "--json")
         self.assertNotEqual(result.returncode, 0)
 
+    def test_status_reports_closeout_candidate_for_clean_branch_ahead_of_master(self) -> None:
+        root, repo = self.make_repo()
+        other = self.add_worktree(root, repo, "feature-closeout")
+        (other / "docs" / "a.md").write_text("updated\n", encoding="utf-8")
+        self.assertEqual(run(["git", "commit", "-am", "feature"], other).returncode, 0)
+        result = self.run_script(repo, "status", "--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["closeout_candidates"][0]["branch"], "feature-closeout")
+
+    def test_status_reports_stale_active_effort_for_clean_branch_not_ahead(self) -> None:
+        root, repo = self.make_repo()
+        other = self.add_worktree(root, repo, "feature-stale")
+        self.run_script(other, "register", "--effort-id", "stale-a", "--stage", "build", "--scope", "docs", "--json")
+        result = self.run_script(repo, "status", "--json")
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["stale_active_efforts"][0]["effort_id"], "stale-a")
+
 
 if __name__ == "__main__":
     unittest.main()
