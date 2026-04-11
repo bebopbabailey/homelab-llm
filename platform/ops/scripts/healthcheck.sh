@@ -2,7 +2,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-LITELLM_ENV_LOCAL="${LITELLM_ENV_LOCAL:-$REPO_ROOT/layer-gateway/litellm-orch/config/env.local}"
+SERVICE_REGISTRY="$REPO_ROOT/scripts/service_registry.py"
+if [[ -z "${LITELLM_ENV_LOCAL:-}" ]]; then
+  LITELLM_ENV_LOCAL="$REPO_ROOT/$(python3 "$SERVICE_REGISTRY" path litellm-orch)/config/env.local"
+fi
 OPTILLM_ENV_FILE="${OPTILLM_ENV_FILE:-/etc/optillm-proxy/env}"
 MLXCTL_BIN="${MLXCTL_BIN:-$REPO_ROOT/platform/ops/scripts/mlxctl}"
 MINI_LAN_HOST="${MINI_LAN_HOST:-192.168.1.71}"

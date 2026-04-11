@@ -36,6 +36,8 @@ Expected:
 - FULL confirms Studio OptiLLM exact-SHA deploy plus MLX lane `auto`/`--no-async-scheduling` with no backend bearer auth.
 - FULL also confirms the locked `8101` parser override: `--tool-call-parser hermes`
   and no `--reasoning-parser`.
+- Repo-local validation resolves `litellm-orch` and `optillm-proxy` through the
+  service registry rather than hardcoded `layer-*` script constants.
 
 Additional Studio backend checks (not part of the current live FULL gate):
 ```bash

@@ -1,12 +1,12 @@
 # NOW
 
 Active
-- Retire the five first-party service submodules and restore plain tracked
-  directories at their existing `layer-*` paths.
-- Remove submodule-specific lane bootstrap, closeout, runtime-lock, and audit
-  assumptions so the repo behaves like a plain monorepo.
-- Keep this tranche compatibility-first: no `services/` path moves yet.
+- Remove repo-local runtime/tooling dependence on raw `layer-*` paths where the
+  service registry is now the canonical source of truth.
+- Tighten runtime-lock validation around `service_refs` and object path refs so
+  later `services/` / `experiments/` moves do not require another lock-format shim.
+- Keep this tranche compatibility-first: no directory moves yet.
 
 NEXT UP
-- Use the flattened monorepo plus the service registry to plan the later
-  `services/` and `experiments/` path migration.
+- Move low-risk services and experiments into `services/` and `experiments/`
+  once repo-local tooling resolves service paths through the registry cleanly.

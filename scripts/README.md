@@ -112,6 +112,8 @@ Repository utility scripts.
   - `uv run python scripts/service_registry_audit.py --strict --json`
   - `platform/registry/services.jsonl` is the canonical service taxonomy during
     the service-centric refactor
+  - repo-local ops/validation scripts should resolve first-party service roots
+    through the service registry instead of hardcoded `layer-*` path maps
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
   - filesystem-based and Git-independent at runtime

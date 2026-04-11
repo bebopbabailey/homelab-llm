@@ -9,11 +9,17 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from service_registry import resolve_service_path
+
 DEFAULT_REGISTRY = os.path.expanduser("~/models/converted_models/registry.json")
-DEFAULT_PROFILE_DIR = Path("/home/christopherbailey/homelab-llm/platform/ops/ov-profiles")
+DEFAULT_PROFILE_DIR = REPO_ROOT / "platform/ops/ov-profiles"
 DEFAULT_SERVER_URL = "http://127.0.0.1:9000"
-WARM_SCRIPT = Path("/home/christopherbailey/homelab-llm/layer-inference/ov-llm-server/scripts/ov-warm-models")
-CONVERT_SCRIPT = Path("/home/christopherbailey/homelab-llm/layer-inference/ov-llm-server/scripts/ov-convert-model")
+OV_SERVICE_ROOT = REPO_ROOT / resolve_service_path(REPO_ROOT, "ov-llm-server")
+WARM_SCRIPT = OV_SERVICE_ROOT / "scripts/ov-warm-models"
+CONVERT_SCRIPT = OV_SERVICE_ROOT / "scripts/ov-convert-model"
 DEFAULT_OUT_ROOT = Path("/home/christopherbailey/models/converted_models")
 DEFAULT_OG_ROOT = Path("/mnt/seagate/og_models")
 

@@ -24,6 +24,7 @@ set -Eeuo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HEALTHCHECK="$REPO_ROOT/platform/ops/scripts/healthcheck.sh"
+SERVICE_REGISTRY="$REPO_ROOT/scripts/service_registry.py"
 
 # Services we know how to manage.
 KNOWN_SERVICES=("litellm-orch" "open-webui" "openhands" "ov-server" "optillm-proxy")
@@ -45,14 +46,15 @@ require_cmd() {
 
 service_dir() {
   local svc="$1"
+  local service_id="$svc"
   case "$svc" in
-    litellm-orch) echo "$REPO_ROOT/layer-gateway/litellm-orch" ;;
-    openhands) echo "$REPO_ROOT/layer-gateway/openhands" ;;
-    optillm-proxy) echo "$REPO_ROOT/layer-gateway/optillm-proxy" ;;
-    open-webui) echo "$REPO_ROOT/layer-interface/open-webui" ;;
-    ov-server) echo "$REPO_ROOT/layer-inference/ov-llm-server" ;;
-    *) echo "$REPO_ROOT/$svc" ;;
+    ov-server) service_id="ov-llm-server" ;;
   esac
+  if [[ -f "$SERVICE_REGISTRY" ]]; then
+    echo "$REPO_ROOT/$(python3 "$SERVICE_REGISTRY" path "$service_id")"
+    return 0
+  fi
+  echo "$REPO_ROOT/$svc"
 }
 
 maybe_uv_sync() {

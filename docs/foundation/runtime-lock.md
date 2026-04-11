@@ -7,13 +7,16 @@ Compatibility-first note:
 - Runtime lock v2 adds `service_refs` and path refs such as
   `litellm.router_config_ref` so runtime validation can resolve canonical
   service IDs while the filesystem still uses `layer-*` paths.
-- Existing raw path fields may remain temporarily during the migration, but
-  service refs are the new direction of truth.
+- Raw path fallback fields have been removed from the lock schema; repo-local
+  validators and tooling should resolve canonical service paths through
+  `platform/registry/services.jsonl`.
 
 ## Purpose
 - Make runtime assumptions explicit and reviewable.
 - Prevent drift between repo state, Studio runtime, and gateway behavior.
 - Give coding agents a single place to verify what is live and intentionally locked.
+- Keep repo-local ops tooling path-agnostic so later `services/` path moves do
+  not require another runtime-lock schema break.
 
 ## Current canon
 - `layer-gateway/optillm-proxy` deploys by exact git SHA to Studio.
