@@ -1,0 +1,21 @@
+# PlanSearch canary prompts for coding/planning workflows.
+Draft a migration plan from a monolith to services with rollback checkpoints.
+Design a test strategy for a plugin that does staged LLM orchestration with retries.
+Propose a root-cause investigation plan for intermittent empty model outputs.
+Write an implementation plan to add deterministic canary gating to an inference proxy.
+Outline a production hardening checklist for launchd-managed AI services.
+Create a plan to add observability for per-stage latency and token usage in a pipeline.
+Design a rollback-first deployment plan for introducing a new routing alias.
+Propose a failure-mode matrix for model orchestration under partial backend outages.
+Write a code-review checklist for safety around retry loops and fallback logic.
+Design a minimal acceptance suite for a new OpenAI-compatible plugin.
+Draft an incident response playbook for overnight OOM and service restart failures.
+Propose a method to compare quality/latency tradeoffs between two planning approaches.
+Create an implementation plan for adding explicit non-empty output guarantees.
+Design a verification flow for deterministic candidate ordering in parallel jobs.
+Write a migration plan to move a canary alias to default only after objective gates.
+Propose a schema for recording canary results for future trend analysis.
+Design a strategy to reduce truncation while preserving plan completeness.
+Draft a hardening plan for fallback behavior when deep model responses are empty.
+Write a concise integration plan for OpenCode defaults and model alias governance.
+Propose a test matrix for prompt lengths, token caps, and response-format edge cases.

@@ -1,0 +1,11 @@
+[project]
+name = "optillm-proxy"
+version = "0.1.0"
+description = "Service wrapper for OptiLLM proxy"
+requires-python = ">=3.11"
+dependencies = [
+  "optillm==0.3.12",
+  "transformers==4.49.0",
+  "tokenizers==0.21.0",
+  "math-verify",
+]
