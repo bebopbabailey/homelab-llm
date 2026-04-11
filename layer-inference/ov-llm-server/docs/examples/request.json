@@ -1,0 +1,7 @@
+{
+  "model": "qwen",
+  "messages": [
+    {"role": "user", "content": "Hello from another machine."}
+  ],
+  "stream": false
+}

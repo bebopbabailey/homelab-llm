@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+SCRIPT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SRC_ROOT="${OV_MODEL_SRC:-$HOME/models}"
+OG_ROOT="${OV_MODEL_OG:-$HOME/models/og_models}"
+OUT_ROOT="${OV_MODEL_OUT:-$HOME/models/converted_models}"
+CONVERT_ENV="${OV_CONVERT_ENV:-${SCRIPT_ROOT}/.venv-convert}"
+OPTIMUM_CLI="${CONVERT_ENV}/bin/optimum-cli"
+COMPAT_PATCH="${SCRIPT_DIR}/patch-transformers-compat.sh"
+TASK="${OV_TASK:-text-generation-with-past}"
+WEIGHT_FORMAT="${OV_WEIGHT_FORMAT:-fp16}"
+LIBRARY="${OV_LIBRARY:-transformers}"
+LOG_PATH="${OV_CONVERT_LOG:-$OUT_ROOT/convert.log}"
+OG_REMOTE="${OV_MODEL_OG_REMOTE:-hp}"
+OG_REMOTE_DIR="${OV_MODEL_OG_REMOTE_DIR:-/root/models/og_models}"
+
+usage() {
+  cat <<'EOF'
+Usage: ov-convert-model [--model <repo>]... [--weight-format <fp16|int8|int4>] [--task <task>]
+
+Options:
+  --model          Hugging Face repo id (downloads if missing, repeatable).
+  --weight-format  OpenVINO weight format (default: fp16 or OV_WEIGHT_FORMAT).
+  --task           Optimum task name (default: text-generation-with-past or OV_TASK).
+  -h, --help       Show this help.
+EOF
+}
+
+MODEL_IDS=()
+declare -A MODEL_REPOS
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --model" >&2
+        exit 2
+      fi
+      MODEL_IDS+=("$2")
+      shift 2
+      ;;
+    --weight-format)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --weight-format" >&2
+        exit 2
+      fi
+      WEIGHT_FORMAT="$2"
+      shift 2
+      ;;
+    --task)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --task" >&2
+        exit 2
+      fi
+      TASK="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! -x "$OPTIMUM_CLI" ]]; then
+  echo "Missing converter: $OPTIMUM_CLI" >&2
+  echo "Create it with: uv venv .venv-convert" >&2
+  echo "Then install tools: uv pip install --python .venv-convert \"optimum[openvino]\" sentencepiece tiktoken" >&2
+  exit 1
+fi
+
+mkdir -p "$OG_ROOT" "$OUT_ROOT"
+
+log() {
+  local message="$1"
+  local timestamp
+  timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  echo "$message"
+  echo "${timestamp} ${message}" >>"$LOG_PATH"
+}
+
+log "Starting conversion. task=${TASK} weight_format=${WEIGHT_FORMAT}. Failures will be logged; script will continue."
+log "Originals offload target: ${OG_REMOTE}:${OG_REMOTE_DIR}"
+
+if [[ -x "$COMPAT_PATCH" ]]; then
+  if ! "$COMPAT_PATCH" "$CONVERT_ENV"; then
+    log "Compat patch failed; conversion may fail for Phi models."
+  fi
+else
+  log "Compat patch script not found: ${COMPAT_PATCH}"
+fi
+
+shopt -s nullglob
+MODEL_DIRS=()
+declare -A NAME_MAP
+
+if [[ "${#MODEL_IDS[@]}" -gt 0 ]]; then
+  if ! command -v hf >/dev/null 2>&1; then
+    echo "Missing hf CLI on PATH; install it to auto-download models." >&2
+    exit 1
+  fi
+  for repo in "${MODEL_IDS[@]}"; do
+    base="${repo##*/}"
+    src="${SRC_ROOT}/${base}"
+    MODEL_DIRS+=("$src")
+    MODEL_REPOS["$src"]="$repo"
+  done
+else
+  for src in "$SRC_ROOT"/*; do
+    if [[ ! -d "$src" ]]; then
+      continue
+    fi
+    base="$(basename "$src")"
+    if [[ "$base" == "og_models" || "$base" == "converted_models" ]]; then
+      log "Skipping managed dir: $base"
+      continue
+    fi
+    if [[ "$base" == *-ov ]]; then
+      echo "Skipping converted model dir: $base"
+      continue
+    fi
+    if [[ -f "$src/openvino_model.xml" ]]; then
+      log "Skipping converted model dir: $base"
+      continue
+    fi
+    if [[ ! -f "$src/config.json" ]]; then
+      log "Skipping incomplete model dir (missing config.json): $base"
+      continue
+    fi
+    MODEL_DIRS+=("$src")
+  done
+fi
+
+slugify() {
+  local input="$1"
+  local slug
+  slug="$(printf "%s" "$input" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/-+/-/g; s/^-|-$//g')"
+  printf "%s" "$slug"
+}
+
+if [[ "${#MODEL_DIRS[@]}" -eq 0 ]]; then
+  log "No models found under $SRC_ROOT"
+  exit 0
+fi
+
+for src in "${MODEL_DIRS[@]}"; do
+  base="$(basename "$src")"
+  printf "Custom name for %s? Blank for empty: " "$base"
+  read -r custom_name
+  if [[ -z "$custom_name" ]]; then
+    custom_name="$(slugify "$base")"
+  else
+    custom_name="$(slugify "$custom_name")"
+  fi
+  if [[ -z "$custom_name" ]]; then
+    log "Skipping unnamed model: $base"
+    continue
+  fi
+  name="$custom_name"
+  suffix=2
+  while [[ -d "${OUT_ROOT}/${name}" ]]; do
+    name="${custom_name}-${suffix}"
+    suffix=$((suffix + 1))
+  done
+  if [[ "$name" != "$custom_name" ]]; then
+    log "Name in use; using: $name"
+  fi
+  NAME_MAP["$src"]="$name"
+done
+
+FAILED=()
+SUCCEEDED=()
+
+for src in "${MODEL_DIRS[@]}"; do
+  base="$(basename "$src")"
+  repo="${MODEL_REPOS[$src]-}"
+  if [[ -n "$repo" && ! -f "$src/config.json" ]]; then
+    log "Downloading model: ${repo} -> ${src}"
+    if ! hf download "${repo}" --local-dir "${src}"; then
+      log "Download failed: ${repo}"
+      FAILED+=("$base")
+      continue
+    fi
+  fi
+  name="${NAME_MAP[$src]-}"
+  if [[ -z "$name" ]]; then
+    continue
+  fi
+  og_path="$OG_ROOT/$base"
+  dest_dir="${OUT_ROOT}/${name}/task-${TASK}__wf-${WEIGHT_FORMAT}"
+  if [[ -d "$dest_dir" ]]; then
+    log "Skipping already converted: $dest_dir"
+    continue
+  fi
+
+  log "Converting: $src -> $dest_dir"
+  if ! "$OPTIMUM_CLI" export openvino \
+      --model "$src" \
+      --task "$TASK" \
+      --trust-remote-code \
+      --library "$LIBRARY" \
+      --weight-format "$WEIGHT_FORMAT" \
+      "$dest_dir"; then
+    log "Conversion failed: $src"
+    FAILED+=("$base")
+    continue
+  fi
+
+  log "Moving original to: $og_path"
+  original_path="$og_path"
+  if [[ -n "$OG_REMOTE" ]]; then
+    remote_path="${OG_REMOTE_DIR}/${base}"
+    log "Offloading original to: ${OG_REMOTE}:${remote_path}"
+    if ssh "$OG_REMOTE" "mkdir -p \"${remote_path}\"" && rsync -a "$src"/ "${OG_REMOTE}:${remote_path}/"; then
+      rm -rf "$src"
+      original_path="${OG_REMOTE}:${remote_path}"
+      log "Offloaded original; removed local copy: $src"
+    else
+      log "Offload failed; keeping local copy in og_models"
+      mv "$src" "$og_path"
+    fi
+  else
+    mv "$src" "$og_path"
+  fi
+
+  python3 - <<PY
+import json
+import os
+from datetime import datetime, timezone
+
+data = {
+    "name": "${name}",
+    "source_path": "${src}",
+    "original_path": "${original_path}",
+    "converted_path": "${dest_dir}",
+    "task": "${TASK}",
+    "weight_format": "${WEIGHT_FORMAT}",
+    "converted_at": datetime.now(timezone.utc).isoformat(),
+}
+
+with open(os.path.join("${dest_dir}", "conversion.json"), "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
+PY
+
+  python3 - <<PY
+import json
+import os
+import tempfile
+
+registry_path = os.path.join("${OUT_ROOT}", "registry.json")
+data = {"version": 1, "models": {}}
+if os.path.exists(registry_path):
+    with open(registry_path, "r", encoding="utf-8") as handle:
+        try:
+            data = json.load(handle)
+        except json.JSONDecodeError:
+            data = {"version": 1, "models": {}}
+
+data.setdefault("version", 1)
+models = data.setdefault("models", {})
+models["${name}"] = {
+    "path": "${dest_dir}",
+    "task": "${TASK}",
+    "weight_format": "${WEIGHT_FORMAT}",
+}
+
+tmp_dir = os.path.dirname(registry_path)
+with tempfile.NamedTemporaryFile("w", delete=False, dir=tmp_dir, prefix="registry.", suffix=".tmp", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+    tmp_path = handle.name
+
+os.replace(tmp_path, registry_path)
+PY
+  SUCCEEDED+=("$base")
+done
+
+log "Conversion summary: success=${#SUCCEEDED[@]} failed=${#FAILED[@]}"
+if [[ "${#FAILED[@]}" -gt 0 ]]; then
+  log "Failed models: ${FAILED[*]}"
+fi

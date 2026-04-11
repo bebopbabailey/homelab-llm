@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenVINO LLM Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/christopherbailey/ov-llm-server
+EnvironmentFile=/home/christopherbailey/.config/ov-llm-server/ov-server.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/christopherbailey/.local/bin/uv run uvicorn main:app --host 0.0.0.0 --port 9000 --workers 1
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

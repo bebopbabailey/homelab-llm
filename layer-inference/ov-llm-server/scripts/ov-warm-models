@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SERVER_URL="${OV_SERVER_URL:-http://localhost:9000}"
+REGISTRY_PATH="${OV_REGISTRY_PATH:-$HOME/models/converted_models/registry.json}"
+
+if [[ ! -f "$REGISTRY_PATH" ]]; then
+  echo "Registry not found: $REGISTRY_PATH" >&2
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Missing dependency: jq" >&2
+  exit 1
+fi
+
+if [[ "$#" -gt 0 ]]; then
+  MODELS=("$@")
+else
+  mapfile -t MODELS < <(jq -r '.models | keys[]' "$REGISTRY_PATH")
+fi
+
+if [[ "${#MODELS[@]}" -eq 0 ]]; then
+  echo "No models found in registry." >&2
+  exit 1
+fi
+
+for model in "${MODELS[@]}"; do
+  echo "Warming model: $model"
+  curl -sS "${SERVER_URL}/v1/chat/completions" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"${model}\",\"messages\":[{\"role\":\"user\",\"content\":\"warm up\"}],\"stream\":false}" \
+    >/dev/null
+done
+
+echo "Warm-up complete."

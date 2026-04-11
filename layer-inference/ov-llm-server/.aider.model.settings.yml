@@ -1,0 +1,12 @@
+- name: jerry-architect/architect
+  model_id: "deepseek-r1-distill-llama-70b" # Just a label for logs
+  edit_format: diff
+  use_repo_map: true
+
+- name: jerry-editor/editor
+  model_id: "qwen2.5-coder-32b"
+  edit_format: diff
+
+- name: jerry-weak
+  model_id: "qwen2.5-coder-7b"
+  edit_format: whole

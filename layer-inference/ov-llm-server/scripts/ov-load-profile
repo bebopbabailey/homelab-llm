@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SERVER_URL="${OV_SERVER_URL:-http://localhost:9000}"
+REGISTRY_PATH="${OV_REGISTRY_PATH:-$HOME/models/converted_models/registry.json}"
+
+if [[ ! -f "$REGISTRY_PATH" ]]; then
+  echo "Registry not found: $REGISTRY_PATH" >&2
+  exit 1
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Missing dependency: jq" >&2
+  exit 1
+fi
+
+usage() {
+  cat <<'EOF'
+Usage: ov-load-profile <profile>
+
+Profiles:
+  ov-only-expanded  (default) Balanced OpenVINO-only baseline.
+  ov-only-safe      Smaller OpenVINO-only set with extra headroom.
+  ov-only-fast      Small/fast OpenVINO-only set for low latency.
+
+Environment:
+  OV_SERVER_URL  (default: http://localhost:9000)
+  OV_REGISTRY_PATH (default: ~/models/converted_models/registry.json)
+EOF
+}
+
+if [[ "${1:-}" == "" || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+PROFILE="$1"
+
+case "$PROFILE" in
+  ov-only-expanded)
+    MODELS=(
+      ov-qwen2-5-3b-instruct-fp16
+      ov-qwen2-5-1-5b-instruct-fp16
+      ov-phi-4-mini-instruct-fp16
+      ov-phi-3-5-mini-instruct-fp16
+      ov-llama-3-2-3b-instruct-fp16
+      ov-mistral-7b-instruct-v0-3-fp16
+    )
+    ;;
+  ov-only-safe)
+    MODELS=(
+      ov-qwen2-5-1-5b-instruct-fp16
+      ov-phi-4-mini-instruct-fp16
+      ov-phi-3-5-mini-instruct-fp16
+      ov-llama-3-2-3b-instruct-fp16
+    )
+    ;;
+  ov-only-fast)
+    MODELS=(
+      ov-qwen2-5-1-5b-instruct-fp16
+      ov-phi-4-mini-instruct-fp16
+    )
+    ;;
+  *)
+    echo "Unknown profile: $PROFILE" >&2
+    usage
+    exit 1
+    ;;
+esac
+
+# Ensure all requested models exist in the registry.
+missing=()
+for model in "${MODELS[@]}"; do
+  if ! jq -e --arg key "$model" '.models[$key]' "$REGISTRY_PATH" >/dev/null; then
+    missing+=("$model")
+  fi
+done
+
+if [[ "${#missing[@]}" -gt 0 ]]; then
+  echo "Missing models in registry: ${missing[*]}" >&2
+  exit 1
+fi
+
+for model in "${MODELS[@]}"; do
+  echo "Warming model: $model"
+  curl -sS "${SERVER_URL}/v1/chat/completions" \
+    -H "Content-Type: application/json" \
+    -d "{\"model\":\"${model}\",\"messages\":[{\"role\":\"user\",\"content\":\"warm up\"}],\"stream\":false}" \
+    >/dev/null
+done
+
+echo "Profile '$PROFILE' warm-up complete."
