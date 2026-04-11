@@ -4,7 +4,8 @@
 service taxonomy for the repo.
 
 Compatibility-first posture:
-- current filesystem paths still use `layer-*`
+- filesystem paths may now live under `layer-*`, `services/`, or
+  `experiments/` during the migration
 - `planned_path` records the destination service-centric layout
 - `maturity` distinguishes supported services from experiments and historical
   placeholders
@@ -24,3 +25,5 @@ Registry conventions:
 - `planned_path` is the intended destination under `services/` or
   `experiments/`
 - `legacy_paths` remains empty until a path move actually happens
+- once a service is moved, `path` and `planned_path` should match and
+  `legacy_paths` records the old location

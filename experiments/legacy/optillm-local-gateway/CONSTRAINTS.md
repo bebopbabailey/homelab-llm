@@ -24,8 +24,8 @@ This service inherits global + layer constraints:
 - Execute: none required
 
 ## Validation pointers
-- `test -f layer-gateway/optillm-local/SERVICE_SPEC.md`
-- `test -f layer-gateway/optillm-local/RUNBOOK.md`
+- `test -f experiments/legacy/optillm-local-gateway/SERVICE_SPEC.md`
+- `test -f experiments/legacy/optillm-local-gateway/RUNBOOK.md`
 
 ## Change guardrail
 If this directory is ever promoted from placeholder to active runtime, add an explicit activation plan and update canonical platform docs before shipping.

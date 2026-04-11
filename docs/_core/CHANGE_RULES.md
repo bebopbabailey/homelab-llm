@@ -44,9 +44,9 @@ If drift is discovered:
 
 ## Service Behavior and Contracts
 - If a service's inputs, outputs, env vars, health checks, or lifecycle steps change, update:
-  - That service's `layer-*/<service>/SERVICE_SPEC.md`
+  - That service's registry-resolved `SERVICE_SPEC.md`
   - `docs/PLATFORM_DOSSIER.md`
-  - Example: adding a required env var to `layer-gateway/optillm-proxy` must be reflected in its `SERVICE_SPEC.md` and the dossier.
+  - Example: adding a required env var to a service must be reflected in its `SERVICE_SPEC.md` and the dossier.
 
 ## Registries (MLX, MCP, Handles)
 - If model registry fields, sync behavior, or router/env generation changes, update:
@@ -59,6 +59,7 @@ If drift is discovered:
   - `platform/registry/services.jsonl`
   - `scripts/service_registry.py`
   - `scripts/service_registry_audit.py`
+  - `scripts/docs_contract_audit.py`
   - `docs/foundation/service-catalog.md`
   - `docs/foundation/service-additions.md`
   - `docs/_core/SOURCES_OF_TRUTH.md`
@@ -75,7 +76,7 @@ If drift is discovered:
   - `docs/foundation/studio-scheduling-policy.md`
   - `docs/foundation/topology.md`
   - `docs/PLATFORM_DOSSIER.md`
-  - Affected service `layer-*/<service>/SERVICE_SPEC.md` and `layer-*/<service>/RUNBOOK.md`
+  - Affected service `SERVICE_SPEC.md` and `RUNBOOK.md` at the registry-resolved service root
   - Example: adding a new owned Studio label under `com.bebop.*` requires policy-manifest, topology, dossier, and service-contract updates.
 
 ## Scripts and Validation

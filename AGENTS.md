@@ -33,8 +33,8 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   project-level status only, not a concurrent-effort registry.
 - Broad parallel docs/layer lanes are not allowed. If a docs pass would claim
   `docs`, `layer-gateway`, `layer-inference`, `layer-interface`, `layer-tools`,
-  or `layer-data` while another implementation lane is active, narrow the scope
-  first.
+  `layer-data`, `services`, or `experiments` while another implementation lane
+  is active, narrow the scope first.
 - **MLX control:** Ports `8100-8119` are `mlxctl`-managed and MUST use `mlxctl`
   (load/unload/assign-team/sync). Ports `8120-8139` are experimental and do not
   require `mlxctl`.
@@ -62,10 +62,11 @@ If you touch anything inside a layer, read first:
 
 ## Per-service consultation
 If you touch a service (code, config, or docs), read first:
-- `layer-*/<service>/AGENTS.md`
-- `layer-*/<service>/CONSTRAINTS.md`
-- `layer-*/<service>/RUNBOOK.md`
-- `layer-*/<service>/SERVICE_SPEC.md`
+- the canonical service root from `platform/registry/services.jsonl`
+- `<service-root>/AGENTS.md`
+- `<service-root>/CONSTRAINTS.md`
+- `<service-root>/RUNBOOK.md`
+- `<service-root>/SERVICE_SPEC.md`
 
 If touched files are below the service root, read every `AGENTS.md` on the path
 from the service root to the touched directory, with the deepest applicable

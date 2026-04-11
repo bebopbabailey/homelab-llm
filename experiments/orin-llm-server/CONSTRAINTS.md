@@ -24,8 +24,8 @@ This service inherits global + layer constraints:
 - Execute: none required
 
 ## Validation pointers
-- `test -f layer-inference/orin-llm-server/SERVICE_SPEC.md`
-- `test -f layer-inference/orin-llm-server/RUNBOOK.md`
+- `test -f experiments/orin-llm-server/SERVICE_SPEC.md`
+- `test -f experiments/orin-llm-server/RUNBOOK.md`
 
 ## Change guardrail
 If this service is ever activated, update canonical topology/runtime docs and add explicit operational validation before claiming it is live.

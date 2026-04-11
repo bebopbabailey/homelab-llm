@@ -29,8 +29,9 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `platform/ops/templates/mcp-registry.json`
     - `platform/ops/runtime-lock.json`
 - Per-service canon (most specific truth for a service):
-    - `layer-*/<service>/SERVICE_SPEC.md`
-    - (supporting) `layer-*/<service>/ARCHITECTURE.md`, `RUNBOOK.md`, `AGENTS.md`, `CONSTRAINTS.md`
+    - the service root declared in `platform/registry/services.jsonl`
+    - `<service-root>/SERVICE_SPEC.md`
+    - (supporting) `<service-root>/ARCHITECTURE.md`, `RUNBOOK.md`, `AGENTS.md`, `CONSTRAINTS.md`
 
 ## Operational
 How to run, test, or validate the current system.

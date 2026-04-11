@@ -14,6 +14,8 @@ from worktree_effort import IMPLEMENTATION_STAGES, gather_state
 
 BROAD_PARALLEL_PATHS = {
     "docs",
+    "services",
+    "experiments",
     "layer-gateway",
     "layer-inference",
     "layer-interface",

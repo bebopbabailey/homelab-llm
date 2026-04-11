@@ -62,6 +62,7 @@ def audit_registry(repo_root: Path) -> dict[str, object]:
     missing_required_fields: dict[str, list[str]] = {}
     duplicate_service_ids: list[str] = []
     duplicate_paths: list[str] = []
+    legacy_path_conflicts: list[str] = []
     service_ids_seen: set[str] = set()
     paths_seen: set[str] = set()
     entry_paths: list[str] = []
@@ -81,12 +82,26 @@ def audit_registry(repo_root: Path) -> dict[str, object]:
         else:
             paths_seen.add(path)
         entry_paths.append(path)
+        planned_path = entry.get("planned_path")
+        legacy_paths = entry.get("legacy_paths", [])
         target = repo_root / path
         if not target.exists() and not path_within_gitlink(path, gitlinks):
             errors.append(f"missing registry path: {path}")
         runtime_mode = str(entry.get("runtime_mode", ""))
         if runtime_mode != "docs-only" and not (target / "SERVICE_SPEC.md").is_file() and not path_within_gitlink(path, gitlinks):
             errors.append(f"path missing SERVICE_SPEC.md: {path}")
+        if not isinstance(legacy_paths, list):
+            errors.append(f"legacy_paths must be a list: {service_id or path}")
+            legacy_paths = []
+        if legacy_paths:
+            if planned_path != path:
+                errors.append(f"moved service planned_path must match live path: {service_id or path}")
+            for legacy in legacy_paths:
+                if not isinstance(legacy, str) or not legacy:
+                    errors.append(f"legacy path must be a non-empty string: {service_id or path}")
+                    continue
+                if (repo_root / legacy / "SERVICE_SPEC.md").exists():
+                    legacy_path_conflicts.append(legacy)
 
     missing_registry_entries = sorted(path for path in discovered_paths if path not in entry_paths)
     orphan_registry_entries = sorted(
@@ -97,6 +112,7 @@ def audit_registry(repo_root: Path) -> dict[str, object]:
         and not missing_required_fields
         and not duplicate_service_ids
         and not duplicate_paths
+        and not legacy_path_conflicts
         and not missing_registry_entries
         and not orphan_registry_entries
     )
@@ -107,6 +123,7 @@ def audit_registry(repo_root: Path) -> dict[str, object]:
         "missing_required_fields": missing_required_fields,
         "duplicate_service_ids": sorted(set(duplicate_service_ids)),
         "duplicate_paths": sorted(set(duplicate_paths)),
+        "legacy_path_conflicts": sorted(set(legacy_path_conflicts)),
         "missing_registry_entries": missing_registry_entries,
         "orphan_registry_entries": orphan_registry_entries,
         "errors": errors,

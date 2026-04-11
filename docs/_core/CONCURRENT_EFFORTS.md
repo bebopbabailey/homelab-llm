@@ -15,8 +15,9 @@ the same time.
 - Land a finished linked lane from the primary worktree with
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - Broad parallel docs/layer lanes are invalid while another implementation
-  effort is active; narrow them to explicit non-overlapping files or service
-  roots first.
+  effort is active; the same rule applies to broad `services` and
+  `experiments` scopes. Narrow them to explicit non-overlapping files or
+  service roots first.
 
 ## Local-only effort metadata
 Concurrent effort state is local to each worktree and must not be tracked in

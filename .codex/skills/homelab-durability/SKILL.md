@@ -48,7 +48,8 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
 - Do not mix opportunistic cleanup with the requested change unless explicitly approved.
 - Broad parallel docs/layer lanes are not allowed while another implementation
-  effort is active; narrow the scope first.
+  effort is active; broad `services` and `experiments` scopes are treated the
+  same way once those roots become live.
 
 ## Modes / stages
 - `Discover`: read-only, low-friction, broad inspection within scope, no formal startup header unless commands are being proposed.
@@ -57,9 +58,9 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Build`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Build`: if another worktree is only holding dirty context, use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json` there instead of relying on ad hoc `design` registration.
 - `Build`: before proposing file edits or mutation commands, run or propose `uv run python scripts/worktree_effort.py preflight --stage build --json`.
-- `Build`: first-party services under `layer-*` are plain tracked directories;
-  if lane bootstrap fails, fix the scope or worktree state instead of treating
-  it as a submodule problem.
+- `Build`: first-party services under `layer-*`, `services/`, and
+  `experiments/` are plain tracked directories; if lane bootstrap fails, fix
+  the scope or worktree state instead of treating it as a submodule problem.
 - `Verify`: strict on validation reporting. State verification mode and results. Require rollback only when the action class needs it.
 - `Verify`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Verify`: before proposing verification-stage mutations, run or propose `uv run python scripts/worktree_effort.py preflight --stage verify --json`.

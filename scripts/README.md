@@ -114,6 +114,8 @@ Repository utility scripts.
     the service-centric refactor
   - repo-local ops/validation scripts should resolve first-party service roots
     through the service registry instead of hardcoded `layer-*` path maps
+  - broad `services` and `experiments` scopes are treated like broad `layer-*`
+    scopes for concurrent-effort safety once those roots are live
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
   - filesystem-based and Git-independent at runtime

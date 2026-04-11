@@ -1,12 +1,13 @@
 # NOW
 
 Active
-- Remove repo-local runtime/tooling dependence on raw `layer-*` paths where the
-  service registry is now the canonical source of truth.
-- Tighten runtime-lock validation around `service_refs` and object path refs so
-  later `services/` / `experiments/` moves do not require another lock-format shim.
-- Keep this tranche compatibility-first: no directory moves yet.
+- Move the first low-coupling service roots into live `services/` and
+  `experiments/` paths.
+- Update registry, docs-contract discovery, and concurrent-effort guardrails so
+  the new roots are first-class rather than exceptions.
+- Keep this tranche narrow: no `optillm-local`, no control-plane runtime
+  service moves.
 
 NEXT UP
-- Move low-risk services and experiments into `services/` and `experiments/`
-  once repo-local tooling resolves service paths through the registry cleanly.
+- Plan the next move tranche after this one proves the mixed-root migration
+  pattern on a small batch.

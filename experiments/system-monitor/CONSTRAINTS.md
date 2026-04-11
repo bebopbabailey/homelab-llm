@@ -25,8 +25,8 @@ This service inherits global + layer constraints:
 - Execute: read-only health/status commands only
 
 ## Validation pointers
-- `test -f layer-gateway/system-monitor/SERVICE_SPEC.md`
-- `test -f layer-gateway/system-monitor/RUNBOOK.md`
+- `test -f experiments/system-monitor/SERVICE_SPEC.md`
+- `test -f experiments/system-monitor/RUNBOOK.md`
 
 ## Change guardrail
 If this service ever gains write/repair behavior, document the escalation and approval model first and update canonical docs before implementation.

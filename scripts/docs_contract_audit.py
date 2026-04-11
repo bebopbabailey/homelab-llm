@@ -32,6 +32,7 @@ LAYER_REQUIRED_FILES: tuple[str, ...] = (
 )
 SERVICE_MARKERS: tuple[str, ...] = tuple(name for name in SERVICE_REQUIRED_FILES if name != "README.md")
 EXCLUDED_DIR_NAMES: set[str] = {"docs"}
+SERVICE_DISCOVERY_ROOTS: tuple[str, ...] = ("services", "experiments")
 
 
 @dataclass
@@ -76,7 +77,17 @@ def discover_services(repo_root: Path) -> list[Path]:
         if not any((path / marker).exists() for marker in SERVICE_MARKERS):
             continue
         services.append(path)
-    return services
+    for root_name in SERVICE_DISCOVERY_ROOTS:
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for spec in sorted(root.rglob("SERVICE_SPEC.md")):
+            path = spec.parent
+            rel_parts = path.relative_to(repo_root).parts
+            if any(part.startswith(".") or part in EXCLUDED_DIR_NAMES for part in rel_parts):
+                continue
+            services.append(path)
+    return sorted(set(services))
 
 
 def audit_layers(repo_root: Path) -> list[DocAudit]:

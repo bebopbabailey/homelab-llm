@@ -64,6 +64,87 @@ class ServiceRegistryAuditTests(unittest.TestCase):
         self.assertFalse(payload["overall_ok"])
         self.assertEqual(payload["missing_registry_entries"], ["layer-tools/open-terminal"])
 
+    def test_audit_passes_for_services_and_experiments_roots(self) -> None:
+        repo = self.make_repo()
+        (repo / "services" / "grafana").mkdir(parents=True)
+        (repo / "services" / "grafana" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "experiments" / "legacy" / "optillm-local-gateway").mkdir(parents=True)
+        (repo / "experiments" / "legacy" / "optillm-local-gateway" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "platform" / "registry" / "services.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "service_id": "grafana",
+                            "path": "services/grafana",
+                            "planned_path": "services/grafana",
+                            "parent_service_id": None,
+                            "maturity": "supported",
+                            "runtime_mode": "long-running",
+                            "service_kind": "ui",
+                            "host_targets": ["mini"],
+                            "exposure": "localhost",
+                            "taxonomy_tags": ["ui"],
+                            "upstream_service_ids": [],
+                            "legacy_paths": ["layer-interface/grafana"],
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "service_id": "optillm-local-gateway",
+                            "path": "experiments/legacy/optillm-local-gateway",
+                            "planned_path": "experiments/legacy/optillm-local-gateway",
+                            "parent_service_id": None,
+                            "maturity": "historical",
+                            "runtime_mode": "docs-only",
+                            "service_kind": "gateway",
+                            "host_targets": ["studio"],
+                            "exposure": "internal",
+                            "taxonomy_tags": ["historical"],
+                            "upstream_service_ids": [],
+                            "legacy_paths": ["layer-gateway/optillm-local"],
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result = run(["python3", str(SCRIPT), "--repo-root", str(repo), "--json"], repo)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["overall_ok"])
+
+    def test_audit_flags_legacy_path_conflict_after_move(self) -> None:
+        repo = self.make_repo()
+        (repo / "services" / "grafana").mkdir(parents=True)
+        (repo / "services" / "grafana" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "layer-interface" / "grafana").mkdir(parents=True)
+        (repo / "layer-interface" / "grafana" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "platform" / "registry" / "services.jsonl").write_text(
+            json.dumps(
+                {
+                    "service_id": "grafana",
+                    "path": "services/grafana",
+                    "planned_path": "services/grafana",
+                    "parent_service_id": None,
+                    "maturity": "supported",
+                    "runtime_mode": "long-running",
+                    "service_kind": "ui",
+                    "host_targets": ["mini"],
+                    "exposure": "localhost",
+                    "taxonomy_tags": ["ui"],
+                    "upstream_service_ids": [],
+                    "legacy_paths": ["layer-interface/grafana"],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result = run(["python3", str(SCRIPT), "--repo-root", str(repo), "--json"], repo)
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["overall_ok"])
+        self.assertEqual(payload["legacy_path_conflicts"], ["layer-interface/grafana"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,9 +9,9 @@ UI for LiteLLM + Prometheus observability dashboards.
 - **Binary**: `grafana-server` (system package)
 
 ## Configuration
-- Repo config (source of truth): `layer-interface/grafana/config/grafana.ini`
-- Repo provisioning: `layer-interface/grafana/provisioning/`
-- Repo dashboards: `layer-interface/grafana/dashboards/`
+- Repo config (source of truth): `services/grafana/config/grafana.ini`
+- Repo provisioning: `services/grafana/provisioning/`
+- Repo dashboards: `services/grafana/dashboards/`
 - Runtime config (deployed copy): `/etc/homelab-llm/grafana/grafana.ini`
 - Runtime provisioning: `/etc/homelab-llm/grafana/provisioning/`
 - Runtime dashboards: `/etc/homelab-llm/grafana/dashboards/`

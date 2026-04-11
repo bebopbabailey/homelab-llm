@@ -9,7 +9,7 @@ Metrics backend for LiteLLM and related services.
 - **Binary**: `prometheus` (system package)
 
 ## Configuration
-- Repo config (source of truth): `layer-tools/prometheus/config/prometheus.yml`
+- Repo config (source of truth): `services/prometheus/config/prometheus.yml`
 - Runtime config (deployed copy): `/etc/homelab-llm/prometheus/prometheus.yml`
 - Metrics auth token file (not in git): `/etc/homelab-llm/prometheus/litellm_bearer_token`
 

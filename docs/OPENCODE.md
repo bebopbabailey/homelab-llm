@@ -131,9 +131,11 @@ Repo-local durability posture:
   canonical resolver
 - `uv run python scripts/worktree_effort.py close --json` is metadata-only
 - broad parallel docs/layer lanes are not allowed while another implementation
-  lane is active; narrow them first
-- first-party services under `layer-*` are plain tracked directories; lane
-  bootstrap and closeout should not require submodule sync or gitlink audits
+  lane is active; the same rule applies to broad `services` and `experiments`
+  scopes
+- first-party services under `layer-*`, `services/`, and `experiments/` are
+  plain tracked directories; lane bootstrap and closeout should not require
+  submodule sync or gitlink audits
 - closeout is local-only and deterministic: no auto-rebase, no push, and no
   automatic `NOW.md` edits
 - root/doc placement hygiene is enforced separately by

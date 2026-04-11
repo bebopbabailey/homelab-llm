@@ -170,6 +170,20 @@ class StartEffortTests(unittest.TestCase):
         self.assertIn("broad parallel docs/layer scopes", payload["message"])
         self.assertFalse((root / "repo-docs-pass").exists())
 
+    def test_start_effort_rejects_broad_parallel_services_lane(self) -> None:
+        root, repo = self.make_repo()
+        first = self.add_worktree(root, repo, "feature-a")
+        result = run(
+            ["python3", str(WORKTREE_SCRIPT), "register", "--effort-id", "feature-a", "--stage", "build", "--scope", "README.md", "--json"],
+            first,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        blocked = self.run_start(repo, "--id", "services-pass", "--scope", "services", "--json")
+        self.assertNotEqual(blocked.returncode, 0)
+        payload = json.loads(blocked.stdout)
+        self.assertIn("broad parallel docs/layer scopes", payload["message"])
+        self.assertFalse((root / "repo-services-pass").exists())
+
     def test_start_effort_cleans_up_failed_register(self) -> None:
         root, repo = self.make_repo()
         scripts_dir = repo / "scripts"
