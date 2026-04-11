@@ -8,10 +8,6 @@
       "path": "layer-gateway/optillm-proxy"
     }
   },
-  "submodules": {
-    "layer-gateway/optillm-proxy": "e19fd0c0d0c6db18affcc59fdb59aa196eb175d7",
-    "layer-gateway/litellm-orch": "929ab2cca20c53fe583f94d6b19f542e2dd55a6b"
-  },
   "optillm_proxy": {
     "package": {
       "name": "optillm",

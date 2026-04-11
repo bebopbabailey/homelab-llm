@@ -20,7 +20,7 @@ class ValidateRuntimeLockTests(unittest.TestCase):
         self.assertEqual(vr.router_assertions(text), (True, True))
 
     def test_fast_fails_when_patch_artifact_present(self):
-        lock = {"service_refs": {"litellm-orch": {"path": "layer-gateway/litellm-orch"}}, "submodules": {"layer-gateway/optillm-proxy": "abc", "layer-gateway/litellm-orch": "def"}, "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}}}
+        lock = {"service_refs": {"litellm-orch": {"path": "layer-gateway/litellm-orch"}}, "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}}}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "layer-gateway/optillm-proxy/scripts").mkdir(parents=True)
@@ -40,13 +40,12 @@ class ValidateRuntimeLockTests(unittest.TestCase):
             (root / "layer-gateway/optillm-proxy/patches/optillm.patch").write_text('patch')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "PATCH_PATHS", [root / "layer-gateway/optillm-proxy/patches/optillm.patch"]), \
-                 mock.patch.object(vr, "DOC_PATHS", [root / 'docs/foundation/runtime-lock.md']), \
-                 mock.patch.object(vr, "gitlink_sha", side_effect=lambda path: lock['submodules'][path]):
+                 mock.patch.object(vr, "DOC_PATHS", [root / 'docs/foundation/runtime-lock.md']):
                 failures = vr.check_fast(lock)
             self.assertTrue(any("patch artifact present" in f for f in failures))
 
     def test_fast_fails_when_router_missing_drop_params(self):
-        lock = {"submodules": {"layer-gateway/optillm-proxy": "abc", "layer-gateway/litellm-orch": "def"}, "litellm": {"router_yaml": "router.yaml"}}
+        lock = {"litellm": {"router_yaml": "router.yaml"}}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "router.yaml").write_text('router_settings:\n  fallbacks:\n    - {"fast": ["main"]}\n')
@@ -58,13 +57,12 @@ class ValidateRuntimeLockTests(unittest.TestCase):
             (root / 'doc.md').write_text('x')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "PATCH_PATHS", []), \
-                 mock.patch.object(vr, "DOC_PATHS", [root / 'doc.md']), \
-                 mock.patch.object(vr, "gitlink_sha", side_effect=lambda path: lock['submodules'][path]):
+                 mock.patch.object(vr, "DOC_PATHS", [root / 'doc.md']):
                 failures = vr.check_fast(lock)
             self.assertTrue(any('drop_params' in f for f in failures))
 
     def test_fast_fails_when_uv_lock_has_git_source(self):
-        lock = {"submodules": {"layer-gateway/optillm-proxy": "abc", "layer-gateway/litellm-orch": "def"}, "litellm": {"router_yaml": "router.yaml"}}
+        lock = {"litellm": {"router_yaml": "router.yaml"}}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "router.yaml").write_text('drop_params: true\nfallbacks:\n  - {"fast": ["main"]}\n')
@@ -75,8 +73,7 @@ class ValidateRuntimeLockTests(unittest.TestCase):
             (root / 'doc.md').write_text('x')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "PATCH_PATHS", []), \
-                 mock.patch.object(vr, "DOC_PATHS", [root / 'doc.md']), \
-                 mock.patch.object(vr, "gitlink_sha", side_effect=lambda path: lock['submodules'][path]):
+                 mock.patch.object(vr, "DOC_PATHS", [root / 'doc.md']):
                 failures = vr.check_fast(lock)
             self.assertTrue(any('git-sourced optillm' in f for f in failures))
 

@@ -26,15 +26,6 @@ jobs:
           submodules: false
           fetch-depth: 1
 
-      - name: Configure git for private submodules
-        env:
-          GITHUB_APP_TOKEN: ${{ steps.mint_identity_token.outputs.token }}
-        run: |
-          test -n "$GITHUB_APP_TOKEN"
-          git config --global url."https://x-access-token:${GITHUB_APP_TOKEN}@github.com/".insteadOf "git@github.com:"
-          git config --global url."https://x-access-token:${GITHUB_APP_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
-          git submodule sync --recursive
-          git submodule update --init --recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

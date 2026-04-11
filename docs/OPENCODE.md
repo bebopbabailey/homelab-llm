@@ -132,8 +132,8 @@ Repo-local durability posture:
 - `uv run python scripts/worktree_effort.py close --json` is metadata-only
 - broad parallel docs/layer lanes are not allowed while another implementation
   lane is active; narrow them first
-- submodule pin drift is a local hygiene blocker and should be diagnosed with
-  `scripts/submodule_pin_audit.py`
+- first-party services under `layer-*` are plain tracked directories; lane
+  bootstrap and closeout should not require submodule sync or gitlink audits
 - closeout is local-only and deterministic: no auto-rebase, no push, and no
   automatic `NOW.md` edits
 - root/doc placement hygiene is enforced separately by

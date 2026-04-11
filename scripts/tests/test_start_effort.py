@@ -31,10 +31,6 @@ class StartEffortTests(unittest.TestCase):
         (repo / "docs" / "a.md").write_text("a\n", encoding="utf-8")
         (repo / "scripts").mkdir()
         (repo / "scripts" / "worktree_effort.py").write_text(WORKTREE_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-        (repo / "scripts" / "submodule_pin_audit.py").write_text(
-            (START_SCRIPT.parents[0] / "submodule_pin_audit.py").read_text(encoding="utf-8"),
-            encoding="utf-8",
-        )
         (repo / "scripts" / "service_registry.py").write_text(
             SERVICE_REGISTRY_SCRIPT.read_text(encoding="utf-8"),
             encoding="utf-8",
@@ -73,23 +69,6 @@ class StartEffortTests(unittest.TestCase):
         result = run(["git", "worktree", "add", "-b", name, str(other)], repo)
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         return other
-
-    def add_submodule(self, root: Path, repo: Path, rel_path: str) -> None:
-        child = root / "child-submodule"
-        child.mkdir()
-        self.assertEqual(run(["git", "init", "-b", "master"], child).returncode, 0)
-        self.assertEqual(run(["git", "config", "user.email", "test@example.com"], child).returncode, 0)
-        self.assertEqual(run(["git", "config", "user.name", "Test User"], child).returncode, 0)
-        self.assertEqual(run(["git", "config", "protocol.file.allow", "always"], repo).returncode, 0)
-        (child / "sub.txt").write_text("submodule\n", encoding="utf-8")
-        self.assertEqual(run(["git", "add", "."], child).returncode, 0)
-        self.assertEqual(run(["git", "commit", "-m", "init"], child).returncode, 0)
-        result = run(
-            ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(child), rel_path],
-            repo,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
-        self.assertEqual(run(["git", "commit", "-am", "add submodule"], repo).returncode, 0)
 
     def test_start_effort_creates_linked_worktree_and_registers_effort(self) -> None:
         _, repo = self.make_repo()
@@ -163,15 +142,19 @@ class StartEffortTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("target worktree path already exists", result.stderr)
 
-    def test_start_effort_initializes_overlapping_submodule_only(self) -> None:
+    def test_start_effort_allows_layer_service_scope_as_normal_path(self) -> None:
         root, repo = self.make_repo()
-        self.add_submodule(root, repo, "layer-gateway/example-submodule")
-        result = self.run_start(repo, "--id", "demo", "--scope", "layer-gateway/example-submodule", "--json")
+        service_root = repo / "layer-gateway" / "example-service"
+        service_root.mkdir(parents=True)
+        (service_root / "SERVICE_SPEC.md").write_text("service\n", encoding="utf-8")
+        self.assertEqual(run(["git", "add", "."], repo).returncode, 0)
+        self.assertEqual(run(["git", "commit", "-m", "add service"], repo).returncode, 0)
+        result = self.run_start(repo, "--id", "demo", "--scope", "layer-gateway/example-service", "--json")
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["initialized_submodules"], ["layer-gateway/example-submodule"])
-        submodule_file = Path(payload["worktree_path"]) / "layer-gateway" / "example-submodule" / "sub.txt"
-        self.assertTrue(submodule_file.is_file())
+        self.assertEqual(payload["scope_paths"], ["layer-gateway/example-service"])
+        service_file = Path(payload["worktree_path"]) / "layer-gateway" / "example-service" / "SERVICE_SPEC.md"
+        self.assertTrue(service_file.is_file())
 
     def test_start_effort_rejects_broad_parallel_docs_lane(self) -> None:
         root, repo = self.make_repo()
@@ -187,14 +170,18 @@ class StartEffortTests(unittest.TestCase):
         self.assertIn("broad parallel docs/layer scopes", payload["message"])
         self.assertFalse((root / "repo-docs-pass").exists())
 
-    def test_start_effort_cleans_up_failed_submodule_bootstrap(self) -> None:
+    def test_start_effort_cleans_up_failed_register(self) -> None:
         root, repo = self.make_repo()
-        self.add_submodule(root, repo, "layer-gateway/example-submodule")
-        child = root / "child-submodule"
-        result = run(["rm", "-rf", str(child)], repo)
-        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        scripts_dir = repo / "scripts"
+        scripts_dir.mkdir(exist_ok=True)
+        (scripts_dir / "worktree_effort.py").write_text(
+            "import sys\nsys.stderr.write('forced register failure\\n')\nsys.exit(1)\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(run(["git", "add", "scripts/worktree_effort.py"], repo).returncode, 0)
+        self.assertEqual(run(["git", "commit", "-m", "break register"], repo).returncode, 0)
         target = root / "repo-demo"
-        failed = self.run_start(repo, "--id", "demo", "--scope", "layer-gateway/example-submodule", "--path", str(target), "--json")
+        failed = self.run_start(repo, "--id", "demo", "--scope", "docs", "--path", str(target), "--json")
         self.assertNotEqual(failed.returncode, 0)
         payload = json.loads(failed.stdout)
         self.assertTrue(payload["cleanup_attempted"])

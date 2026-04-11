@@ -53,15 +53,6 @@ def load_lock(path=LOCK_PATH):
     return json.loads(read_text(path))
 
 
-def gitlink_sha(path):
-    proc = run(["git", "submodule", "status", path], cwd=REPO_ROOT)
-    text = proc.stdout.strip()
-    parts = text.split()
-    if not parts:
-        raise RuntimeError(f"unable to parse submodule status for {path}")
-    return parts[0].lstrip("+-U")
-
-
 def service_ref_path(lock, service_id):
     refs = lock.get("service_refs", {}) or {}
     entry = refs.get(service_id)
@@ -129,11 +120,6 @@ def check_fast(lock):
         failures.append("missing platform/ops/runtime-lock.json")
         return failures
 
-    for path, sha in lock["submodules"].items():
-        current = gitlink_sha(path)
-        if current != sha:
-            failures.append(f"submodule mismatch {path}: {current} != {sha}")
-
     pyproject = read_text(REPO_ROOT / "layer-gateway/optillm-proxy/pyproject.toml")
     if 'optillm==0.3.12' not in pyproject:
         failures.append("optillm pin missing from pyproject.toml")
@@ -176,11 +162,6 @@ def parse_remote_json(proc, context):
 
 def check_full(lock, host):
     failures = check_fast(lock)
-
-    target_sha = lock["submodules"]["layer-gateway/optillm-proxy"]
-    proc = studio_run("cd /Users/thestudio/optillm-proxy && git rev-parse HEAD", host)
-    if proc.returncode != 0 or proc.stdout.strip() != target_sha:
-        failures.append("studio optillm-proxy HEAD does not match runtime lock")
 
     proc = studio_run("/Users/thestudio/optillm-proxy/.venv/bin/python - <<'PY'\nimport importlib.metadata as md, json\nd = md.distribution('optillm')\nprint(json.dumps({'version': md.version('optillm'), 'has_direct_url': any(str(f).endswith('direct_url.json') for f in (d.files or []))}))\nPY", host)
     try:

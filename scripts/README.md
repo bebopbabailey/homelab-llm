@@ -27,17 +27,14 @@ Repository utility scripts.
   the current dirty tree exceeds its declared effort scope. The primary
   worktree is baseline-only and cannot host `Build`/`Verify` work.
 - `start_effort.py` — creates a linked worktree from a clean primary `master`
-  baseline, initializes only scoped submodules, registers the effort, and runs
-  preflight before implementation starts.
-- `submodule_pin_audit.py` — checks whether scoped submodule gitlink commits
-  are present locally and remotely reachable; local-only pins are a hygiene
-  failure.
+  baseline, registers the effort, and runs preflight before implementation
+  starts.
 - `closeout_effort.py` — lands a linked worktree locally by committing scoped
   work if needed, running repo audits, fast-forward merging to `master`,
   closing local metadata, removing the linked worktree, and deleting the local
   branch.
 - `repo_snapshot_zip.py` — packages the current repo filesystem snapshot as it
-  exists on disk, including submodule contents automatically, while excluding
+  exists on disk, including service contents automatically, while excluding
   obvious local heavyweight junk such as `.git`, `.venv*`, caches, and build
   artifacts; copies the ZIP to `studio:~/` by default.
 - `websearch_eval_summary.py` — summarizes saved promptfoo web-search eval
@@ -93,7 +90,6 @@ Repository utility scripts.
   - `uv run python scripts/worktree_effort.py preflight --stage build --json`
   - `uv run python scripts/worktree_effort.py preflight --stage verify --json`
   - `uv run python scripts/worktree_effort.py close --json`
-  - `uv run python scripts/submodule_pin_audit.py --ref master --scope <submodule-path> --json`
   - `uv run python scripts/closeout_effort.py --worktree <linked-worktree-path> --json`
   - `start_effort.py` is the normal bootstrap path from the primary worktree
   - `start_effort.py` rejects broad parallel docs/layer scopes and cleans up a
@@ -107,6 +103,8 @@ Repository utility scripts.
     finished lane and restore the boring baseline
   - `closeout_effort.py` is local-only and deterministic: no auto-rebase, no
     push, and no automatic `NOW.md` edits
+  - first-party services under `layer-*` are plain tracked directories, not
+    submodules
   - keeps concurrent implementation state local to each worktree and out of repo-tracked files
 - Service registry:
   - `uv run python scripts/service_registry.py show litellm-orch --json`

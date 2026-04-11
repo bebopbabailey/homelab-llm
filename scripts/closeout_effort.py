@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from submodule_pin_audit import list_submodules, audit_submodule
 from worktree_effort import (
     IMPLEMENTATION_STAGES,
     build_preflight_payload,
@@ -79,28 +78,6 @@ def run_repo_audits(target_path: Path) -> tuple[bool, bool]:
     return (repo_hygiene_ok, sync_ok)
 
 
-def changed_submodule_paths(repo_root: Path, branch: str) -> list[str]:
-    submodule_paths = {item["path"] for item in list_submodules(repo_root)}
-    result = run(
-        ["git", "diff", "--name-only", "--diff-filter=M", f"master...{branch}"],
-        repo_root,
-    )
-    if result.returncode != 0:
-        raise SystemExit(result.stderr.strip() or result.stdout.strip() or "failed to inspect changed submodule paths")
-    return sorted(path for path in result.stdout.splitlines() if path in submodule_paths)
-
-
-def audit_changed_submodule_pins(repo_root: Path, target_path: Path, branch: str) -> tuple[bool, list[dict[str, object]]]:
-    failures: list[dict[str, object]] = []
-    submodule_records = {item["path"]: item for item in list_submodules(repo_root)}
-    for rel_path in changed_submodule_paths(repo_root, branch):
-        expected_commit = run_git(target_path, "ls-files", "--stage", "--", rel_path).split()[1]
-        audit = audit_submodule(repo_root, rel_path, submodule_records[rel_path]["url"], expected_commit, target_path)
-        if audit["issues"]:
-            failures.append(audit)
-    return (not failures, failures)
-
-
 def close_metadata_if_present(target_path: Path) -> bool:
     result = run([sys.executable, "scripts/worktree_effort.py", "close", "--json"], target_path)
     return result.returncode == 0
@@ -154,9 +131,6 @@ def main() -> int:
     if behind_master_count != 0:
         raise SystemExit("target branch is not fast-forwardable from master; realign it manually before closeout")
     repo_hygiene_ok, sync_ok = run_repo_audits(target_path)
-    submodule_pin_ok, submodule_failures = audit_changed_submodule_pins(repo_root, target_path, branch)
-    if not submodule_pin_ok:
-        raise SystemExit(json.dumps({"submodule_pin_ok": False, "failures": submodule_failures}, indent=2))
     merge = run(["git", "merge", "--ff-only", branch], repo_root)
     if merge.returncode != 0:
         raise SystemExit(merge.stderr.strip() or merge.stdout.strip() or "failed to fast-forward merge target branch")
@@ -174,7 +148,6 @@ def main() -> int:
         "commit_sha": commit_sha,
         "repo_hygiene_ok": repo_hygiene_ok,
         "control_plane_sync_ok": sync_ok,
-        "submodule_pin_ok": submodule_pin_ok,
         "merged_to_master": True,
         "merged_sha": merged_sha,
         "metadata_closed": metadata_closed,

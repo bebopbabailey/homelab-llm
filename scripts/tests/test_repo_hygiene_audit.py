@@ -31,6 +31,10 @@ MANIFEST_TEMPLATE = {
 }
 
 
+def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False)
+
+
 class RepoHygieneAuditTests(unittest.TestCase):
     def make_repo(
         self,
@@ -72,6 +76,11 @@ class RepoHygieneAuditTests(unittest.TestCase):
         (repo / "docs" / "archive" / "README.md").write_text("# Archive\n", encoding="utf-8")
         for name in archive_files or []:
             (repo / "docs" / "archive" / name).write_text(f"# {name}\n", encoding="utf-8")
+        self.assertEqual(run(["git", "init", "-b", "master"], repo).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.email", "test@example.com"], repo).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.name", "Test User"], repo).returncode, 0)
+        self.assertEqual(run(["git", "add", "."], repo).returncode, 0)
+        self.assertEqual(run(["git", "commit", "-m", "init"], repo).returncode, 0)
         return repo
 
     def run_script(self, repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -86,8 +95,10 @@ class RepoHygieneAuditTests(unittest.TestCase):
         self.assertEqual(payload["unexpected_root_files"], ["junk.txt"])
 
     def test_root_scope_ignores_git_worktree_file(self) -> None:
-        repo = self.make_repo(extra_root_files=[".git"])
-        result = self.run_script(repo, "--scope", "root", "--json")
+        repo = self.make_repo()
+        linked = repo.parent / "linked"
+        self.assertEqual(run(["git", "worktree", "add", "-b", "linked", str(linked)], repo).returncode, 0)
+        result = self.run_script(linked, "--scope", "root", "--json")
         payload = json.loads(result.stdout)
         self.assertTrue(payload["root_ok"])
         self.assertEqual(payload["unexpected_root_files"], [])
@@ -135,24 +146,42 @@ class RepoHygieneAuditTests(unittest.TestCase):
 
     def test_gitlinks_scope_passes_without_forbidden_paths(self) -> None:
         repo = self.make_repo()
-        (repo / ".gitmodules").write_text(
-            '[submodule "layer-tools/mcp-tools"]\n\tpath = layer-tools/mcp-tools\n\turl = git@example.com:mcp-tools.git\n',
-            encoding="utf-8",
+        child = repo / "child"
+        child.mkdir()
+        self.assertEqual(run(["git", "init", "-b", "master"], child).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.email", "test@example.com"], child).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.name", "Test User"], child).returncode, 0)
+        (child / "README.md").write_text("child\n", encoding="utf-8")
+        self.assertEqual(run(["git", "add", "."], child).returncode, 0)
+        self.assertEqual(run(["git", "commit", "-m", "init"], child).returncode, 0)
+        sha = run(["git", "rev-parse", "HEAD"], child).stdout.strip()
+        self.assertEqual(
+            run(["git", "update-index", "--add", "--cacheinfo", f"160000,{sha},vendor/example"], repo).returncode,
+            0,
         )
         result = self.run_script(repo, "--scope", "gitlinks", "--json")
         payload = json.loads(result.stdout)
         self.assertTrue(payload["gitlink_ok"])
 
-    def test_gitlinks_scope_flags_forbidden_services_paths(self) -> None:
+    def test_gitlinks_scope_flags_forbidden_layer_paths(self) -> None:
         repo = self.make_repo()
-        (repo / ".gitmodules").write_text(
-            '[submodule "services/example"]\n\tpath = services/example\n\turl = git@example.com:example.git\n',
-            encoding="utf-8",
+        child = repo / "child"
+        child.mkdir()
+        self.assertEqual(run(["git", "init", "-b", "master"], child).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.email", "test@example.com"], child).returncode, 0)
+        self.assertEqual(run(["git", "config", "user.name", "Test User"], child).returncode, 0)
+        (child / "README.md").write_text("child\n", encoding="utf-8")
+        self.assertEqual(run(["git", "add", "."], child).returncode, 0)
+        self.assertEqual(run(["git", "commit", "-m", "init"], child).returncode, 0)
+        sha = run(["git", "rev-parse", "HEAD"], child).stdout.strip()
+        self.assertEqual(
+            run(["git", "update-index", "--add", "--cacheinfo", f"160000,{sha},layer-tools/example"], repo).returncode,
+            0,
         )
         result = self.run_script(repo, "--scope", "gitlinks", "--json")
         payload = json.loads(result.stdout)
         self.assertFalse(payload["gitlink_ok"])
-        self.assertEqual(payload["forbidden_gitlink_paths"], ["services/example"])
+        self.assertEqual(payload["forbidden_gitlink_paths"], ["layer-tools/example"])
 
 
 if __name__ == "__main__":

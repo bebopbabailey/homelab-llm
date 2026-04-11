@@ -1007,7 +1007,6 @@ uv run python scripts/worktree_effort.py register --effort-id bad --stage build 
 uv run python scripts/worktree_effort.py preflight --stage build --json
 uv run python scripts/worktree_effort.py preflight --stage verify --json
 uv run python scripts/worktree_effort.py close --json
-uv run python scripts/submodule_pin_audit.py --ref master --scope layer-gateway/litellm-orch --json
 uv run python scripts/closeout_effort.py --worktree /home/christopherbailey/homelab-llm-demo --json
 uv run python scripts/service_registry_audit.py --strict --json
 uv run python scripts/docs_link_audit.py
@@ -1037,13 +1036,12 @@ Expected:
   worktree.
 - `close --json` removes local metadata and returns the worktree to a null
   state, but is metadata-only.
-- `submodule_pin_audit.py` reports whether a submodule gitlink commit is
-  present locally and remotely reachable; local-only pins are a closeout
-  blocker.
 - `closeout_effort.py` stages scoped lane changes, commits if needed,
   fast-forward merges to `master`, closes metadata, removes the linked
   worktree, and deletes the local branch.
 - `closeout_effort.py` does not auto-rebase and does not update `NOW.md`.
+- first-party services under `layer-*` are plain tracked directories, so
+  lane bootstrap and closeout do not require submodule sync or gitlink checks.
 - `service_registry_audit.py` hard-fails if a discovered `SERVICE_SPEC.md`
   service root is missing from the service registry.
 - `docs_link_audit.py` validates internal markdown links on the supported

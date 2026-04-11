@@ -9,8 +9,7 @@ import subprocess
 from pathlib import Path, PurePosixPath
 
 from service_registry import resolve_service_path
-from submodule_pin_audit import audit_submodule, filter_submodules, list_submodules
-from worktree_effort import IMPLEMENTATION_STAGES, build_preflight_payload, gather_state
+from worktree_effort import IMPLEMENTATION_STAGES, gather_state
 
 
 BROAD_PARALLEL_PATHS = {
@@ -127,16 +126,6 @@ def branch_exists(repo_root: Path, branch: str) -> bool:
     return result.returncode == 0
 
 
-def list_submodule_paths(repo_root: Path) -> list[str]:
-    return [item["path"] for item in list_submodules(repo_root)]
-
-
-def submodules_overlapping_scope(submodule_paths: list[str], scope_paths: list[str]) -> list[str]:
-    return sorted(
-        path for path in submodule_paths if any(paths_overlap(path, scope) for scope in scope_paths)
-    )
-
-
 def create_worktree(repo_root: Path, base_ref: str, branch: str, worktree_path: Path) -> None:
     subprocess.run(
         ["git", "-C", str(repo_root), "worktree", "add", "-b", branch, str(worktree_path), base_ref],
@@ -144,19 +133,6 @@ def create_worktree(repo_root: Path, base_ref: str, branch: str, worktree_path: 
         capture_output=True,
         text=True,
     )
-
-
-def init_scoped_submodules(worktree_path: Path, submodule_paths: list[str]) -> None:
-    if not submodule_paths:
-        return
-    subprocess.run(
-        ["git", "-C", str(worktree_path), "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive", "--", *submodule_paths],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-
 def failure_payload(message: str, **extra: object) -> dict[str, object]:
     payload = {
         "overall_ok": False,
@@ -311,12 +287,10 @@ def main() -> int:
         print_payload(payload, args.json)
         return 1
 
-    overlapping_submodules = submodules_overlapping_scope(list_submodule_paths(repo_root), scope_paths)
     created = False
     try:
         create_worktree(repo_root, args.base, branch, worktree_path)
         created = True
-        init_scoped_submodules(worktree_path, overlapping_submodules)
 
         register_args = [
             "register",
@@ -342,14 +316,6 @@ def main() -> int:
             "--json",
         )
     except (subprocess.CalledProcessError, SystemExit) as error:
-        submodule_diagnostics = []
-        if created and overlapping_submodules:
-            scoped_submodules = filter_submodules(list_submodules(repo_root), overlapping_submodules)
-            for item in scoped_submodules:
-                expected_commit = run_git(worktree_path, "ls-files", "--stage", "--", item["path"]).split()[1]
-                submodule_diagnostics.append(
-                    audit_submodule(repo_root, item["path"], item["url"], expected_commit, worktree_path)
-                )
         cleanup_ok, cleanup_errors = cleanup_created_lane(repo_root, branch, worktree_path) if created else (True, [])
         payload = failure_payload(
             str(error),
@@ -358,7 +324,6 @@ def main() -> int:
             cleanup_ok=cleanup_ok,
             cleanup_errors=cleanup_errors,
             blocking_issues=[str(error)],
-            submodule_diagnostics=submodule_diagnostics,
         )
         print_payload(payload, args.json)
         return 1
@@ -371,7 +336,6 @@ def main() -> int:
         "stage": args.stage,
         "service_ids": service_ids,
         "scope_paths": scope_paths,
-        "initialized_submodules": overlapping_submodules,
         "register_ok": True,
         "preflight_ok": bool(preflight_payload.get("overall_ok")),
         "overall_ok": bool(preflight_payload.get("overall_ok")),

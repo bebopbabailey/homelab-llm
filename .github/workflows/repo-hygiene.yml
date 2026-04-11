@@ -27,7 +27,6 @@ jobs:
           python -m unittest discover -s scripts/tests -p 'test_control_plane_sync_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_service_registry_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_start_effort.py'
-          python -m unittest discover -s scripts/tests -p 'test_submodule_pin_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_closeout_effort.py'
           python -m unittest discover -s scripts/tests -p 'test_worktree_effort.py'
 

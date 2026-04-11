@@ -1,91 +1,26 @@
-# Git Submodules (Homelab LLM)
+# Git Submodules
 
-This repo uses **git submodules** for service repos that evolve independently.
-This keeps each service’s history intact while the monorepo pins exact versions.
+This repo no longer uses first-party git submodules for active services.
 
-## Why submodules here
-- Services like `layer-gateway/litellm-orch` and `layer-inference/ov-llm-server` have their own
-  lifecycles, releases, and dependency management.
-- The monorepo records the exact commit for each service so the platform is reproducible.
+## Current rule
+- Active first-party services under `layer-*` are plain tracked directories in
+  the monorepo.
+- Historical submodule guidance is retired.
+- If `git ls-files --stage | grep '^160000 '` prints first-party service paths,
+  repo hygiene is broken.
 
-## Key concept
-A submodule is a *pointer* to a specific commit in another repo. The monorepo must
-be updated whenever the submodule pointer changes.
-
-## One-time setup (after clone)
+## Working model
 ```bash
-# Clone the monorepo and initialize submodules
-
-git clone <your-monorepo-url>
+git clone <repo>
 cd homelab-llm
-
-git submodule update --init --recursive
+uv run python scripts/start_effort.py --id demo --scope layer-gateway/litellm-orch --json
+uv run python scripts/closeout_effort.py --worktree /path/to/linked-worktree --json
 ```
 
-## Daily workflow
-### 1) Pull updates (monorepo + submodules)
-```bash
-git pull
+## Common mistakes
+- Treating a first-party service directory as if it were its own repo.
+- Reintroducing gitlinks under first-party service paths.
+- Following historical submodule instructions for active lane work.
 
-git submodule update --init --recursive
-```
-
-### 2) Work inside a submodule
-```bash
-cd layer-gateway/litellm-orch
-# make changes, commit in the submodule repo
-
-git status
-
-git add -A
-
-git commit -m "your message"
-```
-
-### 3) Update the monorepo pointer
-```bash
-cd /home/christopherbailey/homelab-llm
-
-git status
-# You will see the submodule marked as modified
-
-git add layer-gateway/litellm-orch
-
-git commit -m "Update litellm-orch submodule"
-```
-
-### 4) Push
-```bash
-# Push submodule repo first
-cd layer-gateway/litellm-orch
-
-git push
-
-# Then push the monorepo pointer
-cd /home/christopherbailey/homelab-llm
-
-git push
-```
-
-Replace `layer-gateway/litellm-orch` with the submodule you are working in.
-
-## Common pitfalls
-- **Forgetting to update the monorepo pointer** after committing inside a submodule.
-- **Pulling the monorepo** without running `git submodule update` (submodules stay stale).
-- **Trying to edit submodule files without committing** inside the submodule repo.
-
-## Quick health check
-```bash
-cd /home/christopherbailey/homelab-llm
-
-git submodule status
-```
-
-If you see a leading `-` or `+`, the submodule pointer is out of sync.
-
-## Where we use submodules
-- `layer-gateway/litellm-orch`
-- `layer-gateway/optillm-proxy`
-- `layer-inference/ov-llm-server`
-- `layer-tools/mcp-tools`
-- `layer-tools/searxng`
+## Historical note
+Older commits used first-party submodules. Current active development does not.

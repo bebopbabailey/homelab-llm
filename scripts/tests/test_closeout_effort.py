@@ -10,7 +10,6 @@ from pathlib import Path
 CLOSEOUT_SCRIPT = Path(__file__).resolve().parents[1] / "closeout_effort.py"
 START_SCRIPT = Path(__file__).resolve().parents[1] / "start_effort.py"
 WORKTREE_SCRIPT = Path(__file__).resolve().parents[1] / "worktree_effort.py"
-SUBMODULE_AUDIT_SCRIPT = Path(__file__).resolve().parents[1] / "submodule_pin_audit.py"
 
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -34,7 +33,6 @@ class CloseoutEffortTests(unittest.TestCase):
         (repo / "scripts" / "start_effort.py").write_text(START_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
         (repo / "scripts" / "worktree_effort.py").write_text(WORKTREE_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
         (repo / "scripts" / "closeout_effort.py").write_text(CLOSEOUT_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-        (repo / "scripts" / "submodule_pin_audit.py").write_text(SUBMODULE_AUDIT_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
         (repo / "scripts" / "repo_hygiene_audit.py").write_text(
             "import json\nprint(json.dumps({'overall_ok': True}))\n",
             encoding="utf-8",

@@ -1,13 +1,12 @@
 # NOW
 
 Active
-- Establish the compatibility-first service registry and service-centric control
-  surfaces without moving service directories yet.
-- Move platform-wide registries to `platform/registry/` and update tooling to
-  resolve canonical service IDs.
-- Keep the refactor lane limited to docs, scripts, platform, and registry
-  surfaces until path moves are ready.
+- Retire the five first-party service submodules and restore plain tracked
+  directories at their existing `layer-*` paths.
+- Remove submodule-specific lane bootstrap, closeout, runtime-lock, and audit
+  assumptions so the repo behaves like a plain monorepo.
+- Keep this tranche compatibility-first: no `services/` path moves yet.
 
 NEXT UP
-- Use the new service registry to plan the later `services/` and
-  `experiments/` path migration.
+- Use the flattened monorepo plus the service registry to plan the later
+  `services/` and `experiments/` path migration.

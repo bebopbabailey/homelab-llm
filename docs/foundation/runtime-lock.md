@@ -150,7 +150,7 @@ Compatibility-first note:
 
 ## Update rules
 Update both the doc and `platform/ops/runtime-lock.json` if any of these change:
-- locked submodule SHAs
+- service refs and exact runtime file paths resolved from the monorepo tree
 - OptiLLM package provenance or version
 - Studio OptiLLM deploy contract
 - LiteLLM resilience settings (`drop_params`, fallbacks)

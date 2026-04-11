@@ -57,8 +57,9 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Build`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Build`: if another worktree is only holding dirty context, use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json` there instead of relying on ad hoc `design` registration.
 - `Build`: before proposing file edits or mutation commands, run or propose `uv run python scripts/worktree_effort.py preflight --stage build --json`.
-- `Build`: if scoped submodule bootstrap fails, stop and repair the submodule
-  pin drift; do not rely on local-only seeded state.
+- `Build`: first-party services under `layer-*` are plain tracked directories;
+  if lane bootstrap fails, fix the scope or worktree state instead of treating
+  it as a submodule problem.
 - `Verify`: strict on validation reporting. State verification mode and results. Require rollback only when the action class needs it.
 - `Verify`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Verify`: before proposing verification-stage mutations, run or propose `uv run python scripts/worktree_effort.py preflight --stage verify --json`.

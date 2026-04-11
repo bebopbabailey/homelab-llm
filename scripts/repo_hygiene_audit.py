@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -126,17 +127,29 @@ def audit_archive(repo_root: Path, manifest: dict[str, object]) -> dict[str, obj
 
 
 def audit_gitlinks(repo_root: Path) -> dict[str, object]:
-    gitlink_paths: list[str] = []
-    gitmodules = repo_root / ".gitmodules"
-    if gitmodules.is_file():
-        for line in gitmodules.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line.startswith("path = "):
-                gitlink_paths.append(line.split("=", 1)[1].strip())
-    forbidden_prefixes = ("services/", "experiments/")
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-files", "--stage"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    gitlink_paths = sorted(
+        line.split(maxsplit=3)[3]
+        for line in result.stdout.splitlines()
+        if line.startswith("160000 ")
+    )
+    forbidden_prefixes = (
+        "services/",
+        "experiments/",
+        "layer-data/",
+        "layer-gateway/",
+        "layer-inference/",
+        "layer-interface/",
+        "layer-tools/",
+    )
     forbidden_gitlink_paths = sorted(path for path in gitlink_paths if path.startswith(forbidden_prefixes))
     return {
-        "gitlink_paths": sorted(gitlink_paths),
+        "gitlink_paths": gitlink_paths,
         "forbidden_gitlink_paths": forbidden_gitlink_paths,
         "gitlink_ok": not forbidden_gitlink_paths,
     }
