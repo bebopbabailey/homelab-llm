@@ -9,6 +9,7 @@ from pathlib import Path
 
 START_SCRIPT = Path(__file__).resolve().parents[1] / "start_effort.py"
 WORKTREE_SCRIPT = Path(__file__).resolve().parents[1] / "worktree_effort.py"
+SERVICE_REGISTRY_SCRIPT = Path(__file__).resolve().parents[1] / "service_registry.py"
 
 
 def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -34,7 +35,32 @@ class StartEffortTests(unittest.TestCase):
             (START_SCRIPT.parents[0] / "submodule_pin_audit.py").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
+        (repo / "scripts" / "service_registry.py").write_text(
+            SERVICE_REGISTRY_SCRIPT.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
         (repo / "scripts" / "start_effort.py").write_text(START_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+        (repo / "platform" / "registry").mkdir(parents=True)
+        (repo / "platform" / "registry" / "services.jsonl").write_text(
+            json.dumps(
+                {
+                    "service_id": "docs-service",
+                    "path": "docs",
+                    "planned_path": "services/docs-service",
+                    "parent_service_id": None,
+                    "maturity": "supported",
+                    "runtime_mode": "docs-only",
+                    "service_kind": "tool",
+                    "host_targets": ["local"],
+                    "exposure": "internal",
+                    "taxonomy_tags": ["docs"],
+                    "upstream_service_ids": [],
+                    "legacy_paths": [],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         self.assertEqual(run(["git", "add", "."], repo).returncode, 0)
         self.assertEqual(run(["git", "commit", "-m", "init"], repo).returncode, 0)
         return root, repo
@@ -77,6 +103,14 @@ class StartEffortTests(unittest.TestCase):
         status_payload = json.loads(status.stdout)
         self.assertEqual(status_payload["current_effort"]["effort_id"], "demo")
         self.assertFalse(status_payload["is_primary_worktree"])
+
+    def test_start_effort_resolves_service_scope(self) -> None:
+        _, repo = self.make_repo()
+        result = self.run_start(repo, "--id", "demo-service", "--service", "docs-service", "--json")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["service_ids"], ["docs-service"])
+        self.assertEqual(payload["scope_paths"], ["docs"])
 
     def test_start_effort_fails_from_linked_worktree(self) -> None:
         root, repo = self.make_repo()

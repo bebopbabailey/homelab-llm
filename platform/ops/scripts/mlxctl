@@ -29,7 +29,7 @@ DEFAULT_CONVERT_CMD = "python3 -m mlx_lm.convert --hf-path {src} --mlx-path {des
 DEFAULT_GATEWAY_ROOT = "/home/christopherbailey/homelab-llm"
 DEFAULT_GATEWAY_HOST = "mini"
 DEFAULT_GATEWAY_MLXCTL = "/home/christopherbailey/homelab-llm/platform/ops/scripts/mlxctl"
-DEFAULT_HANDLES_PATH = "/home/christopherbailey/homelab-llm/layer-gateway/registry/handles.jsonl"
+DEFAULT_HANDLES_PATH = "/home/christopherbailey/homelab-llm/platform/registry/handles.jsonl"
 DEFAULT_ENSEMBLES_DOC = "/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy/ENSEMBLES.md"
 DEFAULT_MLX_HOST = "192.168.1.72"
 DEFAULT_MLX_BIND_HOST = "192.168.1.72"
@@ -3332,7 +3332,7 @@ def cmd_sync_gateway(args):
     gateway_root = Path(os.environ.get("GATEWAY_ROOT", DEFAULT_GATEWAY_ROOT))
     router_path = gateway_root / "layer-gateway/litellm-orch/config/router.yaml"
     env_path = gateway_root / "layer-gateway/litellm-orch/config/env.local"
-    handles_path = gateway_root / "layer-gateway/registry/handles.jsonl"
+    handles_path = gateway_root / "platform/registry/handles.jsonl"
 
     if not router_path.exists():
         gateway_host = os.environ.get("GATEWAY_HOST", DEFAULT_GATEWAY_HOST)

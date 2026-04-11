@@ -10,6 +10,8 @@ the same time.
 - `NOW.md is project-level status`, not the effort registry.
 - If a dirty worktree is holding context only while another worktree builds or verifies, park it locally first.
 - Start new implementation work from the primary worktree with `uv run python scripts/start_effort.py ...`, then mutate only in the linked worktree it creates.
+- Prefer `uv run python scripts/start_effort.py --service <service-id> ...`
+  when the lane maps to a canonical service registry entry.
 - Land a finished linked lane from the primary worktree with
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - Broad parallel docs/layer lanes are invalid while another implementation
@@ -52,6 +54,7 @@ Normal path:
 
 ```bash
 uv run python scripts/start_effort.py --id <effort-id> --scope <repo-relative-path>
+uv run python scripts/start_effort.py --id <effort-id> --service <service-id>
 ```
 
 Manual fallback:
@@ -93,6 +96,8 @@ linked worktree, and delete the local branch. It does not auto-rebase or edit
 
 ## Scope rules
 - `scope_paths` are repo-relative path prefixes, not globs.
+- Service registry entries provide canonical service roots; `--service` expands
+  to the registry path before overlap checks run.
 - Parent/child overlaps count as conflicts.
 - Sibling paths do not overlap by default.
 - Reject absolute paths and any path containing `..`.

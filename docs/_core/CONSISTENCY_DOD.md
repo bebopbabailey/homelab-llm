@@ -100,7 +100,7 @@ Expected signals:
 
 Evidence sources:
 - `layer-gateway/litellm-orch/config/router.yaml`
-- `layer-gateway/registry/handles.jsonl`
+- `platform/registry/handles.jsonl`
 - `scripts/validate_handles.py`
 
 Checks:

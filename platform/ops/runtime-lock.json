@@ -1,5 +1,13 @@
 {
-  "version": 1,
+  "version": 2,
+  "service_refs": {
+    "litellm-orch": {
+      "path": "layer-gateway/litellm-orch"
+    },
+    "optillm-proxy": {
+      "path": "layer-gateway/optillm-proxy"
+    }
+  },
   "submodules": {
     "layer-gateway/optillm-proxy": "e19fd0c0d0c6db18affcc59fdb59aa196eb175d7",
     "layer-gateway/litellm-orch": "929ab2cca20c53fe583f94d6b19f542e2dd55a6b"
@@ -24,6 +32,10 @@
     }
   },
   "litellm": {
+    "router_config_ref": {
+      "service_id": "litellm-orch",
+      "relpath": "config/router.yaml"
+    },
     "router_yaml": "layer-gateway/litellm-orch/config/router.yaml",
     "bind_host": "0.0.0.0",
     "port": 4000,

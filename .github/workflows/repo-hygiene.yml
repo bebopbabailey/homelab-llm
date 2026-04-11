@@ -25,6 +25,7 @@ jobs:
         run: |
           python -m unittest discover -s scripts/tests -p 'test_repo_hygiene_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_control_plane_sync_audit.py'
+          python -m unittest discover -s scripts/tests -p 'test_service_registry_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_start_effort.py'
           python -m unittest discover -s scripts/tests -p 'test_submodule_pin_audit.py'
           python -m unittest discover -s scripts/tests -p 'test_closeout_effort.py'
@@ -41,6 +42,9 @@ jobs:
 
       - name: Control-plane sync advisory audit
         run: python scripts/control_plane_sync_audit.py --json > /tmp/control_plane_sync.json
+
+      - name: Service registry advisory audit
+        run: python scripts/service_registry_audit.py --json > /tmp/service_registry.json
 
       - name: Internal markdown link audit
         run: python scripts/docs_link_audit.py

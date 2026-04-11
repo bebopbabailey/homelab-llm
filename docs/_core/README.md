@@ -38,6 +38,7 @@ Start at root `AGENTS.md`, then come here.
 ## Canonical Links
 - `docs/_core/CONCURRENT_EFFORTS.md`
 - `docs/foundation/overview.md`
+- `docs/foundation/service-catalog.md`
 - `docs/foundation/topology.md`
 - `docs/foundation/testing.md`
 - `docs/foundation/node-toolchain.md`

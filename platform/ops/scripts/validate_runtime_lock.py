@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
 LOCK_PATH = REPO_ROOT / "platform/ops/runtime-lock.json"
 STUDIO_WRAPPER = REPO_ROOT / "platform/ops/scripts/studio_run_utility.sh"
 
@@ -58,6 +60,30 @@ def gitlink_sha(path):
     if not parts:
         raise RuntimeError(f"unable to parse submodule status for {path}")
     return parts[0].lstrip("+-U")
+
+
+def service_ref_path(lock, service_id):
+    refs = lock.get("service_refs", {}) or {}
+    entry = refs.get(service_id)
+    if not isinstance(entry, dict):
+        raise RuntimeError(f"runtime lock missing service_ref for {service_id}")
+    path = entry.get("path")
+    if not isinstance(path, str) or not path:
+        raise RuntimeError(f"runtime lock service_ref missing path for {service_id}")
+    return path
+
+
+def resolve_lock_path(lock, value):
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        raise RuntimeError("runtime lock path ref must be a string or object")
+    service_id = value.get("service_id")
+    relpath = value.get("relpath")
+    if not isinstance(service_id, str) or not isinstance(relpath, str):
+        raise RuntimeError("runtime lock path ref requires service_id and relpath")
+    base = service_ref_path(lock, service_id)
+    return f"{base}/{relpath}"
 
 
 def file_contains(path, pattern):
@@ -128,7 +154,7 @@ def check_fast(lock):
     if "git checkout --detach" not in deploy or "uv sync --frozen" not in deploy:
         failures.append("deploy_studio.sh missing exact-SHA deploy markers")
 
-    router_text = read_text(REPO_ROOT / lock["litellm"]["router_yaml"])
+    router_text = read_text(REPO_ROOT / resolve_lock_path(lock, lock["litellm"].get("router_config_ref") or lock["litellm"]["router_yaml"]))
     ok_drop, ok_fast_main = router_assertions(router_text)
     if not ok_drop:
         failures.append("router.yaml missing drop_params: true")

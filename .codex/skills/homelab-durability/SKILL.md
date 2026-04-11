@@ -39,6 +39,10 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   mutating elsewhere.
 - Default bootstrap path for new implementation worktrees is
   `uv run python scripts/start_effort.py ...`.
+- Prefer `uv run python scripts/start_effort.py --service <service-id> ...`
+  when the effort maps to `platform/registry/services.jsonl`.
+- Use `scripts/service_registry.py` to resolve canonical service paths during
+  the service-centric migration.
 - Default landing path for a finished linked lane is
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.

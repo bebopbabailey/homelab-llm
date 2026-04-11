@@ -8,6 +8,7 @@ import json
 import subprocess
 from pathlib import Path, PurePosixPath
 
+from service_registry import resolve_service_path
 from submodule_pin_audit import audit_submodule, filter_submodules, list_submodules
 from worktree_effort import IMPLEMENTATION_STAGES, build_preflight_payload, gather_state
 
@@ -240,7 +241,8 @@ def run_local_script(worktree_path: Path, script_name: str, *args: str) -> dict[
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--id", required=True, dest="effort_id")
-    parser.add_argument("--scope", action="append", required=True, default=[])
+    parser.add_argument("--scope", action="append", default=[])
+    parser.add_argument("--service", action="append", default=[])
     parser.add_argument("--base", default="master")
     parser.add_argument("--branch")
     parser.add_argument("--path")
@@ -258,7 +260,11 @@ def main() -> int:
     ensure_no_local_effort_metadata(repo_root)
 
     effort_label = sanitize_label(args.effort_id)
-    scope_paths = sorted({normalize_scope_path(item) for item in args.scope})
+    service_ids = sorted({item.strip() for item in args.service if item.strip()})
+    if not args.scope and not service_ids:
+        raise SystemExit("start_effort.py requires at least one --scope or --service")
+    resolved_service_scopes = [resolve_service_path(repo_root, service_id) for service_id in service_ids]
+    scope_paths = sorted({normalize_scope_path(item) for item in [*args.scope, *resolved_service_scopes]})
     branch = args.branch or f"codex/{effort_label}"
     worktree_path = Path(args.path).resolve() if args.path else repo_root.parent / f"{repo_root.name}-{effort_label}"
 
@@ -363,6 +369,7 @@ def main() -> int:
         "branch": branch,
         "base_ref": args.base,
         "stage": args.stage,
+        "service_ids": service_ids,
         "scope_paths": scope_paths,
         "initialized_submodules": overlapping_submodules,
         "register_ok": True,

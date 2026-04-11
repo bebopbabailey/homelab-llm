@@ -11,7 +11,8 @@ This is a short navigation guide. Details live in the foundation docs:
 Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Prune
 
 - Inventory: enumerate services, ports, and registries from
-  `docs/PLATFORM_DOSSIER.md` and `docs/foundation/topology.md`.
+  `docs/PLATFORM_DOSSIER.md`, `docs/foundation/topology.md`, and
+  `platform/registry/services.jsonl`.
 - Constraints: apply non-negotiables from
   `docs/foundation/constraints-and-decisions.md`.
 - Minimal contract: define the smallest viable `SERVICE_SPEC.md` and tool
@@ -34,7 +35,8 @@ Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Pr
 ### Design
 - Align with constraints in `docs/foundation/constraints-and-decisions.md`.
 - Draft minimal contracts (`SERVICE_SPEC.md`, tool contracts).
-- Identify required registry updates (MLX, MCP, handles).
+- Identify required registry updates (MLX, MCP, handles) and any service
+  taxonomy changes in `platform/registry/services.jsonl`.
 
 ### Build
 - Build work must happen in a linked worktree, not the primary baseline

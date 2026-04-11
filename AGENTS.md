@@ -23,6 +23,8 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - `Build`/`Verify` work must pass local worktree-effort preflight before repo
   writes: `uv run python scripts/worktree_effort.py preflight --stage <stage>`.
+- Prefer `uv run python scripts/start_effort.py --service <service-id> ...`
+  when the lane maps to a canonical service in `platform/registry/services.jsonl`.
 - If a dirty worktree is holding context only while another worktree builds or
   verifies, park it locally first with `uv run python scripts/worktree_effort.py park`.
 - `uv run python scripts/worktree_effort.py close --json` is metadata-only; it
@@ -75,6 +77,8 @@ If any are missing, state that and proceed with the least risky interpretation.
 - Prefer working within a single service boundary per task.
 - Only change shared docs/registries when required by the change.
 - If a change triggers doc obligations, follow `docs/_core/CHANGE_RULES.md`.
+- During the service-centric refactor, treat `platform/registry/services.jsonl`
+  as the canonical taxonomy surface and raw `layer-*` paths as transitional.
 - When cleaning or adding repo-root docs, preserve the root markdown allowlist
   in `DOCS_CONTRACT.md`.
 - For concurrent implementation work, prefer one worktree per effort and keep

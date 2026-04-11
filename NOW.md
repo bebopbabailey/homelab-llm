@@ -1,12 +1,13 @@
 # NOW
 
 Active
-- Maintain a clean merged baseline after the documentation hardening closeout.
-- Keep repo documentation and control-plane validation surfaces green from
-  `master`.
-- Treat follow-on work as new linked efforts rather than implicit continuation
-  of this pass.
+- Establish the compatibility-first service registry and service-centric control
+  surfaces without moving service directories yet.
+- Move platform-wide registries to `platform/registry/` and update tooling to
+  resolve canonical service IDs.
+- Keep the refactor lane limited to docs, scripts, platform, and registry
+  surfaces until path moves are ready.
 
 NEXT UP
-- Resume the LiteLLM ChatGPT/Open Terminal lane now that the documentation
-  hardening and link-integrity guardrail are landed.
+- Use the new service registry to plan the later `services/` and
+  `experiments/` path migration.

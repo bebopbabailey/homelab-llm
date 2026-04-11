@@ -3,8 +3,12 @@
 Repository utility scripts.
 
 ## Current scripts
-- `validate_handles.py` — validates `layer-gateway/registry/handles.jsonl`
+- `validate_handles.py` — validates `platform/registry/handles.jsonl`
   for schema, naming constraints, and duplicate tuple collisions.
+- `service_registry.py` — resolves canonical service metadata from
+  `platform/registry/services.jsonl`.
+- `service_registry_audit.py` — audits registry coverage against discovered
+  service roots and validates the compatibility-first service catalog.
 - `docs_contract_audit.py` — audits layer-level docs contract completeness
   (`README`, `AGENTS`, `CONSTRAINTS`, `DEPENDENCIES`, `RUNBOOK`) and
   service-level docs contract completeness (`README`, `SERVICE_SPEC`,
@@ -55,7 +59,7 @@ Repository utility scripts.
   - filter to selected voices: `scripts/play_orin_tts_voices.sh af_nova am_echo`
   - force ALSA path: `PLAYER=aplay scripts/play_orin_tts_voices.sh`
 - Prefer `uv run python scripts/validate_handles.py`.
-- Default path target is `layer-gateway/registry/handles.jsonl`.
+- Default path target is `platform/registry/handles.jsonl`.
 - Docs contract audit:
   - `uv run python scripts/docs_contract_audit.py`
   - `uv run python scripts/docs_contract_audit.py --json`
@@ -82,6 +86,7 @@ Repository utility scripts.
     `platform/ops/README.md`, and `scripts/README.md`
 - Worktree effort preflight:
   - `uv run python scripts/start_effort.py --id <id> --scope <repo-path> --json`
+  - `uv run python scripts/start_effort.py --id <id> --service <service-id> --json`
   - `uv run python scripts/worktree_effort.py park --notes "holding context" --json`
   - `uv run python scripts/worktree_effort.py register --effort-id <id> --stage build --scope <repo-path>`
   - `uv run python scripts/worktree_effort.py status --json`
@@ -103,6 +108,12 @@ Repository utility scripts.
   - `closeout_effort.py` is local-only and deterministic: no auto-rebase, no
     push, and no automatic `NOW.md` edits
   - keeps concurrent implementation state local to each worktree and out of repo-tracked files
+- Service registry:
+  - `uv run python scripts/service_registry.py show litellm-orch --json`
+  - `uv run python scripts/service_registry.py path open-webui`
+  - `uv run python scripts/service_registry_audit.py --strict --json`
+  - `platform/registry/services.jsonl` is the canonical service taxonomy during
+    the service-centric refactor
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
   - filesystem-based and Git-independent at runtime

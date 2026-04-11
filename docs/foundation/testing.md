@@ -9,12 +9,14 @@ Run these for doc-heavy changes before sign-off:
 uv run python scripts/docs_contract_audit.py --strict --json
 uv run python scripts/repo_hygiene_audit.py --json
 uv run python scripts/control_plane_sync_audit.py --strict --json
+uv run python scripts/service_registry_audit.py --strict --json
 uv run python scripts/docs_link_audit.py
 ```
 
 Expected:
 - docs bundle contracts stay complete
 - root_ok and journal_index_ok remain true
+- service registry coverage remains complete
 - control-plane sync remains aligned
 - internal markdown links on the supported doc surface resolve cleanly
 
@@ -244,7 +246,7 @@ Notes:
 - `mlxctl ensure` takes a Hugging Face repo id (example: `mlx-community/Qwen3-4B-Instruct-2507-gabliterated-mxfp4`).
   Use `mlxctl list` to discover canonical `mlx-*` model ids.
 - `mlxctl verify` is read-only by default and also validates (on gateway hosts) that
-  served MLX handles in `layer-gateway/registry/handles.jsonl` exist in the Studio registry.
+  served MLX handles in `platform/registry/handles.jsonl` exist in the Studio registry.
 - Use `mlxctl verify --fix-defaults` only when explicitly persisting inferred defaults.
 - `mlxctl` now requires `platform/ops/mlx-runtime-profiles.json`; missing,
   invalid, or ambiguous profile resolution is a validation failure.
@@ -999,6 +1001,7 @@ active.
 cd /home/christopherbailey/homelab-llm
 uv run python scripts/worktree_effort.py status --json
 uv run python scripts/start_effort.py --id demo --scope docs --json
+uv run python scripts/start_effort.py --id demo-service --service open-webui --json
 uv run python scripts/worktree_effort.py park --notes "holding context" --json
 uv run python scripts/worktree_effort.py register --effort-id bad --stage build --scope docs --json
 uv run python scripts/worktree_effort.py preflight --stage build --json
@@ -1006,6 +1009,7 @@ uv run python scripts/worktree_effort.py preflight --stage verify --json
 uv run python scripts/worktree_effort.py close --json
 uv run python scripts/submodule_pin_audit.py --ref master --scope layer-gateway/litellm-orch --json
 uv run python scripts/closeout_effort.py --worktree /home/christopherbailey/homelab-llm-demo --json
+uv run python scripts/service_registry_audit.py --strict --json
 uv run python scripts/docs_link_audit.py
 ```
 
@@ -1016,6 +1020,8 @@ Expected:
 - `start_effort.py` succeeds only from a clean primary worktree on `master` and
   creates the linked worktree that will own the implementation effort. It also
   fails before leaving a blocked placeholder lane behind.
+- `start_effort.py --service <service-id>` resolves the current canonical path
+  through `platform/registry/services.jsonl` before overlap checks run.
 - broad parallel docs/layer scopes are rejected while another implementation
   lane is active.
 - `park --notes ... --json` marks a dirty context worktree as parked without
@@ -1038,6 +1044,8 @@ Expected:
   fast-forward merges to `master`, closes metadata, removes the linked
   worktree, and deletes the local branch.
 - `closeout_effort.py` does not auto-rebase and does not update `NOW.md`.
+- `service_registry_audit.py` hard-fails if a discovered `SERVICE_SPEC.md`
+  service root is missing from the service registry.
 - `docs_link_audit.py` validates internal markdown links on the supported
   documentation surface.
 - these checks are local-only and are not CI-backed, because CI cannot see your

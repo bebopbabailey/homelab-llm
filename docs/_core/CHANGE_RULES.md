@@ -51,9 +51,18 @@ If drift is discovered:
 ## Registries (MLX, MCP, Handles)
 - If model registry fields, sync behavior, or router/env generation changes, update:
   - `docs/foundation/mlx-registry.md`
-  - `layer-gateway/registry/handles.jsonl` (if handles are affected)
+  - `platform/registry/handles.jsonl` (if handles are affected)
   - `docs/PLATFORM_DOSSIER.md`
   - Example: adding a new registry field used by LiteLLM routing requires a doc update and any affected registry entries.
+
+- If service identity, taxonomy, supported/experimental classification, or canonical service paths change, update:
+  - `platform/registry/services.jsonl`
+  - `scripts/service_registry.py`
+  - `scripts/service_registry_audit.py`
+  - `docs/foundation/service-catalog.md`
+  - `docs/foundation/service-additions.md`
+  - `docs/_core/SOURCES_OF_TRUTH.md`
+  - Example: reclassifying `optillm-local` as an experiment requires registry, audit, and documentation updates together.
 
 - If MCP server/tool metadata or schema changes, update:
   - `docs/foundation/mcp-registry.md`
@@ -113,12 +122,15 @@ If drift is discovered:
   - `docs/foundation/testing.md`
   - `scripts/worktree_effort.py`
   - `scripts/start_effort.py`
+  - `scripts/service_registry.py`
+  - `scripts/service_registry_audit.py`
   - `scripts/submodule_pin_audit.py`
   - `scripts/closeout_effort.py`
   - `scripts/README.md`
   - `scripts/control_plane_sync_audit.py`
   - `scripts/tests/test_worktree_effort.py`
   - `scripts/tests/test_start_effort.py`
+  - `scripts/tests/test_service_registry_audit.py`
   - `scripts/tests/test_submodule_pin_audit.py`
   - `scripts/tests/test_closeout_effort.py`
   - `scripts/tests/test_control_plane_sync_audit.py`

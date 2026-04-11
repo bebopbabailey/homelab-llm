@@ -3,6 +3,13 @@
 This document and `platform/ops/runtime-lock.json` define the current locked runtime
 contract for the active LiteLLM + OptiLLM + vLLM-metal stack.
 
+Compatibility-first note:
+- Runtime lock v2 adds `service_refs` and path refs such as
+  `litellm.router_config_ref` so runtime validation can resolve canonical
+  service IDs while the filesystem still uses `layer-*` paths.
+- Existing raw path fields may remain temporarily during the migration, but
+  service refs are the new direction of truth.
+
 ## Purpose
 - Make runtime assumptions explicit and reviewable.
 - Prevent drift between repo state, Studio runtime, and gateway behavior.

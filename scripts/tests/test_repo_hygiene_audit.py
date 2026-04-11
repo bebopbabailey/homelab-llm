@@ -133,6 +133,27 @@ class RepoHygieneAuditTests(unittest.TestCase):
         result = self.run_script(repo, "--scope", "root", "--strict", "--json")
         self.assertNotEqual(result.returncode, 0)
 
+    def test_gitlinks_scope_passes_without_forbidden_paths(self) -> None:
+        repo = self.make_repo()
+        (repo / ".gitmodules").write_text(
+            '[submodule "layer-tools/mcp-tools"]\n\tpath = layer-tools/mcp-tools\n\turl = git@example.com:mcp-tools.git\n',
+            encoding="utf-8",
+        )
+        result = self.run_script(repo, "--scope", "gitlinks", "--json")
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["gitlink_ok"])
+
+    def test_gitlinks_scope_flags_forbidden_services_paths(self) -> None:
+        repo = self.make_repo()
+        (repo / ".gitmodules").write_text(
+            '[submodule "services/example"]\n\tpath = services/example\n\turl = git@example.com:example.git\n',
+            encoding="utf-8",
+        )
+        result = self.run_script(repo, "--scope", "gitlinks", "--json")
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["gitlink_ok"])
+        self.assertEqual(payload["forbidden_gitlink_paths"], ["services/example"])
+
 
 if __name__ == "__main__":
     unittest.main()

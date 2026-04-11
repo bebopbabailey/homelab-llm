@@ -8,7 +8,7 @@ import importlib.util
 
 SPEC = importlib.util.spec_from_file_location(
     "validate_runtime_lock",
-    "/home/christopherbailey/homelab-llm/platform/ops/scripts/validate_runtime_lock.py",
+    str(Path(__file__).resolve().parents[1] / "validate_runtime_lock.py"),
 )
 vr = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(vr)
@@ -20,7 +20,7 @@ class ValidateRuntimeLockTests(unittest.TestCase):
         self.assertEqual(vr.router_assertions(text), (True, True))
 
     def test_fast_fails_when_patch_artifact_present(self):
-        lock = {"submodules": {"layer-gateway/optillm-proxy": "abc", "layer-gateway/litellm-orch": "def"}, "litellm": {"router_yaml": "layer-gateway/litellm-orch/config/router.yaml"}}
+        lock = {"service_refs": {"litellm-orch": {"path": "layer-gateway/litellm-orch"}}, "submodules": {"layer-gateway/optillm-proxy": "abc", "layer-gateway/litellm-orch": "def"}, "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}}}
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "layer-gateway/optillm-proxy/scripts").mkdir(parents=True)

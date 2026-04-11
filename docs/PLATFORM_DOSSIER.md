@@ -237,7 +237,7 @@ Networking note:
   the current Studio runtime target at `/Users/thestudio/optillm-proxy/layer-data/vector-db`.
 
 ## Data registries (authoritative)
-- Lexicon registry (term correction): `layer-data/registry/lexicon.jsonl`
+- Lexicon registry (term correction): `platform/registry/lexicon.jsonl`
 
 ## Exposure and secrets (short)
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.

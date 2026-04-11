@@ -22,9 +22,10 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `.opencode/skills/*/SKILL.md`
     - `docs/OPENCODE.md` (supporting narrative doc for the repo-local control surface)
 - Registry/template data (prefer data over summaries):
-    - `layer-gateway/registry/handles.jsonl`
-    - `layer-inference/registry/models.jsonl`
-    - `layer-data/registry/lexicon.jsonl`
+    - `platform/registry/services.jsonl`
+    - `platform/registry/handles.jsonl`
+    - `platform/registry/models.jsonl`
+    - `platform/registry/lexicon.jsonl`
     - `platform/ops/templates/mcp-registry.json`
     - `platform/ops/runtime-lock.json`
 - Per-service canon (most specific truth for a service):

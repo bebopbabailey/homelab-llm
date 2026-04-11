@@ -11,6 +11,14 @@ via the LiteLLM `boost` handle (with `optillm_approach` in the request body).
 Direct calls to the proxy port are reserved for operator debugging on the host
 that runs the proxy.
 
+Compatibility-first service taxonomy:
+- Register or update the service in `platform/registry/services.jsonl` before
+  changing the service boundary.
+- Use `uv run python scripts/service_registry.py show <service-id> --json` to
+  confirm canonical path, maturity, and planned path during the refactor.
+- `layer-*` paths remain current filesystem locations during the transition, but
+  registry metadata is now the canonical taxonomy surface.
+
 ## Before You Start
 - Confirm you are not adding a new LAN-exposed service without approval.
 - Ports are immutable; do not reuse or change existing ones.

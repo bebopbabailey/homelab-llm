@@ -117,6 +117,7 @@ Repo-local durability posture:
   mutations
 - start new implementation work from the clean primary worktree with
   `uv run python scripts/start_effort.py --id <effort-id> --scope <repo-path>`
+  or `uv run python scripts/start_effort.py --id <effort-id> --service <service-id>`
 - dirty context-only worktrees should use `uv run python scripts/worktree_effort.py park --notes "<reason>" --json`
 - local `Build`/`Verify` passes should run
   `uv run python scripts/worktree_effort.py preflight --stage <stage> --json`
@@ -125,6 +126,9 @@ Repo-local durability posture:
   `uv run python scripts/closeout_effort.py --worktree <path> --json`
 - concurrent-effort metadata is local to each worktree; `NOW.md` is not the
   effort registry
+- the compatibility-first service registry lives at
+  `platform/registry/services.jsonl`, with `scripts/service_registry.py` as the
+  canonical resolver
 - `uv run python scripts/worktree_effort.py close --json` is metadata-only
 - broad parallel docs/layer lanes are not allowed while another implementation
   lane is active; narrow them first

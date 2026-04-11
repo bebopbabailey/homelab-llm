@@ -181,7 +181,7 @@ disabled or unloaded.
 - `layer-gateway/litellm-orch/config/env.local`
 
 Served-set source of truth:
-- Handle inclusion is curated in `layer-gateway/registry/handles.jsonl`.
+- Handle inclusion is curated in `platform/registry/handles.jsonl`.
 - Registry data enriches metadata for those served handles.
 
 Current alias intent:

@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         "path",
         nargs="?",
-        default="layer-gateway/registry/handles.jsonl",
+        default="platform/registry/handles.jsonl",
         help="Path to handles.jsonl",
     )
     args = parser.parse_args()

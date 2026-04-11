@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 MANIFEST_PATH = Path("docs/_core/root_hygiene_manifest.json")
-SCOPE_CHOICES = ("all", "root", "journal", "archive")
+SCOPE_CHOICES = ("all", "root", "journal", "archive", "gitlinks")
 
 
 def load_manifest(repo_root: Path) -> dict[str, object]:
@@ -125,6 +125,23 @@ def audit_archive(repo_root: Path, manifest: dict[str, object]) -> dict[str, obj
     }
 
 
+def audit_gitlinks(repo_root: Path) -> dict[str, object]:
+    gitlink_paths: list[str] = []
+    gitmodules = repo_root / ".gitmodules"
+    if gitmodules.is_file():
+        for line in gitmodules.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("path = "):
+                gitlink_paths.append(line.split("=", 1)[1].strip())
+    forbidden_prefixes = ("services/", "experiments/")
+    forbidden_gitlink_paths = sorted(path for path in gitlink_paths if path.startswith(forbidden_prefixes))
+    return {
+        "gitlink_paths": sorted(gitlink_paths),
+        "forbidden_gitlink_paths": forbidden_gitlink_paths,
+        "gitlink_ok": not forbidden_gitlink_paths,
+    }
+
+
 def audit_repo(repo_root: Path, scope: str) -> dict[str, object]:
     errors: list[str] = []
     try:
@@ -151,6 +168,9 @@ def audit_repo(repo_root: Path, scope: str) -> dict[str, object]:
                 "archive_top_level_files": [],
                 "archive_non_rollup_top_level_files": [],
                 "archive_ok": False,
+                "gitlink_paths": [],
+                "forbidden_gitlink_paths": [],
+                "gitlink_ok": False,
                 "overall_ok": False,
                 "scope": scope,
             }
@@ -160,14 +180,17 @@ def audit_repo(repo_root: Path, scope: str) -> dict[str, object]:
     root_payload = audit_root(repo_root, manifest)
     journal_payload = audit_journal(repo_root, manifest)
     archive_payload = audit_archive(repo_root, manifest)
+    gitlink_payload = audit_gitlinks(repo_root)
     payload.update(root_payload)
     payload.update(journal_payload)
     payload.update(archive_payload)
+    payload.update(gitlink_payload)
 
     scope_map = {
         "root": bool(payload["root_ok"]),
         "journal": bool(payload["journal_index_ok"]),
         "archive": bool(payload["archive_ok"]),
+        "gitlinks": bool(payload["gitlink_ok"]),
     }
     if scope == "all":
         overall_ok = all(scope_map.values())
@@ -205,6 +228,13 @@ def print_table(payload: dict[str, object]) -> None:
     print("archive_non_rollup_top_level_files:")
     if payload["archive_non_rollup_top_level_files"]:
         for name in payload["archive_non_rollup_top_level_files"]:
+            print(f"- {name}")
+    else:
+        print("-")
+    print(f"gitlink_ok: {'yes' if payload['gitlink_ok'] else 'no'}")
+    print("forbidden_gitlink_paths:")
+    if payload["forbidden_gitlink_paths"]:
+        for name in payload["forbidden_gitlink_paths"]:
             print(f"- {name}")
     else:
         print("-")
