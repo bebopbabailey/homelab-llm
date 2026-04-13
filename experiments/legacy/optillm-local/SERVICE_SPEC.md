@@ -1,4 +1,4 @@
-# Service Spec: optillm-local (experimental tooling workspace)
+# Service Spec: optillm-local (legacy tooling workspace)
 
 ## Purpose
 Provide reproducible, non-production tooling for inference experiments, with
@@ -6,7 +6,7 @@ primary emphasis on Studio `vllm-metal` lane diagnostics and tuning.
 
 ## Status
 - Not deployed as an always-on production service.
-- Tooling-only boundary (scripts + profiles + reports).
+- Historical tooling boundary retained for scripts + profiles + reports.
 
 ## Active interfaces
 - Harness CLI: `scripts/run_vllm_metal_lane_tuning.py`

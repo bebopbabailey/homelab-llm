@@ -106,7 +106,7 @@ linked worktree, and delete the local branch. It does not auto-rebase or edit
 Examples:
 - `docs` overlaps `docs/INTEGRATIONS.md`
 - `scripts/worktree_effort.py` overlaps only itself
-- `layer-gateway/openhands` overlaps any file below that service root
+- `services/openhands` overlaps any file below that service root
 
 ## Preflight meaning
 `Build` or `Verify` preflight fails when:
@@ -148,7 +148,7 @@ metadata.
 - Agent B:
   - worktree: `~/wt-openhands`
   - effort: `openhands-secret-persistence`
-  - scope: `layer-gateway/openhands`, `platform/ops/systemd/openhands.service`
+  - scope: `services/openhands`, `platform/ops/systemd/openhands.service`
 
 These can run in parallel because the context worktree is explicitly parked and
 the implementation worktree has its own scope and preflight.

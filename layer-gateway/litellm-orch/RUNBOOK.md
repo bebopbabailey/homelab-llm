@@ -112,7 +112,7 @@ curl -sS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
 ```bash
 source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
 
-uv run python /home/christopherbailey/homelab-llm/layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
   --base-url http://127.0.0.1:4000/v1 \
   --model fast \
   --api-key "$LITELLM_MASTER_KEY" \

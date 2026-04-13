@@ -1,10 +1,12 @@
 import importlib.util
 import json
 import unittest
+from pathlib import Path
 
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "run_gpt_oss_acceptance.py"
 SPEC = importlib.util.spec_from_file_location(
     "run_gpt_oss_acceptance",
-    "/home/christopherbailey/homelab-llm/layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py",
+    SCRIPT,
 )
 mod = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(mod)

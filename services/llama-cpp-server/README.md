@@ -3,7 +3,7 @@
 Repo-owned GPT service family for FAST/DEEP rollout.
 
 Approved architecture:
-- service boundary: `layer-inference/llama-cpp-server/`
+- service boundary: `services/llama-cpp-server/`
 - headless implementation: `llmster`
 - inference architecture: llama.cpp
 - canonical GPT artifacts: MXFP4 GGUF

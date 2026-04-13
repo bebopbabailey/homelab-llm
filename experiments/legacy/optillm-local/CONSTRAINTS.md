@@ -1,4 +1,4 @@
-# Constraints: optillm-local (experimental)
+# Constraints: optillm-local (legacy experimental)
 
 ## Hard constraints
 - Experimental workspace only; do not alter production LiteLLM/OptiLLM/MLX services.

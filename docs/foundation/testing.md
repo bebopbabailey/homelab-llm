@@ -53,7 +53,7 @@ Additional backend interpretation:
 ### GPT `llmster` rollout checks
 Studio retention dry-run:
 ```bash
-uv run python layer-inference/llama-cpp-server/scripts/studio_model_retention.py \
+uv run python services/llama-cpp-server/scripts/studio_model_retention.py \
   --host studio \
   --staged-slug gpt-oss-20b-mxfp4 \
   --output /tmp/studio-model-retention-fast.json
@@ -61,7 +61,7 @@ uv run python layer-inference/llama-cpp-server/scripts/studio_model_retention.py
 
 Raw fast mirror launch:
 ```bash
-uv run python layer-inference/llama-cpp-server/scripts/start_raw_llama_mirror.py \
+uv run python services/llama-cpp-server/scripts/start_raw_llama_mirror.py \
   --host studio \
   --port 8130 \
   --server-bin /Users/thestudio/llama.cpp-releases/current/bin/llama-server \
@@ -76,11 +76,11 @@ Raw launcher invariants:
 
 Raw/direct acceptance:
 ```bash
-uv run python layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+uv run python services/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
   --base-url http://127.0.0.1:8130/v1 \
   --model llmster-gpt-oss-20b-mxfp4-gguf
 
-uv run python layer-inference/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
+uv run python services/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
   --base-url http://192.168.1.72:8126/v1 \
   --model llmster-gpt-oss-20b-mxfp4-gguf \
   --api-key "$LLMSTER_API_KEY"
@@ -173,7 +173,7 @@ Accepted cutover order:
 
 Raw mirror teardown:
 ```bash
-uv run python layer-inference/llama-cpp-server/scripts/stop_raw_llama_mirror.py \
+uv run python services/llama-cpp-server/scripts/stop_raw_llama_mirror.py \
   --host studio \
   --port 8130
 ```

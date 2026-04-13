@@ -8,7 +8,7 @@ without explicit approval.
 - **Language**: Python 3.x (upstream supports 3.10+)
 - **Dependency manager**: `uv` only
 - **Process model**: long-running web app (WSGI)
-- **App dir**: `layer-tools/searxng/app`
+- **App dir**: `services/searxng/app`
 - **Systemd unit**: `/etc/systemd/system/searxng.service`
 
 ## Network

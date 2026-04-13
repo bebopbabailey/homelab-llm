@@ -13,25 +13,25 @@ Docs: `https://docs.searxng.org/admin/installation.html`
 - Use `uv` for Python dependency management.
 
 ## Install (no Docker, repo-based)
-SearXNG runs from `layer-tools/searxng/app` and is managed via systemd.
+SearXNG runs from `services/searxng/app` and is managed via systemd.
 
 1) Clone upstream into the service directory:
 
 ```bash
-git clone https://github.com/searxng/searxng.git layer-tools/searxng/app
+git clone https://github.com/searxng/searxng.git services/searxng/app
 ```
 
 2) Bootstrap dependencies + settings:
 
 ```bash
-./layer-tools/searxng/scripts/bootstrap.sh
+./services/searxng/scripts/bootstrap.sh
 ```
 
 This will:
-- create `layer-tools/searxng/app/.venv`
+- create `services/searxng/app/.venv`
 - install `requirements.txt` + `requirements-server.txt`
-- write `/etc/searxng/settings.yml` from `layer-tools/searxng/settings.yml.example`
-- write `/etc/searxng/env` from `layer-tools/searxng/searxng.env.example`
+- write `/etc/searxng/settings.yml` from `services/searxng/settings.yml.example`
+- write `/etc/searxng/env` from `services/searxng/searxng.env.example`
 
 ## Configuration (essentials)
 Key settings in `/etc/searxng/settings.yml`:

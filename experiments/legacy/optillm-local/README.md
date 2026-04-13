@@ -1,6 +1,6 @@
-# optillm-local (Inference Experiments)
+# optillm-local (Legacy Inference Experiments)
 
-Status: non-production workspace.
+Status: historical non-production workspace retained for reference and selective diagnostics.
 
 This service boundary contains experimental tooling only. Current active use is
 `vllm-metal` lane diagnostics/tuning on Studio experimental ports, plus retained

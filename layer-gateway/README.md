@@ -9,10 +9,10 @@ alternate client paths to inference backends.
 
 Live service roots still in this layer:
 - `layer-gateway/litellm-orch`
-- `layer-gateway/openhands`
 - `layer-gateway/optillm-proxy`
 
 Recently moved service roots:
+- `services/openhands`
 - `services/tiny-agents`
 - `experiments/system-monitor`
 

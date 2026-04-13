@@ -283,7 +283,7 @@ if a param is rejected by the backend.
 - Approval prompts inside OpenCode do not override the service sandbox. Repo editability depends on `ReadWritePaths=` in the systemd unit.
 
 ## OpenHands (Mini, Phase A managed service)
-- Service boundary: `layer-gateway/openhands`.
+- Service boundary: `services/openhands`.
 - Primary launch path: repo-managed `systemd` + Docker on the Mini, published locally to `127.0.0.1:4031`.
 - Repo-managed unit: `platform/ops/systemd/openhands.service`.
 - Host runtime files: `/etc/systemd/system/openhands.service`, `/etc/openhands/env`.

@@ -5,7 +5,7 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MODULE_PATH = REPO_ROOT / "layer-inference/llama-cpp-server/scripts/studio_model_retention.py"
+MODULE_PATH = REPO_ROOT / "services/llama-cpp-server/scripts/studio_model_retention.py"
 
 
 def _load_module(path: Path, name: str):

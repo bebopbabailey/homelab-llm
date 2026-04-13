@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-PATCH_DIR="$REPO_ROOT/layer-inference/optillm-local/runtime/patches/mlx_lm"
+PATCH_DIR="$REPO_ROOT/experiments/legacy/optillm-local/runtime/patches/mlx_lm"
 
 DEFAULT_REF="ad067ea627c752bddaa194a4e4e8adc858a62433"
 WORKSPACE="${WORKSPACE:-$HOME/optillm-mlx-experimental/mlx-lm-optillm}"

@@ -83,7 +83,7 @@ Compatibility-first note:
 - legacy `main` shadow/fallback rollout space on `8123/8124/8125` is retired
   and no longer approved as rollout or recovery space.
 - `fast` and `deep` target backend family: `llmster`-backed llama.cpp behind the
-  repo-owned `layer-inference/llama-cpp-server` boundary.
+  repo-owned `services/llama-cpp-server` boundary.
 - Canonical GPT artifacts for `fast` and `deep` are MXFP4 GGUF variants:
   `llmster-gpt-oss-20b-mxfp4-gguf` and `llmster-gpt-oss-120b-mxfp4-gguf`.
 - Direct truth-path validation for GPT lanes stays on raw `llama-server`

@@ -24,8 +24,8 @@ This folder contains a minimal patch overlay for an experimental `mlx_lm.server`
 From a checked-out upstream `mlx-lm` repo root:
 
 ```bash
-cp /path/to/homelab-llm/layer-inference/optillm-local/runtime/patches/mlx_lm/optillm_decoding.py mlx_lm/optillm_decoding.py
-patch -p0 < /path/to/homelab-llm/layer-inference/optillm-local/runtime/patches/mlx_lm/server.diff
+cp /path/to/homelab-llm/experiments/legacy/optillm-local/runtime/patches/mlx_lm/optillm_decoding.py mlx_lm/optillm_decoding.py
+patch -p0 < /path/to/homelab-llm/experiments/legacy/optillm-local/runtime/patches/mlx_lm/server.diff
 ```
 
 ## Run (loopback-only example)
