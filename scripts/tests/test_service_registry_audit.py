@@ -28,13 +28,13 @@ class ServiceRegistryAuditTests(unittest.TestCase):
 
     def test_audit_passes_when_registry_covers_service_specs(self) -> None:
         repo = self.make_repo()
-        (repo / "layer-interface" / "open-webui").mkdir(parents=True)
-        (repo / "layer-interface" / "open-webui" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "services" / "open-webui").mkdir(parents=True)
+        (repo / "services" / "open-webui" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
         (repo / "platform" / "registry" / "services.jsonl").write_text(
             json.dumps(
                 {
                     "service_id": "open-webui",
-                    "path": "layer-interface/open-webui",
+                    "path": "services/open-webui",
                     "planned_path": "services/open-webui",
                     "parent_service_id": None,
                     "maturity": "supported",
@@ -44,7 +44,7 @@ class ServiceRegistryAuditTests(unittest.TestCase):
                     "exposure": "lan",
                     "taxonomy_tags": ["ui"],
                     "upstream_service_ids": [],
-                    "legacy_paths": [],
+                    "legacy_paths": ["layer-interface/open-webui"],
                 }
             )
             + "\n",
@@ -56,13 +56,13 @@ class ServiceRegistryAuditTests(unittest.TestCase):
 
     def test_audit_flags_missing_registry_entry(self) -> None:
         repo = self.make_repo()
-        (repo / "layer-tools" / "open-terminal").mkdir(parents=True)
-        (repo / "layer-tools" / "open-terminal" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
+        (repo / "services" / "open-terminal").mkdir(parents=True)
+        (repo / "services" / "open-terminal" / "SERVICE_SPEC.md").write_text("spec\n", encoding="utf-8")
         (repo / "platform" / "registry" / "services.jsonl").write_text("", encoding="utf-8")
         result = run(["python3", str(SCRIPT), "--repo-root", str(repo), "--json"], repo)
         payload = json.loads(result.stdout)
         self.assertFalse(payload["overall_ok"])
-        self.assertEqual(payload["missing_registry_entries"], ["layer-tools/open-terminal"])
+        self.assertEqual(payload["missing_registry_entries"], ["services/open-terminal"])
 
     def test_audit_passes_for_services_and_experiments_roots(self) -> None:
         repo = self.make_repo()

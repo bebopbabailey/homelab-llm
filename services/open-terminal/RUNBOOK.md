@@ -3,7 +3,7 @@
 ## Build image
 ```bash
 docker build -t local/open-terminal-mcp:0.11.29 \
-  -f /home/christopherbailey/homelab-llm/layer-tools/open-terminal/Dockerfile.mcp \
+  -f /home/christopherbailey/homelab-llm/services/open-terminal/Dockerfile.mcp \
   /home/christopherbailey/homelab-llm
 ```
 
@@ -32,7 +32,7 @@ docker logs --tail 200 open-terminal-mcp
 
 ## Direct MCP smoke
 ```bash
-layer-interface/open-webui/.venv/bin/python - <<'PY'
+services/open-webui/.venv/bin/python - <<'PY'
 import asyncio
 from open_webui.utils.mcp.client import MCPClient
 

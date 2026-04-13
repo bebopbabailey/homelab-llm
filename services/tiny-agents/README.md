@@ -18,7 +18,7 @@ registry. It must not call inference backends directly.
 Install dependencies from local `pyproject.toml`:
 
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
+cd /home/christopherbailey/homelab-llm/services/tiny-agents
 uv sync
 ```
 
@@ -66,16 +66,16 @@ curl -fsS http://127.0.0.1:4030/run \
 Use the web-fetch MCP server to validate `search.web` and `web.fetch`:
 
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch
+cd /home/christopherbailey/homelab-llm/services/mcp-tools/web-fetch
 uv venv .venv
 uv pip install -e .
-.venv/bin/python3 /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents/scripts/mcp_smoke.py --tool search.web
+.venv/bin/python3 /home/christopherbailey/homelab-llm/services/tiny-agents/scripts/mcp_smoke.py --tool search.web
 ```
 
 ## TinyAgents smoke
 
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
+cd /home/christopherbailey/homelab-llm/services/tiny-agents
 bash scripts/smoke_tiny_agents.sh
 ```
 

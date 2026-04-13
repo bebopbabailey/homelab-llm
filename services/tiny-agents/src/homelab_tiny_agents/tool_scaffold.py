@@ -7,7 +7,7 @@ import re
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
-def scaffold_tool(name: str, dest_root: str = "layer-tools/mcp-tools") -> Path:
+def scaffold_tool(name: str, dest_root: str = "services/mcp-tools") -> Path:
     if not _NAME_RE.match(name):
         raise ValueError("Tool name must be kebab-case [a-z0-9-]")
 

@@ -65,7 +65,7 @@ Provide trimmed, relevant HTML or clean text to improve extraction fidelity.
 
 ### MCP server note
 `web.fetch` and `search.web` are implemented as a stdio MCP tool server under
-`layer-tools/mcp-tools/web-fetch` and are launched by the agent runtime.
+`services/mcp-tools/web-fetch` and are launched by the agent runtime.
 
 Open Terminal MCP is intentionally not listed in the TinyAgents registry in the
 first slice. The current direct client is Open WebUI on the Mini, while any

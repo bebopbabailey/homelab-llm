@@ -21,13 +21,13 @@ This service inherits global + layer constraints:
 - Cross-layer runtime wiring outside this service scope.
 
 ## Sandbox permissions
-- Read: `layer-gateway/*`
+- Read: `services/tiny-agents/*` plus `layer-gateway/*` guidance
 - Write: this service docs/config/code only
 - Execute: service-local diagnostics only
 
 ## Validation pointers
-- `test -f layer-gateway/tiny-agents/SERVICE_SPEC.md`
-- `test -f layer-gateway/tiny-agents/RUNBOOK.md`
+- `test -f services/tiny-agents/SERVICE_SPEC.md`
+- `test -f services/tiny-agents/RUNBOOK.md`
 
 ## Change guardrail
 If TinyAgents exposure, gateway pathing, or tool contracts change, update `SERVICE_SPEC.md`, `RUNBOOK.md`, and canonical integration docs in the same change.

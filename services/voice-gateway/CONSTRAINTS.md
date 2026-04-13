@@ -23,13 +23,13 @@ This service inherits global + layer constraints:
 - Cross-layer runtime modifications outside interface scope.
 
 ## Sandbox permissions
-- Read: `layer-interface/*`
+- Read: `services/voice-gateway/*` plus `layer-interface/*` guidance
 - Write: this service docs/config/code only
 - Execute: service-local diagnostics only
 
 ## Validation pointers
-- `test -f layer-interface/voice-gateway/SERVICE_SPEC.md`
-- `test -f layer-interface/voice-gateway/RUNBOOK.md`
+- `test -f services/voice-gateway/SERVICE_SPEC.md`
+- `test -f services/voice-gateway/RUNBOOK.md`
 
 ## Change guardrail
 If voice routing, exposure, or backend pathing changes, update `SERVICE_SPEC.md`, `RUNBOOK.md`, and platform docs in the same change.

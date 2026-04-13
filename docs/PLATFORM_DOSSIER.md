@@ -37,7 +37,7 @@
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
-| Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `layer-interface/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
+| Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `services/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
 | OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
 | Studio main vector DB | Studio | 55432 | 127.0.0.1 | http://127.0.0.1:55432 | n/a | `com.bebop.pgvector-main`, policy-managed launchd |
 | Studio main memory API | Studio | 55440 | 127.0.0.1 | http://127.0.0.1:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd |
@@ -91,7 +91,7 @@ Networking note:
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
-  Working dir: `/home/christopherbailey/homelab-llm/layer-interface/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
+  Working dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
   Canonical speech path uses env-driven `AUDIO_STT_*` / `AUDIO_TTS_*` values pointed at LiteLLM speech aliases only.
   Current web-search contract is the documented native path:
   `WEB_SEARCH_ENGINE=searxng`,
@@ -169,7 +169,7 @@ Networking note:
   configured Kokoro backend voice and forwards STT/TTS to localhost-only Speaches.
   Operator control plane is CLI-first (`voicectl`) with dashboard support at `/ops`.
   Canonical TTS candidate set is repo-curated in
-  `layer-interface/voice-gateway/registry/tts_models.jsonl`; live Speaches registry is discovery-only.
+  `services/voice-gateway/registry/tts_models.jsonl`; live Speaches registry is discovery-only.
   Live deployment evidence is tracked in `docs/foundation/orin-agx.md` and
   includes deploy provenance surfaced from `/ops/api/state` when
   `.deploy-manifest.json` is present in the deploy checkout.

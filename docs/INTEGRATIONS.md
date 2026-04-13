@@ -218,7 +218,7 @@ if a param is rejected by the backend.
 ## Web fetch + clean (implemented, MCP stdio)
 - Purpose: fetch a URL and return clean, model-ready text for summarization,
   RAG, or schema extraction.
-- Implemented as MCP stdio tool (`layer-tools/mcp-tools/web-fetch`) exposing `web.fetch`
+- Implemented as MCP stdio tool (`services/mcp-tools/web-fetch`) exposing `web.fetch`
   and `search.web` (LiteLLM `/v1/search` backend). Invoked by an MCP client;
   not running as a systemd service yet.
 - Recommended `web.fetch` stack: `httpx` + `trafilatura` (primary extraction)
@@ -268,7 +268,7 @@ if a param is rejected by the backend.
   first blocking hygiene class.
 
 ## OpenCode Web (Mini)
-- Service boundary: `layer-interface/opencode-web`.
+- Service boundary: `services/opencode-web`.
 - Bind: `http://127.0.0.1:4096` locally, `0.0.0.0:4096` at the listener.
 - Tailnet operator URL: `https://codeagent.tailfd1400.ts.net/`
 - Tailscale exposure: dedicated Service `svc:codeagent`

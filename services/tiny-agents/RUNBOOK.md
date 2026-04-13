@@ -4,7 +4,7 @@ TinyAgents supports CLI mode and localhost-only service mode.
 
 ## Prerequisites
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents
+cd /home/christopherbailey/homelab-llm/services/tiny-agents
 uv sync
 ```
 
@@ -29,7 +29,7 @@ curl -fsS http://127.0.0.1:4030/health | cat
 
 ## Smoke checks
 ```bash
-bash /home/christopherbailey/homelab-llm/layer-gateway/tiny-agents/scripts/smoke_tiny_agents.sh
+bash /home/christopherbailey/homelab-llm/services/tiny-agents/scripts/smoke_tiny_agents.sh
 ```
 
 ## Notes

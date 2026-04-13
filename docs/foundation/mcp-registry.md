@@ -24,7 +24,7 @@ intended to be the single source of truth for tool endpoints and transports.
       "args": [
         "run",
         "--directory",
-        "/home/christopherbailey/homelab-llm/layer-tools/mcp-tools/web-fetch",
+        "/home/christopherbailey/homelab-llm/services/mcp-tools/web-fetch",
         "python",
         "-m",
         "web_fetch_mcp"

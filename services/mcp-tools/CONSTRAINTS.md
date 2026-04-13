@@ -20,13 +20,13 @@ This service inherits global + layer constraints:
 - Cross-layer runtime changes outside the tools boundary.
 
 ## Sandbox permissions
-- Read: `layer-tools/*`
+- Read: `services/mcp-tools/*` plus `layer-tools/*` guidance
 - Write: this service docs/code only
 - Execute: stdio tool diagnostics/tests only
 
 ## Validation pointers
-- `test -f layer-tools/mcp-tools/SERVICE_SPEC.md`
-- `test -f layer-tools/mcp-tools/RUNBOOK.md`
+- `test -f services/mcp-tools/SERVICE_SPEC.md`
+- `test -f services/mcp-tools/RUNBOOK.md`
 
 ## Change guardrail
 If tool contracts change, update `SERVICE_SPEC.md`, `RUNBOOK.md`, and integration docs in the same change.

@@ -1,7 +1,7 @@
 # Agent Guidance: mcp-tools
 
 ## Scope
-Only change `layer-tools/mcp-tools/*`.
+Only change `services/mcp-tools/*`.
 
 ## Non-negotiables
 - Do not add network listeners without an explicit plan and approval.

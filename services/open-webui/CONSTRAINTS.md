@@ -21,7 +21,7 @@ This service inherits global + layer constraints:
 - Cross-layer changes outside interface scope unless explicitly requested.
 
 ## Sandbox permissions
-- Read: `layer-interface/*`
+- Read: `services/open-webui/*` plus `layer-interface/*` guidance
 - Write: this service docs/config only
 - Execute: Open WebUI restart/health/log commands only
 

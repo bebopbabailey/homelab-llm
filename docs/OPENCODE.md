@@ -214,8 +214,8 @@ Do not commit secrets:
 - template only: `platform/ops/templates/opencode.env.example`
 
 Service boundary docs:
-- `layer-interface/opencode-web/SERVICE_SPEC.md`
-- `layer-interface/opencode-web/RUNBOOK.md`
+- `services/opencode-web/SERVICE_SPEC.md`
+- `services/opencode-web/RUNBOOK.md`
 
 ## Quick checks
 List models:

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="/home/christopherbailey/homelab-llm"
-cd "$ROOT/layer-gateway/tiny-agents"
+cd "$ROOT/services/tiny-agents"
 
 export MCP_REGISTRY_PATH="${MCP_REGISTRY_PATH:-$ROOT/platform/ops/templates/mcp-registry.json}"
 export LITELLM_API_BASE="${LITELLM_API_BASE:-http://127.0.0.1:4000/v1}"

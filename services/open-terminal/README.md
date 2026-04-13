@@ -40,7 +40,7 @@ changing the current LiteLLM-centered model contract for LLM calls.
 ## Build
 ```bash
 docker build -t local/open-terminal-mcp:0.11.29 \
-  -f /home/christopherbailey/homelab-llm/layer-tools/open-terminal/Dockerfile.mcp \
+  -f /home/christopherbailey/homelab-llm/services/open-terminal/Dockerfile.mcp \
   /home/christopherbailey/homelab-llm
 ```
 

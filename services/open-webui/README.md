@@ -8,7 +8,7 @@ a browser UI on port 3000.
 - Systemd unit: `/etc/systemd/system/open-webui.service`
 - Env file: `/etc/open-webui/env`
 - Data: `/home/christopherbailey/.open-webui`
-- Venv: `/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv`
+- Venv: `/home/christopherbailey/homelab-llm/services/open-webui/.venv`
 
 ## Run (systemd)
 ```bash
