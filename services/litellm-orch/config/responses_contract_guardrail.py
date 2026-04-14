@@ -20,7 +20,7 @@ if not logger.handlers:
     _handler.setFormatter(logging.Formatter("%(message)s"))
     logger.addHandler(_handler)
 _TRACE_PATH = Path("/tmp/litellm_responses_contract_guardrail.jsonl")
-_TARGET_MODELS_DEFAULT = {"metal-test-gptoss20b-enforce"}
+_TARGET_MODELS_DEFAULT = {"chatgpt-5"}
 _REQUEST_CONTEXTS: dict[int, dict[str, Any]] = {}
 _COUNTERS = Counter()
 _LOCK = Lock()
@@ -164,8 +164,7 @@ class ResponsesContractGuardrail(CustomGuardrail):
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "experimental lane metal-test-gptoss20b-enforce only accepts "
-                    "/v1/responses requests"
+                    f"model {context['lane_alias']} only accepts /v1/responses requests"
                 ),
             )
 

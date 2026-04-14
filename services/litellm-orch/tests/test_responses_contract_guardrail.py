@@ -42,10 +42,10 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
             guardrail_name="responses-contract-pre",
             event_hook="pre_call",
             default_on=True,
-            target_models="metal-test-gptoss20b-enforce",
+            target_models="chatgpt-5",
         )
         data = {
-            "model": "metal-test-gptoss20b-enforce",
+            "model": "chatgpt-5",
             "stream": True,
             "tools": [{"type": "function", "name": "noop"}],
             "tool_choice": "auto",
@@ -73,7 +73,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
             default_on=True,
         )
         data = {
-            "model": "metal-test-gptoss20b-enforce",
+            "model": "chatgpt-5",
             "stream": False,
             "temperature": 0.0,
             "input": "hello",
@@ -97,7 +97,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
             event_hook="pre_call",
             default_on=True,
         )
-        data = {"model": "metal-test-gptoss20b-enforce", "messages": [{"role": "user", "content": "hi"}]}
+        data = {"model": "chatgpt-5", "messages": [{"role": "user", "content": "hi"}]}
         captured = []
         with patch.object(responses_contract_guardrail, "emit_policy_event", side_effect=captured.append):
             with self.assertRaises(Exception) as ctx:
@@ -107,7 +107,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
                     data=data,
                     call_type="completion",
                 )
-        self.assertIn("only accepts /v1/responses requests", str(ctx.exception))
+        self.assertIn("model chatgpt-5 only accepts /v1/responses requests", str(ctx.exception))
         self.assertEqual(captured[0]["decision"], "rejected")
 
     async def test_post_call_logs_response_ids(self):
@@ -117,7 +117,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
             default_on=True,
         )
         data = {
-            "model": "metal-test-gptoss20b-enforce",
+            "model": "chatgpt-5",
             "stream": True,
         }
         await guardrail.async_pre_call_hook(

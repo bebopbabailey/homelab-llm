@@ -51,10 +51,11 @@
 - `main` is closed as an active backend project and remains accepted for public
   use with known limitations on forced-tool semantics and structured outputs.
 - Resilience baseline: `fast -> main`.
-- GPT lanes are Chat Completions-first in the current hardening phase.
-- `/v1/responses` remains in validation scope for GPT lanes but is advisory
-  unless it exposes a defect that also matters to the public Chat Completions
-  path.
+- GPT human-chat lanes are responses-first in the current contract.
+- `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on
+  `POST /v1/responses`.
+- `POST /v1/chat/completions` remains available only as a legacy-compatible path
+  for lanes that already support it cleanly.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
   - refresh raw standalone llama.cpp while live `llmster` remained untouched
@@ -167,9 +168,10 @@ if a param is rejected by the backend.
 - ChatGPT aliases remain operator-only in the current contract. Do not treat
   them as part of the accepted Open WebUI model contract unless they are
   explicitly promoted in a later pass.
-- `chatgpt-5` is currently validated on `POST /v1/responses`; the Chat
-  Completions path is not accepted in this pass because the pinned baseline
-  currently hits a Cloudflare HTML challenge there.
+- `chatgpt-5` is now part of the accepted Open WebUI human-chat model contract,
+  but only through the Responses-backed LiteLLM connection.
+- The gateway rejects `chatgpt-5` on `POST /v1/chat/completions` with a clear
+  `responses-only` error instead of leaking upstream Cloudflare HTML.
 - `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
   intentionally not exposed.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`

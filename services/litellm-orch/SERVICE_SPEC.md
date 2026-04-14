@@ -92,9 +92,10 @@ implement inference or web-search business logic.
 - Additive operator-only ChatGPT alias is `chatgpt-5`.
 - No ChatGPT-backed alias is part of the accepted public or Open WebUI gateway
   contract in the current runtime.
-- GPT lanes remain Chat Completions-first in the current hardening phase.
-- `/v1/responses` remains in validation scope for GPT lanes but is advisory
-  unless a defect there also matters to the public Chat Completions path.
+- Human-chat GPT lanes are now responses-first in the current runtime:
+  `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on `POST /v1/responses`.
+- `POST /v1/chat/completions` remains available for legacy-compatible lanes, but
+  it is no longer the primary human-chat contract.
 - On the current ChatGPT account, `chatgpt/gpt-5.4` is validated on
   `POST /v1/responses`, while `chatgpt/gpt-5.4-pro` is rejected as unsupported
   for Codex on ChatGPT accounts and is not exposed as an alias.
@@ -141,8 +142,14 @@ implement inference or web-search business logic.
   - no provider reasoning-field stripping
   - no forced `stream=false`
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
-- Current supported GPT contract remains Chat Completions-first:
-  - ordinary tool calling is supported
+- `chatgpt-5` is protected by a responses-contract guardrail:
+  - `POST /v1/responses` is accepted
+  - `POST /v1/chat/completions` is rejected with a gateway-owned `400`
+    explaining that the lane is responses-only
+- Current supported GPT contract is responses-first for human chat:
+  - `main`, `deep`, `fast`, and `chatgpt-5` all accept `POST /v1/responses`
+  - ordinary tool calling is still accepted on the legacy Chat Completions path
+    for compatible lanes
   - named/object-form forced-tool choice is unsupported on the current GPT
     backend family
   - strict structured-output guarantees are not part of the supported GPT or
@@ -176,9 +183,9 @@ implement inference or web-search business logic.
   `~/.config/litellm/chatgpt/auth.json` for the service user. Runtime-only
   overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`, but that auth
   state alone does not make ChatGPT aliases production-ready on the current
-  stable runtime. The current pinned baseline also still hits a Cloudflare HTML
-  challenge on the Chat Completions path for `chatgpt-5`, so only
-  `POST /v1/responses` is validated in this pass.
+  stable runtime. The current pinned baseline still hits a Cloudflare HTML
+  challenge on the Chat Completions path for `chatgpt-5`, so the gateway now
+  rejects that call type before LiteLLM reaches the upstream ChatGPT backend.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.

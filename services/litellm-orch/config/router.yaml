@@ -111,6 +111,18 @@ guardrails:
       guardrail: "prompt_guardrail.PromptGuardrail"
       mode: "pre_call"
       default_on: true
+  - guardrail_name: "responses-contract-pre"
+    litellm_params:
+      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
+      mode: "pre_call"
+      default_on: true
+      target_models: "chatgpt-5"
+  - guardrail_name: "responses-contract-post"
+    litellm_params:
+      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
+      mode: "post_call"
+      default_on: true
+      target_models: "chatgpt-5"
   - guardrail_name: "gpt-request-defaults"
     litellm_params:
       guardrail: "gpt_request_defaults.GPTRequestDefaults"

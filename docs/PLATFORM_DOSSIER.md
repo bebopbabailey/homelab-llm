@@ -14,8 +14,8 @@
   but are unloaded.
   Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
   and `fast` plus `deep` on shared `llmster` at `8126`.
-  Additive operator-only ChatGPT alias `chatgpt-5` is exposed through the same
-  Mini LiteLLM gateway without changing the public canon.
+  Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
+  gateway on the accepted responses-first human-chat path.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
@@ -74,20 +74,18 @@ Networking note:
   repo-managed systemd unit now must keep
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so drift fails fast on startup.
   ChatGPT device auth can complete on Mini through LiteLLM's provider flow.
-  Additive operator-only alias `chatgpt-5` is not part of the accepted public
-  gateway or Open WebUI contract.
-  `chatgpt-5` is currently validated on `POST /v1/responses`; the pinned
-  baseline still hits a Cloudflare HTML challenge on Chat Completions, and
-  `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account.
+  `chatgpt-5` is part of the accepted Open WebUI human-chat surface through the
+  responses-first LiteLLM contract.
+  The gateway rejects `chatgpt-5` on Chat Completions before reaching the
+  upstream ChatGPT backend, because that upstream path still hits a Cloudflare
+  challenge on the pinned baseline.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
   `reasoning_effort` on `fast`/`deep`.
-  GPT lanes remain Chat Completions-first in the current hardening phase;
-  `/v1/responses` stays advisory unless a defect there also matters to the
-  public Chat Completions path.
+  GPT human-chat lanes are now responses-first on the LiteLLM/Open WebUI path.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.

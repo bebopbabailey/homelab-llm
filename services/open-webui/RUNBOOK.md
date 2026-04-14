@@ -16,6 +16,8 @@ journalctl -u open-webui.service -f
 Audio env still comes from `/etc/open-webui/env`.
 Terminal/tool server registrations currently come from the Open WebUI config
 API and persist in Open WebUI state.
+The LiteLLM/OpenAI provider connection also persists through Open WebUI config
+state and must keep `api_type=responses` on the active LiteLLM connection.
 
 ## Canonical speech canary env
 ```dotenv
@@ -33,6 +35,28 @@ AUDIO_TTS_OPENAI_PARAMS={}
 ```
 
 Keep the global LiteLLM OpenAI settings unchanged.
+
+## LiteLLM connection checks
+Verify the active Open WebUI LiteLLM/OpenAI connection is in Responses mode:
+
+```bash
+python3 - <<'PY'
+import json, sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+req = urllib.request.Request(
+    'http://127.0.0.1:3000/openai/config',
+    headers={'Authorization': f'Bearer {api_key}'},
+)
+with urllib.request.urlopen(req, timeout=20) as resp:
+    print(resp.read().decode())
+PY
+```
+
+Expected:
+- `OPENAI_API_BASE_URLS` still points at `http://127.0.0.1:4000/v1`
+- `OPENAI_API_CONFIGS["0"].api_type` is `responses`
 
 ## Open Terminal registrations
 Open WebUI currently uses:

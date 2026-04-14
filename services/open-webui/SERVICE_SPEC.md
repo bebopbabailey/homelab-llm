@@ -9,6 +9,7 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 
 ## Dependencies
 - LiteLLM proxy at `http://127.0.0.1:4000/v1`
+- Human-chat model traffic uses the LiteLLM/OpenAI connection in Responses mode.
 - Speech path:
   - Open WebUI -> LiteLLM only
   - LiteLLM -> Orin `voice-gateway` only
@@ -50,6 +51,8 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 ## Config authority
 - Audio env in `/etc/open-webui/env` remains the authority for the speech path.
 - Terminal/tool server registrations currently use Open WebUI persistent config.
+- The LiteLLM/OpenAI provider connection also uses Open WebUI persistent config
+  for connection-specific settings such as API type.
 - Do not flip `ENABLE_PERSISTENT_CONFIG=False` for this service without a
   separate migration of existing DB-backed settings.
 

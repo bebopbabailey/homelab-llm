@@ -120,8 +120,9 @@ uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scri
 ```
 
 Current GPT public-lane posture:
-- Chat Completions-first
-- `/v1/responses` remains advisory
+- Responses-first
+- `/v1/responses` is the accepted human-chat contract for `main`, `deep`,
+  `fast`, and `chatgpt-5`
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
 - GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
@@ -177,14 +178,18 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model":"chatgpt-5","input":[{"role":"user","content":"Reply with exactly: responses-ok"}],"max_output_tokens":32}' | jq .
+
+curl -sS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: no"}],"stream":false,"max_tokens":32}' | jq .
 ```
 
 Expected:
 - `/v1/models` includes `chatgpt-5`
 - Responses succeeds for `chatgpt-5`
-- Chat Completions is not part of the accepted `chatgpt-5` contract in this
-  pass because the pinned baseline currently hits a Cloudflare HTML challenge on
-  that path
+- Chat Completions returns a gateway-owned `400` saying `chatgpt-5` only
+  accepts `/v1/responses` requests
 - `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
   intentionally absent from the router
 

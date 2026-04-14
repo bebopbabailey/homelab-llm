@@ -1,13 +1,14 @@
 # NOW
 
 Active
-- Restore `litellm-orch` on the Mini after the service-root move stranded the
-  installed systemd unit and local runtime artifacts.
-- Reintroduce operator-only ChatGPT aliases at the LiteLLM gateway without
-  changing the public `main` / `deep` / `fast` contract.
-- Revalidate the recovered LiteLLM runtime, then close any remaining docs drift
-  against the accepted gateway contract.
+- Shift the Mini gateway and Open WebUI human-chat path to a responses-first
+  LiteLLM contract.
+- Keep `chatgpt-5` live as the subscription-backed ChatGPT lane, but enforce it
+  as responses-only at the gateway.
+- Revalidate `main`, `deep`, `fast`, and `chatgpt-5` through `/v1/responses`,
+  then close docs drift against the accepted contract.
 
 NEXT UP
-- If the pinned LiteLLM baseline still fails real `chatgpt/...` inference after
-  recovery, stage a narrow package upgrade for `services/litellm-orch`.
+- If Open WebUI cannot stably consume the responses-first LiteLLM connection,
+  isolate the exact connection-setting gap and stage the narrowest possible UI
+  config follow-up.
