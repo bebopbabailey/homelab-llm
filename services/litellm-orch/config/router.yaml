@@ -34,6 +34,16 @@ model_list:
     api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 16384
+- model_name: chatgpt-5
+  litellm_params:
+    model: chatgpt/gpt-5.4
+    api_base: https://chatgpt.com/backend-api/codex
+    max_tokens: 16384
+  model_info:
+    mode: chat
+    max_output_tokens: 16384
+    supports_function_calling: true
+    supports_system_messages: true
 # 2) Task completion aliases below
 - model_name: task-transcribe
   litellm_params:
@@ -106,7 +116,7 @@ guardrails:
       guardrail: "gpt_request_defaults.GPTRequestDefaults"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,code-reasoning"
+      target_models: "deep,fast,code-reasoning,chatgpt-5"
   - guardrail_name: "transcribe-pre"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"

@@ -89,7 +89,7 @@ rg -n "gpt-request-defaults|target_models|reasoning_effort" \
 ```
 
 Expected:
-- `gpt-request-defaults` targets `deep`, `fast`, and `code-reasoning`.
+- `gpt-request-defaults` targets `deep`, `fast`, `code-reasoning`, and `chatgpt-5`.
 - No web-search-specific pre-call or post-call guardrails remain.
 - No GPT-lane post-call formatting guardrail remains active.
 
@@ -166,13 +166,27 @@ Expected:
 - Current resilience baseline keeps `fast -> main`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
-ChatGPT validation note on stable `1.83.4`:
-- device auth succeeded on Mini and the aliases appeared in `/v1/models`
-- real `chatgpt/...` inference still failed with
-  `ChatgptException - Unknown items in responses API response: []`
-- do not re-add ChatGPT aliases to the active router contract until both
-  `/v1/chat/completions` and `/v1/responses` succeed on a supported LiteLLM
-  baseline
+Operator-only ChatGPT alias checks:
+```bash
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort | rg '^chatgpt-5$'
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatgpt-5","input":[{"role":"user","content":"Reply with exactly: responses-ok"}],"max_output_tokens":32}' | jq .
+```
+
+Expected:
+- `/v1/models` includes `chatgpt-5`
+- Responses succeeds for `chatgpt-5`
+- Chat Completions is not part of the accepted `chatgpt-5` contract in this
+  pass because the pinned baseline currently hits a Cloudflare HTML challenge on
+  that path
+- `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
+  intentionally absent from the router
 
 Historical cutover order:
 - raw `deep`

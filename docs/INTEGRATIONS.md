@@ -45,6 +45,7 @@
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
 - Stable local public LLM aliases: `main`, `deep`, `fast`.
+- Additive operator-only ChatGPT alias: `chatgpt-5`.
 - There are no active temporary GPT rollout aliases in the current gateway
   contract.
 - `main` is closed as an active backend project and remains accepted for public
@@ -152,6 +153,8 @@ if a param is rejected by the backend.
 - LiteLLM transcript-cleanup aliases:
   - standard: `task-transcribe`
   - vivid: `task-transcribe-vivid`
+- LiteLLM operator-only ChatGPT aliases:
+  - `chatgpt-5`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path.
 - LiteLLM transcript-to-JSON utility alias:
@@ -160,10 +163,15 @@ if a param is rejected by the backend.
   It returns canonical JSON extraction output and is not part of the Open WebUI
   `AUDIO_STT_*` speech path.
 - ChatGPT provider auth can complete through LiteLLM's device-code/OAuth flow
-  without changing Open WebUI settings, but the current stable LiteLLM runtime
-  on Mini still fails real `chatgpt/...` inference after auth. Do not treat
-  ChatGPT aliases as part of the accepted Open WebUI model contract on this
-  baseline.
+  without changing Open WebUI settings.
+- ChatGPT aliases remain operator-only in the current contract. Do not treat
+  them as part of the accepted Open WebUI model contract unless they are
+  explicitly promoted in a later pass.
+- `chatgpt-5` is currently validated on `POST /v1/responses`; the Chat
+  Completions path is not accepted in this pass because the pinned baseline
+  currently hits a Cloudflare HTML challenge there.
+- `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
+  intentionally not exposed.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.

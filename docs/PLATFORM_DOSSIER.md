@@ -14,6 +14,8 @@
   but are unloaded.
   Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
   and `fast` plus `deep` on shared `llmster` at `8126`.
+  Additive operator-only ChatGPT alias `chatgpt-5` is exposed through the same
+  Mini LiteLLM gateway without changing the public canon.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
@@ -71,9 +73,12 @@ Networking note:
   deployment before `/key/generate` and `/v1/mcp/*` worked again. The
   repo-managed systemd unit now must keep
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so drift fails fast on startup.
-  ChatGPT device auth can complete on Mini through LiteLLM's provider flow, but
-  stable `1.83.4` still fails real `chatgpt/...` inference after auth, so no
-  ChatGPT-backed alias is part of the accepted public gateway contract.
+  ChatGPT device auth can complete on Mini through LiteLLM's provider flow.
+  Additive operator-only alias `chatgpt-5` is not part of the accepted public
+  gateway or Open WebUI contract.
+  `chatgpt-5` is currently validated on `POST /v1/responses`; the pinned
+  baseline still hits a Cloudflare HTML challenge on Chat Completions, and
+  `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).

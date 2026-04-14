@@ -89,11 +89,15 @@ implement inference or web-search business logic.
 - There are no active temporary GPT canary aliases in the current gateway
   contract.
 - The local canonical public trio remains `main`, `deep`, and `fast`.
-- No ChatGPT-backed public aliases are part of the accepted gateway contract on
-  the current stable LiteLLM runtime.
+- Additive operator-only ChatGPT alias is `chatgpt-5`.
+- No ChatGPT-backed alias is part of the accepted public or Open WebUI gateway
+  contract in the current runtime.
 - GPT lanes remain Chat Completions-first in the current hardening phase.
 - `/v1/responses` remains in validation scope for GPT lanes but is advisory
   unless a defect there also matters to the public Chat Completions path.
+- On the current ChatGPT account, `chatgpt/gpt-5.4` is validated on
+  `POST /v1/responses`, while `chatgpt/gpt-5.4-pro` is rejected as unsupported
+  for Codex on ChatGPT accounts and is not exposed as an alias.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -154,10 +158,7 @@ implement inference or web-search business logic.
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so future drift fails fast at startup
   instead of surfacing later as partial MCP/key-management breakage.
 - ChatGPT provider auth uses LiteLLM's own device-code/OAuth login flow on first
-  use, but the current stable 1.83.4 Mini runtime still fails real
-  `chatgpt/...` inference after auth with `ChatgptException - Unknown items in
-  responses API response: []`. Do not treat ChatGPT aliases as an accepted
-  Open WebUI contract on this baseline.
+  use. Auth state must remain local-only and out of git.
 
 ## Search Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -175,7 +176,9 @@ implement inference or web-search business logic.
   `~/.config/litellm/chatgpt/auth.json` for the service user. Runtime-only
   overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`, but that auth
   state alone does not make ChatGPT aliases production-ready on the current
-  stable runtime.
+  stable runtime. The current pinned baseline also still hits a Cloudflare HTML
+  challenge on the Chat Completions path for `chatgpt-5`, so only
+  `POST /v1/responses` is validated in this pass.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.

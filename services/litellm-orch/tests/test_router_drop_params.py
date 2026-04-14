@@ -27,6 +27,29 @@ class TestRouterDropParams(unittest.TestCase):
             "router_settings.fallbacks must preserve fast -> main",
         )
 
+    def test_operator_only_chatgpt_alias_exists(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        model_names = {
+            item.get("model_name")
+            for item in config.get("model_list", [])
+            if isinstance(item, dict)
+        }
+        self.assertIn("chatgpt-5", model_names)
+        self.assertNotIn("chatgpt-5-thinking", model_names)
+
+    def test_gpt_request_defaults_targets_chatgpt_alias(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        guardrails = config.get("guardrails", [])
+        targets = None
+        for item in guardrails:
+            if item.get("guardrail_name") == "gpt-request-defaults":
+                targets = item.get("litellm_params", {}).get("target_models", "")
+                break
+        self.assertIsNotNone(targets, "gpt-request-defaults guardrail must exist")
+        target_set = {part.strip() for part in targets.split(",") if part.strip()}
+        self.assertIn("chatgpt-5", target_set)
+        self.assertNotIn("chatgpt-5-thinking", target_set)
+
 
 if __name__ == "__main__":
     unittest.main()

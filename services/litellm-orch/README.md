@@ -29,8 +29,10 @@ only; it does not implement inference.
 - Repo-local OpenCode defaults and agent/skill behavior are documented in
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The local canonical public LLM trio remains `fast`, `main`, and `deep`.
-- Additive experimental cloud aliases are `chatgpt-5` and
-  `chatgpt-5-thinking`.
+- Additive operator-only ChatGPT alias is `chatgpt-5`; it is not part of the
+  accepted public human chat contract.
+- `chatgpt-5` is currently validated on `POST /v1/responses`. Do not treat it
+  as a public Chat Completions or Open WebUI contract in this pass.
 - `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
   not part of the public human chat-lane trio.
 - `task-json` is an additional utility alias, not part of the public human
