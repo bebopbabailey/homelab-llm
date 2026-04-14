@@ -16,8 +16,8 @@ from pathlib import Path
 
 REPO_HYGIENE_REQUIRED = {
     "docs/foundation/testing.md": ["repo_hygiene_audit.py", "root_ok", "journal_index_ok", "service_registry_audit.py", "worktree_effort.py", "start_effort.py", "--service", "closeout_effort.py", "primary worktree", "park", "close", "metadata-only", "NOW.md", "platform/registry/services.jsonl"],
-    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "start_effort.py", "service_registry.py", "service_registry_audit.py", "closeout_effort.py", "CONCURRENT_EFFORTS.md", "platform/registry/services.jsonl"],
-    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "service_registry.py", "service_registry_audit.py", "worktree_effort.py", "start_effort.py", "--service", "closeout_effort.py", "preflight", "park", "close", "metadata-only", "NOW.md", "auto-rebase", "platform/registry/handles.jsonl"],
+    "docs/_core/CHANGE_RULES.md": ["repo_hygiene_audit.py", "repo-hygiene.yml", "root_hygiene_manifest.json", "worktree_effort.py", "start_effort.py", "service_registry.py", "service_registry_audit.py", "closeout_effort.py", "CONCURRENT_EFFORTS.md", "platform/registry/services.jsonl", "layer-*/README.md", "platform/registry/README.md"],
+    "scripts/README.md": ["repo_hygiene_audit.py", "--scope", "--strict", "service_registry.py", "service_registry_audit.py", "worktree_effort.py", "start_effort.py", "--service", "closeout_effort.py", "preflight", "park", "close", "metadata-only", "NOW.md", "auto-rebase", "platform/registry/handles.jsonl", "README-only"],
     "DOCS_CONTRACT.md": ["root_hygiene_manifest.json", "repo_hygiene_audit.py"],
     ".github/workflows/repo-hygiene.yml": ["repo_hygiene_audit.py", "--scope root --strict", "control_plane_sync_audit.py"],
 }
@@ -43,6 +43,7 @@ SKILL_REQUIRED = {
         "no auto-rebase",
         "NOW.md",
         "service_registry.py",
+        "layer-*",
     ],
     "docs/OPENCODE.md": [
         "homelab-durability",
@@ -64,6 +65,7 @@ SKILL_REQUIRED = {
         "NOW.md",
         "auto-rebase",
         "service_registry.py",
+        "layer-*",
     ],
     "docs/INTEGRATIONS.md": [
         "homelab-durability",
@@ -90,6 +92,7 @@ SKILL_REQUIRED = {
         "metadata-only",
         "broad parallel",
         "service registry",
+        "README.md",
     ],
 }
 

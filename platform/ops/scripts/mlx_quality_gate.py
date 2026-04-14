@@ -18,7 +18,7 @@ from pathlib import Path
 
 
 DEFAULT_FIXTURE = (
-    "/home/christopherbailey/homelab-llm/layer-inference/docs/fixtures/inference_golden_smoke.json"
+    "/home/christopherbailey/homelab-llm/platform/ops/fixtures/inference_golden_smoke.json"
 )
 DEFAULT_PORTS = "8101"
 DEFAULT_HOST = "127.0.0.1"

@@ -8,9 +8,8 @@ Repository utility scripts.
 - `service_registry.py` — resolves canonical service metadata from
   `platform/registry/services.jsonl`.
 - `service_registry_audit.py` — audits registry coverage against discovered
-  service roots and validates the compatibility-first service catalog.
-- `docs_contract_audit.py` — audits layer-level docs contract completeness
-  (`README`, `AGENTS`, `CONSTRAINTS`, `DEPENDENCIES`, `RUNBOOK`) and
+  service roots and validates the service catalog.
+- `docs_contract_audit.py` — audits layer taxonomy README coverage and
   service-level docs contract completeness (`README`, `SERVICE_SPEC`,
   `ARCHITECTURE`, `AGENTS`, `CONSTRAINTS`, `RUNBOOK`, `TASKS`).
 - `repo_hygiene_audit.py` — audits root-file allowlist, journal index/link
@@ -61,7 +60,7 @@ Repository utility scripts.
   - `uv run python scripts/docs_contract_audit.py`
   - `uv run python scripts/docs_contract_audit.py --json`
   - `uv run python scripts/docs_contract_audit.py --strict --json`
-  - `--json` preserves the existing service keys and appends layer audit keys:
+  - `--json` preserves the existing service keys and appends layer taxonomy audit keys:
     `required_layer_files`, `layer_count`, `layers`, `layers_with_gaps`,
     `layers_ok`, `overall_ok`
 - Repo hygiene audit:
@@ -111,11 +110,13 @@ Repository utility scripts.
   - `uv run python scripts/service_registry.py path open-webui`
   - `uv run python scripts/service_registry_audit.py --strict --json`
   - `platform/registry/services.jsonl` is the canonical service taxonomy during
-    the service-centric refactor
+    the current service-centric layout
   - repo-local ops/validation scripts should resolve first-party service roots
     through the service registry instead of hardcoded `layer-*` path maps
   - broad `services` and `experiments` scopes are treated like broad `layer-*`
     scopes for concurrent-effort safety once those roots are live
+  - `legacy_paths` is historical traceability only
+  - `layer-*` is README-only taxonomy/navigation, not a live service-root surface
 - Repo review snapshot ZIP:
   - `./scripts/repo_snapshot_zip.py`
   - filesystem-based and Git-independent at runtime

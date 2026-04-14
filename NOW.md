@@ -1,11 +1,12 @@
 # NOW
 
 Active
-- Move `vector-db` into the live `services/` tree.
-- Update registry, canon docs, deploy script, and path-sensitive fixtures to
-  the new service root while keeping the Studio runtime target unchanged.
-- Reduce `layer-data` to taxonomy and registry docs only.
+- Finalize the service-centric migration by reducing `layer-*` to README-only
+  taxonomy surfaces.
+- Consolidate remaining layer registry guidance under `platform/registry/`.
+- Align audits and control-plane docs with the steady-state service-centric
+  model.
 
 NEXT UP
-- Land this final service-move tranche, then decide whether `layer-*` taxonomy
-  cleanup is still worth doing.
+- Land the final taxonomy cleanup, then decide whether any further registry or
+  catalog work needs a separate design phase.

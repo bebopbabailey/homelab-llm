@@ -65,6 +65,14 @@ If drift is discovered:
   - `docs/_core/SOURCES_OF_TRUTH.md`
   - Example: reclassifying `optillm-local` as an experiment requires registry, audit, and documentation updates together.
 
+- If layer taxonomy/navigation changes, update:
+  - the affected `layer-*/README.md`
+  - `platform/registry/README.md` when registry guidance or categorization context changes
+  - `scripts/docs_contract_audit.py`
+  - `docs/foundation/service-catalog.md`
+  - `docs/_core/SOURCES_OF_TRUTH.md`
+  - Example: reducing `layer-*` to README-only taxonomy surfaces requires audit and source-of-truth updates together.
+
 - If MCP server/tool metadata or schema changes, update:
   - `docs/foundation/mcp-registry.md`
   - `platform/ops/templates/mcp-registry.json`

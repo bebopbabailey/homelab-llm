@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit layer and service documentation contract coverage.
+"""Audit layer taxonomy and service documentation contract coverage.
 
 Usage:
   uv run python scripts/docs_contract_audit.py
@@ -23,13 +23,7 @@ SERVICE_REQUIRED_FILES: tuple[str, ...] = (
     "RUNBOOK.md",
     "TASKS.md",
 )
-LAYER_REQUIRED_FILES: tuple[str, ...] = (
-    "README.md",
-    "AGENTS.md",
-    "CONSTRAINTS.md",
-    "DEPENDENCIES.md",
-    "RUNBOOK.md",
-)
+LAYER_REQUIRED_FILES: tuple[str, ...] = ("README.md",)
 SERVICE_MARKERS: tuple[str, ...] = tuple(name for name in SERVICE_REQUIRED_FILES if name != "README.md")
 EXCLUDED_DIR_NAMES: set[str] = {"docs"}
 SERVICE_DISCOVERY_ROOTS: tuple[str, ...] = ("services", "experiments")

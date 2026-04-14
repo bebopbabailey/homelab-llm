@@ -43,6 +43,8 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   when the effort maps to `platform/registry/services.jsonl`.
 - Use `scripts/service_registry.py` to resolve canonical service paths during
   the service-centric migration.
+- Treat `layer-*` as taxonomy/navigation only; do not use it as the primary
+  service-boundary contract.
 - Default landing path for a finished linked lane is
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
@@ -83,7 +85,7 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   - `docs/foundation/topology.md`
 - Consult when touching gateway or runtime behavior:
   - `docs/_core/CHANGE_RULES.md`
-  - `layer-gateway/CONSTRAINTS.md`
+  - `docs/INTEGRATIONS.md`
   - relevant service `SERVICE_SPEC.md`, `RUNBOOK.md`, and `CONSTRAINTS.md`
 
 ## Rollback discipline

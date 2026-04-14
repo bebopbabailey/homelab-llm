@@ -983,7 +983,7 @@ uv run python scripts/validate_handles.py
 Expected:
 - `docs_contract_audit.py` returns `ok: true` with `services_with_gaps: 0`.
 - `docs_contract_audit.py` also returns `layers_ok: true` and `overall_ok: true`
-  with `layers_with_gaps: 0`.
+  with README-only layer taxonomy surfaces.
 - root strict mode returns `root_ok: true` and `overall_ok: true`.
 - journal advisory mode returns `journal_index_ok: true`.
 - archive advisory mode returns `archive_ok: true`.

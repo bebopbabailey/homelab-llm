@@ -26,12 +26,18 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `platform/registry/handles.jsonl`
     - `platform/registry/models.jsonl`
     - `platform/registry/lexicon.jsonl`
+    - `platform/registry/README.md`
     - `platform/ops/templates/mcp-registry.json`
     - `platform/ops/runtime-lock.json`
 - Per-service canon (most specific truth for a service):
     - the service root declared in `platform/registry/services.jsonl`
     - `<service-root>/SERVICE_SPEC.md`
     - (supporting) `<service-root>/ARCHITECTURE.md`, `RUNBOOK.md`, `AGENTS.md`, `CONSTRAINTS.md`
+- Layer taxonomy/navigation only:
+    - `layer-*/README.md`
+    - These are non-authoritative indexes. They should not carry service
+      contracts, runtime rules, or operational truth that duplicates service or
+      platform docs.
 
 ## Operational
 How to run, test, or validate the current system.

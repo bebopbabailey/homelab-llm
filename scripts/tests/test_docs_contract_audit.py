@@ -37,3 +37,14 @@ class DocsContractAuditTests(unittest.TestCase):
             sorted(Path(item["path"]).relative_to(repo).as_posix() for item in payload["services"]),
             ["experiments/legacy/optillm-local-gateway", "experiments/system-monitor", "services/grafana"],
         )
+
+    def test_audit_accepts_readme_only_layers(self) -> None:
+        repo = self.make_repo()
+        for rel in ("layer-data", "layer-gateway", "layer-inference", "layer-interface", "layer-tools"):
+            root = repo / rel
+            root.mkdir(parents=True)
+            (root / "README.md").write_text("x\n", encoding="utf-8")
+        result = run(["python3", str(repo / "scripts" / "docs_contract_audit.py"), "--json"], repo)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["layers_ok"])
+        self.assertEqual(payload["required_layer_files"], ["README.md"])

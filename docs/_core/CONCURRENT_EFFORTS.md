@@ -18,6 +18,8 @@ the same time.
   effort is active; the same rule applies to broad `services` and
   `experiments` scopes. Narrow them to explicit non-overlapping files or
   service roots first.
+- `layer-*` survives only as README.md taxonomy/navigation surfaces and is not
+  a live service-root boundary.
 
 ## Local-only effort metadata
 Concurrent effort state is local to each worktree and must not be tracked in

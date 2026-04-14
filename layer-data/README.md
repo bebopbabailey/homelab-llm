@@ -1,14 +1,13 @@
 # Data Layer
 
-Mission: persistence and memory (vector DB, summaries, registries) that supports
-the rest of the system.
+Taxonomy only. This layer groups persistence and memory services for human
+navigation; it is not a live service-root boundary.
 
-Transitional status:
-- `layer-data/` is now a taxonomy and registry surface, not a live service root.
-- The active vector-store service root is `services/vector-db`.
+Current entries:
+- `services/content-extract`
+- `services/vector-db`
 
-See root docs: `/home/christopherbailey/homelab-llm/SYSTEM_OVERVIEW.md`.
-Use `docs/` for deeper data notes.
-
-## Registries
-- Lexicon registry: `layer-data/registry/lexicon.jsonl` (deterministic term correction)
+Canonical taxonomy and registry data:
+- `platform/registry/services.jsonl`
+- `platform/registry/lexicon.jsonl`
+- `platform/registry/README.md`

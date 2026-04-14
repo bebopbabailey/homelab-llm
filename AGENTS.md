@@ -54,11 +54,11 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
 - Select verification mode (FAST or FULL) and list the commands you will run.
 
 ## Per-layer consultation
-If you touch anything inside a layer, read first:
-- `layer-*/AGENTS.md` (if present)
-- `layer-*/CONSTRAINTS.md`
-- `layer-*/DEPENDENCIES.md`
-- `layer-*/RUNBOOK.md`
+If you touch anything inside a `layer-*` taxonomy surface, read first:
+- `layer-*/README.md`
+
+`layer-*` is taxonomy/navigation only. It is not a service boundary or the
+authoritative architecture surface.
 
 ## Per-service consultation
 If you touch a service (code, config, or docs), read first:
@@ -78,8 +78,8 @@ If any are missing, state that and proceed with the least risky interpretation.
 - Prefer working within a single service boundary per task.
 - Only change shared docs/registries when required by the change.
 - If a change triggers doc obligations, follow `docs/_core/CHANGE_RULES.md`.
-- During the service-centric refactor, treat `platform/registry/services.jsonl`
-  as the canonical taxonomy surface and raw `layer-*` paths as transitional.
+- Treat `platform/registry/services.jsonl` as the canonical taxonomy surface.
+- Treat `layer-*` as thin navigation/index surfaces only.
 - When cleaning or adding repo-root docs, preserve the root markdown allowlist
   in `DOCS_CONTRACT.md`.
 - For concurrent implementation work, prefer one worktree per effort and keep

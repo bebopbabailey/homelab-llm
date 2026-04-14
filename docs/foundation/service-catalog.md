@@ -3,14 +3,13 @@
 `platform/registry/services.jsonl` is now the canonical machine-readable
 service taxonomy for the repo.
 
-Compatibility-first posture:
-- filesystem paths may now live under `layer-*`, `services/`, or
-  `experiments/` during the migration
-- `planned_path` records the destination service-centric layout
+Current posture:
+- active service roots live under `services/` or `experiments/`
 - `maturity` distinguishes supported services from experiments and historical
   placeholders
 - `parent_service_id` allows explicit child-service relationships such as
   `mcp-tools/web-fetch`
+- `layer-*` is taxonomy/navigation only and is not a live service-root surface
 
 Useful commands:
 ```bash
@@ -21,9 +20,7 @@ uv run python scripts/service_registry_audit.py --strict --json
 ```
 
 Registry conventions:
-- `path` is the current live repo path during migration
-- `planned_path` is the intended destination under `services/` or
-  `experiments/`
-- `legacy_paths` remains empty until a path move actually happens
-- once a service is moved, `path` and `planned_path` should match and
-  `legacy_paths` records the old location
+- `path` is the current live repo path
+- `planned_path` should match `path` in the steady state
+- `legacy_paths` records historical service locations for traceability only
+- `legacy_paths` must not be used for runtime resolution or operator fallback

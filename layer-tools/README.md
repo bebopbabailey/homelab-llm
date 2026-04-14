@@ -1,10 +1,16 @@
 # Tools Layer
 
-Mission: action and observability services used by agents or gateway-adjacent
-workflows.
+Taxonomy only. This layer groups tool and observability services for human
+navigation; it is not a live service-root boundary.
 
-Current service types in this layer:
-- stdio MCP collection under `services/mcp-tools`
-- localhost-only HTTP MCP service under `services/open-terminal`
-- local search service `services/searxng`
-- local observability support service `services/prometheus`
+Current entries:
+- `services/mcp-tools`
+- `services/mcp-tools/web-fetch`
+- `services/open-terminal`
+- `services/searxng`
+- `services/prometheus`
+
+Canonical taxonomy and registry references:
+- `platform/registry/services.jsonl`
+- `platform/ops/templates/mcp-registry.json`
+- `docs/foundation/mcp-registry.md`
