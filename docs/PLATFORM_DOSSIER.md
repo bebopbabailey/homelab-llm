@@ -38,7 +38,7 @@
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `services/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
-| OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `layer-gateway/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
+| OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `services/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
 | Studio main vector DB | Studio | 55432 | 127.0.0.1 | http://127.0.0.1:55432 | n/a | `com.bebop.pgvector-main`, policy-managed launchd |
 | Studio main memory API | Studio | 55440 | 127.0.0.1 | http://127.0.0.1:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
@@ -56,7 +56,7 @@ Networking note:
 - Do not change or reuse ports without an explicit port-migration phase.
 
 ## Service inventory (concise)
-- LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `layer-gateway/litellm-orch/config/router.yaml`.
+- LiteLLM: systemd unit `/etc/systemd/system/litellm-orch.service`, json logs in `services/litellm-orch/config/router.yaml`.
   Auth: API calls require `Authorization: Bearer <LITELLM_MASTER_KEY>` (even on localhost).
   Health/auth behavior: `/v1/*` and `/health` are auth-gated; `/health/readiness`,
   `/health/liveliness`, and `/metrics/` are currently open.

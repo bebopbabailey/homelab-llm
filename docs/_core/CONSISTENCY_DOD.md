@@ -99,7 +99,7 @@ Expected signals:
 ### C) Routing/aliases/handles and model inventory
 
 Evidence sources:
-- `layer-gateway/litellm-orch/config/router.yaml`
+- `services/litellm-orch/config/router.yaml`
 - `platform/registry/handles.jsonl`
 - `scripts/validate_handles.py`
 
@@ -119,7 +119,7 @@ Expected signals:
 #### Boost lane reachability (Mini → Studio)
 
 Evidence sources:
-- `layer-gateway/litellm-orch/config/router.yaml` (`model_name: boost` uses `OPTILLM_API_BASE`)
+- `services/litellm-orch/config/router.yaml` (`model_name: boost` uses `OPTILLM_API_BASE`)
 - Studio listener on `:4020`
 
 Checks:

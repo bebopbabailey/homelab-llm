@@ -2,7 +2,7 @@
 
 ## Start/stop
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch
+cd /home/christopherbailey/homelab-llm/services/litellm-orch
 uv sync --frozen
 
 sudo systemctl start litellm-orch.service
@@ -17,7 +17,7 @@ journalctl -u litellm-orch.service -f
 
 ## Health
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/health
 curl http://127.0.0.1:4000/health/readiness
 curl http://127.0.0.1:4000/health/liveliness
@@ -39,7 +39,7 @@ Symptoms seen on the broken Mini runtime:
 
 Supported repair path used on Mini:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch
+cd /home/christopherbailey/homelab-llm/services/litellm-orch
 set -a
 source config/env.local >/dev/null 2>&1
 
@@ -85,7 +85,7 @@ done
 ## GPT request-default checks
 ```bash
 rg -n "gpt-request-defaults|target_models|reasoning_effort" \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml
+  /home/christopherbailey/homelab-llm/services/litellm-orch/config/router.yaml
 ```
 
 Expected:
@@ -95,7 +95,7 @@ Expected:
 
 ## GPT streaming checks (pass-through)
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -N -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
@@ -110,7 +110,7 @@ curl -sS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
 
 ## GPT acceptance harness (public lanes)
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scripts/run_gpt_oss_acceptance.py \
   --base-url http://127.0.0.1:4000/v1 \
@@ -133,7 +133,7 @@ Temporary GPT canary alias:
 
 ## Fallback validation
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -146,15 +146,15 @@ Expected:
 
 ## Active alias checks
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
 
 rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/router.yaml \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/SERVICE_SPEC.md \
-  /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/docs/openwebui.md
+  /home/christopherbailey/homelab-llm/services/litellm-orch/config/router.yaml \
+  /home/christopherbailey/homelab-llm/services/litellm-orch/SERVICE_SPEC.md \
+  /home/christopherbailey/homelab-llm/services/litellm-orch/docs/openwebui.md
 ```
 
 Expected:
@@ -191,7 +191,7 @@ Current public `deep` cutover result:
 
 ## Speech canary checks
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS http://127.0.0.1:4000/v1/audio/speech \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -213,7 +213,7 @@ Expected:
 
 ## Transcript alias checks
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -233,7 +233,7 @@ Expected:
 
 ## Task JSON alias check
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -250,7 +250,7 @@ Expected:
 
 ## Main tool-calling validation
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 python3 - <<'PY'
 import json, os, urllib.request
@@ -281,7 +281,7 @@ Expected:
 
 Argument-bearing `main` tool-calling validation:
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 python3 - <<'PY'
 import json, os, urllib.request
@@ -313,7 +313,7 @@ Expected:
 
 Structured-output reality check:
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 python3 - <<'PY'
 import json, os, urllib.request
@@ -458,7 +458,7 @@ Expected:
 
 ## Search tool checks
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 curl -fsS http://127.0.0.1:4000/v1/search/searxng-search \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \

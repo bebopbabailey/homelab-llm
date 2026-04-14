@@ -2,10 +2,10 @@
   "version": 2,
   "service_refs": {
     "litellm-orch": {
-      "path": "layer-gateway/litellm-orch"
+      "path": "services/litellm-orch"
     },
     "optillm-proxy": {
-      "path": "layer-gateway/optillm-proxy"
+      "path": "services/optillm-proxy"
     }
   },
   "optillm_proxy": {

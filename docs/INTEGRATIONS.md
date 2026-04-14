@@ -1,8 +1,8 @@
 # INTEGRATIONS
 
 ## LiteLLM routing
-- Config: `layer-gateway/litellm-orch/config/router.yaml` + `layer-gateway/litellm-orch/config/env.local`.
-- Router settings: retries and cooldowns in `layer-gateway/litellm-orch/config/router.yaml`.
+- Config: `services/litellm-orch/config/router.yaml` + `services/litellm-orch/config/env.local`.
+- Router settings: retries and cooldowns in `services/litellm-orch/config/router.yaml`.
 - Upstreams: active Studio MLX lane `http://192.168.1.72:8101/v1`,
   active `llmster` GPT service on `8126`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
@@ -314,7 +314,7 @@ if a param is rejected by the backend.
   backend hardening phase.
 
 ## LiteLLM extension points (summary)
-See `layer-gateway/litellm-orch/docs/litellm-extension-points.md` for the hook map
+See `services/litellm-orch/docs/litellm-extension-points.md` for the hook map
 and where this repo uses callbacks vs guardrails.
 
 ### GPT formatting ownership policy

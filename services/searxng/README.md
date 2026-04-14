@@ -71,8 +71,8 @@ Once running on localhost:
 
 ## LiteLLM Integration
 LiteLLM exposes SearXNG via `/v1/search/<tool_name>` once configured in
-`layer-gateway/litellm-orch/config/router.yaml`.
-Set these in `layer-gateway/litellm-orch/config/env.local`:
+`services/litellm-orch/config/router.yaml`.
+Set these in `services/litellm-orch/config/env.local`:
 - `SEARXNG_API_BASE=http://127.0.0.1:8888`
 - `SEARXNG_API_KEY=` (optional)
 

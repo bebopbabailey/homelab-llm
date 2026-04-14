@@ -5,7 +5,7 @@ import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ROUTER_CONFIG = REPO_ROOT / "layer-gateway/litellm-orch/config/router.yaml"
+ROUTER_CONFIG = REPO_ROOT / "services/litellm-orch/config/router.yaml"
 
 
 class TestRouterDropParams(unittest.TestCase):

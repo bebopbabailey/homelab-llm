@@ -132,7 +132,7 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   - `http://192.168.1.71:4000/v1`
 - OpenVINO binds 0.0.0.0 for maintenance; internal callers use localhost.
 - Env/secrets live outside the repo:
-  - LiteLLM: `layer-gateway/litellm-orch/config/env.local`
+  - LiteLLM: `services/litellm-orch/config/env.local`
   - Open WebUI: `/etc/open-webui/env`
   - OpenCode Web: `/etc/opencode/env`
   - OpenVINO: `/etc/homelab-llm/ov-server.env`

@@ -466,7 +466,7 @@ with urllib.request.urlopen(req, timeout=60) as r:
 print(json.dumps(body['choices'][0]['message'], indent=2))
 PY"
 
-bash -lc 'set -a && source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local && set +a && python3 - <<'"'"'PY'"'"'
+bash -lc 'set -a && source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local && set +a && python3 - <<'"'"'PY'"'"'
 import json, os, urllib.request
 schema={
   "type":"object",
@@ -1176,7 +1176,7 @@ Use this flow when validating quality impact (not just latency/sentinel health):
 
 1) Capture paired outputs:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/ab_capture_plansearch.py \
   --url http://127.0.0.1:4000/v1/chat/completions \
   --bearer "$LITELLM_API_KEY" \
@@ -1191,7 +1191,7 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 
 2) Build a blinded human-scoring packet:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/ab_blind_packet.py \
   --capture-jsonl /tmp/plansearchtrio_ab_capture.jsonl \
   --out-csv /tmp/plansearchtrio_blind_score.csv \
@@ -1204,7 +1204,7 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 
 4) Compute model-level summary:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/ab_score_blind.py \
   --scored-csv /tmp/plansearchtrio_blind_score.csv \
   --key-json /tmp/plansearchtrio_blind_key.json \
@@ -1284,7 +1284,7 @@ PYTHONPATH=/home/christopherbailey/voice-gateway-canary/src \
 
 ## LiteLLM speech canary (Mini)
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS http://127.0.0.1:4000/v1/audio/speech   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -H "Content-Type: application/json"   -d '{"model":"voice-tts-canary","input":"LiteLLM speech canary.","voice":"alloy","response_format":"wav","speed":1.0}'   --output /tmp/litellm-voice-canary.wav
 
@@ -1645,14 +1645,14 @@ Readiness and model checks:
 curl -fsS http://127.0.0.1:4000/health/readiness | jq .
 curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]' | rg 'WebsearchSchemaGuardrail'
 
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
 ```
 
 Generic search-tool smoke:
 ```bash
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   http://127.0.0.1:4000/v1/search/searxng-search \
@@ -1667,7 +1667,7 @@ Pass guidance:
 ## LiteLLM Transcript Cleanup Alias Checks (Mini)
 ```bash
 set -a
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 set +a
 
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \

@@ -1,12 +1,11 @@
 # NOW
 
 Active
-- Move the next edge service batch into live `services/` paths.
-- Retire `optillm-local` into `experiments/legacy/` without archiving it out of
-  the repo.
-- Update registry, repo-owned units, docs, and path-sensitive tests so the
-  mixed-root migration remains deterministic.
+- Move `litellm-orch` and `optillm-proxy` into live `services/` paths.
+- Update runtime-lock, repo-owned unit sources, docs, and path-sensitive tests
+  to the new control-plane service roots.
+- Keep `vector-db` as the only remaining transitional `layer-*` service for the
+  final follow-on tranche.
 
 NEXT UP
-- Land this batch, then plan the final control-plane and data moves around
-  `litellm-orch`, `optillm-proxy`, and `vector-db`.
+- Land this batch, then plan and execute the final `vector-db` tranche.

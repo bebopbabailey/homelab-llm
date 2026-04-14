@@ -66,8 +66,8 @@ Compatibility-first service taxonomy:
    - `GET /v1/models`
    - `GET /health`
 4) Add routing in LiteLLM:
-   - Update `layer-gateway/litellm-orch/config/router.yaml`.
-   - Add env vars to `layer-gateway/litellm-orch/config/env.local` (not committed).
+   - Update `services/litellm-orch/config/router.yaml`.
+   - Add env vars to `services/litellm-orch/config/env.local` (not committed).
    - Use plain logical model names (`mlx-*`, `ov-*`).
    - OptiLLM techniques are selected per-request via `optillm_approach`.
 5) Update topology docs:
@@ -75,7 +75,7 @@ Compatibility-first service taxonomy:
    - `docs/PLATFORM_DOSSIER.md`
 6) Validate with health checks:
    - `platform/ops/scripts/healthcheck.sh` (extend if needed).
-   - `layer-gateway/litellm-orch/scripts/health-check.sh` for LiteLLM.
+   - `services/litellm-orch/scripts/health-check.sh` for LiteLLM.
 
 ## Add a New Client/Orchestrator (TinyAgents)
 1) Client must call LiteLLM only (`http://127.0.0.1:4000/v1` on-host).
@@ -86,7 +86,7 @@ Compatibility-first service taxonomy:
 3) Document the client contract in `docs/` and its service folder.
 
 ## Config Sources of Truth
-- LiteLLM routing: `layer-gateway/litellm-orch/config/router.yaml`.
-- LiteLLM env: `layer-gateway/litellm-orch/config/env.local` (local only).
+- LiteLLM routing: `services/litellm-orch/config/router.yaml`.
+- LiteLLM env: `services/litellm-orch/config/env.local` (local only).
 - Open WebUI env: `/etc/open-webui/env`.
 - OpenVINO env: `/etc/homelab-llm/ov-server.env`.

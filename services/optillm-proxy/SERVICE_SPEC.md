@@ -84,7 +84,7 @@ Minimum required:
 
 ## Planned registry
 - Service-level JSONL registry for OptiLLM ensembles (planned):
-  `layer-gateway/optillm-proxy/registry/ensembles.jsonl`
+  `services/optillm-proxy/registry/ensembles.jsonl`
 - Source of truth for selectors, model membership, and purpose tags.
 
 ---
@@ -183,7 +183,7 @@ HTTP 200 + valid JSON indicates healthy.
 - Not for low-latency chat
 - Router model cache (proxy user): `~/.cache/huggingface/hub`
 - `web_search` uses **SearXNG** when `SEARXNG_API_BASE` is set in `/etc/optillm-proxy/env`.
-  Local override: `layer-gateway/optillm-proxy/optillm/plugins/web_search_plugin.py`.
+  Local override: `services/optillm-proxy/optillm/plugins/web_search_plugin.py`.
   If unset, the plugin falls back to its built-in Selenium/Google path.
 
 ## Technique selection (request-body field)
@@ -231,7 +231,7 @@ Upgrades must be deliberate and validated.
 No Docker installs are allowed in this repo.
 
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 uv venv .venv
 uv sync
 ```

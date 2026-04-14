@@ -6,7 +6,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_LOCAL="${LITELLM_ENV_LOCAL:-$REPO_ROOT/layer-gateway/litellm-orch/config/env.local}"
+ENV_LOCAL="${LITELLM_ENV_LOCAL:-$REPO_ROOT/services/litellm-orch/config/env.local}"
 LITELLM_API_KEY="${LITELLM_API_KEY:-}"
 
 if [[ -z "${LITELLM_API_KEY}" && -f "$ENV_LOCAL" ]]; then

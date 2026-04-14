@@ -17,8 +17,8 @@ SPEC.loader.exec_module(vr)
 class ValidateRuntimeLockTests(unittest.TestCase):
     def _service_path(self, _repo_root, service_id):
         mapping = {
-            "litellm-orch": "layer-gateway/litellm-orch",
-            "optillm-proxy": "layer-gateway/optillm-proxy",
+            "litellm-orch": "services/litellm-orch",
+            "optillm-proxy": "services/optillm-proxy",
         }
         return mapping[service_id]
 
@@ -29,28 +29,28 @@ class ValidateRuntimeLockTests(unittest.TestCase):
     def test_fast_fails_when_patch_artifact_present(self):
         lock = {
             "service_refs": {
-                "litellm-orch": {"path": "layer-gateway/litellm-orch"},
-                "optillm-proxy": {"path": "layer-gateway/optillm-proxy"},
+                "litellm-orch": {"path": "services/litellm-orch"},
+                "optillm-proxy": {"path": "services/optillm-proxy"},
             },
             "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}},
         }
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "layer-gateway/optillm-proxy/scripts").mkdir(parents=True)
-            (root / "layer-gateway/optillm-proxy/patches").mkdir(parents=True)
-            (root / "layer-gateway/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
-            (root / "layer-gateway/optillm-proxy/uv.lock").write_text('source = { registry = "https://pypi.org/simple" }')
-            (root / "layer-gateway/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
-            (root / "layer-gateway/litellm-orch/config").mkdir(parents=True)
-            (root / "layer-gateway/litellm-orch/config/router.yaml").write_text('drop_params: true\nfallbacks:\n  - {"fast": ["main"]}\n')
+            (root / "services/optillm-proxy/scripts").mkdir(parents=True)
+            (root / "services/optillm-proxy/patches").mkdir(parents=True)
+            (root / "services/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
+            (root / "services/optillm-proxy/uv.lock").write_text('source = { registry = "https://pypi.org/simple" }')
+            (root / "services/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
+            (root / "services/litellm-orch/config").mkdir(parents=True)
+            (root / "services/litellm-orch/config/router.yaml").write_text('drop_params: true\nfallbacks:\n  - {"fast": ["main"]}\n')
             for doc in [
                 'docs/foundation/runtime-lock.md','docs/_core/SOURCES_OF_TRUTH.md','docs/_core/CHANGE_RULES.md','docs/foundation/testing.md',
-                'layer-gateway/optillm-proxy/SERVICE_SPEC.md','layer-gateway/optillm-proxy/RUNBOOK.md','layer-gateway/optillm-proxy/AGENTS.md',
-                'layer-gateway/litellm-orch/SERVICE_SPEC.md','layer-gateway/litellm-orch/RUNBOOK.md','docs/foundation/mlx-registry.md','docs/PLATFORM_DOSSIER.md','docs/INTEGRATIONS.md']:
+                'services/optillm-proxy/SERVICE_SPEC.md','services/optillm-proxy/RUNBOOK.md','services/optillm-proxy/AGENTS.md',
+                'services/litellm-orch/SERVICE_SPEC.md','services/litellm-orch/RUNBOOK.md','docs/foundation/mlx-registry.md','docs/PLATFORM_DOSSIER.md','docs/INTEGRATIONS.md']:
                 p = root / doc
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text('x')
-            (root / "layer-gateway/optillm-proxy/patches/optillm.patch").write_text('patch')
+            (root / "services/optillm-proxy/patches/optillm.patch").write_text('patch')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "resolve_service_path", side_effect=self._service_path):
                 failures = vr.check_fast(lock)
@@ -59,19 +59,19 @@ class ValidateRuntimeLockTests(unittest.TestCase):
     def test_fast_fails_when_router_missing_drop_params(self):
         lock = {
             "service_refs": {
-                "litellm-orch": {"path": "layer-gateway/litellm-orch"},
-                "optillm-proxy": {"path": "layer-gateway/optillm-proxy"},
+                "litellm-orch": {"path": "services/litellm-orch"},
+                "optillm-proxy": {"path": "services/optillm-proxy"},
             },
             "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}},
         }
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "layer-gateway/litellm-orch/config").mkdir(parents=True)
-            (root / "layer-gateway/litellm-orch/config/router.yaml").write_text('router_settings:\n  fallbacks:\n    - {"fast": ["main"]}\n')
-            (root / "layer-gateway/optillm-proxy/scripts").mkdir(parents=True)
-            (root / "layer-gateway/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
-            (root / "layer-gateway/optillm-proxy/uv.lock").write_text('registry')
-            (root / "layer-gateway/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
+            (root / "services/litellm-orch/config").mkdir(parents=True)
+            (root / "services/litellm-orch/config/router.yaml").write_text('router_settings:\n  fallbacks:\n    - {"fast": ["main"]}\n')
+            (root / "services/optillm-proxy/scripts").mkdir(parents=True)
+            (root / "services/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
+            (root / "services/optillm-proxy/uv.lock").write_text('registry')
+            (root / "services/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
             (root / 'doc.md').write_text('x')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "resolve_service_path", side_effect=self._service_path), \
@@ -82,19 +82,19 @@ class ValidateRuntimeLockTests(unittest.TestCase):
     def test_fast_fails_when_uv_lock_has_git_source(self):
         lock = {
             "service_refs": {
-                "litellm-orch": {"path": "layer-gateway/litellm-orch"},
-                "optillm-proxy": {"path": "layer-gateway/optillm-proxy"},
+                "litellm-orch": {"path": "services/litellm-orch"},
+                "optillm-proxy": {"path": "services/optillm-proxy"},
             },
             "litellm": {"router_config_ref": {"service_id": "litellm-orch", "relpath": "config/router.yaml"}},
         }
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "layer-gateway/litellm-orch/config").mkdir(parents=True)
-            (root / "layer-gateway/litellm-orch/config/router.yaml").write_text('drop_params: true\nfallbacks:\n  - {"fast": ["main"]}\n')
-            (root / "layer-gateway/optillm-proxy/scripts").mkdir(parents=True)
-            (root / "layer-gateway/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
-            (root / "layer-gateway/optillm-proxy/uv.lock").write_text('git+https://github.com/algorithmicsuperintelligence/optillm')
-            (root / "layer-gateway/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
+            (root / "services/litellm-orch/config").mkdir(parents=True)
+            (root / "services/litellm-orch/config/router.yaml").write_text('drop_params: true\nfallbacks:\n  - {"fast": ["main"]}\n')
+            (root / "services/optillm-proxy/scripts").mkdir(parents=True)
+            (root / "services/optillm-proxy/pyproject.toml").write_text('optillm==0.3.12')
+            (root / "services/optillm-proxy/uv.lock").write_text('git+https://github.com/algorithmicsuperintelligence/optillm')
+            (root / "services/optillm-proxy/scripts/deploy_studio.sh").write_text('git checkout --detach\nuv sync --frozen\n')
             (root / 'doc.md').write_text('x')
             with mock.patch.object(vr, "REPO_ROOT", root), \
                  mock.patch.object(vr, "resolve_service_path", side_effect=self._service_path), \

@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=christopherbailey
-WorkingDirectory=/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/optillm-proxy
 EnvironmentFile=/etc/optillm-proxy/env
-ExecStart=/home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy/.venv/bin/optillm --host 192.168.1.72 --port 4020 --base-url http://192.168.1.71:4000/v1 --approach proxy --model main
+ExecStart=/home/christopherbailey/homelab-llm/services/optillm-proxy/.venv/bin/optillm --host 192.168.1.72 --port 4020 --base-url http://192.168.1.71:4000/v1 --approach proxy --model main
 Restart=always
 RestartSec=2
 LimitNOFILE=65536

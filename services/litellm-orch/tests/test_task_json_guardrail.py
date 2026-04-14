@@ -18,7 +18,7 @@ def _load_module(path: Path, name: str):
 
 
 task_json_guardrail = _load_module(
-    REPO_ROOT / "layer-gateway/litellm-orch/config/task_json_guardrail.py",
+    REPO_ROOT / "services/litellm-orch/config/task_json_guardrail.py",
     "task_json_guardrail",
 )
 

@@ -29,7 +29,7 @@ without explicit approval.
 
 ## LiteLLM Integration
 - Add a `search_tools` entry for SearXNG in
-  `layer-gateway/litellm-orch/config/router.yaml`.
+  `services/litellm-orch/config/router.yaml`.
 - Use `/v1/search/<tool_name>` for clients to query via LiteLLM.
 - Tool name: `searxng-search`.
 

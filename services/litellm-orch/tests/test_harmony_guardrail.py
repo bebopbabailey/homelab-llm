@@ -4,7 +4,7 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MODULE_PATH = REPO_ROOT / "layer-gateway/litellm-orch/config/harmony_guardrail.py"
+MODULE_PATH = REPO_ROOT / "services/litellm-orch/config/harmony_guardrail.py"
 
 
 def _load_module(path: Path, name: str):

@@ -16,12 +16,12 @@ def _load_module(path: Path, name: str):
 
 
 transcribe_utils = _load_module(
-    REPO_ROOT / "layer-gateway/litellm-orch/config/transcribe_utils.py",
+    REPO_ROOT / "services/litellm-orch/config/transcribe_utils.py",
     "transcribe_utils",
 )
 sys.modules["config.transcribe_utils"] = transcribe_utils
 transcribe_guardrail = _load_module(
-    REPO_ROOT / "layer-gateway/litellm-orch/config/transcribe_guardrail.py",
+    REPO_ROOT / "services/litellm-orch/config/transcribe_guardrail.py",
     "transcribe_guardrail",
 )
 strip_wrappers = transcribe_utils.strip_wrappers
@@ -117,8 +117,8 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertIs(transcribe_guardrail._preprocess_transcript, strip_punct_outside_words)
 
     def test_golden_output_matches_expectations(self):
-        raw = (REPO_ROOT / "layer-gateway/litellm-orch/tests/fixtures_transcribe_raw.txt").read_text().strip()
-        expected = (REPO_ROOT / "layer-gateway/litellm-orch/tests/fixtures_transcribe_expected.txt").read_text().strip()
+        raw = (REPO_ROOT / "services/litellm-orch/tests/fixtures_transcribe_raw.txt").read_text().strip()
+        expected = (REPO_ROOT / "services/litellm-orch/tests/fixtures_transcribe_expected.txt").read_text().strip()
 
         # 1) no headings/labels
         lowered = expected.lower()

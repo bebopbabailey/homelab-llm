@@ -177,8 +177,8 @@ disabled or unloaded.
 
 ## Gateway Sync Contract
 `mlxctl sync-gateway` updates:
-- `layer-gateway/litellm-orch/config/router.yaml`
-- `layer-gateway/litellm-orch/config/env.local`
+- `services/litellm-orch/config/router.yaml`
+- `services/litellm-orch/config/env.local`
 
 Served-set source of truth:
 - Handle inclusion is curated in `platform/registry/handles.jsonl`.

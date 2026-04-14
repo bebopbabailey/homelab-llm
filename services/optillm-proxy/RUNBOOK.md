@@ -107,7 +107,7 @@ Planner policy:
 ### Trio canary A/B gate (`boost-plan` vs `boost-plan-trio`)
 Run from Mini:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/canary_plansearch_profiles.py \
   --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_API_KEY" \
@@ -124,7 +124,7 @@ Gate policy (current):
 
 Compact Trio gate run (recommended for current canary):
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/canary_plansearch_profiles.py \
   --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_API_KEY" \
@@ -137,14 +137,14 @@ cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
 
 Release closeout canary artifact:
 - Locked-runtime artifact path:
-  `layer-gateway/optillm-proxy/docs/plansearchtrio_closeout_canary_locked_runtime_2026-03-09.json`
+  `services/optillm-proxy/docs/plansearchtrio_closeout_canary_locked_runtime_2026-03-09.json`
 - This artifact records the current locked-runtime canary comparison.
 - It is not a replacement for the earlier blind human eval.
 
 Artifact generation command:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
-source /home/christopherbailey/homelab-llm/layer-gateway/litellm-orch/config/env.local
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 uv run python scripts/canary_plansearch_profiles.py \
   --url http://192.168.1.71:4000/v1/chat/completions \
   --bearer "$LITELLM_MASTER_KEY" \
@@ -163,7 +163,7 @@ Reasoning-effort note:
 ### Streaming benchmark (TTFT + total time)
 
 ```bash
-layer-gateway/optillm-proxy/scripts/bench_stream.py \
+services/optillm-proxy/scripts/bench_stream.py \
   --model p-plan-max \
   --prompt "Write a detailed migration plan with risks and rollbacks." \
   --max-tokens 1200
@@ -173,7 +173,7 @@ layer-gateway/optillm-proxy/scripts/bench_stream.py \
 1) Update the pin in `pyproject.toml`.
 2) Reinstall and restart:
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 uv sync
 # Studio: restart launchd service
 sudo launchctl kickstart -k system/com.bebop.optillm-proxy
@@ -181,7 +181,7 @@ sudo launchctl kickstart -k system/com.bebop.optillm-proxy
 
 ## Rebuild the venv (if needed)
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 rm -rf .venv
 uv venv .venv
 uv sync
@@ -193,7 +193,7 @@ sudo launchctl kickstart -k system/com.bebop.optillm-proxy
 ## Studio deploy (launchd)
 Use the deploy helper from the Mini (source of truth):
 ```bash
-cd /home/christopherbailey/homelab-llm/layer-gateway/optillm-proxy
+cd /home/christopherbailey/homelab-llm/services/optillm-proxy
 ./scripts/deploy_studio.sh
 ```
 

@@ -5,7 +5,7 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MODULE_PATH = REPO_ROOT / "layer-gateway/litellm-orch/config/qwen_toolcall_posthook.py"
+MODULE_PATH = REPO_ROOT / "services/litellm-orch/config/qwen_toolcall_posthook.py"
 
 
 def _load_module(path: Path, name: str):

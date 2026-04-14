@@ -19,7 +19,7 @@ Compatibility-first note:
   not require another runtime-lock schema break.
 
 ## Current canon
-- `layer-gateway/optillm-proxy` deploys by exact git SHA to Studio.
+- `services/optillm-proxy` deploys by exact git SHA to Studio.
 - `optillm` is pinned to `0.3.12` from PyPI, not a git source.
 - Deploy-time patching is not allowed.
 - LiteLLM binds `0.0.0.0:4000`; canonical infra URL is `http://192.168.1.71:4000/v1`.

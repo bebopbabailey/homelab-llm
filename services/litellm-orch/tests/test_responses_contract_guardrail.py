@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-MODULE_PATH = REPO_ROOT / "layer-gateway/litellm-orch/config/responses_contract_guardrail.py"
+MODULE_PATH = REPO_ROOT / "services/litellm-orch/config/responses_contract_guardrail.py"
 
 
 def _load_module(path: Path, name: str):
@@ -148,7 +148,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
 
 class TestEmitPolicyEvent(unittest.TestCase):
     def test_emit_policy_event_writes_jsonl(self):
-        trace_path = REPO_ROOT / "layer-gateway/litellm-orch/tests/_tmp_responses_contract_trace.jsonl"
+        trace_path = REPO_ROOT / "services/litellm-orch/tests/_tmp_responses_contract_trace.jsonl"
         try:
             if trace_path.exists():
                 trace_path.unlink()

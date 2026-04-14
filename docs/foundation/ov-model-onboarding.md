@@ -27,8 +27,8 @@ The former role-based `ov-*` aliases are deprecated.
 - `ov-modernbert-large-router-encoder-fp32` (router checkpoint encoder; parity stable)
 
 ## Where to update
-- LiteLLM env: `layer-gateway/litellm-orch/config/env.local`
-- LiteLLM router: `layer-gateway/litellm-orch/config/router.yaml`
+- LiteLLM env: `services/litellm-orch/config/env.local`
+- LiteLLM router: `services/litellm-orch/config/router.yaml`
 - OpenVINO registry: `~/models/converted_models/registry.json`
 - OpenVINO warm profiles: `platform/ops/ov-profiles/*.txt`
 
@@ -38,4 +38,4 @@ The former role-based `ov-*` aliases are deprecated.
 - Before enabling any `ov-*` handles, reconcile with:
   - `docs/INTEGRATIONS.md`
   - `docs/PLATFORM_DOSSIER.md`
-  - `layer-gateway/litellm-orch/config/router.yaml`
+  - `services/litellm-orch/config/router.yaml`

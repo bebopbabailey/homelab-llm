@@ -7,11 +7,13 @@ For client-facing model/API traffic, LiteLLM remains the only approved gateway.
 Other services in this layer are operator or orchestration surfaces, not
 alternate client paths to inference backends.
 
-Live service roots still in this layer:
-- `layer-gateway/litellm-orch`
-- `layer-gateway/optillm-proxy`
+This layer no longer contains live service roots. It remains as a transitional
+taxonomy and layer-doc surface while the final `vector-db` move and the
+remaining layer-level registry/docs cleanup land elsewhere.
 
 Recently moved service roots:
+- `services/litellm-orch`
+- `services/optillm-proxy`
 - `services/openhands`
 - `services/tiny-agents`
 - `experiments/system-monitor`

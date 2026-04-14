@@ -34,7 +34,7 @@ Examples (request-body techniques via gateway):
 - Techniques (request-based) change how a model is queried (e.g., `moa`).
 - Plugins (pipeline-based) add request/response transforms (e.g., `readurls`, `memory`).
 - Plugins can be chained with `&` (sequential) or `|` (parallel) when supported.
-- Current enabled plugins are documented in `layer-gateway/optillm-proxy/docs/FEATURES.md`.
+- Current enabled plugins are documented in `services/optillm-proxy/docs/FEATURES.md`.
 - Deterministic coding-quality aliases are available through LiteLLM:
   `boost-plan`, `boost-plan-verify`, `boost-ideate`, `boost-fastdraft`.
 
@@ -117,7 +117,7 @@ Recommended workflow:
 
 ## Ensemble matrix (v0)
 The initial evaluation matrix lives in the OptiLLM service directory:
-`layer-gateway/optillm-proxy/ENSEMBLES.md`.
+`services/optillm-proxy/ENSEMBLES.md`.
 
 ## Naming conventions (system-wide)
 - Registry values are kebab-case only (letters, digits, dashes).
