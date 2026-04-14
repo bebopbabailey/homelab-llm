@@ -52,10 +52,16 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 ## Config authority
 - Audio env in `/etc/open-webui/env` remains the authority for the speech path.
 - Terminal/tool server registrations currently use Open WebUI persistent config.
-- The LiteLLM/OpenAI provider connection uses the active runtime config, but
-  the live service currently also sets `ENABLE_PERSISTENT_CONFIG=False`, so
-  `/etc/open-webui/env` plus service restart is the practical provider-default
-  authority unless explicitly proven otherwise.
+- The LiteLLM/OpenAI provider connection also persists in Open WebUI state in
+  practice. `ENABLE_PERSISTENT_CONFIG=False` does not prevent stale provider
+  mode from surviving in the DB, so the DB plus authenticated `/openai/config`
+  is the authority for whether the live connection is still pinned to
+  `api_type=responses`.
+- `chatgpt-5` is an Open WebUI Chat Completions lane only. For native tool use
+  in Open WebUI, it is constrained to the read-only Open Terminal MCP subset:
+  `health_check`, `list_files`, `read_file`, `grep_search`, and `glob_search`.
+- `chatgpt-5` must not receive native terminal execution tools, direct tool
+  servers, or builtin native tools from Open WebUI in the current contract.
 
 ## Ownership boundary
 - Open WebUI owns the human UI and audio UX.
