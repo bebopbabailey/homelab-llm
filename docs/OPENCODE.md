@@ -178,6 +178,15 @@ Repo-local OpenCode defaults in this repo:
 - default model: `litellm/deep`
 - small model: `litellm/fast`
 
+Optional reviewer lane:
+- repo-local agent: `repo-codex-review`
+- backing model: `litellm/chatgpt-5`
+- intended role: critique and refinement after a grounded local planning pass
+- requires the machine-local OpenCode provider config to expose `chatgpt-5`
+- current stable contract is text-only review of the supplied draft; repo-tool
+  use on this lane remains follow-on work
+- not part of the default repo-work lane policy
+
 ## Commands
 Canonical markdown command locations:
 - user-global commands: `~/.config/opencode/commands/`
@@ -190,6 +199,10 @@ Current local convention:
 Current Phase A command:
 - canonical path: `~/.config/opencode/commands/phase-a.md`
 - deprecated legacy copy: `~/.opencode/commands/phase-a.md.deprecated`
+
+Repo-local review command:
+- path: `.opencode/commands/codex-review.md`
+- purpose: run the experimental ChatGPT/Codex lane as a plan reviewer
 
 Scope note:
 - command-path normalization is separate from prompt or lane-behavior fixes
@@ -230,9 +243,19 @@ One-shot run:
 opencode run -m litellm/deep "Reply with exactly: plan-ok"
 ```
 
+Plan review run:
+```bash
+opencode run --agent repo-codex-review "Review this repo plan for drift, missing tests, rollback gaps, and simpler alternatives: <paste plan here>"
+```
+
 Run a named command:
 ```bash
 opencode run --command phase-a "Inspect docs/OPENCODE.md and summarize the commands section."
+```
+
+Run the repo-local review command:
+```bash
+opencode run --command codex-review "Review this repo plan: <paste plan here>"
 ```
 
 Start (TUI):
