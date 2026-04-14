@@ -1,7 +1,6 @@
 # Data Layer Runbook
 
-This layer includes both registries and an active Studio-local vector-store
-service boundary.
+This layer includes registries and transitional taxonomy docs only.
 
 ## Safe checks
 ```bash
@@ -11,5 +10,5 @@ rg -n "registry|memory|vector" layer-data -S || true
 
 ## Active service
 - `vector-db` owns the current Studio main memory store.
-- Read `layer-data/vector-db/RUNBOOK.md` for health checks, deploy steps, and
+- Read `services/vector-db/RUNBOOK.md` for health checks, deploy steps, and
   evaluation flow.

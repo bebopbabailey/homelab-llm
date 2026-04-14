@@ -14,11 +14,11 @@
           "rrf_score": 0.99825603,
           "source": "repo_docs_pilot",
           "source_message_id": "a821eb5840dff0c3c1fe0b4d",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Agent Guidance: Vector DB (Studio Main Store)\n\n## Scope\n- Studio-only main memory store for general retrieval over personal/export data.\n- Postgres + pgvector, localhost-only bindings.\n\n## Guardrails\n- Do not expose new LAN ports without explicit plan + approval.\n- Do not mix embedding spaces in one vector index.\n- Keep Mini web-search pipeline out of scope for this service.\n- Keep rollout shadow-first before coupling to production inference flows.\n\n## Runtime ownership\n- Studio launchd labels under `com.bebop.*` only.\n- All owned labels must be allowlisted/audited by Studio scheduling policy.",
           "timestamp_utc": "2026-03-04T02:08:03.034647+00:00",
           "title": "AGENTS",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/AGENTS.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/AGENTS.md"
         },
         {
           "chunk_id": 2,
@@ -28,11 +28,11 @@
           "rrf_score": 0.99463046,
           "source": "repo_docs_pilot",
           "source_message_id": "8c291692576b5bd283d1cec2",
-          "source_thread_id": "layer-data/vector-db/docs",
+          "source_thread_id": "services/vector-db/docs",
           "text": "# Vector DB docs\n\nService-specific deep references for the Studio main vector store.\n\nPlanned additions:\n- `SCHEMA.md`: table-level contract and migration notes\n- `EMBEDDING_SPACES.md`: dual-index rationale and fallback behavior\n- `RETENTION_AND_BACKUP.md`: base backup, WAL policy, restore drills\n- `QUALITY_GATES.md`: shadow-mode acceptance criteria before inference coupling",
           "timestamp_utc": "2026-03-04T02:12:58.322539+00:00",
           "title": "README",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/docs/README.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/docs/README.md"
         },
         {
           "chunk_id": 3,
@@ -42,11 +42,11 @@
           "rrf_score": 0.9906413,
           "source": "repo_docs_pilot",
           "source_message_id": "d9f070ccaebea13835c1b7a4",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Service Spec: Vector DB (Studio Main Store)\n\n## Purpose\nProvide Studio-local durable memory retrieval over personal/export corpora.\n\n## Runtime\n- Host: Studio (macOS)\n- Store: Postgres 16 + pgvector\n- API: FastAPI (Uvicorn)\n- Management: launchd (`com.bebop.*` labels)\n\n## Launchd identity contract\n- Domain: `system`\n- Managed labels:\n  - `com.bebop.pgvector-main`\n  - `com.bebop.memory-api-main`\n  - `com.bebop.memory-ingest-nightly`\n  - `com.bebop.memory-backup-nightly`\n- Plist paths:\n  - `/Library/LaunchDaemons/com.bebop.pgvector-main.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-api-main.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-ingest-nightly.plist`\n  - `/Library/LaunchDaemons/com.bebop.memory-backup-nightly.plist`\n- Scheduling/allowlist policy:\n  - `platform/ops/templates/studio_scheduling_policy.json`\n  - `docs/foundation/studio-scheduling-policy.md`\n- Operational wrapper for transient Studio commands:\n  - `platform/ops/scripts/studio_run_utility.sh`\n\n## v1 endpoints\n- `GET /health`\n- `GET /v1/memory/stats`\n- `POST /v1/embeddings`\n- `POST /v1/memory/upsert`\n- `POST /v1/memory/search`\n- `POST /v1/memory/delete`\n\n## Network bindings (v1)\n- Postgres: `127.0.0.1:55432`\n- Memory API: `127.0.0.1:55440`\n\n## Backend modes\n- `MEMORY_BACKEND=legacy|haystack`\n- Default remains `legacy` until cutover.\n- Rollback contract: set `MEMORY_BACKEND=legacy` and restart `com.bebop.memory-api-main`.\n\n## Embedding spaces\n- `qwen` space: `studio-qwen-embed-0.6b` (`Qwen/Qwen3-Embedding-0.6B`)\n- `mxbai` space: `studio-mxbai-embed-large-v1` (`mixedbread-ai/mxbai-embed-large-v1`)\n- Query embeddings use model-specific query prompt/prefix.\n- Document embeddings are unprompted.\n\n## Retrieval contract\n- Hybrid lexical + vector retrieval.\n- Haystack mode components:\n  - `PgvectorKeywordRetriever`\n  - `PgvectorEmbeddingRetriever`\n  - `DocumentJoiner(join_mode=\"reciprocal_rank_fusion\")`\n  - `SentenceTransformersSimilarityRanker` (optional via `MEMORY_RERANK_ENABLED`)\n- `model_space` is strict; no cross-space retrieval fallback.\n\n## Data model (minimum)\n- Legacy tables (unchanged):\n  - `memory_documents`\n  - `memory_chunks`\n  - `memory_vectors_qwen`\n  - `memory_vectors_mxbai`",
           "timestamp_utc": "2026-03-06T00:30:33.462743+00:00",
           "title": "SERVICE_SPEC",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/SERVICE_SPEC.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/SERVICE_SPEC.md"
         },
         {
           "chunk_id": 4,
@@ -56,11 +56,11 @@
           "rrf_score": 0.98832792,
           "source": "repo_docs_pilot",
           "source_message_id": "3593d751271d9b49ba22d0c4",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Vector DB (Studio Main Store)\n\nPurpose: Studio-hosted durable memory store for general-use retrieval over\npersonal data exports.\n\nStatus: active v1 baseline, Studio-local only, with internal `legacy|haystack`\nbackend selection via `MEMORY_BACKEND`.\n\n## v1 contract\n- Engine: Postgres 16 + pgvector.\n- Exposure: localhost only (`127.0.0.1`).\n- Scope: personal/export corpus first (no web-search coupling in this service).\n- Retrieval: hybrid lexical + vector.\n- Internal backend mode: `legacy` or `haystack` (API contract unchanged).\n- Embeddings: dual-space indexing:\n  - primary: `studio-qwen-embed-0.6b`\n  - fallback: `studio-mxbai-embed-large-v1`\n\n## Components\n- API service: `app/main.py`\n- Backend implementations: `app/backends/*`\n- Service config/env parser: `app/config.py`\n- DB and schema bootstrap helpers: `app/db.py`, `sql/*.sql`\n- Embedding loader wrappers: `app/embed.py`\n- Legacy hybrid retrieval planner: `app/retrieval.py`\n- Batch ingest runner: `app/ingest.py`\n- Haystack schema bootstrap: `scripts/init_haystack_schema.py`\n- Studio launchd templates: `launchd/*.plist`\n- Studio operational scripts: `scripts/*`\n\n## Source-of-truth docs\n- `SERVICE_SPEC.md`\n- `ARCHITECTURE.md`\n- `RUNBOOK.md`\n- `CONSTRAINTS.md`",
           "timestamp_utc": "2026-03-06T00:34:52.172630+00:00",
           "title": "README",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/README.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/README.md"
         },
         {
           "chunk_id": 5,
@@ -84,11 +84,11 @@
           "rrf_score": 0.98454446,
           "source": "repo_docs_pilot",
           "source_message_id": "f28840439ad4b94cdbec0aac",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Architecture: Studio Main Vector Store (v1)\n\n## High-level flow\n1. Nightly ingest job reads normalized JSONL from configured Studio-local path.\n2. Records are normalized to document/chunk rows with stable provenance keys.\n3. Embeddings are generated for both spaces (`qwen`, `mxbai`).\n4. Lexical and vector indexes are maintained in Postgres + pgvector.\n5. API serves health, upsert, search, delete, and stats endpoints.\n\n## Why dual embedding spaces\nDifferent embedding models map text into different latent spaces.\nDistance comparisons are only meaningful within the same model space.\nTherefore, v1 stores vectors in separate tables and queries one space at a time.\n\n## Retrieval plan (hybrid)\n- Lexical candidate set: Postgres FTS rank.\n- Vector candidate set: cosine distance in selected vector table.\n- Merge strategy: reciprocal-rank fusion (RRF) with deterministic weighting.\n- Output: top-k chunk hits with provenance and score breakdown.\n\n## Data integrity\n- Provenance-first schema for traceability:\n  `source`, `source_thread_id`, `source_message_id`, `timestamp`, `raw_ref`.\n- Idempotent upsert keys prevent duplicate ingest on reruns.\n- Ingest runs are tracked for audit/debug.\n\n## Boundaries\n- This service does not alter MLX lane behavior.\n- This service does not implement Mini web-search retrieval.\n- Cross-host gateway wiring is a separate phase.",
           "timestamp_utc": "2026-03-04T02:08:28.549242+00:00",
           "title": "ARCHITECTURE",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/ARCHITECTURE.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/ARCHITECTURE.md"
         },
         {
           "chunk_id": 7,
@@ -98,11 +98,11 @@
           "rrf_score": 0.97342885,
           "source": "repo_docs_pilot",
           "source_message_id": "32953b81e06e517168f5b7c8",
-          "source_thread_id": "layer-data/vector-db",
-          "text": "# Runbook: Vector DB (Studio Main Store)\n\n## Scope\nStudio-local operations for Postgres + pgvector and memory API.\n\n## Utility wrapper\nUse the Studio utility wrapper for transient remote commands:\n`platform/ops/scripts/studio_run_utility.sh`.\n\n## Preflight (Mini)\n```bash\nuv run python platform/ops/scripts/validate_studio_policy.py --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json\n```\n\n## Deploy service code to Studio\n```bash\ncd /home/christopherbailey/homelab-llm/layer-data/vector-db\n./scripts/deploy_studio.sh\n```\n\n## Initialize DB on Studio (legacy schema)\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/studio_install.sh\"\n```\n\n## Initialize Haystack schema/tables\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \\\n   PYTHONPATH=. uv run python scripts/init_haystack_schema.py\"\n```\n\n## Start/restart Studio launchd labels\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.pgvector-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.memory-api-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.pgvector-main\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.memory-api-main\"\n```\n\n## Health checks\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/health | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/v1/memory/stats | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'\"\n```\n\n## Docs-first quality gate (canonical)\n\n### 1) Build repo docs pilot JSONL on Mini\n```bash\nmkdi",
+          "source_thread_id": "services/vector-db",
+          "text": "# Runbook: Vector DB (Studio Main Store)\n\n## Scope\nStudio-local operations for Postgres + pgvector and memory API.\n\n## Utility wrapper\nUse the Studio utility wrapper for transient remote commands:\n`platform/ops/scripts/studio_run_utility.sh`.\n\n## Preflight (Mini)\n```bash\nuv run python platform/ops/scripts/validate_studio_policy.py --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --policy-only --json\nuv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json\n```\n\n## Deploy service code to Studio\n```bash\ncd /home/christopherbailey/homelab-llm/services/vector-db\n./scripts/deploy_studio.sh\n```\n\n## Initialize DB on Studio (legacy schema)\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/studio_install.sh\"\n```\n\n## Initialize Haystack schema/tables\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \\\n   PYTHONPATH=. uv run python scripts/init_haystack_schema.py\"\n```\n\n## Start/restart Studio launchd labels\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.pgvector-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl bootstrap system /Library/LaunchDaemons/com.bebop.memory-api-main.plist || true\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.pgvector-main\"\nplatform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \\\n  \"launchctl kickstart -k system/com.bebop.memory-api-main\"\n```\n\n## Health checks\n```bash\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/health | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"curl -fsS http://127.0.0.1:55440/v1/memory/stats | jq .\"\nplatform/ops/scripts/studio_run_utility.sh --host studio -- \\\n  \"lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'\"\n```\n\n## Docs-first quality gate (canonical)\n\n### 1) Build repo docs pilot JSONL on Mini\n```bash\nmkdi",
           "timestamp_utc": "2026-03-06T05:41:46.302558+00:00",
           "title": "RUNBOOK",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/RUNBOOK.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/RUNBOOK.md"
         },
         {
           "chunk_id": 8,
@@ -112,11 +112,11 @@
           "rrf_score": 0.97208619,
           "source": "repo_docs_pilot",
           "source_message_id": "0722852f731f5bfc912a4d66",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Tasks: Vector DB (Studio Main Store)\n\n## Completed\n- [x] Service/API architecture and docs baseline.\n- [x] SQL schema for docs/chunks/vectors/ingest runs.\n- [x] Studio launchd templates + policy wiring for owned labels.\n- [x] Deploy/install scripts and runbook wiring for Studio utility wrapper.\n- [x] Baseline smoke-tested ingest/search/backup path documented.\n- [x] Codex history pilot corpus builder (`build_codex_history_pilot.py`) with deterministic IDs and secret redaction.\n- [x] QG1 evaluation scaffold (fixed query pack, judgment template, scoring helper).\n- [x] Backend abstraction (`legacy|haystack`) with contract-preserving API handlers.\n- [x] Haystack backend core retrieval path (keyword+vector+RRF+optional rerank).\n- [x] Haystack schema bootstrap script (`scripts/init_haystack_schema.py`).\n- [x] Ingest mode split (`jsonl` + `manuals_pdf`) with backend-aware writer path.\n- [x] Docs-first corpus builder (`build_repo_docs_pilot.py`) for deterministic canonical eval corpus.\n- [x] Split eval packs for docs and manuals (`query_pack.docs.v1.jsonl`, `query_pack.manuals.v1.jsonl`).\n\n## Next (active gate path)\n- [ ] Run docs-first gate (`D1`) end-to-end: ingest, run-pack, label, score.\n- [ ] Run manuals gate (`M1`) end-to-end: ingest, run-pack, label, score.\n- [ ] Compare `qwen` vs `mxbai` retrieval quality for D1 and M1.\n- [ ] Lock retrieval defaults only after docs and manuals gates pass independently.\n- [ ] Keep Codex-history corpus out of primary quality-gate decisions.\n\n## Deferred\n- [ ] Implement retention + compaction contract (daily/weekly/monthly windows).\n- [ ] Add restore drill script and parity query checks.",
           "timestamp_utc": "2026-03-06T05:41:58.028825+00:00",
           "title": "TASKS",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/TASKS.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/TASKS.md"
         },
         {
           "chunk_id": 9,
@@ -126,11 +126,11 @@
           "rrf_score": 0.96180207,
           "source": "repo_docs_pilot",
           "source_message_id": "99fd4fad1a33df3170a17d54",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Constraints: Vector DB (Studio Main Store)\n\n## Hard constraints\n- Engine is Postgres + pgvector for v1.\n- Bindings are localhost-only for DB and API.\n- Service remains Studio-local in this phase; no cross-host client wiring.\n- Inference/retrieval integration is tool-mediated first (no blind auto-injection).\n- Data retention is explicit snapshots + WAL archival (no implicit TTL deletion).\n\n## Data constraints\n- Message-first chunking with deterministic long-message splitting.\n- Preserve provenance fields required by downstream citation and traceability.\n- Never combine vectors from different embedding models in a single distance space.\n- `model_space` routing is strict (`qwen` or `mxbai`), no cross-space fallback retrieval.\n\n## Retrieval implementation constraints\n- Haystack backend must use framework-native components for retrieval/fusion/rerank/filtering.\n- Do not add custom retrieval SQL in Haystack mode.\n- Do not add custom Haystack table/index DDL; let `PgvectorDocumentStore` manage table/index objects.\n- Allowed bootstrap SQL is limited to schema existence (`CREATE SCHEMA IF NOT EXISTS ...`).\n\n## Operational constraints\n- Launchd labels must be policy-audited in\n  `platform/ops/templates/studio_scheduling_policy.json`.\n- All deploy/restart actions to Studio should use `platform/ops/scripts/studio_run_utility.sh`.\n- Keep scripts idempotent and rollback-friendly.",
           "timestamp_utc": "2026-03-06T00:30:42.211942+00:00",
           "title": "CONSTRAINTS",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/CONSTRAINTS.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/CONSTRAINTS.md"
         },
         {
           "chunk_id": 10,
@@ -141,7 +141,7 @@
           "source": "repo_docs_pilot",
           "source_message_id": "b315395c07c422ff6ccd8c09",
           "source_thread_id": "docs/_core",
-          "text": "bed as `mlx_lm.server` default | `mlxctl status --checks` reports `family=vllm-metal`; `mlxctl` source defaults `MLX_BACKEND` to `vllm-metal` | medium | fix_now | Replaced stale `mlx_lm.server` default-runtime wording with `vllm-metal` and marked legacy backends as fallback-only. |\n| CLAIM-OWUI-PERSISTENTCONFIG-2026-03 | `layer-gateway/litellm-orch/docs/openwebui.md` | Config authority | Documented that Open WebUI PersistentConfig stores env values after first start | `systemctl cat open-webui.service` includes drop-in `ENABLE_PERSISTENT_CONFIG=False` | medium | fix_now | Updated docs to state env/drop-ins are authoritative in current deployment. |\n| CLAIM-DATA-LAYER-STATUS-DRIFT-2026-03 | `SYSTEM_OVERVIEW.md`, `layer-data/RUNBOOK.md`, `layer-data/DEPENDENCIES.md`, `TOPOLOGY.md`, `layer-data/vector-db/README.md` | Data layer runtime status | Docs mixed active and future/scaffold-only wording for Studio vector-store and data-layer scope | Active topology and service docs include Studio-local `:55432/:55440` store and policy-managed labels in canonical runtime docs | high | fix_now | Updated wording to active baseline status and removed stale future/scaffold language in layer/root docs. |\n| CLAIM-VECTOR-RUNBOOK-UTILITY-DRIFT-2026-03 | `layer-data/vector-db/RUNBOOK.md` | Studio operations contract | Runbook used direct `ssh studio` commands despite utility-wrapper policy for transient commands | `docs/foundation/studio-scheduling-policy.md` requires transient Studio automation through `platform/ops/scripts/studio_run_utility.sh` | medium | fix_now | Rewrote vector-store runbook commands to use the Studio utility wrapper for remote transient operations. |\n| CLAIM-FOUNDATION-SOURCE-LINK-DRIFT-2026-03 | `docs/foundation/README.md` | Source-of-truth pointers | Referenced non-existent `docs/OPENWEBUI_FEATURES.md` and duplicated `SERVICE_SPEC.md` bullet | Actual file path is `layer-interface/open-webui/docs/OPENWEBUI_FEATURES.md`; duplicate bullet detected in section | low | fix_now | Corrected Open WebUI features path and removed duplicate service-contract bullet entry. |\n| CLAIM-MLX-LABEL-NAME-DRIFT-2026-03 | `docs/foundation/overview.md` | MLX launchd label naming | R",
+          "text": "bed as `mlx_lm.server` default | `mlxctl status --checks` reports `family=vllm-metal`; `mlxctl` source defaults `MLX_BACKEND` to `vllm-metal` | medium | fix_now | Replaced stale `mlx_lm.server` default-runtime wording with `vllm-metal` and marked legacy backends as fallback-only. |\n| CLAIM-OWUI-PERSISTENTCONFIG-2026-03 | `layer-gateway/litellm-orch/docs/openwebui.md` | Config authority | Documented that Open WebUI PersistentConfig stores env values after first start | `systemctl cat open-webui.service` includes drop-in `ENABLE_PERSISTENT_CONFIG=False` | medium | fix_now | Updated docs to state env/drop-ins are authoritative in current deployment. |\n| CLAIM-DATA-LAYER-STATUS-DRIFT-2026-03 | `SYSTEM_OVERVIEW.md`, `layer-data/RUNBOOK.md`, `layer-data/DEPENDENCIES.md`, `TOPOLOGY.md`, `services/vector-db/README.md` | Data layer runtime status | Docs mixed active and future/scaffold-only wording for Studio vector-store and data-layer scope | Active topology and service docs include Studio-local `:55432/:55440` store and policy-managed labels in canonical runtime docs | high | fix_now | Updated wording to active baseline status and removed stale future/scaffold language in layer/root docs. |\n| CLAIM-VECTOR-RUNBOOK-UTILITY-DRIFT-2026-03 | `services/vector-db/RUNBOOK.md` | Studio operations contract | Runbook used direct `ssh studio` commands despite utility-wrapper policy for transient commands | `docs/foundation/studio-scheduling-policy.md` requires transient Studio automation through `platform/ops/scripts/studio_run_utility.sh` | medium | fix_now | Rewrote vector-store runbook commands to use the Studio utility wrapper for remote transient operations. |\n| CLAIM-FOUNDATION-SOURCE-LINK-DRIFT-2026-03 | `docs/foundation/README.md` | Source-of-truth pointers | Referenced non-existent `docs/OPENWEBUI_FEATURES.md` and duplicated `SERVICE_SPEC.md` bullet | Actual file path is `layer-interface/open-webui/docs/OPENWEBUI_FEATURES.md`; duplicate bullet detected in section | low | fix_now | Corrected Open WebUI features path and removed duplicate service-contract bullet entry. |\n| CLAIM-MLX-LABEL-NAME-DRIFT-2026-03 | `docs/foundation/overview.md` | MLX launchd label naming | R",
           "timestamp_utc": "2026-03-04T16:34:36.759088+00:00",
           "title": "consistency_audit_2026-03",
           "uri": "file:///home/christopherbailey/homelab-llm/docs/_core/consistency_audit_2026-03.md"
@@ -168,11 +168,11 @@
           "rrf_score": 0.98897576,
           "source": "repo_docs_pilot",
           "source_message_id": "a821eb5840dff0c3c1fe0b4d",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Agent Guidance: Vector DB (Studio Main Store)\n\n## Scope\n- Studio-only main memory store for general retrieval over personal/export data.\n- Postgres + pgvector, localhost-only bindings.\n\n## Guardrails\n- Do not expose new LAN ports without explicit plan + approval.\n- Do not mix embedding spaces in one vector index.\n- Keep Mini web-search pipeline out of scope for this service.\n- Keep rollout shadow-first before coupling to production inference flows.\n\n## Runtime ownership\n- Studio launchd labels under `com.bebop.*` only.\n- All owned labels must be allowlisted/audited by Studio scheduling policy.",
           "timestamp_utc": "2026-03-04T02:08:03.034647+00:00",
           "title": "AGENTS",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/AGENTS.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/AGENTS.md"
         },
         {
           "chunk_id": 2,
@@ -196,11 +196,11 @@
           "rrf_score": 0.88918072,
           "source": "repo_docs_pilot",
           "source_message_id": "3593d751271d9b49ba22d0c4",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Vector DB (Studio Main Store)\n\nPurpose: Studio-hosted durable memory store for general-use retrieval over\npersonal data exports.\n\nStatus: active v1 baseline, Studio-local only, with internal `legacy|haystack`\nbackend selection via `MEMORY_BACKEND`.\n\n## v1 contract\n- Engine: Postgres 16 + pgvector.\n- Exposure: localhost only (`127.0.0.1`).\n- Scope: personal/export corpus first (no web-search coupling in this service).\n- Retrieval: hybrid lexical + vector.\n- Internal backend mode: `legacy` or `haystack` (API contract unchanged).\n- Embeddings: dual-space indexing:\n  - primary: `studio-qwen-embed-0.6b`\n  - fallback: `studio-mxbai-embed-large-v1`\n\n## Components\n- API service: `app/main.py`\n- Backend implementations: `app/backends/*`\n- Service config/env parser: `app/config.py`\n- DB and schema bootstrap helpers: `app/db.py`, `sql/*.sql`\n- Embedding loader wrappers: `app/embed.py`\n- Legacy hybrid retrieval planner: `app/retrieval.py`\n- Batch ingest runner: `app/ingest.py`\n- Haystack schema bootstrap: `scripts/init_haystack_schema.py`\n- Studio launchd templates: `launchd/*.plist`\n- Studio operational scripts: `scripts/*`\n\n## Source-of-truth docs\n- `SERVICE_SPEC.md`\n- `ARCHITECTURE.md`\n- `RUNBOOK.md`\n- `CONSTRAINTS.md`",
           "timestamp_utc": "2026-03-06T00:34:52.172630+00:00",
           "title": "README",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/README.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/README.md"
         },
         {
           "chunk_id": 4,
@@ -280,11 +280,11 @@
           "rrf_score": 0.38387051,
           "source": "repo_docs_pilot",
           "source_message_id": "99fd4fad1a33df3170a17d54",
-          "source_thread_id": "layer-data/vector-db",
+          "source_thread_id": "services/vector-db",
           "text": "# Constraints: Vector DB (Studio Main Store)\n\n## Hard constraints\n- Engine is Postgres + pgvector for v1.\n- Bindings are localhost-only for DB and API.\n- Service remains Studio-local in this phase; no cross-host client wiring.\n- Inference/retrieval integration is tool-mediated first (no blind auto-injection).\n- Data retention is explicit snapshots + WAL archival (no implicit TTL deletion).\n\n## Data constraints\n- Message-first chunking with deterministic long-message splitting.\n- Preserve provenance fields required by downstream citation and traceability.\n- Never combine vectors from different embedding models in a single distance space.\n- `model_space` routing is strict (`qwen` or `mxbai`), no cross-space fallback retrieval.\n\n## Retrieval implementation constraints\n- Haystack backend must use framework-native components for retrieval/fusion/rerank/filtering.\n- Do not add custom retrieval SQL in Haystack mode.\n- Do not add custom Haystack table/index DDL; let `PgvectorDocumentStore` manage table/index objects.\n- Allowed bootstrap SQL is limited to schema existence (`CREATE SCHEMA IF NOT EXISTS ...`).\n\n## Operational constraints\n- Launchd labels must be policy-audited in\n  `platform/ops/templates/studio_scheduling_policy.json`.\n- All deploy/restart actions to Studio should use `platform/ops/scripts/studio_run_utility.sh`.\n- Keep scripts idempotent and rollback-friendly.",
           "timestamp_utc": "2026-03-06T00:30:42.211942+00:00",
           "title": "CONSTRAINTS",
-          "uri": "file:///home/christopherbailey/homelab-llm/layer-data/vector-db/CONSTRAINTS.md"
+          "uri": "file:///home/christopherbailey/homelab-llm/services/vector-db/CONSTRAINTS.md"
         },
         {
           "chunk_id": 10,

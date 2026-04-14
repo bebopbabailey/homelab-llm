@@ -8,7 +8,7 @@ Provide Studio-local durable memory retrieval over personal/export corpora.
 - Store: Postgres 16 + pgvector
 - API: FastAPI (Uvicorn)
 - Management: launchd (`com.bebop.*` labels)
-- Canonical source: `homelab-llm/layer-data/vector-db`
+- Canonical source: `homelab-llm/services/vector-db`
 - Current deployed target path:
   `/Users/thestudio/optillm-proxy/layer-data/vector-db`
 
@@ -30,7 +30,7 @@ Provide Studio-local durable memory retrieval over personal/export corpora.
 - Operational wrapper for transient Studio commands:
   - `platform/ops/scripts/studio_run_utility.sh`
 - Deploy sync entrypoint:
-  - `layer-data/vector-db/scripts/deploy_studio.sh`
+  - `services/vector-db/scripts/deploy_studio.sh`
 
 ## v1 endpoints
 - `GET /health`

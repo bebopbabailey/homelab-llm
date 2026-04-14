@@ -605,8 +605,8 @@ cd /home/christopherbailey/homelab-llm
 
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py run-pack \
-     --pack layer-data/vector-db/eval/query_pack.docs.v1.jsonl \
+   uv run python services/vector-db/scripts/eval_memory_quality.py run-pack \
+     --pack services/vector-db/eval/query_pack.docs.v1.jsonl \
      --api-base http://127.0.0.1:55440 \
      --model-space qwen \
      --top-k 10 \
@@ -617,7 +617,7 @@ platform/ops/scripts/studio_run_utility.sh --host studio -- \
 
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py autolabel \
+   uv run python services/vector-db/scripts/eval_memory_quality.py autolabel \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --mode conservative_graded \
@@ -626,7 +626,7 @@ platform/ops/scripts/studio_run_utility.sh --host studio -- \
 
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py triage \
+   uv run python services/vector-db/scripts/eval_memory_quality.py triage \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --out /Users/thestudio/data/memory-main/eval/D1.triage.json"
@@ -635,7 +635,7 @@ platform/ops/scripts/studio_run_utility.sh --host studio -- \
 Only if triage returns flagged query ids, review those cases interactively:
 ```bash
 ssh -t studio "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py label \
+   uv run python services/vector-db/scripts/eval_memory_quality.py label \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
@@ -655,7 +655,7 @@ Score on Studio:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py score \
+   uv run python services/vector-db/scripts/eval_memory_quality.py score \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
      --out /Users/thestudio/data/memory-main/eval/D1.score.json && \

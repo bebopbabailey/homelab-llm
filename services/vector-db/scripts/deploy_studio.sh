@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 STUDIO_HOST="${STUDIO_HOST:-studio}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-SOURCE_DIR="$REPO_ROOT/layer-data/vector-db"
+SOURCE_DIR="$REPO_ROOT/services/vector-db"
 SERVICE_DIR="/Users/thestudio/optillm-proxy/layer-data/vector-db"
 WRAPPER="${STUDIO_UTILITY_WRAPPER:-$REPO_ROOT/platform/ops/scripts/studio_run_utility.sh}"
 DRY_RUN=0

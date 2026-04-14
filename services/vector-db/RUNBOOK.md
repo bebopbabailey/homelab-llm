@@ -4,7 +4,7 @@
 Studio-local operations for Postgres + pgvector and memory API.
 
 Canonical source tree:
-- `/home/christopherbailey/homelab-llm/layer-data/vector-db`
+- `/home/christopherbailey/homelab-llm/services/vector-db`
 
 Current Studio runtime target:
 - `/Users/thestudio/optillm-proxy/layer-data/vector-db`
@@ -23,13 +23,13 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 ## Deploy service code to Studio
 ```bash
 cd /home/christopherbailey/homelab-llm
-./layer-data/vector-db/scripts/deploy_studio.sh
+./services/vector-db/scripts/deploy_studio.sh
 ```
 
 Preview sync first:
 ```bash
 cd /home/christopherbailey/homelab-llm
-./layer-data/vector-db/scripts/deploy_studio.sh --dry-run
+./services/vector-db/scripts/deploy_studio.sh --dry-run
 ```
 
 ## Initialize DB on Studio (legacy schema)
@@ -137,8 +137,8 @@ Run the docs pack on Studio:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py run-pack \
-     --pack layer-data/vector-db/eval/query_pack.docs.v1.jsonl \
+   uv run python services/vector-db/scripts/eval_memory_quality.py run-pack \
+     --pack services/vector-db/eval/query_pack.docs.v1.jsonl \
      --api-base http://127.0.0.1:55440 \
      --model-space qwen \
      --top-k 10 \
@@ -152,7 +152,7 @@ Auto-label conservatively:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py autolabel \
+   uv run python services/vector-db/scripts/eval_memory_quality.py autolabel \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --mode conservative_graded \
@@ -164,7 +164,7 @@ Flag only the cases that need human review:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py triage \
+   uv run python services/vector-db/scripts/eval_memory_quality.py triage \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --out /Users/thestudio/data/memory-main/eval/D1.triage.json"
@@ -174,7 +174,7 @@ Review only flagged cases when triage output is non-empty:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio --tty -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py label \
+   uv run python services/vector-db/scripts/eval_memory_quality.py label \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
      --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
@@ -194,7 +194,7 @@ Score the run:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "cd /Users/thestudio/optillm-proxy && \
-   uv run python layer-data/vector-db/scripts/eval_memory_quality.py score \
+   uv run python services/vector-db/scripts/eval_memory_quality.py score \
      --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
      --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
      --out /Users/thestudio/data/memory-main/eval/D1.score.json && \

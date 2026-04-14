@@ -1,11 +1,11 @@
 # NOW
 
 Active
-- Move `litellm-orch` and `optillm-proxy` into live `services/` paths.
-- Update runtime-lock, repo-owned unit sources, docs, and path-sensitive tests
-  to the new control-plane service roots.
-- Keep `vector-db` as the only remaining transitional `layer-*` service for the
-  final follow-on tranche.
+- Move `vector-db` into the live `services/` tree.
+- Update registry, canon docs, deploy script, and path-sensitive fixtures to
+  the new service root while keeping the Studio runtime target unchanged.
+- Reduce `layer-data` to taxonomy and registry docs only.
 
 NEXT UP
-- Land this batch, then plan and execute the final `vector-db` tranche.
+- Land this final service-move tranche, then decide whether `layer-*` taxonomy
+  cleanup is still worth doing.

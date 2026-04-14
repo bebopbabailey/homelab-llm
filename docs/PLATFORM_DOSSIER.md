@@ -233,7 +233,7 @@ Networking note:
   Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
   while preserving the same API contract (`/v1/memory/*`). Service remains
   Studio-local (no LAN exposure) with tool-mediated retrieval boundary.
-  Canonical source lives in monorepo `layer-data/vector-db`; deploy sync keeps
+  Canonical source lives in monorepo `services/vector-db`; deploy sync keeps
   the current Studio runtime target at `/Users/thestudio/optillm-proxy/layer-data/vector-db`.
 
 ## Data registries (authoritative)
