@@ -5,6 +5,8 @@ should either be:
 - A backend that LiteLLM routes to, or
 - A client/orchestrator that calls LiteLLM (never backends directly).
 Optimization proxies (e.g., OptiLLM) bind to localhost only.
+Experimental auth-backed translation sidecars such as `ccproxy-api` also bind
+to localhost only and must stay behind LiteLLM.
 
 Current preferred usage: clients call LiteLLM only and select OptiLLM techniques
 via the LiteLLM `boost` handle (with `optillm_approach` in the request body).

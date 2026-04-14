@@ -1,14 +1,12 @@
 # NOW
 
 Active
-- Shift the Mini gateway and Open WebUI human-chat path to a responses-first
-  LiteLLM contract.
-- Keep `chatgpt-5` live as the subscription-backed ChatGPT lane, but enforce it
-  as responses-only at the gateway.
-- Revalidate `main`, `deep`, `fast`, and `chatgpt-5` through `/v1/responses`,
-  then close docs drift against the accepted contract.
+- Move the experimental `chatgpt-5` lane off the raw ChatGPT backend and onto
+  the Mini-local `ccproxy-api` Codex sidecar.
+- Restore Open WebUI to a Chat Completions-first LiteLLM path for human chat.
+- Revalidate the `chatgpt-5` lane in Open WebUI and codify the new experimental
+  localhost-sidecar contract.
 
 NEXT UP
-- If Open WebUI cannot stably consume the responses-first LiteLLM connection,
-  isolate the exact connection-setting gap and stage the narrowest possible UI
-  config follow-up.
+- If the Codex-backed sidecar still shows behavioral gaps in Open WebUI, lock
+  the exact unsupported feature set and narrow the lane contract further.

@@ -55,6 +55,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
+| CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
 | Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
 | OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
@@ -124,7 +125,7 @@ Use `mlxctl status` as the canonical “which mlx-* model is on which port” si
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
-  8010, Open Terminal MCP 8011.
+  8010, Open Terminal MCP 8011, CCProxy API 4010.
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
   operator access at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
   Studio local-only: main vector DB 55432, memory API 55440.

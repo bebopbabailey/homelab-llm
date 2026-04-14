@@ -37,7 +37,7 @@ class TestRouterDropParams(unittest.TestCase):
         self.assertIn("chatgpt-5", model_names)
         self.assertNotIn("chatgpt-5-thinking", model_names)
 
-    def test_gpt_request_defaults_targets_chatgpt_alias(self):
+    def test_gpt_request_defaults_excludes_chatgpt_alias(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         guardrails = config.get("guardrails", [])
         targets = None
@@ -47,7 +47,7 @@ class TestRouterDropParams(unittest.TestCase):
                 break
         self.assertIsNotNone(targets, "gpt-request-defaults guardrail must exist")
         target_set = {part.strip() for part in targets.split(",") if part.strip()}
-        self.assertIn("chatgpt-5", target_set)
+        self.assertNotIn("chatgpt-5", target_set)
         self.assertNotIn("chatgpt-5-thinking", target_set)
 
 

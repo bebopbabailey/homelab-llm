@@ -15,7 +15,7 @@
   Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
   and `fast` plus `deep` on shared `llmster` at `8126`.
   Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
-  gateway on the accepted responses-first human-chat path.
+  gateway, but now via the localhost-only experimental `ccproxy-api` sidecar.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
   Studio main vector-store services (localhost-only): Postgres+pgvector `:55432`,
   memory API `:55440`, nightly ingest/backup jobs.
@@ -33,6 +33,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
+| CCProxy API (experimental) | Mini | 4010 | 127.0.0.1 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models | `/etc/systemd/system/ccproxy-api.service`, `ss -ltnp`, direct curl |
 | OpenCode Web | Mini | 4096 | 0.0.0.0 | http://127.0.0.1:4096 | UI root (401 unauthenticated) | `/etc/systemd/system/opencode-web.service`, `systemctl show opencode-web.service -p ExecStart`, `ss -ltnp` |
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | 127.0.0.1 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root | `/etc/systemd/system/openhands.service`, `systemctl show openhands.service -p ExecStart`, `ss -ltnp`, `tailscale serve status --json` |
 | Samba SMB | Mini | 139/445 | `127.0.0.1` + `192.168.1.71` | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth | `/etc/samba/smb.conf`, `systemctl status smbd.service nmbd.service`, `pdbedit -L` |
@@ -73,19 +74,16 @@ Networking note:
   deployment before `/key/generate` and `/v1/mcp/*` worked again. The
   repo-managed systemd unit now must keep
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so drift fails fast on startup.
-  ChatGPT device auth can complete on Mini through LiteLLM's provider flow.
-  `chatgpt-5` is part of the accepted Open WebUI human-chat surface through the
-  responses-first LiteLLM contract.
-  The gateway rejects `chatgpt-5` on Chat Completions before reaching the
-  upstream ChatGPT backend, because that upstream path still hits a Cloudflare
-  challenge on the pinned baseline.
+  `chatgpt-5` is now backed by Mini-local `ccproxy-api`, which uses local Codex
+  auth state and returns clean Chat Completions output to LiteLLM.
+  Open WebUI human chat is Chat Completions-first again on the LiteLLM path.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
   `reasoning_effort` on `fast`/`deep`.
-  GPT human-chat lanes are now responses-first on the LiteLLM/Open WebUI path.
+  GPT human-chat lanes are Chat Completions-first on the LiteLLM/Open WebUI path.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.
@@ -121,13 +119,16 @@ Networking note:
     model tools
   - the Open WebUI MCP registration currently filters to `health_check`,
     `list_files`, `read_file`, `grep_search`, and `glob_search`
-  - Open WebUI terminal/tool server connections are currently stored through its
-    supported persistent-config API; this lane does not currently rely on
-    `ENABLE_PERSISTENT_CONFIG=False`
+  - terminal/tool server registrations still use persistent config, but the
+    active LiteLLM provider default no longer depends on Responses mode
   - shared LiteLLM exposure is still blocked on current stable runtime
   - any future shared LiteLLM path may expose only an explicitly filtered
     read-only subset, not the full direct backend surface
   - OpenHands remains denied for `/v1/mcp/*`
+- CCProxy API: systemd unit `/etc/systemd/system/ccproxy-api.service`,
+  localhost-only on `127.0.0.1:4010`, backed by upstream `ccproxy-api`.
+  It uses a local bearer token from `/etc/homelab-llm/ccproxy.env` and local
+  Codex auth state from the service user.
 - OpenCode Web: systemd unit `/etc/systemd/system/opencode-web.service`, env `/etc/opencode/env`.
   Repo-managed source of truth: `platform/ops/systemd/opencode-web.service`.
   Runtime bind is `0.0.0.0:4096` with HTTP Basic Auth.
@@ -248,7 +249,7 @@ Networking note:
 - LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
   `8126` on `192.168.1.72`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
-  8010, Open Terminal MCP 8011.
+  8010, Open Terminal MCP 8011, CCProxy API 4010.
 - Local-only bind with tailnet-only operator access: OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): main vector DB 55432, memory API 55440.
 - Tailnet HTTPS (Tailscale Serve on Mini):

@@ -7,6 +7,8 @@ Current posture:
 - active service roots live under `services/` or `experiments/`
 - `maturity` distinguishes supported services from experiments and historical
   placeholders
+- localhost-only experimental backends may also live under `experiments/` when
+  they sit behind LiteLLM and are not part of the public client contract
 - `parent_service_id` allows explicit child-service relationships such as
   `mcp-tools/web-fetch`
 - `layer-*` is taxonomy/navigation only and is not a live service-root surface

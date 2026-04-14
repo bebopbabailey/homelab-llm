@@ -1,0 +1,15 @@
+[Unit]
+Description=CCProxy API (Codex sidecar)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/experiments/ccproxy-api
+EnvironmentFile=/etc/homelab-llm/ccproxy.env
+ExecStart=/home/christopherbailey/homelab-llm/experiments/ccproxy-api/scripts/run_ccproxy.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -74,6 +74,7 @@ check_studio_mlx_lanes() {
 
 check_port 4000
 check_port 3000
+check_port 4010
 check_port 4031
 check_port 8011
 
@@ -85,6 +86,12 @@ fi
 check_http "http://127.0.0.1:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:4000/v1/mcp/tools" -H "Authorization: Bearer ${LITELLM_API_KEY}"
+if [[ -f /etc/homelab-llm/ccproxy.env ]]; then
+  CCPROXY_AUTH_TOKEN="$(get_env_value CCPROXY_AUTH_TOKEN /etc/homelab-llm/ccproxy.env || true)"
+  if [[ -n "${CCPROXY_AUTH_TOKEN}" ]]; then
+    check_http "http://127.0.0.1:4010/codex/v1/models" -H "Authorization: Bearer ${CCPROXY_AUTH_TOKEN}"
+  fi
+fi
 check_http "http://127.0.0.1:4031/"
 check_http "http://${MINI_LAN_HOST}:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://${MINI_LAN_HOST}:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"

@@ -867,6 +867,33 @@ curl -sS http://127.0.0.1:4000/v1/chat/completions \
   }' | jq .
 ```
 
+## CCProxy experimental lane
+`chatgpt-5` is now backed by Mini-local `ccproxy-api` for Open WebUI testing.
+
+Validation:
+```bash
+source /etc/homelab-llm/ccproxy.env
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+curl -fsS -H "Authorization: Bearer ${CCPROXY_AUTH_TOKEN}" \
+  http://127.0.0.1:4010/codex/v1/models | jq .
+
+curl -fsS -H "Authorization: Bearer ${CCPROXY_AUTH_TOKEN}" \
+  -H "Content-Type: application/json" \
+  http://127.0.0.1:4010/codex/v1/chat/completions \
+  -d '{"model":"gpt-5.3-codex","messages":[{"role":"user","content":"Reply with exactly: ccproxy-chat-ok"}],"stream":false,"max_tokens":32}' | jq .
+
+curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  http://127.0.0.1:4000/v1/chat/completions \
+  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: litellm-chat-ok"}],"stream":false,"max_tokens":32}' | jq .
+```
+
+Expected:
+- `ccproxy-api` returns Codex models on `/codex/v1/models`
+- direct CCProxy Chat Completions returns non-empty assistant content
+- LiteLLM `chatgpt-5` Chat Completions returns non-empty assistant content
+
 Expected:
 - named/object-form forced-tool choice is rejected or backend-visible unsupported
 - strict structured-output/schema guarantee is rejected, ignored, or otherwise

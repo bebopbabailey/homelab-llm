@@ -45,17 +45,17 @@
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
 - Stable local public LLM aliases: `main`, `deep`, `fast`.
-- Additive operator-only ChatGPT alias: `chatgpt-5`.
+- Additive experimental Codex-backed alias: `chatgpt-5`.
 - There are no active temporary GPT rollout aliases in the current gateway
   contract.
 - `main` is closed as an active backend project and remains accepted for public
   use with known limitations on forced-tool semantics and structured outputs.
 - Resilience baseline: `fast -> main`.
-- GPT human-chat lanes are responses-first in the current contract.
+- GPT human-chat lanes are Chat Completions-first in the current Open WebUI
+  contract.
 - `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on
-  `POST /v1/responses`.
-- `POST /v1/chat/completions` remains available only as a legacy-compatible path
-  for lanes that already support it cleanly.
+  `POST /v1/chat/completions`.
+- `/v1/responses` remains available for direct callers on compatible lanes.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
   - refresh raw standalone llama.cpp while live `llmster` remained untouched
@@ -154,7 +154,7 @@ if a param is rejected by the backend.
 - LiteLLM transcript-cleanup aliases:
   - standard: `task-transcribe`
   - vivid: `task-transcribe-vivid`
-- LiteLLM operator-only ChatGPT aliases:
+- LiteLLM experimental Codex-backed alias:
   - `chatgpt-5`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path.
@@ -163,17 +163,13 @@ if a param is rejected by the backend.
 - `task-json` is also a `POST /v1/chat/completions` utility contract only.
   It returns canonical JSON extraction output and is not part of the Open WebUI
   `AUDIO_STT_*` speech path.
-- ChatGPT provider auth can complete through LiteLLM's device-code/OAuth flow
-  without changing Open WebUI settings.
-- ChatGPT aliases remain operator-only in the current contract. Do not treat
-  them as part of the accepted Open WebUI model contract unless they are
-  explicitly promoted in a later pass.
-- `chatgpt-5` is now part of the accepted Open WebUI human-chat model contract,
-  but only through the Responses-backed LiteLLM connection.
-- The gateway rejects `chatgpt-5` on `POST /v1/chat/completions` with a clear
-  `responses-only` error instead of leaking upstream Cloudflare HTML.
-- `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
-  intentionally not exposed.
+- `chatgpt-5` is now backed by Mini-local experimental `ccproxy-api` on
+  `127.0.0.1:4010/codex/v1`, with LiteLLM still serving as the only user-facing
+  gateway.
+- Open WebUI uses the standard OpenAI-compatible Chat Completions path again
+  against LiteLLM, which avoids the previous empty-output failure on the raw
+  ChatGPT backend path.
+- The current validated upstream model id for the alias is `gpt-5.3-codex`.
 - LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.

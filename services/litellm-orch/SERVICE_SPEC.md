@@ -89,16 +89,11 @@ implement inference or web-search business logic.
 - There are no active temporary GPT canary aliases in the current gateway
   contract.
 - The local canonical public trio remains `main`, `deep`, and `fast`.
-- Additive operator-only ChatGPT alias is `chatgpt-5`.
-- No ChatGPT-backed alias is part of the accepted public or Open WebUI gateway
-  contract in the current runtime.
-- Human-chat GPT lanes are now responses-first in the current runtime:
-  `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on `POST /v1/responses`.
-- `POST /v1/chat/completions` remains available for legacy-compatible lanes, but
-  it is no longer the primary human-chat contract.
-- On the current ChatGPT account, `chatgpt/gpt-5.4` is validated on
-  `POST /v1/responses`, while `chatgpt/gpt-5.4-pro` is rejected as unsupported
-  for Codex on ChatGPT accounts and is not exposed as an alias.
+- Additive experimental Codex-backed alias is `chatgpt-5`.
+- `chatgpt-5` now routes through the Mini-local `ccproxy-api` sidecar instead
+  of the raw `chatgpt.com/backend-api/codex` path.
+- The current validated upstream model for that alias is `gpt-5.3-codex`.
+- Open WebUI human chat is Chat Completions-first again on the LiteLLM path.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -142,14 +137,13 @@ implement inference or web-search business logic.
   - no provider reasoning-field stripping
   - no forced `stream=false`
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
-- `chatgpt-5` is protected by a responses-contract guardrail:
-  - `POST /v1/responses` is accepted
-  - `POST /v1/chat/completions` is rejected with a gateway-owned `400`
-    explaining that the lane is responses-only
-- Current supported GPT contract is responses-first for human chat:
-  - `main`, `deep`, `fast`, and `chatgpt-5` all accept `POST /v1/responses`
-  - ordinary tool calling is still accepted on the legacy Chat Completions path
-    for compatible lanes
+- Current supported GPT contract for Open WebUI is Chat Completions-first:
+  - `main`, `deep`, `fast`, and `chatgpt-5` all accept
+    `POST /v1/chat/completions`
+  - `/v1/responses` remains available for direct/operator use where supported
+  - `chatgpt-5` follows the Codex-backed sidecar path rather than the local GPT
+    request-default shim
+  - ordinary tool calling is accepted on compatible lanes
   - named/object-form forced-tool choice is unsupported on the current GPT
     backend family
   - strict structured-output guarantees are not part of the supported GPT or
@@ -164,8 +158,9 @@ implement inference or web-search business logic.
 - The repo-managed systemd unit must keep
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so future drift fails fast at startup
   instead of surfacing later as partial MCP/key-management breakage.
-- ChatGPT provider auth uses LiteLLM's own device-code/OAuth login flow on first
-  use. Auth state must remain local-only and out of git.
+- `chatgpt-5` now uses `ccproxy-api` with local Codex auth state and a local
+  bearer token. Auth state and service tokens must remain local-only and out of
+  git.
 
 ## Search Ownership Boundary
 - Open WebUI owns web-search UX plus provider/loader configuration.
@@ -179,13 +174,10 @@ implement inference or web-search business logic.
 - API key enforcement is enabled for `/v1/*` and `/health`.
 - `/health/readiness`, `/health/liveliness`, and `/metrics/` are currently open.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
-- ChatGPT auth state must stay out of git. By default LiteLLM stores it at
-  `~/.config/litellm/chatgpt/auth.json` for the service user. Runtime-only
-  overrides may use `CHATGPT_TOKEN_DIR` and `CHATGPT_AUTH_FILE`, but that auth
-  state alone does not make ChatGPT aliases production-ready on the current
-  stable runtime. The current pinned baseline still hits a Cloudflare HTML
-  challenge on the Chat Completions path for `chatgpt-5`, so the gateway now
-  rejects that call type before LiteLLM reaches the upstream ChatGPT backend.
+- `chatgpt-5` no longer uses LiteLLM's raw ChatGPT backend path. Instead,
+  LiteLLM calls the Mini-local `ccproxy-api` sidecar with a local bearer token,
+  while CCProxy uses local Codex auth state. None of that auth material may be
+  committed.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.

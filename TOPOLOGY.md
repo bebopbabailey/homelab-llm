@@ -5,6 +5,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 ## Mini (Ubuntu, always-on)
 - **LiteLLM (gateway)**: `0.0.0.0:4000` (canonical infra path `http://192.168.1.71:4000/v1`; localhost still valid)
 - **Open WebUI**: `0.0.0.0:3000` (tailnet via Tailscale Serve)
+- **CCProxy API (experimental)**: `127.0.0.1:4010` (`/codex/v1`, localhost-only Codex sidecar behind LiteLLM)
 - **Open Terminal API**: `127.0.0.1:8010` (optional native Open WebUI human UX path)
 - **Open Terminal MCP**: `127.0.0.1:8011` (`/mcp`, localhost-only direct backend; shared LiteLLM alias is future work)
 - **OpenCode Web**: `0.0.0.0:4096` (Basic Auth; writable workspace limited to `~/homelab-llm`)
@@ -85,8 +86,10 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - LiteLLM `fast` and `deep` route to Studio `llmster` on `192.168.1.72:8126`.
 - There are no active temporary GPT rollout aliases in the public LiteLLM
   surface.
-- GPT lanes are currently Chat Completions-first; `/v1/responses` remains in
-  validation scope but advisory for this rollout.
+- GPT lanes are currently Chat Completions-first; `/v1/responses` remains
+  available for direct callers where supported.
+- `chatgpt-5` now routes through the Mini-local `ccproxy-api` sidecar on
+  `127.0.0.1:4010/codex/v1`.
 - Shadow rollout listeners `8123-8125` are retired and are not part of the
   active gateway alias surface.
 - Studio OptiLLM upstream currently reaches Mini LiteLLM via the Mini LAN URL `http://192.168.1.71:4000/v1`.

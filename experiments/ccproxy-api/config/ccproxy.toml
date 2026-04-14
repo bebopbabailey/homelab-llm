@@ -1,0 +1,5 @@
+# CCProxy config for the Mini-side experimental Codex lane.
+enabled_plugins = ["codex", "oauth_codex"]
+
+[logging]
+level = "WARNING"

@@ -29,11 +29,9 @@ only; it does not implement inference.
 - Repo-local OpenCode defaults and agent/skill behavior are documented in
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The local canonical public LLM trio remains `fast`, `main`, and `deep`.
-- Human-chat traffic is now responses-first through LiteLLM for `main`,
-  `deep`, `fast`, and `chatgpt-5`.
-- `chatgpt-5` remains the additive subscription-backed ChatGPT lane.
-- `chatgpt-5` is responses-only at the gateway and returns a clear request
-  error on `POST /v1/chat/completions`.
+- Human-chat traffic is Chat Completions-first through LiteLLM for `main`,
+  `deep`, `fast`, and the experimental `chatgpt-5` lane.
+- `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
 - `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
   not part of the public human chat-lane trio.
 - `task-json` is an additional utility alias, not part of the public human

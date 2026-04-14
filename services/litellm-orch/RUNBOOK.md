@@ -89,7 +89,7 @@ rg -n "gpt-request-defaults|target_models|reasoning_effort" \
 ```
 
 Expected:
-- `gpt-request-defaults` targets `deep`, `fast`, `code-reasoning`, and `chatgpt-5`.
+- `gpt-request-defaults` targets `deep`, `fast`, and `code-reasoning`.
 - No web-search-specific pre-call or post-call guardrails remain.
 - No GPT-lane post-call formatting guardrail remains active.
 
@@ -167,31 +167,30 @@ Expected:
 - Current resilience baseline keeps `fast -> main`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
-Operator-only ChatGPT alias checks:
+Experimental ChatGPT/Codex alias checks:
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort | rg '^chatgpt-5$'
 
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: chat-ok"}],"stream":false,"max_tokens":32}' | jq .
+
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model":"chatgpt-5","input":[{"role":"user","content":"Reply with exactly: responses-ok"}],"max_output_tokens":32}' | jq .
-
-curl -sS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"chatgpt-5","messages":[{"role":"user","content":"Reply with exactly: no"}],"stream":false,"max_tokens":32}' | jq .
 ```
 
 Expected:
 - `/v1/models` includes `chatgpt-5`
-- Responses succeeds for `chatgpt-5`
-- Chat Completions returns a gateway-owned `400` saying `chatgpt-5` only
-  accepts `/v1/responses` requests
-- `gpt-5.4-pro` is unsupported for Codex on the current ChatGPT account and is
-  intentionally absent from the router
+- Chat Completions succeeds for `chatgpt-5`
+- Responses also succeeds for `chatgpt-5`
+- the alias is backed by local `ccproxy-api` on `127.0.0.1:4010/codex/v1`
+- `gpt-5.3-codex` is the current validated upstream model id for the alias
 
 Historical cutover order:
 - raw `deep`
