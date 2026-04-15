@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-04-15-qwen3-coder-next-failure-closeout](2026-04-15-qwen3-coder-next-failure-closeout.md)
 - [2026-04-08-litellm-upstream-mcp-toolset-eval-no-go](2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md)
 - [2026-04-02-root-allowlist-and-root-artifact-cleanup](2026-04-02-root-allowlist-and-root-artifact-cleanup.md)
 - [2026-04-02-homelab-durability-eval-loop](2026-04-02-homelab-durability-eval-loop.md)
