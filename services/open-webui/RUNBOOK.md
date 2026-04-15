@@ -82,9 +82,9 @@ sudo systemctl restart open-webui.service
 Open WebUI currently uses:
 - native terminal server: `http://127.0.0.1:8010`
 - read-only MCP tool server: `http://127.0.0.1:8011/mcp`
-- `chatgpt-5` tool use is intentionally constrained to the read-only MCP
-  subset. It must not receive `run_command`, direct tool servers, or builtin
-  native tools in the current contract.
+- `chatgpt-5` follows the standard Open WebUI tool/terminal routing for the
+  active chat. Open WebUI does not force it onto a special native/MCP-only
+  lane.
 
 Admin API checks:
 ```bash
@@ -123,10 +123,11 @@ match the env-driven values.
 ## `chatgpt-5` tool-use canary
 Use an authenticated Open WebUI chat-completions probe that asks for a repo
 inspection task and verify:
-- no `shell` tool call is stored
-- no empty `function_call_output` is stored
-- `journalctl -u litellm-orch.service` has no `Expected an ID that begins with 'fc'`
-- host-style repo paths are normalized to the MCP repo root when needed
+- the reply completes through the standard Open WebUI tool path used by the
+  browser
+- if tools are used, the chat produces a visible final assistant response
+- `journalctl -u open-webui.service` and `journalctl -u litellm-orch.service`
+  do not show a forced native/MCP-only lane for `chatgpt-5`
 
 Reference canary:
 
@@ -139,15 +140,7 @@ api_key = cur.execute('select key from api_key order by created_at asc limit 1')
 payload = {
     "model": "chatgpt-5",
     "stream": False,
-    "messages": [
-        {
-            "role": "user",
-            "content": (
-                "Tell me what you think of my docs structure in "
-                "/homelab-llm/services/litellm-orch."
-            ),
-        }
-    ],
+    "messages": [{"role": "user", "content": "Reply with exactly chatgpt-5-ok"}],
 }
 req = urllib.request.Request(
     'http://127.0.0.1:3000/api/chat/completions',
@@ -163,17 +156,10 @@ with urllib.request.urlopen(req, timeout=60) as resp:
 PY
 ```
 
-Success criteria on the first hop:
+Success criteria:
 - assistant content is non-empty
-- `finish_reason` is `tool_calls`
-- tool name is one of the read-only MCP functions
-- tool call id starts with `fc_`
-
-Path contract for the `chatgpt-5` read-only lane:
-- prefer repo-relative paths such as `services/litellm-orch`
-- valid MCP absolute root is `/lab/homelab-llm`
-- Open WebUI now normalizes `/homelab-llm/...` and
-  `/home/christopherbailey/homelab-llm/...` to `/lab/homelab-llm/...`
+- the lane is no longer forced into a `function_calling=native` / read-only MCP
+  contract by Open WebUI runtime patches
 
 ## End-to-end voice canary
 - restart Open WebUI
