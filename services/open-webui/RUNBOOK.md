@@ -127,6 +127,48 @@ inspection task and verify:
 - no empty `function_call_output` is stored
 - `journalctl -u litellm-orch.service` has no `Expected an ID that begins with 'fc'`
 
+Reference canary:
+
+```bash
+python3 - <<'PY'
+import json, sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+payload = {
+    "model": "chatgpt-5",
+    "stream": False,
+    "params": {"function_calling": "native"},
+    "messages": [
+        {
+            "role": "user",
+            "content": (
+                "Inspect only the repository root using read-only repo tools if needed, "
+                "then summarize what you find in 2-3 sentences."
+            ),
+        }
+    ],
+}
+req = urllib.request.Request(
+    'http://127.0.0.1:3000/api/chat/completions',
+    data=json.dumps(payload).encode(),
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    },
+)
+with urllib.request.urlopen(req, timeout=60) as resp:
+    body = json.loads(resp.read().decode())
+    print(json.dumps(body, indent=2))
+PY
+```
+
+Success criteria on the first hop:
+- assistant content is non-empty
+- `finish_reason` is `tool_calls`
+- tool name is one of the read-only MCP functions
+- tool call id starts with `fc_`
+
 ## End-to-end voice canary
 - restart Open WebUI
 - open the UI and complete one voice turn

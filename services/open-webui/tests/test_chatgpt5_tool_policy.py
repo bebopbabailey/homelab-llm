@@ -73,6 +73,18 @@ class ChatGpt5ToolPolicyTests(unittest.TestCase):
         self.assertTrue(allowed)
         self.assertFalse(denied)
 
+    def test_allowed_tool_names_match_readonly_mcp_subset(self):
+        self.assertEqual(
+            set(self.middleware.CHATGPT5_ALLOWED_TOOL_NAMES),
+            {
+                "open-terminal-mcp-ro_glob_search",
+                "open-terminal-mcp-ro_grep_search",
+                "open-terminal-mcp-ro_health_check",
+                "open-terminal-mcp-ro_list_files",
+                "open-terminal-mcp-ro_read_file",
+            },
+        )
+
     def test_unavailable_tool_message_lists_allowed_tools(self):
         message = self.middleware._unavailable_tool_message(
             "shell",
