@@ -29,6 +29,9 @@ implement inference or web-search business logic.
 - Environment variables supply upstream base URLs and runtime options.
 - Example envs live in `config/env.example`.
 - For long-running service use, load env vars explicitly (for example systemd `EnvironmentFile=config/env.local`).
+- `DATABASE_URL` is required in the runtime environment for DB-backed LiteLLM
+  auth/key-management features such as teams, groups, service accounts, and
+  `/key/generate`.
 - Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them, but canonical `main` on the current Qwen backend is still failing both current non-stream direct `8101` structured-output request paths:
@@ -173,12 +176,18 @@ implement inference or web-search business logic.
 ## Auth (Current)
 - API key enforcement is enabled for `/v1/*` and `/health`.
 - `/health/readiness`, `/health/liveliness`, and `/metrics/` are currently open.
+- For this deployment, `/health/readiness` is not considered healthy when the
+  JSON body reports `db: "Not connected"`, even if the endpoint still returns
+  HTTP `200`.
 - Keys are loaded from `config/env.local` by systemd `EnvironmentFile`.
 - `chatgpt-5` no longer uses LiteLLM's raw ChatGPT backend path. Instead,
   LiteLLM calls the Mini-local `ccproxy-api` sidecar with a local bearer token,
   while CCProxy uses local Codex auth state. None of that auth material may be
   committed.
 - DB-backed team and service-account endpoints are live in the deployed proxy.
+- DB-backed auth depends on the Prisma/Postgres path being connected at runtime;
+  when it is not, non-master keys fail before model routing with
+  `type=no_db_connection`.
 - OpenHands Phase B uses one reserved internal worker alias only:
   `code-reasoning`.
 - `code-reasoning` is not a public human lane. It is the governed OpenHands

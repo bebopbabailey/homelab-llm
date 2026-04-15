@@ -26,6 +26,15 @@ curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/v1/m
 curl -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" http://127.0.0.1:4000/v1/mcp/server | jq .
 ```
 
+DB-backed auth note:
+- `DATABASE_URL` must be present in the service environment for LiteLLM-owned
+  teams, groups, service accounts, and `/key/generate`.
+- For this deployment, readiness is not acceptable when
+  `.db == "Not connected"`, even if `/health/readiness` still returns `200`.
+- If local agents or worker keys return `{"type":"no_db_connection"}`, check
+  `/health/readiness` first and restore `DATABASE_URL` before deeper route or
+  alias triage.
+
 ## Prisma schema repair (Mini)
 Use this only when LiteLLM is healthy enough to start but runtime features such
 as `/key/generate` or `/v1/mcp/*` fail with Prisma client/schema drift.
@@ -64,7 +73,8 @@ SQL
 ```
 
 Expected post-repair checks:
-- `curl http://127.0.0.1:4000/health/readiness` returns healthy
+- `curl http://127.0.0.1:4000/health/readiness` returns healthy and does not
+  report `db: "Not connected"`
 - `POST /key/generate` succeeds
 - `GET /v1/models` succeeds
 - `GET /v1/mcp/server` succeeds

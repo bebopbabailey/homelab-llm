@@ -63,6 +63,9 @@ Networking note:
   Auth: API calls require `Authorization: Bearer <LITELLM_MASTER_KEY>` (even on localhost).
   Health/auth behavior: `/v1/*` and `/health` are auth-gated; `/health/readiness`,
   `/health/liveliness`, and `/metrics/` are currently open.
+  DB-backed auth requirement: runtime must include `DATABASE_URL`; if readiness
+  reports `db: "Not connected"`, non-master keys, groups, service accounts,
+  and `/key/generate` are effectively down even if the endpoint still returns `200`.
   Runtime lock baseline: `drop_params=true`, `fast -> main`.
   Current package baseline: `litellm[proxy]==1.83.4`.
   Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route

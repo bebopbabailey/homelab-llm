@@ -59,6 +59,23 @@ check_http_post() {
   fi
 }
 
+check_litellm_readiness() {
+  local url="$1"
+  local auth_header="$2"
+  local raw
+  raw="$(curl -fsS --max-time 3 -H "$auth_header" "$url")"
+  python3 - <<'PY' "$raw" "$url"
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+url = sys.argv[2]
+if payload.get("db") == "Not connected":
+    raise SystemExit(f"litellm readiness failed: {url} reports db=Not connected")
+print(f"http ok: {url}")
+PY
+}
+
 check_studio_mlx_lanes() {
   local ports
   ports="$("$MLXCTL_BIN" status --json | jq -r '.ports[] | select(.port >= 8100 and .port <= 8119) | select(.registry_model != "-") | .port')"
@@ -83,7 +100,7 @@ if [[ -z "${LITELLM_API_KEY}" ]]; then
   exit 1
 fi
 
-check_http "http://127.0.0.1:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
+check_litellm_readiness "http://127.0.0.1:4000/health/readiness" "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:4000/v1/mcp/tools" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 if [[ -f /etc/homelab-llm/ccproxy.env ]]; then
@@ -93,7 +110,7 @@ if [[ -f /etc/homelab-llm/ccproxy.env ]]; then
   fi
 fi
 check_http "http://127.0.0.1:4031/"
-check_http "http://${MINI_LAN_HOST}:4000/health/readiness" -H "Authorization: Bearer ${LITELLM_API_KEY}"
+check_litellm_readiness "http://${MINI_LAN_HOST}:4000/health/readiness" "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://${MINI_LAN_HOST}:4000/v1/models" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 
 check_http "http://${STUDIO_LAN_HOST}:4020/v1/models"

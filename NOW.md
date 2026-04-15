@@ -1,9 +1,9 @@
 # NOW
 
 Active
-- Close out the failed `Qwen3-Coder-Next` backend experiment and restore clean
-  repo/worktree hygiene.
+- Restore `litellm-orch` DB-backed auth so non-master keys, groups, and route
+  policy work again for local agents.
 
 NEXT UP
-- Start a separate `Qwen Agent` project on the existing accepted lane after the
-  cleanup is landed and the baseline is boring again.
+- Return to the deferred `Qwen3-Coder-Next` cleanup lane after the gateway auth
+  repair is verified and closed out.

@@ -1670,6 +1670,7 @@ Guardrails:
 Readiness and model checks:
 ```bash
 curl -fsS http://127.0.0.1:4000/health/readiness | jq .
+curl -fsS http://127.0.0.1:4000/health/readiness | jq -e '.db != "Not connected"'
 curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]' | rg 'WebsearchSchemaGuardrail'
 
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
@@ -1687,6 +1688,7 @@ curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
 ```
 
 Pass guidance:
+- readiness JSON does not report `db: "Not connected"`.
 - `WebsearchSchemaGuardrail` is absent from readiness callbacks.
 - `/v1/models` does not include `fast-research`.
 - `/v1/search/searxng-search` still works for direct callers and MCP tools.
@@ -1709,9 +1711,27 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model":"task-transcribe-vivid","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
+
+SMOKE_KEY_JSON="$(curl -fsS http://127.0.0.1:4000/key/generate \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"key_alias":"task-transcribe-smoke","key_type":"llm_api","duration":"1h","models":["task-transcribe","task-transcribe-vivid"],"allowed_routes":["/v1/models","/v1/chat/completions"]}')"
+SMOKE_KEY="$(printf '%s' "$SMOKE_KEY_JSON" | jq -r '.key')"
+
+curl -fsS http://127.0.0.1:4000/v1/models \
+  -H "Authorization: Bearer ${SMOKE_KEY}" | jq -r '.data[].id' | sort
+
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+  -H "Authorization: Bearer ${SMOKE_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
 ```
 
 Pass guidance:
+- `/health/readiness` does not report `db: "Not connected"`.
+- `/key/generate` succeeds for a short-lived non-master smoke key.
+- the smoke key can call `/v1/models` and `POST /v1/chat/completions` for the
+  allowed transcript aliases.
 - `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
 - both aliases succeed through `POST /v1/chat/completions`
 - outputs are plain cleaned transcript text with no wrapper heading, label, or commentary

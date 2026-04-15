@@ -7,7 +7,7 @@ set -euo pipefail
 # Set VERBOSE=1 to hit /health (deep checks).
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ENV_LOCAL="${LITELLM_ENV_LOCAL:-$REPO_ROOT/services/litellm-orch/config/env.local}"
 LITELLM_API_KEY="${LITELLM_API_KEY:-}"
 
@@ -41,6 +41,9 @@ import json,sys,datetime
 data = json.loads(sys.argv[1])
 now = datetime.datetime.utcnow().isoformat() + "Z"
 
+if data.get("db") == "Not connected":
+  raise SystemExit("LiteLLM readiness reports db=Not connected")
+
 def compact(items, status):
   out = []
   for item in items:
@@ -63,6 +66,7 @@ unhealthy = compact(data.get("unhealthy_endpoints", []), "unhealthy")
 out = {
   "healthy_count": data.get("healthy_count", len(healthy)),
   "unhealthy_count": data.get("unhealthy_count", len(unhealthy)),
+  "db": data.get("db"),
   "checks": healthy + unhealthy,
 }
 print(json.dumps(out, indent=2))

@@ -5,6 +5,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -133,6 +135,20 @@ def parse_systemd_execstart(text):
     return match.group(1), int(match.group(2))
 
 
+def litellm_readiness_failure():
+    proc = run(["systemctl", "is-active", "litellm-orch.service"], check=False)
+    if proc.returncode != 0 or proc.stdout.strip() != "active":
+        return None
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:4000/health/readiness", timeout=3) as resp:
+            payload = json.load(resp)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return f"litellm-orch readiness probe failed: {exc}"
+    if payload.get("db") == "Not connected":
+        return 'litellm-orch readiness reports db="Not connected"'
+    return None
+
+
 def check_fast(lock):
     failures = []
     if not LOCK_PATH.exists():
@@ -170,6 +186,10 @@ def check_fast(lock):
     for doc in doc_paths():
         if not doc.exists():
             failures.append(f"missing canon doc: {doc.relative_to(REPO_ROOT)}")
+
+    readiness_failure = litellm_readiness_failure()
+    if readiness_failure:
+        failures.append(readiness_failure)
 
     return failures
 
@@ -269,6 +289,10 @@ def check_full(lock, host):
         failures.append("litellm-orch bind host drift")
     if port_value != lock["litellm"]["port"]:
         failures.append("litellm-orch port drift")
+
+    readiness_failure = litellm_readiness_failure()
+    if readiness_failure:
+        failures.append(readiness_failure)
 
     return failures
 

@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.error import URLError
 
 import importlib.util
 
@@ -147,6 +148,31 @@ class ValidateRuntimeLockTests(unittest.TestCase):
     def test_parse_systemd_execstart(self):
         text = "ExecStart=/path/to/litellm --config x --host 0.0.0.0 --port 4000\n"
         self.assertEqual(vr.parse_systemd_execstart(text), ("0.0.0.0", 4000))
+
+    def test_litellm_readiness_failure_ignores_inactive_service(self):
+        proc = mock.Mock(returncode=3, stdout="inactive\n", stderr="")
+        with mock.patch.object(vr, "run", return_value=proc):
+            self.assertIsNone(vr.litellm_readiness_failure())
+
+    def test_litellm_readiness_failure_flags_db_disconnect(self):
+        active = mock.Mock(returncode=0, stdout="active\n", stderr="")
+        response = mock.Mock()
+        response.__enter__ = mock.Mock(return_value=response)
+        response.__exit__ = mock.Mock(return_value=False)
+        response.read = mock.Mock(return_value=b'{"db":"Not connected"}')
+        with mock.patch.object(vr, "run", return_value=active), \
+             mock.patch.object(vr.urllib.request, "urlopen", return_value=response):
+            self.assertEqual(
+                vr.litellm_readiness_failure(),
+                'litellm-orch readiness reports db="Not connected"',
+            )
+
+    def test_litellm_readiness_failure_flags_probe_errors(self):
+        active = mock.Mock(returncode=0, stdout="active\n", stderr="")
+        with mock.patch.object(vr, "run", return_value=active), \
+             mock.patch.object(vr.urllib.request, "urlopen", side_effect=URLError("boom")):
+            failure = vr.litellm_readiness_failure()
+        self.assertIn("litellm-orch readiness probe failed", failure)
 
 
 if __name__ == '__main__':
