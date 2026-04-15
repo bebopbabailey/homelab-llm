@@ -85,6 +85,51 @@ class ChatGpt5ToolPolicyTests(unittest.TestCase):
             },
         )
 
+    def test_repo_path_guidance_mentions_relative_and_mcp_root_paths(self):
+        guidance = self.middleware.CHATGPT5_REPO_PATH_GUIDANCE
+        self.assertIn("services/litellm-orch", guidance)
+        self.assertIn("/lab/homelab-llm", guidance)
+        self.assertIn("/homelab-llm", guidance)
+
+    def test_normalize_chatgpt5_readonly_tool_params_rewrites_host_paths(self):
+        cases = {
+            "open-terminal-mcp-ro_list_files": {
+                "directory": "/homelab-llm/services/litellm-orch"
+            },
+            "open-terminal-mcp-ro_read_file": {
+                "path": "/home/christopherbailey/homelab-llm/AGENTS.md"
+            },
+            "open-terminal-mcp-ro_grep_search": {
+                "query": "chatgpt-5",
+                "path": "/homelab-llm/services/open-webui",
+            },
+            "open-terminal-mcp-ro_glob_search": {
+                "pattern": "*.md",
+                "path": "/home/christopherbailey/homelab-llm/docs",
+            },
+        }
+
+        expected = {
+            "open-terminal-mcp-ro_list_files": "/lab/homelab-llm/services/litellm-orch",
+            "open-terminal-mcp-ro_read_file": "/lab/homelab-llm/AGENTS.md",
+            "open-terminal-mcp-ro_grep_search": "/lab/homelab-llm/services/open-webui",
+            "open-terminal-mcp-ro_glob_search": "/lab/homelab-llm/docs",
+        }
+
+        for tool_name, params in cases.items():
+            normalized = self.middleware._normalize_chatgpt5_readonly_tool_params(
+                tool_name, params
+            )
+            key = "directory" if "directory" in params else "path"
+            self.assertEqual(normalized[key], expected[tool_name])
+
+    def test_normalize_chatgpt5_readonly_tool_params_keeps_relative_paths(self):
+        params = {"directory": "services/litellm-orch"}
+        normalized = self.middleware._normalize_chatgpt5_readonly_tool_params(
+            "open-terminal-mcp-ro_list_files", params
+        )
+        self.assertEqual(normalized["directory"], "services/litellm-orch")
+
     def test_unavailable_tool_message_lists_allowed_tools(self):
         message = self.middleware._unavailable_tool_message(
             "shell",

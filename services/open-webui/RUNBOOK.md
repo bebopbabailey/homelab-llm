@@ -126,6 +126,7 @@ inspection task and verify:
 - no `shell` tool call is stored
 - no empty `function_call_output` is stored
 - `journalctl -u litellm-orch.service` has no `Expected an ID that begins with 'fc'`
+- host-style repo paths are normalized to the MCP repo root when needed
 
 Reference canary:
 
@@ -138,13 +139,12 @@ api_key = cur.execute('select key from api_key order by created_at asc limit 1')
 payload = {
     "model": "chatgpt-5",
     "stream": False,
-    "params": {"function_calling": "native"},
     "messages": [
         {
             "role": "user",
             "content": (
-                "Inspect only the repository root using read-only repo tools if needed, "
-                "then summarize what you find in 2-3 sentences."
+                "Tell me what you think of my docs structure in "
+                "/homelab-llm/services/litellm-orch."
             ),
         }
     ],
@@ -168,6 +168,12 @@ Success criteria on the first hop:
 - `finish_reason` is `tool_calls`
 - tool name is one of the read-only MCP functions
 - tool call id starts with `fc_`
+
+Path contract for the `chatgpt-5` read-only lane:
+- prefer repo-relative paths such as `services/litellm-orch`
+- valid MCP absolute root is `/lab/homelab-llm`
+- Open WebUI now normalizes `/homelab-llm/...` and
+  `/home/christopherbailey/homelab-llm/...` to `/lab/homelab-llm/...`
 
 ## End-to-end voice canary
 - restart Open WebUI

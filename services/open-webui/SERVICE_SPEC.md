@@ -60,8 +60,15 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - `chatgpt-5` is an Open WebUI Chat Completions lane only. For native tool use
   in Open WebUI, it is constrained to the read-only Open Terminal MCP subset:
   `health_check`, `list_files`, `read_file`, `grep_search`, and `glob_search`.
+- Open WebUI forces `chatgpt-5` browser chats onto native function calling for
+  this lane, even when the browser request omits that flag.
 - `chatgpt-5` must not receive native terminal execution tools, direct tool
   servers, or builtin native tools from Open WebUI in the current contract.
+- For the read-only MCP lane, the preferred path form is repo-relative from the
+  MCP repo root, for example `services/litellm-orch`. The MCP runtime repo root
+  is `/lab/homelab-llm`, and Open WebUI normalizes host-style repo paths such
+  as `/homelab-llm/...` and
+  `/home/christopherbailey/homelab-llm/...` to that MCP root for `chatgpt-5`.
 
 ## Ownership boundary
 - Open WebUI owns the human UI and audio UX.
