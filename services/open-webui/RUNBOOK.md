@@ -84,11 +84,19 @@ Open WebUI currently uses:
 - read-only MCP tool server: `http://127.0.0.1:8011/mcp`
 - Keep native tool calling off for `chatgpt-5` in Open WebUI.
 - If the browser omits terminal/tool selection for `chatgpt-5`, Open WebUI now
-  defaults the lane to `open-terminal` so repo review uses the historical
-  `terminal:open-terminal/...` path.
+  defaults the lane to `open-terminal` using the selected browser-chat model id
+  so repo review uses the historical `terminal:open-terminal/...` path even
+  when `TASK_MODEL` / `TASK_MODEL_EXTERNAL` points at `task-meta`.
+- In the non-native tool-selection phase for that same lane, Open WebUI now
+  bypasses `task-meta` and uses `chatgpt-5` itself whenever regular Open
+  Terminal tools are present, with an exact-tool-name prompt guard so the model
+  does not invent `shell`.
 - After a tool result, Open WebUI retries the known transient `chatgpt-5`
   upstream `502`/response-conversion failure up to two times before surfacing
   the failure.
+- The follow-up loop also normalizes provider `call_...` tool ids into `fc_...`
+  ids before the next LiteLLM request so this lane does not trip the Codex
+  `Expected an ID that begins with 'fc'` error.
 - Explicit `terminal_id`, `tool_ids`, or caller-supplied OpenAI `tools` are not
   overridden.
 
@@ -172,6 +180,8 @@ Success criteria:
 - assistant content is non-empty
 - the tool/source path is `terminal:open-terminal/...`
 - the lane no longer falls through to `shell` with no available tools
+- `journalctl -u litellm-orch.service` does not show `Expected an ID that begins with 'fc'`
+- the browser lane no longer routes non-native tool selection through `task-meta`
 
 ## End-to-end voice canary
 - restart Open WebUI

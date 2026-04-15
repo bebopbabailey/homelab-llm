@@ -60,9 +60,16 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - `chatgpt-5` is an Open WebUI Chat Completions lane only.
 - For repo review in Open WebUI, keep native tool calling off for `chatgpt-5`.
 - If a `chatgpt-5` chat arrives without an explicit terminal or tool selection,
-  Open WebUI defaults the lane to the regular `open-terminal` integration.
+  Open WebUI defaults the lane to the regular `open-terminal` integration based
+  on the selected browser-chat model id, not the task model.
+- In the non-native tool-selection phase for that lane, Open WebUI intentionally
+  uses `chatgpt-5` itself instead of `TASK_MODEL_EXTERNAL=task-meta` whenever
+  regular Open Terminal tools are present, and the selector prompt is hardened
+  to use only exact listed tool names.
 - After a tool result, Open WebUI retries the known transient `chatgpt-5`
   upstream `502`/response-conversion failure up to two times before giving up.
+- Tool-call follow-up messages normalize provider `call_...` ids to `fc_...`
+  ids before they are sent back through the chat-completions loop.
 - Explicit caller selections still win: existing `terminal_id`, `tool_ids`, or
   caller-supplied OpenAI `tools` disable the defaulting behavior.
 
