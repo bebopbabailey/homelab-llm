@@ -36,57 +36,42 @@ class ChatGpt5TerminalDefaultTests(unittest.TestCase):
         )
         cls.misc = _load_module("open_webui/utils/misc.py", "open_webui_misc_runtime")
 
-    def test_defaults_chatgpt5_to_open_terminal_when_unset(self):
-        terminal_id = self.middleware._default_chatgpt5_terminal_id(
-            model_id="chatgpt-5",
-            terminal_id=None,
-            tool_ids=None,
-            payload_tools=None,
-            available_terminal_ids=["open-terminal"],
-        )
-        self.assertEqual(terminal_id, "open-terminal")
-
-    def test_default_uses_selected_model_id_even_if_task_model_differs(self):
-        terminal_id = self.middleware._default_chatgpt5_terminal_id(
-            model_id="chatgpt-5",
-            terminal_id=None,
-            tool_ids=None,
-            payload_tools=None,
-            available_terminal_ids=["open-terminal"],
-        )
-        self.assertEqual(terminal_id, "open-terminal")
-
-    def test_preserves_explicit_terminal_selection(self):
-        terminal_id = self.middleware._default_chatgpt5_terminal_id(
-            model_id="chatgpt-5",
-            terminal_id="custom-terminal",
-            tool_ids=None,
-            payload_tools=None,
-            available_terminal_ids=["open-terminal", "custom-terminal"],
-        )
-        self.assertEqual(terminal_id, "custom-terminal")
-
-    def test_explicit_tool_selection_disables_default(self):
-        terminal_id = self.middleware._default_chatgpt5_terminal_id(
-            model_id="chatgpt-5",
-            terminal_id=None,
-            tool_ids=["server:mcp:open-terminal-mcp-ro"],
-            payload_tools=None,
-            available_terminal_ids=["open-terminal"],
+    def test_chatgpt5_forces_text_only_and_clears_tooling(self):
+        terminal_id, tool_ids, payload_tools, direct_tool_servers, params = (
+            self.middleware._chatgpt5_force_text_only(
+                "chatgpt-5",
+                "open-terminal",
+                ["server:mcp:open-terminal-mcp-ro"],
+                [{"type": "function", "function": {"name": "x"}}],
+                [{"id": "direct"}],
+                {"function_calling": "native", "other": True},
+            )
         )
         self.assertIsNone(terminal_id)
+        self.assertIsNone(tool_ids)
+        self.assertIsNone(payload_tools)
+        self.assertIsNone(direct_tool_servers)
+        self.assertNotIn("function_calling", params)
+        self.assertTrue(params["other"])
 
-    def test_payload_tools_disable_default(self):
-        terminal_id = self.middleware._default_chatgpt5_terminal_id(
-            model_id="chatgpt-5",
-            terminal_id=None,
-            tool_ids=None,
-            payload_tools=[{"type": "function", "function": {"name": "x"}}],
-            available_terminal_ids=["open-terminal"],
+    def test_other_models_do_not_force_text_only(self):
+        terminal_id, tool_ids, payload_tools, direct_tool_servers, params = (
+            self.middleware._chatgpt5_force_text_only(
+                "main",
+                "open-terminal",
+                ["server:mcp:open-terminal-mcp-ro"],
+                [{"type": "function", "function": {"name": "x"}}],
+                [{"id": "direct"}],
+                {"function_calling": "native", "other": True},
+            )
         )
-        self.assertIsNone(terminal_id)
+        self.assertEqual(terminal_id, "open-terminal")
+        self.assertEqual(tool_ids, ["server:mcp:open-terminal-mcp-ro"])
+        self.assertEqual(payload_tools[0]["function"]["name"], "x")
+        self.assertEqual(direct_tool_servers[0]["id"], "direct")
+        self.assertEqual(params["function_calling"], "native")
 
-    def test_other_models_are_unchanged(self):
+    def test_default_terminal_helper_is_now_effectively_unused_for_other_models(self):
         terminal_id = self.middleware._default_chatgpt5_terminal_id(
             model_id="main",
             terminal_id=None,
@@ -95,49 +80,6 @@ class ChatGpt5TerminalDefaultTests(unittest.TestCase):
             available_terminal_ids=["open-terminal"],
         )
         self.assertIsNone(terminal_id)
-
-    def test_chatgpt5_terminal_selector_uses_selected_model_id(self):
-        selector_model_id = self.middleware._chatgpt5_terminal_tool_selector_model_id(
-            "chatgpt-5",
-            "task-meta",
-            {"list_files": {"type": "terminal", "spec": {"name": "list_files"}}},
-        )
-        self.assertEqual(selector_model_id, "chatgpt-5")
-
-    def test_other_selector_cases_keep_task_model(self):
-        self.assertEqual(
-            self.middleware._chatgpt5_terminal_tool_selector_model_id(
-                "main",
-                "task-meta",
-                {"list_files": {"type": "terminal", "spec": {"name": "list_files"}}},
-            ),
-            "task-meta",
-        )
-        self.assertEqual(
-            self.middleware._chatgpt5_terminal_tool_selector_model_id(
-                "chatgpt-5",
-                "task-meta",
-                {"grep_search": {"type": "mcp", "spec": {"name": "grep_search"}}},
-            ),
-            "task-meta",
-        )
-
-    def test_chatgpt5_terminal_selector_prompt_hardens_exact_tool_names(self):
-        prompt = self.middleware._chatgpt5_terminal_tool_selector_prompt(
-            "chatgpt-5",
-            {"list_files": {"type": "terminal", "spec": {"name": "list_files"}}},
-            "Available Tools: [...]",
-        )
-        self.assertIn("Use only exact tool names", prompt)
-        self.assertIn("Never invent aliases such as `shell`", prompt)
-
-    def test_non_chatgpt5_prompt_hardening_is_unchanged(self):
-        prompt = self.middleware._chatgpt5_terminal_tool_selector_prompt(
-            "main",
-            {"list_files": {"type": "terminal", "spec": {"name": "list_files"}}},
-            "Available Tools: [...]",
-        )
-        self.assertEqual(prompt, "Available Tools: [...]")
 
     def test_normalizes_call_prefix_to_fc_prefix(self):
         tool_call_id = self.middleware._normalized_chatgpt5_tool_call_id(

@@ -83,22 +83,13 @@ Open WebUI currently uses:
 - native terminal server: `http://127.0.0.1:8010`
 - read-only MCP tool server: `http://127.0.0.1:8011/mcp`
 - Keep native tool calling off for `chatgpt-5` in Open WebUI.
-- If the browser omits terminal/tool selection for `chatgpt-5`, Open WebUI now
-  defaults the lane to `open-terminal` using the selected browser-chat model id
-  so repo review uses the historical `terminal:open-terminal/...` path even
-  when `TASK_MODEL` / `TASK_MODEL_EXTERNAL` points at `task-meta`.
-- In the non-native tool-selection phase for that same lane, Open WebUI now
-  bypasses `task-meta` and uses `chatgpt-5` itself whenever regular Open
-  Terminal tools are present, with an exact-tool-name prompt guard so the model
-  does not invent `shell`.
-- After a tool result, Open WebUI retries the known transient `chatgpt-5`
-  upstream `502`/response-conversion failure up to two times before surfacing
-  the failure.
-- The follow-up loop also normalizes provider `call_...` tool ids into `fc_...`
-  ids before the next LiteLLM request so this lane does not trip the Codex
-  `Expected an ID that begins with 'fc'` error.
-- Explicit `terminal_id`, `tool_ids`, or caller-supplied OpenAI `tools` are not
-  overridden.
+- `chatgpt-5` is now text-only in Open WebUI.
+- Open WebUI strips `terminal_id`, `tool_ids`, direct tool servers,
+  caller-supplied OpenAI `tools`, and `function_calling` for `chatgpt-5` before
+  request execution.
+- Do not use this lane for repo review, terminal actions, MCP, or tool calling
+  in the UI.
+- Use the regular local models for tool-using workflows in Open WebUI.
 
 Admin API checks:
 ```bash
@@ -134,15 +125,12 @@ Then verify in the Admin UI audio page after restart:
 Promotion is blocked if the restarted UI shows stale audio settings that do not
 match the env-driven values.
 
-## `chatgpt-5` tool-use canary
-Use an authenticated Open WebUI chat-completions probe that asks for a repo
-inspection task and verify:
-- the reply completes through the standard Open Terminal path used by the
-  browser
-- if tools are used, the chat produces a visible final assistant response
-- saved/resulting sources show `terminal:open-terminal/...`
-- `journalctl -u litellm-orch.service` does not show `params.function_calling=native`
-  for this lane
+## `chatgpt-5` text-only canary
+Use a direct text-only probe and verify:
+- the reply completes with non-empty assistant content
+- no tool/source entries are attached
+- `journalctl -u litellm-orch.service` shows a normal `POST /v1/chat/completions`
+  success for `chatgpt-5`
 
 Reference canary:
 
@@ -155,12 +143,7 @@ api_key = cur.execute('select key from api_key order by created_at asc limit 1')
 payload = {
     "model": "chatgpt-5",
     "stream": False,
-    "messages": [
-        {
-            "role": "user",
-            "content": "Tell me what you think of my docs structure in the root directory.",
-        }
-    ],
+    "messages": [{"role": "user", "content": "Reply with exactly text-only-ok"}],
 }
 req = urllib.request.Request(
     'http://127.0.0.1:3000/api/chat/completions',
@@ -178,10 +161,8 @@ PY
 
 Success criteria:
 - assistant content is non-empty
-- the tool/source path is `terminal:open-terminal/...`
-- the lane no longer falls through to `shell` with no available tools
-- `journalctl -u litellm-orch.service` does not show `Expected an ID that begins with 'fc'`
-- the browser lane no longer routes non-native tool selection through `task-meta`
+- no tool/source path is attached for this lane
+- the lane does not enter OWUI tool flow at all
 
 ## End-to-end voice canary
 - restart Open WebUI
