@@ -6,5 +6,9 @@
 - [ ] Verify only the disposable workspace is mounted into `/workspace` during a
   sandboxed task run.
 - [x] Prepare one scratch-repo target with a failing stdlib `unittest`.
-- [ ] Run one scratch-repo loop: `plan -> patch -> validate -> summarize`.
+- [x] Prepare one SWE-bench-style micro bugfix repo with a clean reset point for
+  the joint Qwen-Agent trial.
+- [ ] Run one OpenHands trial loop on the micro bugfix repo:
+  `plan -> patch -> validate -> summarize`.
+- [ ] Reset the benchmark repo and run the matching Codex loop on the same task.
 - [x] Keep LiteLLM handoff documented but unimplemented until policy is ready.

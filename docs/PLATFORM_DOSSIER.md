@@ -32,6 +32,7 @@
 | service | host | port | bind | base URL | health | evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
+| Qwen-Agent proxy (experimental) | Mini | 4021 | 127.0.0.1 | http://127.0.0.1:4021 | /health, /v1/models, /v1/chat/completions | `platform/ops/systemd/qwen-agent-proxy.service`, `ss -ltnp`, direct curl |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
 | CCProxy API (experimental) | Mini | 4010 | 127.0.0.1 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models | `/etc/systemd/system/ccproxy-api.service`, `ss -ltnp`, direct curl |
 | OpenCode Web | Mini | 4096 | 0.0.0.0 | http://127.0.0.1:4096 | UI root (401 unauthenticated) | `/etc/systemd/system/opencode-web.service`, `systemctl show opencode-web.service -p ExecStart`, `ss -ltnp` |
@@ -79,6 +80,10 @@ Networking note:
   `ENFORCE_PRISMA_MIGRATION_CHECK=true` so drift fails fast on startup.
   `chatgpt-5` is now backed by Mini-local `ccproxy-api`, which uses local Codex
   auth state and returns clean Chat Completions output to LiteLLM.
+  Experimental OpenHands shadow alias `code-qwen-agent` routes to the Mini-local
+  `qwen-agent-proxy` sidecar and is intended only for operator validation.
+  Worker-scoped `model/info` is still blocked on that shadow LiteLLM instance,
+  so the lane is not yet a full OpenHands handoff path.
   Open WebUI human chat is Chat Completions-first again on the LiteLLM path.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.

@@ -10,6 +10,7 @@ User=christopherbailey
 SupplementaryGroups=docker
 WorkingDirectory=/home/christopherbailey/homelab-llm/services/openhands
 EnvironmentFile=/etc/openhands/env
+EnvironmentFile=-/etc/openhands/secret.env
 ExecStartPre=-/usr/bin/docker rm -f ${OPENHANDS_CONTAINER_NAME}
 ExecStartPre=/usr/bin/install -d -m 0755 ${OPENHANDS_WORKSPACE_DIR}
 ExecStartPre=/usr/bin/install -d -m 0755 ${OPENHANDS_PERSISTENCE_DIR}
@@ -17,6 +18,7 @@ ExecStart=/usr/bin/docker run --rm \
   --name ${OPENHANDS_CONTAINER_NAME} \
   --pull never \
   -p 127.0.0.1:${OPENHANDS_HOST_PORT}:3000 \
+  --env OH_SECRET_KEY \
   -e OPENHANDS_PERSISTENCE_DIR=/.openhands \
   -e SANDBOX_RUNTIME_CONTAINER_IMAGE=${OPENHANDS_RUNTIME_IMAGE} \
   -e AGENT_SERVER_IMAGE_REPOSITORY=${OPENHANDS_AGENT_SERVER_IMAGE_REPOSITORY} \

@@ -1,5 +1,9 @@
 # Journal Index
 
+- [2026-04-16-joint-qwen-agent-trial-prep](2026-04-16-joint-qwen-agent-trial-prep.md)
+- [2026-04-15-qwen-agent-proxy-openhands-shadow-slice](2026-04-15-qwen-agent-proxy-openhands-shadow-slice.md)
+- [2026-04-15-qwen-agent-adapter-slice](2026-04-15-qwen-agent-adapter-slice.md)
+- [2026-04-15-qwen-agent-shadow-probe](2026-04-15-qwen-agent-shadow-probe.md)
 - [2026-04-15-qwen3-coder-next-failure-closeout](2026-04-15-qwen3-coder-next-failure-closeout.md)
 - [2026-04-08-litellm-upstream-mcp-toolset-eval-no-go](2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md)
 - [2026-04-02-root-allowlist-and-root-artifact-cleanup](2026-04-02-root-allowlist-and-root-artifact-cleanup.md)

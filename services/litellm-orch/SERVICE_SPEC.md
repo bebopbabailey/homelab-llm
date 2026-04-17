@@ -63,6 +63,8 @@ implement inference or web-search business logic.
 - `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
 - `code-reasoning` -> reserved internal OpenHands worker alias on the same
   `deep` backend lane (`llmster-gpt-oss-120b-mxfp4-gguf`)
+- `code-qwen-agent` -> experimental internal OpenHands shadow alias through the
+  Mini-local `qwen-agent-proxy` sidecar (`qwen-agent-coder-next-shadow`)
 - `task-transcribe` -> MLX Studio lane `8101`
   (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
 - `task-transcribe-vivid` -> MLX Studio lane `8101`
@@ -130,7 +132,12 @@ implement inference or web-search business logic.
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the
     canonical truth path.
-  - LiteLLM does not own GPT response rewriting for these lanes.
+  - LiteLLM now owns one narrow llmster repair path only for `deep`, `fast`,
+    and `code-reasoning`: if a tool-bearing auto-tool response leaks raw
+    internal tool protocol instead of returning structured `tool_calls`,
+    LiteLLM forces non-streaming, rewrites the response into a valid tool call
+    when the payload is lossless, and otherwise returns a clean assistant error
+    instead of leaving Open WebUI in a half-finished tool turn.
 - LiteLLM retains one narrow GPT request-default shim only:
   - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`, and
     `code-reasoning`
@@ -138,7 +145,14 @@ implement inference or web-search business logic.
   - no assistant-history rewriting
   - no post-call content extraction
   - no provider reasoning-field stripping
-  - no forced `stream=false`
+  - no general forced `stream=false`
+- LiteLLM also retains one llmster tool-call contract shim:
+  - `llmster-toolcall-guardrail` runs `pre_call` and `post_call` for `deep`,
+    `fast`, and `code-reasoning`
+  - behavior: force `stream=false` only for tool-bearing `tool_choice=auto`
+    requests, normalize leaked `to=functions...<|message|>{...}` protocol into
+    OpenAI-compatible `tool_calls`, and fail closed to a clean assistant retry
+    error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
 - Current supported GPT contract for Open WebUI is Chat Completions-first:
   - `main`, `deep`, `fast`, and `chatgpt-5` all accept
@@ -192,6 +206,12 @@ implement inference or web-search business logic.
   `code-reasoning`.
 - `code-reasoning` is not a public human lane. It is the governed OpenHands
   worker alias and tracks the current `deep` backend lane behind LiteLLM.
+- `code-qwen-agent` is an experimental shadow OpenHands alias only. It is not a
+  public human lane and must not replace `code-reasoning` without a separate
+  promotion pass.
+- Current verified scope for `code-qwen-agent` is worker-key `models` plus
+  `chat/completions`; worker-key `model/info` is still blocked on the shadow
+  LiteLLM instance.
 - Current worker-key contract for OpenHands is:
   - service-account key only
   - models allowlist: `code-reasoning`
@@ -210,6 +230,9 @@ implement inference or web-search business logic.
 - Current OpenHands container contract is `http://host.docker.internal:4000/v1`,
   with `http://192.168.1.71:4000/v1` retained as the verified fallback/reference
   path.
+- Shadow validation may also use a separate localhost-only LiteLLM instance on
+  `127.0.0.1:4001` with the same OpenHands container path shape via
+  `host.docker.internal:4001`.
 - Internal Studio MLX and Studio OptiLLM backends do not require backend bearer auth.
 
 ## Orchestration (Planned)

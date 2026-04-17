@@ -217,6 +217,32 @@ Current public `deep` cutover result:
 - required arg-bearing `9/10`
 - named forced-tool choice unsupported on current backend path
 
+## Llmster MCP tool-call hardening checks
+```bash
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+/home/christopherbailey/homelab-llm/services/litellm-orch/.venv/bin/python -m unittest discover \
+  -s /home/christopherbailey/homelab-llm/services/litellm-orch/tests \
+  -p 'test_llmster_toolcall_guardrail.py'
+
+/home/christopherbailey/homelab-llm/services/litellm-orch/.venv/bin/python -m unittest discover \
+  -s /home/christopherbailey/homelab-llm/services/litellm-orch/tests \
+  -p 'test_router_drop_params.py'
+
+sudo systemctl restart litellm-orch.service
+
+journalctl -u litellm-orch.service -n 120 --no-pager | \
+  rg 'llmster_toolcall_guardrail|protocol_tool_call_rewritten|fallback_error'
+```
+
+Expected:
+- tool-bearing `deep` / `fast` / `code-reasoning` auto-tool requests are forced
+  non-streaming before the upstream call
+- malformed `to=functions...<|message|>{...}` llmster emissions are either
+  rewritten into valid `tool_calls` or converted into a clean retry error
+- no raw `<|channel|>` / `to=functions.` protocol text is left in the final
+  assistant content for these lanes
+
 ## Speech canary checks
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
@@ -470,6 +496,55 @@ Expected:
 - named/object-form forced tool choice is rejected or backend-visible unsupported
 - strict structured-output/schema guarantee is rejected, ignored, or otherwise
   not boring enough to advertise for `code-reasoning`
+
+## OpenHands shadow Qwen-Agent lane
+Experimental shadow alias:
+- alias: `code-qwen-agent`
+- backend target: Mini-local `qwen-agent-proxy`
+- intended upstream model: `qwen-agent-coder-next-shadow`
+- contract shape: Chat Completions-first ordinary, `required`, and named tool use
+- unsupported/out of contract:
+  - streaming
+  - `/v1/responses`
+  - MCP access
+
+Shadow-worker verification:
+```bash
+OPENHANDS_WORKER_SHADOW_KEY=$(cat /home/christopherbailey/.config/openhands/worker_api_key_shadow)
+OPENHANDS_LITELLM_SHADOW_BASE_URL=${OPENHANDS_LITELLM_SHADOW_BASE_URL:-http://127.0.0.1:4001/v1}
+
+curl -fsS "${OPENHANDS_LITELLM_SHADOW_BASE_URL}/models" \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_SHADOW_KEY}" | jq .
+
+curl -fsS "${OPENHANDS_LITELLM_SHADOW_BASE_URL}/model/info" \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_SHADOW_KEY}" | jq .
+
+curl -fsS "${OPENHANDS_LITELLM_SHADOW_BASE_URL}/chat/completions" \
+  -H "Authorization: Bearer ${OPENHANDS_WORKER_SHADOW_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"code-qwen-agent",
+    "messages":[{"role":"user","content":"Call noop once with {\"value\":\"x\"}."}],
+    "tools":[{"type":"function","function":{"name":"noop","description":"noop","parameters":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}}}],
+    "tool_choice":{"type":"function","function":{"name":"noop"}},
+    "stream":false,
+    "max_tokens":128
+  }' | jq .
+```
+
+Expected:
+- `/models` returns only `code-qwen-agent`
+- chat completions returns one populated `tool_calls` entry
+- named and `required` tool modes fail closed if the adapter does not return a callable function object
+- `/v1/responses` remains unavailable on the shadow alias
+
+Current verified caveat on LiteLLM `1.83.4`:
+- `/v1/model/info` and `/model/info` return `403` for worker-scoped shadow keys
+  on the `4001` instance.
+- LiteLLM normalizes the supplied route list to `["llm_api_routes"]`, and that
+  route group does not include model-info endpoints here.
+- Master-key access to `/v1/model/info` on `4001` is healthy; this is a worker
+  key policy gap, not a sidecar or backend failure.
 
 ## Readiness callback check
 ```bash

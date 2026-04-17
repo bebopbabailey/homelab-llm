@@ -19,6 +19,16 @@ homelab can validate coding-worker mechanics before LiteLLM integration.
   - `API Key = openhands-worker`
   - canonical container path: `http://host.docker.internal:4000/v1`
   - verified fallback/reference path: `http://192.168.1.71:4000/v1`
+- Experimental shadow worker path:
+  - preferred direct provider path:
+    - `Custom Model = qwen-agent-coder-next-shadow`
+    - `API Key = qwen-agent-proxy local bearer token`
+    - canonical shadow container path: `http://host.docker.internal:4021/v1`
+  - optional LiteLLM validation path:
+    - `Custom Model = litellm_proxy/code-qwen-agent`
+    - `API Key = openhands-worker-shadow`
+    - shadow LiteLLM container path: `http://host.docker.internal:4001/v1`
+  - intended role: operator-only Qwen3-Coder-Next coding-agent shadow tests
 
 ## Runtime owner
 - `openhands.service` launches Docker container `openhands-app`
@@ -56,3 +66,9 @@ homelab can validate coding-worker mechanics before LiteLLM integration.
 - Worker contract is Chat Completions-first
 - MCP remains denied
 - `/v1/responses` remains denied
+- Experimental shadow Qwen-Agent lane is separate and must not replace the
+  trusted worker lane in this slice.
+- The preferred direct shadow lane proves `models`, `model/info`, and
+  `chat/completions`.
+- The optional shadow LiteLLM path still does not prove worker-key
+  `model/info`.

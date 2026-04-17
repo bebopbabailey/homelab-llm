@@ -307,9 +307,19 @@ if a param is rejected by the backend.
   - Chat Completions-first
   - MCP denied
   - `/v1/responses` denied
+- Experimental shadow path for Qwen-Agent:
+  - Mini-local localhost sidecar: `qwen-agent-proxy` on `127.0.0.1:4021`
+  - shadow LiteLLM alias: `code-qwen-agent`
+  - OpenHands model string: `litellm_proxy/code-qwen-agent`
+  - non-human shadow key only: `openhands-worker-shadow`
+  - intended upstream backend: Studio `Qwen3-Coder-Next` shadow on `8134`
+  - contract is adapter-backed, not a public or canonical lane
+  - current verified scope: `models` plus `chat/completions`; worker-key
+    `model/info` is still blocked on the shadow LiteLLM instance
 - Current runtime note:
   - canonical OpenHands container path is `http://host.docker.internal:4000/v1`
   - verified fallback/reference path is `http://192.168.1.71:4000/v1`
+  - shadow validation path may use `http://host.docker.internal:4001/v1`
 - Security posture: Docker sandbox only, operator-supervised, no GitHub
   integration, no deploy rights, no auto-merge, no LAN exposure, tailnet access
   limited to dedicated service `svc:hands`.
@@ -336,6 +346,8 @@ and where this repo uses callbacks vs guardrails.
   service contract does not expose a server-side default knob for it.
 - LiteLLM does not currently rewrite GPT response content, strip provider
   reasoning fields, or repair named/object-form forced-tool semantics.
+- `code-qwen-agent` is a separate adapter-backed shadow lane and is outside this
+  upstream-first GPT formatting policy.
 - Current GPT contract remains Chat Completions-first:
   - ordinary tool calling supported
   - named/object-form forced-tool choice unsupported

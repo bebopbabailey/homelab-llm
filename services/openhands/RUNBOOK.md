@@ -14,6 +14,15 @@
   `http://host.docker.internal:4000/v1`
 - Verified fallback/reference path:
   `http://192.168.1.71:4000/v1`
+- Experimental shadow contract for Qwen-Agent:
+  - preferred direct provider path:
+    - model: `qwen-agent-coder-next-shadow`
+    - token file: `/etc/homelab-llm/qwen-agent-proxy.secret.env`
+    - base URL: `http://host.docker.internal:4021/v1`
+  - optional LiteLLM validation path:
+    - model: `litellm_proxy/code-qwen-agent`
+    - key file: `/home/christopherbailey/.config/openhands/worker_api_key_shadow`
+    - shadow LiteLLM base URL: `http://host.docker.internal:4001/v1`
 - Still pending: first provider-backed `plan -> patch -> validate -> summarize`
   loop inside the sandbox
 - Current residual: `docker.openhands.dev/openhands/runtime:latest-nikolaik`
@@ -173,6 +182,56 @@ Expected:
   Mini after authenticated inside-container proof
 - `http://192.168.1.71:4000/v1` remains a verified fallback/reference path
 
+## Shadow Qwen-Agent direct provider gate
+Validate the preferred direct Qwen-Agent-backed shadow contract from inside the
+app container:
+```bash
+QWEN_AGENT_PROXY_AUTH_TOKEN=$(sudo sed -n 's/^QWEN_AGENT_PROXY_AUTH_TOKEN=//p' /etc/homelab-llm/qwen-agent-proxy.secret.env)
+
+docker exec -e QWEN_AGENT_PROXY_AUTH_TOKEN="$QWEN_AGENT_PROXY_AUTH_TOKEN" openhands-app sh -lc '
+python3 - <<\"PY\"
+import json, os, urllib.request, urllib.error
+key = os.environ["QWEN_AGENT_PROXY_AUTH_TOKEN"]
+base = "http://host.docker.internal:4021/v1"
+tests = {
+    "models": ("GET", "/models", None),
+    "model_info": ("GET", "/model/info", None),
+    "chat_named": ("POST", "/chat/completions", {
+        "model": "qwen-agent-coder-next-shadow",
+        "messages": [{"role": "user", "content": "Call noop once with {\\\"value\\\":\\\"x\\\"}."}],
+        "tools": [{"type": "function", "function": {"name": "noop", "description": "noop", "parameters": {"type": "object", "properties": {"value": {"type": "string"}}, "required": ["value"], "additionalProperties": False}}}],
+        "tool_choice": {"type": "function", "function": {"name": "noop"}},
+        "stream": False,
+        "max_tokens": 128
+    }),
+}
+out = {}
+for name, (method, path, payload) in tests.items():
+    req = urllib.request.Request(
+        base + path,
+        data=(json.dumps(payload).encode() if payload is not None else None),
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            out[name] = {"status": r.status, "body": r.read().decode()[:800]}
+    except urllib.error.HTTPError as e:
+        out[name] = {"status": e.code, "body": e.read().decode()[:800]}
+print(json.dumps(out, indent=2, sort_keys=True))
+PY'
+```
+
+Expected:
+- `/models` returns only `qwen-agent-coder-next-shadow`
+- `/model/info` succeeds
+- named tool call succeeds with populated `tool_calls`
+
+## Optional shadow LiteLLM gate
+The LiteLLM shadow path remains useful for operator validation, but it is not
+the preferred OpenHands integration path for this slice because worker-key
+`/v1/model/info` is still blocked there.
+
 Verify the governed worker contract through LiteLLM only:
 ```bash
 export OPENHANDS_WORKER_KEY="$(cat /home/christopherbailey/.config/openhands/worker_api_key)"
@@ -210,6 +269,69 @@ Use that scratch repo, then prompt OpenHands to:
 
 Do not start this loop casually on the current host state: the runtime sandbox
 image is not cached, so the first task execution may trigger a large image pull.
+
+## Joint Qwen-Agent trial
+Preferred benchmark repo:
+`/home/christopherbailey/openhands-experimental/phase-a-workspace/swebench-micro-001-config-merge`
+
+### Operator setup in the UI
+Use the direct Qwen-Agent provider path for this trial:
+
+1. Open `http://127.0.0.1:4031`
+2. Set the custom provider/base URL to:
+   - `http://host.docker.internal:4021/v1`
+3. Set the model to:
+   - `qwen-agent-coder-next-shadow`
+4. Set the API key to the local bearer token:
+```bash
+sudo sed -n 's/^QWEN_AGENT_PROXY_AUTH_TOKEN=//p' /etc/homelab-llm/qwen-agent-proxy.secret.env
+```
+5. Keep the workspace rooted in:
+   - `/home/christopherbailey/openhands-experimental/phase-a-workspace/swebench-micro-001-config-merge`
+
+### Task prompt to paste into OpenHands
+Use this exact prompt for the first joint trial:
+
+```text
+You are working in a small Python repo with a failing unittest suite.
+
+Task:
+- Fix the config merge bug so nested overrides merge recursively instead of replacing whole nested dictionaries.
+- Do not mutate the input base config while merging.
+
+Requirements:
+- Start by explaining the plan briefly.
+- Make the smallest correct patch.
+- Run `python3 -m unittest`.
+- Finish by summarizing the change and the test result.
+
+Do not add dependencies. Keep the fix contained to the existing repo.
+```
+
+### Expected validation command
+```bash
+cd /home/christopherbailey/openhands-experimental/phase-a-workspace/swebench-micro-001-config-merge
+python3 -m unittest
+```
+
+### Reset between runs
+After the OpenHands run and before the Codex run:
+```bash
+cd /home/christopherbailey/openhands-experimental/phase-a-workspace/swebench-micro-001-config-merge
+git reset --hard benchmark-baseline
+git clean -fd
+python3 -m unittest
+```
+
+Expected reset state:
+- the repo returns to the intentionally failing baseline
+- `python3 -m unittest` fails until the bug is fixed again
+
+### What to save from the OpenHands run
+- the final summary text
+- the final diff
+- the final `python3 -m unittest` output
+- any extra files it touched beyond the expected bugfix surface
 
 ## Teardown / rollback
 ```bash

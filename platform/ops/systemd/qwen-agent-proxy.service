@@ -1,0 +1,16 @@
+[Unit]
+Description=Qwen-Agent Proxy (localhost-only shadow sidecar)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/experiments/qwen-agent-proxy
+EnvironmentFile=/etc/homelab-llm/qwen-agent-proxy.env
+EnvironmentFile=/etc/homelab-llm/qwen-agent-proxy.secret.env
+ExecStart=/home/christopherbailey/homelab-llm/experiments/qwen-agent-proxy/scripts/run_qwen_agent_proxy.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

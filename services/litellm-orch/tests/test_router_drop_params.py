@@ -50,6 +50,25 @@ class TestRouterDropParams(unittest.TestCase):
         self.assertNotIn("chatgpt-5", target_set)
         self.assertNotIn("chatgpt-5-thinking", target_set)
 
+    def test_llmster_toolcall_guardrails_target_local_llmster_aliases(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        guardrails = config.get("guardrails", [])
+        names = {}
+        for item in guardrails:
+            name = item.get("guardrail_name")
+            if name in {"llmster-toolcall-pre", "llmster-toolcall-post"}:
+                names[name] = item.get("litellm_params", {})
+        self.assertEqual(
+            set(names),
+            {"llmster-toolcall-pre", "llmster-toolcall-post"},
+            "router must wire both llmster toolcall guardrails",
+        )
+        for params in names.values():
+            self.assertEqual(
+                params.get("target_models"),
+                "deep,fast,code-reasoning",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
