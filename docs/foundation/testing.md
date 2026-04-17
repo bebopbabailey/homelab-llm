@@ -902,7 +902,7 @@ Expected:
 ## Open Terminal MCP read-only slice
 Direct backend smoke:
 ```bash
-services/open-webui/.venv/bin/python - <<'PY'
+/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/bin/python - <<'PY'
 import asyncio
 from open_webui.utils.mcp.client import MCPClient
 
@@ -922,6 +922,39 @@ Expected:
 - raw backend exposes the 13-tool Open Terminal MCP surface
 - direct backend remains localhost-only and should not be treated as the
   primary durable auth boundary
+
+Direct backend path-compatibility probe:
+```bash
+/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/bin/python - <<'PY'
+import asyncio
+from open_webui.utils.mcp.client import MCPClient
+
+PATHS = [
+    ".",
+    "/homelab-llm",
+    "/home/christopherbailey/homelab-llm",
+    "/services/litellm-orch",
+]
+
+async def main():
+    client = MCPClient()
+    await client.connect("http://127.0.0.1:8011/mcp")
+    try:
+        for directory in PATHS:
+            result = await client.call_tool("list_files", {"directory": directory})
+            print(directory, result[0]["text"][:200])
+    finally:
+        await client.disconnect()
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- all listed paths succeed without `Directory not found`
+- compatibility aliases are accepted for host-style absolute repo paths and
+  root-level repo directories while repo-relative paths remain the preferred
+  caller contract
 
 Open WebUI direct registration smoke:
 ```bash

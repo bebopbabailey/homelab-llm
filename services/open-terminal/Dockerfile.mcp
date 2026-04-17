@@ -2,4 +2,7 @@ FROM ghcr.io/open-webui/open-terminal@sha256:2edd68f62221a99275675af5109c3944162
 
 USER root
 RUN python -m pip install --no-cache-dir "open-terminal[mcp]==0.11.29"
-USER user
+COPY services/open-terminal/bin/start-mcp-compat.sh /usr/local/bin/start-mcp-compat.sh
+RUN chmod 0755 /usr/local/bin/start-mcp-compat.sh
+
+ENTRYPOINT ["/usr/local/bin/start-mcp-compat.sh"]

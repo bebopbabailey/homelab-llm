@@ -32,7 +32,7 @@ docker logs --tail 200 open-terminal-mcp
 
 ## Direct MCP smoke
 ```bash
-services/open-webui/.venv/bin/python - <<'PY'
+/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/bin/python - <<'PY'
 import asyncio
 from open_webui.utils.mcp.client import MCPClient
 
@@ -51,6 +51,38 @@ Expected:
 - connect succeeds
 - the raw upstream tool list includes the 13 Open Terminal tools
 - this direct backend remains localhost-only
+
+Direct path-compatibility probe:
+```bash
+/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/bin/python - <<'PY'
+import asyncio
+from open_webui.utils.mcp.client import MCPClient
+
+PATHS = [
+    ".",
+    "/homelab-llm",
+    "/home/christopherbailey/homelab-llm",
+    "/services/litellm-orch",
+]
+
+async def main():
+    client = MCPClient()
+    await client.connect("http://127.0.0.1:8011/mcp")
+    try:
+        for directory in PATHS:
+            result = await client.call_tool("list_files", {"directory": directory})
+            print(directory, result[0]["text"][:200])
+    finally:
+        await client.disconnect()
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- `list_files` succeeds for repo-relative and host-style compatibility paths
+- `journalctl -u open-terminal-mcp.service` shows no new `Directory not found`
+  entries during the probe
 
 ## Open WebUI direct registration smoke
 ```bash
@@ -72,6 +104,9 @@ Expected:
 - `/api/v1/tools/` lists `server:mcp:open-terminal-mcp-ro`
 - the MCP tool lane is filtered to `health_check`, `list_files`, `read_file`,
   `grep_search`, and `glob_search`
+- the direct backend tolerates canonical repo-relative paths plus compatibility
+  aliases under `/homelab-llm`, `/home/christopherbailey/homelab-llm`, and
+  root-level repo directories such as `/services`
 
 ## LiteLLM note
 Shared LiteLLM exposure for the Open Terminal read-only subset is follow-on

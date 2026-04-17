@@ -22,7 +22,26 @@ mcp --transport streamable-http --host 0.0.0.0 --port 8000 --cwd /lab/homelab-ll
 - named volume for `/home/user`
 - `OPEN_TERMINAL_ENABLE_TERMINAL=false`
 - `OPEN_TERMINAL_ENABLE_NOTEBOOKS=false`
+- image entrypoint creates compatibility symlinks before dropping back to
+  `user`
 - no `docker.sock`
+
+## Path contract
+- canonical repo root inside the container remains `/lab/homelab-llm`
+- repo-relative paths such as `services/litellm-orch` remain the preferred form
+- the derived image also accepts these compatibility aliases for the mounted
+  repo root:
+  - `/homelab-llm`
+  - `/home/christopherbailey/homelab-llm`
+- for top-level repo directories, the image also creates root-level aliases at
+  container start when those paths are otherwise unused, for example:
+  - `/services`
+  - `/docs`
+  - `/platform`
+  - `/layer-interface`
+- compatibility aliases are tolerated for `list_files.directory`,
+  `read_file.path`, `grep_search.path`, and `glob_search.path`; canonical
+  repo-relative paths are still the documented contract
 
 ## Upstream tool surface
 Open Terminal `0.11.29` exposes:
