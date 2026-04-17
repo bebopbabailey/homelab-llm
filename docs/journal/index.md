@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-04-17-sglang-mlx-native-evaluation-plan](2026-04-17-sglang-mlx-native-evaluation-plan.md)
 - [2026-04-16-joint-qwen-agent-trial-prep](2026-04-16-joint-qwen-agent-trial-prep.md)
 - [2026-04-15-qwen-agent-proxy-openhands-shadow-slice](2026-04-15-qwen-agent-proxy-openhands-shadow-slice.md)
 - [2026-04-15-qwen-agent-adapter-slice](2026-04-15-qwen-agent-adapter-slice.md)
