@@ -82,9 +82,14 @@ sudo systemctl restart open-webui.service
 Open WebUI currently uses:
 - native terminal server: `http://127.0.0.1:8010`
 - read-only MCP tool server: `http://127.0.0.1:8011/mcp`
-- `chatgpt-5` follows the standard Open WebUI tool/terminal routing for the
-  active chat. Open WebUI does not force it onto a special native/MCP-only
-  lane.
+- Keep native tool calling off for `chatgpt-5` in Open WebUI.
+- `chatgpt-5` is now text-only in Open WebUI.
+- Open WebUI strips `terminal_id`, `tool_ids`, direct tool servers,
+  caller-supplied OpenAI `tools`, and `function_calling` for `chatgpt-5` before
+  request execution.
+- Do not use this lane for repo review, terminal actions, MCP, or tool calling
+  in the UI.
+- Use the regular local models for tool-using workflows in Open WebUI.
 
 Admin API checks:
 ```bash
@@ -120,14 +125,12 @@ Then verify in the Admin UI audio page after restart:
 Promotion is blocked if the restarted UI shows stale audio settings that do not
 match the env-driven values.
 
-## `chatgpt-5` tool-use canary
-Use an authenticated Open WebUI chat-completions probe that asks for a repo
-inspection task and verify:
-- the reply completes through the standard Open WebUI tool path used by the
-  browser
-- if tools are used, the chat produces a visible final assistant response
-- `journalctl -u open-webui.service` and `journalctl -u litellm-orch.service`
-  do not show a forced native/MCP-only lane for `chatgpt-5`
+## `chatgpt-5` text-only canary
+Use a direct text-only probe and verify:
+- the reply completes with non-empty assistant content
+- no tool/source entries are attached
+- `journalctl -u litellm-orch.service` shows a normal `POST /v1/chat/completions`
+  success for `chatgpt-5`
 
 Reference canary:
 
@@ -140,7 +143,7 @@ api_key = cur.execute('select key from api_key order by created_at asc limit 1')
 payload = {
     "model": "chatgpt-5",
     "stream": False,
-    "messages": [{"role": "user", "content": "Reply with exactly chatgpt-5-ok"}],
+    "messages": [{"role": "user", "content": "Reply with exactly text-only-ok"}],
 }
 req = urllib.request.Request(
     'http://127.0.0.1:3000/api/chat/completions',
@@ -158,8 +161,8 @@ PY
 
 Success criteria:
 - assistant content is non-empty
-- the lane is no longer forced into a `function_calling=native` / read-only MCP
-  contract by Open WebUI runtime patches
+- no tool/source path is attached for this lane
+- the lane does not enter OWUI tool flow at all
 
 ## End-to-end voice canary
 - restart Open WebUI

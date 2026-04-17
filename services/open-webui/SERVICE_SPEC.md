@@ -58,9 +58,13 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
   is the authority for whether the live connection is still pinned to
   `api_type=responses`.
 - `chatgpt-5` is an Open WebUI Chat Completions lane only.
-- Open WebUI does not force `chatgpt-5` onto a special native-function-calling
-  or MCP-only path. It follows the standard Open WebUI terminal/tool
-  integrations configured for the active chat.
+- `chatgpt-5` is treated as text-only in Open WebUI.
+- Open WebUI strips terminal, MCP, direct-tool-server, and caller-supplied
+  OpenAI tool wiring for `chatgpt-5` before request execution.
+- Open WebUI also clears `function_calling` for `chatgpt-5`, so this lane does
+  not participate in native or non-native tool loops in the UI.
+- The gateway alias remains available for plain chat/text generation through the
+  existing LiteLLM path.
 
 ## Ownership boundary
 - Open WebUI owns the human UI and audio UX.
