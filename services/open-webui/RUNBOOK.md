@@ -87,6 +87,8 @@ Open WebUI currently uses:
 - Open WebUI strips `terminal_id`, `tool_ids`, direct tool servers,
   caller-supplied OpenAI `tools`, and `function_calling` for `chatgpt-5` before
   request execution.
+- The restart hotfix path must also prevent any later fallback that would
+  silently reattach `open-terminal` for this lane.
 - Do not use this lane for repo review, terminal actions, MCP, or tool calling
   in the UI.
 - Use the regular local models for tool-using workflows in Open WebUI.
@@ -129,6 +131,8 @@ match the env-driven values.
 Use a direct text-only probe and verify:
 - the reply completes with non-empty assistant content
 - no tool/source entries are attached
+- terminal/tool-related request fields are ignored even when the caller sends
+  them explicitly
 - `journalctl -u litellm-orch.service` shows a normal `POST /v1/chat/completions`
   success for `chatgpt-5`
 
@@ -143,6 +147,13 @@ api_key = cur.execute('select key from api_key order by created_at asc limit 1')
 payload = {
     "model": "chatgpt-5",
     "stream": False,
+    "terminal_id": "open-terminal",
+    "tool_ids": ["server:mcp:open-terminal-mcp-ro"],
+    "metadata": {
+        "tool_servers": [{"id": "direct", "specs": []}],
+        "params": {"function_calling": "native"},
+    },
+    "tools": [{"type": "function", "function": {"name": "noop", "parameters": {"type": "object"}}}],
     "messages": [{"role": "user", "content": "Reply with exactly text-only-ok"}],
 }
 req = urllib.request.Request(
@@ -163,6 +174,8 @@ Success criteria:
 - assistant content is non-empty
 - no tool/source path is attached for this lane
 - the lane does not enter OWUI tool flow at all
+- `journalctl -u open-webui.service` does not show terminal access tied to this
+  request after restart
 
 ## End-to-end voice canary
 - restart Open WebUI

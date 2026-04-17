@@ -71,7 +71,17 @@ class ChatGpt5TerminalDefaultTests(unittest.TestCase):
         self.assertEqual(direct_tool_servers[0]["id"], "direct")
         self.assertEqual(params["function_calling"], "native")
 
-    def test_default_terminal_helper_is_now_effectively_unused_for_other_models(self):
+    def test_chatgpt5_does_not_default_back_to_open_terminal(self):
+        terminal_id = self.middleware._default_chatgpt5_terminal_id(
+            model_id="chatgpt-5",
+            terminal_id=None,
+            tool_ids=None,
+            payload_tools=None,
+            available_terminal_ids=["open-terminal"],
+        )
+        self.assertIsNone(terminal_id)
+
+    def test_default_terminal_helper_is_noop_for_other_models(self):
         terminal_id = self.middleware._default_chatgpt5_terminal_id(
             model_id="main",
             terminal_id=None,

@@ -63,6 +63,9 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
   OpenAI tool wiring for `chatgpt-5` before request execution.
 - Open WebUI also clears `function_calling` for `chatgpt-5`, so this lane does
   not participate in native or non-native tool loops in the UI.
+- The live deployment enforces that clamp through the Open WebUI middleware
+  runtime hotfix path on service restart, and the terminal-tool resolution step
+  must not re-default `chatgpt-5` back onto `open-terminal`.
 - The gateway alias remains available for plain chat/text generation through the
   existing LiteLLM path.
 
