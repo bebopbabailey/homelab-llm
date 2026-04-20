@@ -4,12 +4,6 @@ model_list:
 # Canonical model_ids remain in the MLX registry and env.local.
 # END MLXCTL AUTO
 # 1) Core role aliases: stable public lanes only
-- model_name: main
-  litellm_params:
-    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
-    api_key: dummy
-    max_tokens: 16384
 - model_name: deep
   litellm_params:
     model: os.environ/LLMSTER_DEEP_MODEL
@@ -28,18 +22,6 @@ model_list:
     max_output_tokens: 16384
     supports_function_calling: true
     supports_system_messages: true
-- model_name: code-qwen-agent
-  litellm_params:
-    model: os.environ/QWEN_AGENT_PROXY_MODEL
-    api_base: os.environ/QWEN_AGENT_PROXY_API_BASE
-    api_key: os.environ/QWEN_AGENT_PROXY_AUTH_TOKEN
-    max_tokens: 16384
-  model_info:
-    mode: chat
-    max_input_tokens: 32768
-    max_output_tokens: 16384
-    supports_function_calling: true
-    supports_system_messages: true
 - model_name: fast
   litellm_params:
     model: os.environ/LLMSTER_FAST_MODEL
@@ -49,8 +31,8 @@ model_list:
 - model_name: chatgpt-5
   litellm_params:
     model: openai/gpt-5.3-codex
-    api_base: os.environ/CCPROXY_API_BASE
-    api_key: os.environ/CCPROXY_AUTH_TOKEN
+    api_base: os.environ/CCPROXY_ADAPTER_API_BASE
+    api_key: dummy
     max_tokens: 16384
   model_info:
     mode: chat
@@ -60,8 +42,8 @@ model_list:
 # 2) Task completion aliases below
 - model_name: task-transcribe
   litellm_params:
-    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    model: os.environ/LLMSTER_FAST_MODEL
+    api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 4096
   model_info:
@@ -72,8 +54,8 @@ model_list:
 
 - model_name: task-transcribe-vivid
   litellm_params:
-    model: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_MODEL
-    api_base: os.environ/MLX_MLX_QWEN3_NEXT_80B_MXFP4_A3B_INSTRUCT_API_BASE
+    model: os.environ/LLMSTER_FAST_MODEL
+    api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
     max_tokens: 4096
   model_info:
@@ -106,7 +88,7 @@ router_settings:
   allowed_fails: 2
   cooldown_time: 15
   fallbacks:
-    - {"fast": ["main"]}
+    - {"fast": ["deep"]}
   retry_policy:
     Timeout: 1
     APIConnectionError: 1
