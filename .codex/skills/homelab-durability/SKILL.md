@@ -52,6 +52,13 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - Failed experiment branches may be discarded, but journal deltas must first be
   landed on `master` with `abandon_effort.py --salvage-journal`; never prune a
   worktree or branch that contains unsalvaged `docs/journal/` changes.
+- Runtime Build/Verify experiments must leave a durable dated
+  `docs/journal/YYYY-MM-DD-*.md` record before cleanup or closeout, even when
+  the experiment fails early, stops at preflight, or stores raw artifacts under
+  `/tmp`.
+- If runtime artifacts are too large, transient, secret-bearing, or host-local,
+  summarize the finding in `docs/journal/` and include only stable artifact
+  paths, hashes, redacted snippets, and cleanup proof.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
 - Do not mix opportunistic cleanup with the requested change unless explicitly approved.
 - Broad parallel docs/layer lanes are not allowed while another implementation
@@ -68,9 +75,15 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - `Build`: first-party services under `layer-*`, `services/`, and
   `experiments/` are plain tracked directories; if lane bootstrap fails, fix
   the scope or worktree state instead of treating it as a submodule problem.
+- `Build`: for runtime trials, include a journal path in the effort scope before
+  the run starts, or immediately open a follow-up journal-only lane if the trial
+  was launched from a temporary shell and produced findings outside git.
 - `Verify`: strict on validation reporting. State verification mode and results. Require rollback only when the action class needs it.
 - `Verify`: do not run in the primary worktree; stop and move the effort to a linked worktree first.
 - `Verify`: before proposing verification-stage mutations, run or propose `uv run python scripts/worktree_effort.py preflight --stage verify --json`.
+- `Verify`: do not treat cleanup as complete until the durable journal record
+  exists, is indexed in `docs/journal/index.md`, and has either been closed out
+  to `master` or is explicitly protected by an active linked worktree.
 - `Verify`: `uv run python scripts/worktree_effort.py close --json` is
   metadata-only. Use `uv run python scripts/closeout_effort.py --worktree <path> ...`
   from the primary worktree to commit, fast-forward merge, and restore the
@@ -101,6 +114,23 @@ description: Stage-aware durability workflow for this repo; lighter during disco
 - Rollback is not required for pure planning, read-only analysis, or docs-only work.
 - When rollback is required, include it before execution, not after.
 
+## Experiment journal discipline
+- Every runtime experiment that reaches host interaction, listener startup,
+  model download/cache mutation, gateway/proxy wiring, or benchmark execution
+  must produce a dated journal entry.
+- The journal entry should state: objective, exact runtime shape, decision,
+  blocker or success criteria result, cleanup state, and where raw artifacts
+  were left.
+- Failed or stopped trials still need a journal entry. A negative result is a
+  result.
+- Secrets must not be copied into journals. Record key mode, expiry, deletion
+  status, and redacted response metadata instead.
+- `/tmp` and host-local logs are supporting evidence, not durable storage. The
+  journal entry is the durable repo record.
+- Prefer adding the journal path to the original effort scope. If that was not
+  done, create a narrow journal-only worktree and close it to `master` before
+  considering the effort complete.
+
 ## Output expectations
 - `Discover` and `Design` should stay compact and high-signal. Do not force ceremonial headers when no commands or edits are being proposed.
 - `Build` and `Verify` should include the startup declaration before commands or file edits.
@@ -118,6 +148,8 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   of diverged history, and no automatic `NOW.md` edits.
 - Abandonment must preserve append-only journal history: code can die, journals
   survive.
+- Final responses after runtime experiments must name the durable journal entry
+  or explicitly state that journal closeout is still pending.
 
 ## Invocation aliases
 - Invoke by name: `homelab-durability` or `homelab_durability`.
