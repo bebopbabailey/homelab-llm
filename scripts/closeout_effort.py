@@ -84,6 +84,15 @@ def close_metadata_if_present(target_path: Path) -> bool:
 
 
 def remove_worktree_and_branch(repo_root: Path, target_path: Path, branch: str) -> tuple[bool, bool]:
+    journal_check = run(["git", "diff", "--name-only", f"master...{branch}", "--", "docs/journal"], repo_root)
+    if journal_check.returncode != 0:
+        raise SystemExit(journal_check.stderr.strip() or journal_check.stdout.strip() or "failed to check journal deltas")
+    journal_deltas = [line for line in journal_check.stdout.splitlines() if line.strip()]
+    if journal_deltas:
+        raise SystemExit(
+            "refusing to delete branch with unmerged journal deltas: "
+            + ", ".join(journal_deltas)
+        )
     remove = run(["git", "worktree", "remove", "--force", str(target_path)], repo_root)
     if remove.returncode != 0:
         raise SystemExit(remove.stderr.strip() or remove.stdout.strip() or "failed to remove target worktree")

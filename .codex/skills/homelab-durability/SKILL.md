@@ -47,6 +47,11 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   service-boundary contract.
 - Default landing path for a finished linked lane is
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
+- Default abandon path for a failed linked lane is
+  `uv run python scripts/abandon_effort.py --worktree <path> ...`.
+- Failed experiment branches may be discarded, but journal deltas must first be
+  landed on `master` with `abandon_effort.py --salvage-journal`; never prune a
+  worktree or branch that contains unsalvaged `docs/journal/` changes.
 - Before proposing edits, surface repo state briefly when it matters to safety or diff clarity.
 - Do not mix opportunistic cleanup with the requested change unless explicitly approved.
 - Broad parallel docs/layer lanes are not allowed while another implementation
@@ -70,6 +75,9 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   metadata-only. Use `uv run python scripts/closeout_effort.py --worktree <path> ...`
   from the primary worktree to commit, fast-forward merge, and restore the
   baseline.
+- `Verify`: use `uv run python scripts/abandon_effort.py --worktree <path> ...`
+  for failed lanes. If it reports journal deltas, rerun with `--salvage-journal`
+  before deleting the lane.
 - Operating rhythm: `Inventory -> Constraints -> Minimal contract -> Wire -> Validate -> Codify -> Prune`.
 
 ## Sources of truth
@@ -108,6 +116,8 @@ description: Stage-aware durability workflow for this repo; lighter during disco
   metadata file.
 - Closeout must stay deterministic: no auto-rebase, no auto-push, no auto-merge
   of diverged history, and no automatic `NOW.md` edits.
+- Abandonment must preserve append-only journal history: code can die, journals
+  survive.
 
 ## Invocation aliases
 - Invoke by name: `homelab-durability` or `homelab_durability`.

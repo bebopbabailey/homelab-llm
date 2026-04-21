@@ -11,15 +11,15 @@ SCRIPT = Path(__file__).resolve().parents[1] / "control_plane_sync_audit.py"
 
 
 FILES = {
-    ".codex/skills/homelab-durability/SKILL.md": "homelab-durability homelab_durability Discover Design Build Verify Before proposing commands or file edits Rollback is required Rollback is not required worktree_effort.py primary worktree baseline-only start_effort.py --service park closeout_effort.py no auto-rebase NOW.md service_registry.py layer-*",
-    "docs/OPENCODE.md": "homelab-durability homelab_durability Discover Design Build Verify startup declaration rollback worktree_effort.py primary worktree baseline-only start_effort.py --service separate worktree park closeout_effort.py NOW.md auto-rebase service_registry.py layer-*",
+    ".codex/skills/homelab-durability/SKILL.md": "homelab-durability homelab_durability Discover Design Build Verify Before proposing commands or file edits Rollback is required Rollback is not required worktree_effort.py primary worktree baseline-only start_effort.py --service park closeout_effort.py abandon_effort.py --salvage-journal no auto-rebase NOW.md service_registry.py layer-*",
+    "docs/OPENCODE.md": "homelab-durability homelab_durability Discover Design Build Verify startup declaration rollback worktree_effort.py primary worktree baseline-only start_effort.py --service separate worktree park closeout_effort.py abandon_effort.py --salvage-journal NOW.md auto-rebase service_registry.py layer-*",
     "docs/INTEGRATIONS.md": "homelab-durability homelab_durability Discover Design Build Verify conditional rollback",
-    "docs/foundation/testing.md": "repo_hygiene_audit.py root_ok journal_index_ok service_registry_audit.py worktree_effort.py start_effort.py --service closeout_effort.py primary worktree park close metadata-only NOW.md platform/registry/services.jsonl",
-    "docs/_core/CHANGE_RULES.md": "repo_hygiene_audit.py repo-hygiene.yml root_hygiene_manifest.json worktree_effort.py start_effort.py service_registry.py service_registry_audit.py closeout_effort.py CONCURRENT_EFFORTS.md platform/registry/services.jsonl layer-*/README.md platform/registry/README.md",
-    "scripts/README.md": "repo_hygiene_audit.py --scope --strict service_registry.py service_registry_audit.py worktree_effort.py start_effort.py --service closeout_effort.py preflight park close metadata-only NOW.md auto-rebase platform/registry/handles.jsonl README-only",
+    "docs/foundation/testing.md": "repo_hygiene_audit.py root_ok journal_index_ok service_registry_audit.py worktree_effort.py start_effort.py --service closeout_effort.py abandon_effort.py --salvage-journal primary worktree park close metadata-only NOW.md platform/registry/services.jsonl",
+    "docs/_core/CHANGE_RULES.md": "repo_hygiene_audit.py repo-hygiene.yml root_hygiene_manifest.json worktree_effort.py start_effort.py service_registry.py service_registry_audit.py closeout_effort.py abandon_effort.py CONCURRENT_EFFORTS.md platform/registry/services.jsonl layer-*/README.md platform/registry/README.md",
+    "scripts/README.md": "repo_hygiene_audit.py --scope --strict service_registry.py service_registry_audit.py worktree_effort.py start_effort.py --service closeout_effort.py abandon_effort.py --salvage-journal preflight park close metadata-only NOW.md auto-rebase platform/registry/handles.jsonl README-only",
     "DOCS_CONTRACT.md": "root_hygiene_manifest.json repo_hygiene_audit.py",
     ".github/workflows/repo-hygiene.yml": "repo_hygiene_audit.py --scope root --strict control_plane_sync_audit.py",
-    "docs/_core/CONCURRENT_EFFORTS.md": "One implementation effort per worktree worktree_effort.py primary worktree baseline-only start_effort.py --service NOW.md is project-level status park parked close closeout_effort.py metadata-only broad parallel service registry README.md",
+    "docs/_core/CONCURRENT_EFFORTS.md": "One implementation effort per worktree worktree_effort.py primary worktree baseline-only start_effort.py --service NOW.md is project-level status park parked close closeout_effort.py abandon_effort.py --salvage-journal metadata-only broad parallel service registry README.md",
 }
 
 

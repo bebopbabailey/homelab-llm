@@ -33,6 +33,8 @@ class CloseoutEffortTests(unittest.TestCase):
         (repo / "scripts" / "start_effort.py").write_text(START_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
         (repo / "scripts" / "worktree_effort.py").write_text(WORKTREE_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
         (repo / "scripts" / "closeout_effort.py").write_text(CLOSEOUT_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+        (repo / "docs" / "journal").mkdir()
+        (repo / "docs" / "journal" / "index.md").write_text("# Journal Index\n", encoding="utf-8")
         (repo / "scripts" / "repo_hygiene_audit.py").write_text(
             "import json\nprint(json.dumps({'overall_ok': True}))\n",
             encoding="utf-8",

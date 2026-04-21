@@ -32,6 +32,9 @@ Repository utility scripts.
   work if needed, running repo audits, fast-forward merging to `master`,
   closing local metadata, removing the linked worktree, and deleting the local
   branch.
+- `abandon_effort.py` — abandons a failed linked worktree without losing
+  append-only journal records; it blocks deletion on unsalvaged
+  `docs/journal/` deltas unless `--salvage-journal` is used.
 - `repo_snapshot_zip.py` — packages the current repo filesystem snapshot as it
   exists on disk, including service contents automatically, while excluding
   obvious local heavyweight junk such as `.git`, `.venv*`, caches, and build
@@ -90,6 +93,8 @@ Repository utility scripts.
   - `uv run python scripts/worktree_effort.py preflight --stage verify --json`
   - `uv run python scripts/worktree_effort.py close --json`
   - `uv run python scripts/closeout_effort.py --worktree <linked-worktree-path> --json`
+  - `uv run python scripts/abandon_effort.py --worktree <linked-worktree-path> --json`
+  - `uv run python scripts/abandon_effort.py --worktree <linked-worktree-path> --salvage-journal --json`
   - `start_effort.py` is the normal bootstrap path from the primary worktree
   - `start_effort.py` rejects broad parallel docs/layer scopes and cleans up a
     partially created lane automatically on bootstrap failure
@@ -102,6 +107,8 @@ Repository utility scripts.
     finished lane and restore the boring baseline
   - `closeout_effort.py` is local-only and deterministic: no auto-rebase, no
     push, and no automatic `NOW.md` edits
+  - `abandon_effort.py` is the failed-lane deletion path; journal deltas must be
+    salvaged to `master` before pruning
   - first-party services under `layer-*` are plain tracked directories, not
     submodules
   - keeps concurrent implementation state local to each worktree and out of repo-tracked files

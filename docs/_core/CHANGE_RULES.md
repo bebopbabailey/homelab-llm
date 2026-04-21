@@ -134,12 +134,14 @@ If drift is discovered:
   - `scripts/service_registry.py`
   - `scripts/service_registry_audit.py`
   - `scripts/closeout_effort.py`
+  - `scripts/abandon_effort.py`
   - `scripts/README.md`
   - `scripts/control_plane_sync_audit.py`
   - `scripts/tests/test_worktree_effort.py`
   - `scripts/tests/test_start_effort.py`
   - `scripts/tests/test_service_registry_audit.py`
   - `scripts/tests/test_closeout_effort.py`
+  - `scripts/tests/test_abandon_effort.py`
   - `scripts/tests/test_control_plane_sync_audit.py`
 
 ## Runtime Lock
@@ -155,3 +157,5 @@ If drift is discovered:
 - Journal entries are **append-only**. Do not move or delete entries from `docs/journal/`.
 - If a correction is needed, add a **new** entry that references the original.
 - Always update `docs/journal/index.md` when adding a new entry.
+- Failed experiment branches must not be pruned until journal deltas are landed
+  on `master` or explicitly reported as already preserved.

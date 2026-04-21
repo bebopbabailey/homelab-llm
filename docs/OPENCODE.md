@@ -124,6 +124,9 @@ Repo-local durability posture:
   before repo writes
 - land a finished linked lane from the clean primary worktree with
   `uv run python scripts/closeout_effort.py --worktree <path> --json`
+- abandon a failed linked lane from the clean primary worktree with
+  `uv run python scripts/abandon_effort.py --worktree <path> --json`; use
+  `--salvage-journal` when it reports journal deltas
 - concurrent-effort metadata is local to each worktree; `NOW.md` is not the
   effort registry
 - the canonical service registry lives at
@@ -140,6 +143,8 @@ Repo-local durability posture:
   submodule sync or gitlink audits
 - closeout is local-only and deterministic: no auto-rebase, no push, and no
   automatic `NOW.md` edits
+- failed experiment code may be discarded, but journal records must survive on
+  `master` before the worktree/branch is pruned
 - root/doc placement hygiene is enforced separately by
   `scripts/repo_hygiene_audit.py`
 - internal markdown-link integrity is enforced by `scripts/docs_link_audit.py`

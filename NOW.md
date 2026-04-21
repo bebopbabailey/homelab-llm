@@ -1,15 +1,11 @@
 # NOW
 
 Active
-- Build the `qwen-agent-proxy` shadow sidecar for OpenHands over
-  `Qwen3-Coder-Next`.
-- Keep the trusted `code-reasoning` worker lane unchanged while validating the
-  adapter-backed shadow alias `code-qwen-agent`.
-- Current target shape:
-  - Docker-bridge sidecar on `172.17.0.1:4021`
-  - direct OpenHands shadow provider path `http://host.docker.internal:4021/v1`
-  - `Qwen3-Coder-Next` benchmark trial prepared in the disposable workspace
+- Implement failed-worktree journal salvage so abandoned experiment branches can
+  be pruned without losing append-only `docs/journal/` records.
+- Recover stranded journal entries found in abandoned March/April branch
+  history.
 
 NEXT UP
-- Run the first joint OpenHands/Codex coding task on the prepared
-  SWE-bench-style micro bugfix repo.
+- Close out `codex/journal-salvage-abandon-20260421` after local script and
+  journal hygiene checks pass.

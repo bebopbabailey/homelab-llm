@@ -21,6 +21,9 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   or an equivalent linked-worktree flow.
 - Finish linked implementation lanes from the primary worktree with
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
+- Abandon failed linked lanes from the primary worktree with
+  `uv run python scripts/abandon_effort.py --worktree <path> ...`; if journal
+  deltas exist, salvage them with `--salvage-journal` before pruning.
 - `Build`/`Verify` work must pass local worktree-effort preflight before repo
   writes: `uv run python scripts/worktree_effort.py preflight --stage <stage>`.
 - Prefer `uv run python scripts/start_effort.py --service <service-id> ...`
@@ -29,6 +32,9 @@ Resolve cross-document conflicts using `docs/_core/SOURCES_OF_TRUTH.md`.
   verifies, park it locally first with `uv run python scripts/worktree_effort.py park`.
 - `uv run python scripts/worktree_effort.py close --json` is metadata-only; it
   does not commit, merge, or clean up the linked lane.
+- Failed experiment branches may be discarded, but `docs/journal/` records must
+  first be landed on `master`; never prune a branch/worktree with unsalvaged
+  journal deltas.
 - Local effort metadata must stay outside repo-tracked files; `NOW.md` is
   project-level status only, not a concurrent-effort registry.
 - Broad parallel docs/layer lanes are not allowed. If a docs pass would claim

@@ -1070,6 +1070,8 @@ uv run python scripts/worktree_effort.py preflight --stage build --json
 uv run python scripts/worktree_effort.py preflight --stage verify --json
 uv run python scripts/worktree_effort.py close --json
 uv run python scripts/closeout_effort.py --worktree /home/christopherbailey/homelab-llm-demo --json
+uv run python scripts/abandon_effort.py --worktree /home/christopherbailey/homelab-llm-demo --json
+uv run python scripts/abandon_effort.py --worktree /home/christopherbailey/homelab-llm-demo --salvage-journal --json
 uv run python scripts/service_registry_audit.py --strict --json
 uv run python scripts/docs_link_audit.py
 ```
@@ -1102,6 +1104,8 @@ Expected:
   fast-forward merges to `master`, closes metadata, removes the linked
   worktree, and deletes the local branch.
 - `closeout_effort.py` does not auto-rebase and does not update `NOW.md`.
+- `abandon_effort.py` removes failed lanes only when no journal records would be
+  lost; `--salvage-journal` lands journal-only records on `master` first.
 - first-party services under `layer-*` are plain tracked directories, so
   lane bootstrap and closeout do not require submodule sync or gitlink checks.
 - `service_registry_audit.py` hard-fails if a discovered `SERVICE_SPEC.md`

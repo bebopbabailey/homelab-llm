@@ -14,6 +14,9 @@ the same time.
   when the lane maps to a canonical service registry entry.
 - Land a finished linked lane from the primary worktree with
   `uv run python scripts/closeout_effort.py --worktree <path> ...`.
+- Abandon a failed linked lane from the primary worktree with
+  `uv run python scripts/abandon_effort.py --worktree <path> ...`; use
+  `--salvage-journal` when the lane contains journal deltas.
 - Broad parallel docs/layer lanes are invalid while another implementation
   effort is active; the same rule applies to broad `services` and
   `experiments` scopes. Narrow them to explicit non-overlapping files or
@@ -97,6 +100,18 @@ run repo audits, fast-forward merge to `master`, close metadata, remove the
 linked worktree, and delete the local branch. It does not auto-rebase or edit
 `NOW.md`.
 
+6. Abandon a failed linked lane from the primary worktree:
+
+```bash
+uv run python scripts/abandon_effort.py --worktree <linked-worktree-path> --json
+uv run python scripts/abandon_effort.py --worktree <linked-worktree-path> --salvage-journal --json
+```
+
+`abandon_effort.py` is the failed-lane deletion command. It refuses to remove a
+worktree or delete a branch when unmerged `docs/journal/` deltas would be lost.
+`--salvage-journal` lands journal-only records on `master` before pruning the
+failed lane.
+
 ## Scope rules
 - `scope_paths` are repo-relative path prefixes, not globs.
 - Service registry entries provide canonical service roots; `--service` expands
@@ -141,6 +156,8 @@ metadata.
 - Treat the primary worktree as baseline-only, not as a fallback implementation lane.
 - Treat `close` as metadata-only. Use `closeout_effort.py` when you mean “land
   the lane and restore the boring baseline.”
+- Use `abandon_effort.py` when a lane failed and should not be merged; journal
+  history must still be salvaged before deleting the branch/worktree.
 
 ## Two-agent example
 - Agent A:
