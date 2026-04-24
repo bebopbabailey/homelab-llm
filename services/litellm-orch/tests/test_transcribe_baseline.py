@@ -44,7 +44,7 @@ class TestTranscribeBaseline(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertEqual(result["model"], "openai/llmster-gpt-oss-20b-mxfp4-gguf")
         self.assertFalse(result["stream"])
         self.assertEqual(result["temperature"], 0.05)
         self.assertEqual(result["max_tokens"], 4096)
@@ -66,7 +66,7 @@ class TestTranscribeBaseline(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertEqual(result["model"], "openai/llmster-gpt-oss-20b-mxfp4-gguf")
         self.assertFalse(result["stream"])
         self.assertEqual(result["temperature"], 0.4)
         self.assertEqual(result["frequency_penalty"], 0.2)

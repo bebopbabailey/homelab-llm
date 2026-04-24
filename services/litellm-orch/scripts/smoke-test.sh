@@ -27,7 +27,7 @@ curl -fsS "${BASE_URL}/v1/chat/completions" \
   -H "Authorization: Bearer ${LITELLM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "main",
+    "model": "fast",
     "messages": [{"role": "user", "content": "ping"}],
     "max_tokens": 16
   }' | jq -e '.choices | length > 0' >/dev/null

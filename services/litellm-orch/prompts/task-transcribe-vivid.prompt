@@ -1,5 +1,5 @@
 ---
-model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
+model: openai/llmster-gpt-oss-20b-mxfp4-gguf
 input:
   schema:
     user_message: string

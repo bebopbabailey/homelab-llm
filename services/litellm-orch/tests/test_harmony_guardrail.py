@@ -140,14 +140,14 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(out["stream"])
 
-    async def test_pre_call_does_not_force_stream_false_for_main(self):
+    async def test_pre_call_does_not_force_stream_false_for_non_target_model(self):
         guardrail = HarmonyGuardrail(
             guardrail_name="harmony-pre",
             event_hook="pre_call",
             default_on=True,
         )
         data = {
-            "model": "main",
+            "model": "task-transcribe",
             "stream": True,
             "messages": [{"role": "user", "content": "Ping"}],
         }
@@ -218,14 +218,14 @@ class TestHarmonyPreCallGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("reasoning", out["choices"][0]["message"])
         self.assertNotIn("reasoning_content", out["choices"][0]["message"])
 
-    async def test_post_call_passthrough_for_main_lane(self):
+    async def test_post_call_passthrough_for_non_target_lane(self):
         guardrail = HarmonyGuardrail(
             guardrail_name="harmony-post",
             event_hook="post_call",
             default_on=True,
         )
         data = {
-            "model": "main",
+            "model": "task-transcribe",
             "messages": [{"role": "user", "content": "PENG"}],
         }
         response = {

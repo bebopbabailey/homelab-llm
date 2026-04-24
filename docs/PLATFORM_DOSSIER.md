@@ -12,8 +12,8 @@
   (`8100-8119`, with active public MLX lane `192.168.1.72:8101`).
   Retired GPT rollback slots `8100` and `8102` remain in the `mlxctl` domain
   but are unloaded.
-  Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
-  and `fast` plus `deep` on shared `llmster` at `8126`.
+  Public LiteLLM human-chat canon is `deep` and `fast`, both on shared
+  `llmster` at `8126`.
   Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
   gateway, but now via the localhost-only experimental `ccproxy-api` sidecar.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
@@ -67,10 +67,10 @@ Networking note:
   DB-backed auth requirement: runtime must include `DATABASE_URL`; if readiness
   reports `db: "Not connected"`, non-master keys, groups, service accounts,
   and `/key/generate` are effectively down even if the endpoint still returns `200`.
-  Runtime lock baseline: `drop_params=true`, `fast -> main`.
+  Runtime lock baseline: `drop_params=true`, `fast -> deep`.
   Current package baseline: `litellm[proxy]==1.83.4`.
   Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
-  to the current `8101` Qwen lane for transcript cleanup through
+  to the current `fast` GPT backend for transcript cleanup through
   `POST /v1/chat/completions`; they are not speech STT endpoints.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
@@ -88,7 +88,7 @@ Networking note:
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
-  GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
+  GPT formatting/tool-call parsing is upstream-owned for `fast` and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
   `reasoning_effort` on `fast`/`deep`.
   GPT human-chat lanes are Chat Completions-first on the LiteLLM/Open WebUI path.

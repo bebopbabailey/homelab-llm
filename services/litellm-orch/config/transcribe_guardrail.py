@@ -43,8 +43,8 @@ PROMPT_ID_BY_MODEL = {
 }
 
 PROVIDER_MODEL_BY_ALIAS = {
-    "task-transcribe": "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct",
-    "task-transcribe-vivid": "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct",
+    "task-transcribe": "openai/llmster-gpt-oss-20b-mxfp4-gguf",
+    "task-transcribe-vivid": "openai/llmster-gpt-oss-20b-mxfp4-gguf",
 }
 
 DEFAULT_PARAMS_BY_MODEL = {

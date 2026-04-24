@@ -34,20 +34,15 @@ implement inference or web-search business logic.
   `/key/generate`.
 - Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
-- Caller-requested structured outputs pass through LiteLLM when the selected upstream supports them, but canonical `main` on the current Qwen backend is still failing both current non-stream direct `8101` structured-output request paths:
-  - exact documented OpenAI-compatible `response_format.json_schema`
-  - exact vLLM-native `structured_outputs.json`
-  LiteLLM currently reproduces the same backend-visible failure text for the
-  exact documented `response_format` path.
+- Caller-requested structured outputs pass through LiteLLM when the selected
+  upstream supports them. `task-json` is the only current fixed-schema utility
+  alias owned by LiteLLM guardrails in this service.
 - LiteLLM does not inject web-search schemas, repair loops, or citation rendering.
 - `drop_params=true` is part of the current runtime baseline.
-- Active router fallback baseline is `fast -> main`.
+- Active router fallback baseline is `fast -> deep`.
 
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
-- **MLX Studio lane** on the Studio: OpenAI-compatible `vllm-metal` (`vllm serve`)
-  endpoint on **8101** bound to the Studio LAN IP
-  (`http://192.168.1.72:8101/v1`) for public `main`.
 - **Studio llmster GPT service** on the Studio: OpenAI-compatible shared GPT
   listener on **8126** (`http://192.168.1.72:8126/v1`) for public `fast` and `deep`.
 - **Additional Studio operator infrastructure** on the Studio:
@@ -58,17 +53,16 @@ implement inference or web-search business logic.
 - **SearXNG** on the Mini (`http://127.0.0.1:8888/search`) for the generic `searxng-search` tool.
 
 ## Default Logical Models
-- `main` -> MLX Studio lane `8101`
 - `deep` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
 - `fast` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
 - `code-reasoning` -> reserved internal OpenHands worker alias on the same
   `deep` backend lane (`llmster-gpt-oss-120b-mxfp4-gguf`)
 - `code-qwen-agent` -> experimental internal OpenHands shadow alias through the
   Mini-local `qwen-agent-proxy` sidecar (`qwen-agent-coder-next-shadow`)
-- `task-transcribe` -> MLX Studio lane `8101`
-  (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the standard transcript-cleanup prompt
-- `task-transcribe-vivid` -> MLX Studio lane `8101`
-  (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`) with the vivid transcript-cleanup prompt
+- `task-transcribe` -> Studio `llmster` fast lane `8126`
+  (`llmster-gpt-oss-20b-mxfp4-gguf`) with the standard transcript-cleanup prompt
+- `task-transcribe-vivid` -> Studio `llmster` fast lane `8126`
+  (`llmster-gpt-oss-20b-mxfp4-gguf`) with the vivid transcript-cleanup prompt
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -80,12 +74,6 @@ implement inference or web-search business logic.
 - Pushcut MCP integration is not active in the main LiteLLM runtime.
 - Repo-local OpenCode default behavior is the direct `deep` lane as documented
   in `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
-- `main` routes to Studio lane `8101`, where the locked vLLM runtime keeps
-  `tool_choice=auto`, `tool_call_parser=hermes`, and no reasoning parser.
-- `main` is currently hardened around non-stream `tool_choice=auto`,
-  long-context sanity, and concurrency. Forced-tool semantics are currently
-  unsupported and non-blocking for public `main`, and structured outputs remain
-  outside the accepted public `main` contract on the current `8101` runtime.
 - `8126` is active for canonical `fast` plus public `deep`.
 - `8123-8125` are retired shadow ports and are outside the active gateway alias
   surface.
@@ -93,7 +81,7 @@ implement inference or web-search business logic.
   canonical public alias surface.
 - There are no active temporary GPT canary aliases in the current gateway
   contract.
-- The local canonical public trio remains `main`, `deep`, and `fast`.
+- The local canonical public human lanes remain `deep` and `fast`.
 - Additive experimental Codex-backed alias is `chatgpt-5`.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` sidecar instead
   of the raw `chatgpt.com/backend-api/codex` path.
@@ -116,6 +104,9 @@ implement inference or web-search business logic.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
   They are invoked through `POST /v1/chat/completions`, not `POST /v1/audio/transcriptions`,
   and must not be reused for Open WebUI speech wiring.
+- `task-transcribe*` rewrites to the same concrete GPT-OSS 20B provider model
+  used by the `fast` lane so the pre-call prompt render and the router target
+  stay aligned.
 - `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
   `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
 - `task-json` is a transcript-to-JSON utility alias only.
@@ -127,8 +118,6 @@ implement inference or web-search business logic.
   salvage unknown categories into `other`, and fall back once to the canonical
   empty payload with `other.attributes.guardrail_status="repair_failed"` if repair fails.
 - GPT formatting ownership is upstream-first:
-  - `main` keeps the locked upstream parser render on `8101`
-    (`tool_choice=auto`, `tool_call_parser=hermes`, no reasoning parser).
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the
     canonical truth path.
@@ -155,7 +144,7 @@ implement inference or web-search business logic.
     error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
 - Current supported GPT contract for Open WebUI is Chat Completions-first:
-  - `main`, `deep`, `fast`, and `chatgpt-5` all accept
+  - `deep`, `fast`, and `chatgpt-5` all accept
     `POST /v1/chat/completions`
   - `/v1/responses` remains available for direct/operator use where supported
   - `chatgpt-5` follows the Codex-backed sidecar path rather than the local GPT

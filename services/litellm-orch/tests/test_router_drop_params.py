@@ -17,14 +17,14 @@ class TestRouterDropParams(unittest.TestCase):
             "litellm_settings.drop_params must remain true",
         )
 
-    def test_fast_falls_back_to_main(self):
+    def test_fast_falls_back_to_deep(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         router_settings = config.get("router_settings", {})
         fallbacks = router_settings.get("fallbacks", [])
         self.assertIn(
-            {"fast": ["main"]},
+            {"fast": ["deep"]},
             fallbacks,
-            "router_settings.fallbacks must preserve fast -> main",
+            "router_settings.fallbacks must preserve fast -> deep",
         )
 
     def test_operator_only_chatgpt_alias_exists(self):
