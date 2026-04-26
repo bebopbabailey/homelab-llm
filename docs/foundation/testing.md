@@ -1748,38 +1748,38 @@ set +a
 curl -fsS -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   http://127.0.0.1:4000/v1/models | jq -r '.data[].id' | sort
 
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":384}' | jq -r '.output[0].content[0].text'
 
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe-vivid","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
+  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":256}' | jq -r '.output[0].content[0].text'
 
 SMOKE_KEY_JSON="$(curl -fsS http://127.0.0.1:4000/key/generate \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"key_alias":"task-transcribe-smoke","key_type":"llm_api","duration":"1h","models":["task-transcribe","task-transcribe-vivid"],"allowed_routes":["/v1/models","/v1/chat/completions"]}')"
+  -d '{"key_alias":"task-transcribe-smoke","key_type":"llm_api","duration":"1h","models":["task-transcribe","task-transcribe-vivid"],"allowed_routes":["/v1/models","/v1/responses","/v1/chat/completions"]}')"
 SMOKE_KEY="$(printf '%s' "$SMOKE_KEY_JSON" | jq -r '.key')"
 
 curl -fsS http://127.0.0.1:4000/v1/models \
   -H "Authorization: Bearer ${SMOKE_KEY}" | jq -r '.data[].id' | sort
 
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
+curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${SMOKE_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":384}' | jq -r '.output[0].content[0].text'
 ```
 
 Pass guidance:
 - `/health/readiness` does not report `db: "Not connected"`.
 - `/key/generate` succeeds for a short-lived non-master smoke key.
-- the smoke key can call `/v1/models` and `POST /v1/chat/completions` for the
+- the smoke key can call `/v1/models` and `POST /v1/responses` for the
   allowed transcript aliases.
 - `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
-- both aliases succeed through `POST /v1/chat/completions`
+- both aliases succeed through `POST /v1/responses`
 - outputs are plain cleaned transcript text with no wrapper heading, label, or commentary
 - `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
 

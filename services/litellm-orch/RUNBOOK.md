@@ -103,7 +103,7 @@ Expected:
 - No web-search-specific pre-call or post-call guardrails remain.
 - No GPT-lane post-call formatting guardrail remains active.
 
-## GPT streaming checks (pass-through)
+## GPT Chat Completions compatibility checks
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
@@ -130,12 +130,31 @@ uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scri
 ```
 
 Current GPT public-lane posture:
-- Chat Completions-first
-- `/v1/responses` remains available for direct callers on compatible lanes
+- Responses-first for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
+- `/v1/chat/completions` remains temporary compatibility only for those public GPT-OSS aliases
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
 - GPT formatting/tool-call parsing is upstream-owned for `fast` and `deep`;
-  LiteLLM only injects omitted `reasoning_effort=low` for GPT `llmster` lanes
+  LiteLLM only injects omitted reasoning defaults and task-alias shaping where direct `8126` still requires it
+
+## GPT Responses checks (public lanes)
+```bash
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"fast","input":"Reply with exactly: responses-fast-ok","max_output_tokens":128}' | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deep","input":"Reply with exactly: responses-deep-ok","max_output_tokens":128}' | jq .
+```
+Expected:
+- both responses complete with a final assistant message in `output`
+- requests are normalized to `temperature=0.0`
+- omitted reasoning defaults are injected upstream for GPT-OSS lanes
 
 Temporary GPT canary alias:
 - no temporary GPT canary alias is active in the current gateway contract
@@ -174,6 +193,30 @@ Expected:
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
 - Current resilience baseline keeps `fast -> deep`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
+
+Task-alias Responses smokes:
+```bash
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":384}' | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"max_output_tokens":256}' | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/responses \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"task-json","input":[{"role":"user","content":"call mom tomorrow, buy milk, pick up paper towels"}],"max_output_tokens":512}' | jq .
+```
+Expected:
+- `task-transcribe` returns cleaned transcript text in the final Responses `message`
+- `task-transcribe-vivid` returns cleaned vivid transcript text in the final Responses `message`
+- `task-json` returns minified canonical JSON in the final Responses `message`
 
 Experimental ChatGPT/Codex alias checks:
 ```bash

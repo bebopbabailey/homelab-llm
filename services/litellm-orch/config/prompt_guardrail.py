@@ -59,7 +59,12 @@ class PromptGuardrail(CustomGuardrail):
                 return data
 
             messages = _render_prompt_messages(prompt_id, prompt_variables)
-            data["messages"] = messages
+            if call_type in {"responses", "aresponses"}:
+                data["input"] = messages
+                data.pop("messages", None)
+            else:
+                data["messages"] = messages
+                data.pop("input", None)
 
             # Apply prompt-defined model if present
             template_model = getattr(template, "model", None)

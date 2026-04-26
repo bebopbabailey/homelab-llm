@@ -56,6 +56,25 @@ class TestTranscribeBaseline(unittest.TestCase):
             "um i i think this should probably work maybe yes",
         )
 
+    def test_pre_call_task_transcribe_responses_uses_input_and_min_budget(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "input": [{"role": "user", "content": "um i i think this should probably work maybe yes"}],
+                    "max_output_tokens": 128,
+                    "prompt_variables": {},
+                },
+                "responses",
+            )
+        )
+        self.assertEqual(result["prompt_id"], "task-transcribe")
+        self.assertEqual(result["max_output_tokens"], 384)
+        self.assertEqual(result["prompt_variables"]["user_message"], "um i i think this should probably work maybe yes")
+
     def test_pre_call_task_transcribe_vivid_accepts_optional_prompt_variables(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
         result = asyncio.run(
@@ -102,6 +121,26 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertNotIn("prompt_id", rendered)
         self.assertNotIn("prompt_variables", rendered)
         self.assertEqual(rendered["messages"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
+
+    def test_prompt_guardrail_renders_transcribe_template_into_responses_input(self):
+        pre_guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        prompt_pre = prompt_guardrail.PromptGuardrail("prompt-pre", "pre_call", True)
+        request = asyncio.run(
+            pre_guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "input": [{"role": "user", "content": "um i i think this should probably work maybe yes"}],
+                    "prompt_variables": {},
+                },
+                "responses",
+            )
+        )
+        rendered = asyncio.run(prompt_pre.async_pre_call_hook(None, None, request, "responses"))
+        self.assertEqual(rendered["model"], "task-transcribe")
+        self.assertNotIn("messages", rendered)
+        self.assertEqual(rendered["input"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
 
     def test_preprocess_preserves_internal_apostrophes_and_hyphens(self):
         raw = "it's a well-known thing — right? wow!"
@@ -163,6 +202,30 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertNotIn("reasoning", message)
         self.assertNotIn("reasoning_content", message)
         self.assertNotIn("provider_specific_fields", message)
+
+    def test_post_call_rewrites_responses_payload(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = {
+            "object": "response",
+            "output": [
+                {
+                    "type": "reasoning",
+                    "content": [{"type": "reasoning_text", "text": "hidden"}],
+                },
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_text", "text": "**Cleaned Transcript**: Hello there.", "annotations": []}],
+                },
+            ],
+            "reasoning": {"effort": "low"},
+        }
+        result = asyncio.run(guardrail.async_post_call_success_hook({"model": "task-transcribe"}, None, response))
+        self.assertEqual(result["output"][0]["type"], "message")
+        self.assertEqual(result["output"][0]["content"][0]["text"], "Hello there.")
+        self.assertEqual(result["output_text"], "Hello there.")
+        self.assertNotIn("reasoning", result)
 
     def test_golden_output_matches_expectations(self):
         raw = (REPO_ROOT / "services/litellm-orch/tests/fixtures_transcribe_raw.txt").read_text().strip()

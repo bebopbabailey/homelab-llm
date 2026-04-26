@@ -53,6 +53,13 @@ class GPTRequestDefaults(CustomGuardrail):
     ) -> dict:
         if _normalize_model_name(data.get("model")) not in self.target_models:
             return data
-        if not data.get("reasoning_effort"):
+        if call_type in {"responses", "aresponses"}:
+            reasoning = data.get("reasoning")
+            if not isinstance(reasoning, dict):
+                reasoning = {}
+            if not reasoning.get("effort"):
+                reasoning["effort"] = "low"
+            data["reasoning"] = reasoning
+        elif not data.get("reasoning_effort"):
             data["reasoning_effort"] = "low"
         return data

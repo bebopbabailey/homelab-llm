@@ -86,7 +86,10 @@ implement inference or web-search business logic.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` sidecar instead
   of the raw `chatgpt.com/backend-api/codex` path.
 - The current validated upstream model for that alias is `gpt-5.3-codex`.
-- Open WebUI human chat is Chat Completions-first again on the LiteLLM path.
+- Public GPT-OSS lanes are Responses-first on the LiteLLM path.
+- `POST /v1/chat/completions` remains temporarily available as a compatibility
+  path for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`, and
+  `task-json`.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -101,10 +104,12 @@ implement inference or web-search business logic.
 ## Guardrails
 - `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
   Its pre-call path only normalizes transcript punctuation, sets the
-  transcribe `prompt_id`, and forces non-streaming; its post-call path strips
-  wrappers/labels and removes reasoning fields from transcript outputs.
+  transcribe `prompt_id`, and constrains the Responses token budget enough for
+  the `fast` lane to emit final text; its post-call path strips wrappers/labels
+  and rewrites task outputs into clean transcript-only payloads.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
-  They are invoked through `POST /v1/chat/completions`, not `POST /v1/audio/transcriptions`,
+  Their canonical contract is `POST /v1/responses` with native Responses `input`,
+  not `POST /v1/audio/transcriptions`,
   and must not be reused for Open WebUI speech wiring.
 - The transcribe dotprompt files are rendered through the generic
   `prompt-pre` template path. They do not select a backend model; router alias
@@ -112,8 +117,8 @@ implement inference or web-search business logic.
 - `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
   `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
 - `task-json` is a transcript-to-JSON utility alias only.
-  It is invoked through `POST /v1/chat/completions`, forces non-streaming,
-  removes tool-calling fields, and returns minified JSON with exact top-level keys
+  Its canonical contract is `POST /v1/responses` with native Responses `input`.
+  It removes tool-calling fields and returns minified JSON with exact top-level keys
   `todo`, `grocery`, `purchase`, and `other`.
 - `task-json` uses LiteLLM-owned pre-call and post-call guardrails to inject a
   fixed strict `json_schema`, normalize malformed/provider-sloppy payloads,
@@ -130,11 +135,13 @@ implement inference or web-search business logic.
     when the payload is lossless, and otherwise returns a clean assistant error
     instead of leaving Open WebUI in a half-finished tool turn.
 - LiteLLM retains one narrow GPT request-default shim only:
-  - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`, and
-    `code-reasoning`
-  - behavior: inject `reasoning_effort=low` only when the caller omitted it
-  - justification: direct shared `8126` GPT-OSS Chat Completions still show
-    raw Harmony protocol or truncation on some omitted-effort probes
+  - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`,
+    `code-reasoning`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
+  - behavior:
+    - inject `reasoning_effort=low` only when omitted on Chat Completions
+    - inject `reasoning: {"effort":"low"}` only when omitted on Responses
+  - justification: direct shared `8126` GPT-OSS Responses and Chat Completions
+    still degrade on some omitted-effort probes
   - no assistant-history rewriting
   - no post-call content extraction
   - no provider reasoning-field stripping
@@ -147,13 +154,14 @@ implement inference or web-search business logic.
     OpenAI-compatible `tool_calls`, and fail closed to a clean assistant retry
     error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
-- Current supported GPT contract for Open WebUI is Chat Completions-first:
-  - `deep`, `fast`, and `chatgpt-5` all accept
-    `POST /v1/chat/completions`
-  - `/v1/responses` remains available for direct/operator use where supported
+- Current supported public GPT-OSS contract is Responses-first:
+  - `deep`, `fast`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
+    all accept `POST /v1/responses`
+  - `POST /v1/chat/completions` remains compatibility-only during the current migration window
+  - `chatgpt-5` follows its adapter-backed dual-endpoint path rather than the local GPT request-default shim
   - `chatgpt-5` follows the Codex-backed sidecar path rather than the local GPT
     request-default shim
-  - ordinary tool calling is accepted on compatible lanes
+  - ordinary tool calling is accepted on compatible GPT-OSS lanes
   - named/object-form forced-tool choice is unsupported on the current GPT
     backend family
   - strict structured-output guarantees are not part of the supported GPT or

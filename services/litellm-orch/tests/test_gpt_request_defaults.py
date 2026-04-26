@@ -63,7 +63,7 @@ class TestGPTRequestDefaults(unittest.IsolatedAsyncioTestCase):
             default_on=True,
         )
         data = {
-            "model": "task-transcribe",
+            "model": "main",
             "messages": [{"role": "user", "content": "Ping"}],
         }
         out = await guardrail.async_pre_call_hook(
@@ -73,3 +73,40 @@ class TestGPTRequestDefaults(unittest.IsolatedAsyncioTestCase):
             call_type="acompletion",
         )
         self.assertNotIn("reasoning_effort", out)
+
+    async def test_injects_responses_reasoning_object(self):
+        guardrail = GPTRequestDefaults(
+            guardrail_name="gpt-request-defaults",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "fast",
+            "input": "Ping",
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="responses",
+        )
+        self.assertEqual(out["reasoning"]["effort"], "low")
+
+    async def test_preserves_responses_reasoning_object(self):
+        guardrail = GPTRequestDefaults(
+            guardrail_name="gpt-request-defaults",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "deep",
+            "input": "Ping",
+            "reasoning": {"effort": "high"},
+        }
+        out = await guardrail.async_pre_call_hook(
+            user_api_key_dict=None,
+            cache=None,
+            data=data,
+            call_type="responses",
+        )
+        self.assertEqual(out["reasoning"]["effort"], "high")

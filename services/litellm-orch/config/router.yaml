@@ -111,6 +111,13 @@ guardrails:
       guardrail: "prompt_guardrail.PromptGuardrail"
       mode: "pre_call"
       default_on: true
+  - guardrail_name: "responses-contract-public-pre"
+    litellm_params:
+      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
+      mode: "pre_call"
+      default_on: true
+      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json"
+      responses_only: false
   - guardrail_name: "llmster-toolcall-pre"
     litellm_params:
       guardrail: "llmster_toolcall_guardrail.LlmsterToolcallGuardrail"
@@ -122,13 +129,20 @@ guardrails:
       guardrail: "gpt_request_defaults.GPTRequestDefaults"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,code-reasoning"
+      target_models: "deep,fast,code-reasoning,task-transcribe,task-transcribe-vivid,task-json"
   - guardrail_name: "llmster-toolcall-post"
     litellm_params:
       guardrail: "llmster_toolcall_guardrail.LlmsterToolcallGuardrail"
       mode: "post_call"
       default_on: true
       target_models: "deep,fast,code-reasoning"
+  - guardrail_name: "responses-contract-public-post"
+    litellm_params:
+      guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
+      mode: "post_call"
+      default_on: true
+      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json"
+      responses_only: false
   - guardrail_name: "transcribe-post"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"

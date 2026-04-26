@@ -40,6 +40,20 @@ def _parse_model_targets(raw: Any) -> set[str]:
     return set(_TARGET_MODELS_DEFAULT)
 
 
+def _parse_bool(raw: Any, default: bool) -> bool:
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        if value in {"1", "true", "yes", "on"}:
+            return True
+        if value in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
 def _normalize_model_name(model: Any) -> str:
     if not isinstance(model, str):
         return ""
@@ -110,6 +124,7 @@ def _record_summary() -> None:
 class ResponsesContractGuardrail(CustomGuardrail):
     def __init__(self, guardrail_name: str, event_hook: str, default_on: bool, **kwargs):
         self.target_models = _parse_model_targets(kwargs.get("target_models"))
+        self.responses_only = _parse_bool(kwargs.get("responses_only"), True)
         super().__init__(
             guardrail_name=guardrail_name,
             supported_event_hooks=[GuardrailEventHooks.pre_call, GuardrailEventHooks.post_call],
@@ -147,6 +162,22 @@ class ResponsesContractGuardrail(CustomGuardrail):
         data["_responses_contract_call_type"] = call_type
 
         if call_type not in {"responses", "aresponses"}:
+            if not self.responses_only:
+                with _LOCK:
+                    _COUNTERS["passthrough"] += 1
+                emit_policy_event(
+                    {
+                        **context,
+                        "event_type": "policy_decision",
+                        "decision": "passthrough",
+                        "normalized_fields": [],
+                        "rejection_reason": None,
+                        "outbound_stream": incoming_stream,
+                        "outbound_temperature": incoming_temperature,
+                    }
+                )
+                _record_summary()
+                return data
             with _LOCK:
                 _COUNTERS["rejected"] += 1
             emit_policy_event(
@@ -166,6 +197,26 @@ class ResponsesContractGuardrail(CustomGuardrail):
                 detail=(
                     f"model {context['lane_alias']} only accepts /v1/responses requests"
                 ),
+            )
+
+        if "input" not in data:
+            with _LOCK:
+                _COUNTERS["rejected"] += 1
+            emit_policy_event(
+                {
+                    **context,
+                    "event_type": "policy_decision",
+                    "decision": "rejected",
+                    "normalized_fields": [],
+                    "rejection_reason": "responses_input_required",
+                    "outbound_stream": incoming_stream,
+                    "outbound_temperature": incoming_temperature,
+                }
+            )
+            _record_summary()
+            raise HTTPException(
+                status_code=400,
+                detail=f"model {context['lane_alias']} requires native /v1/responses input",
             )
 
         normalized_fields: list[str] = []

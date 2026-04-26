@@ -16,6 +16,7 @@ from litellm.types.guardrails import GuardrailEventHooks
 TASK_JSON_ALIAS = "task-json"
 PROVIDER_MODEL = "openai/llmster-gpt-oss-20b-mxfp4-gguf"
 PROMPT_ID = "task-json"
+RESPONSES_MAX_OUTPUT_TOKENS = 512
 logger = logging.getLogger("task_json_guardrail")
 _PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
 _PROMPT_MANAGER = PromptManager(prompt_directory=str(_PROMPT_DIR))
@@ -119,8 +120,50 @@ def _extract_user_text(messages: Any) -> str:
     return "\n\n".join(parts).strip()
 
 
+def _flatten_responses_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_flatten_responses_text(item) for item in value)
+    if isinstance(value, dict):
+        if value.get("type") in {"input_text", "output_text", "text"}:
+            return _flatten_responses_text(value.get("text") or value.get("value"))
+        if "content" in value:
+            return _flatten_responses_text(value.get("content"))
+        if "input" in value:
+            return _flatten_responses_text(value.get("input"))
+        return _flatten_responses_text(value.get("text"))
+    return str(value)
+
+
+def _extract_input_text(input_value: Any) -> str:
+    if isinstance(input_value, str):
+        return input_value.strip()
+    if not isinstance(input_value, list):
+        return ""
+    parts: list[str] = []
+    for item in input_value:
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        text = _flatten_responses_text(item.get("content"))
+        if text.strip():
+            parts.append(text.strip())
+    return "\n\n".join(parts).strip()
+
+
 def _extract_transcript(messages: Any) -> str:
     transcript = _extract_user_text(messages)
+    if not transcript:
+        return ""
+    if "Transcript:" in transcript:
+        return transcript.split("Transcript:", 1)[1].strip()
+    return transcript
+
+
+def _extract_transcript_from_input(input_value: Any) -> str:
+    transcript = _extract_input_text(input_value)
     if not transcript:
         return ""
     if "Transcript:" in transcript:
@@ -253,6 +296,31 @@ def _extract_chat_content(response: Any) -> Optional[str]:
     return content if isinstance(content, str) else None
 
 
+def _response_to_dict(response: Any) -> Optional[dict[str, Any]]:
+    if hasattr(response, "model_dump"):
+        try:
+            response = response.model_dump()
+        except Exception:
+            pass
+    return response if isinstance(response, dict) else None
+
+
+def _extract_responses_content(response: Any) -> Optional[str]:
+    body = _response_to_dict(response)
+    if not body:
+        return None
+    direct = _flatten_responses_text(body.get("output_text"))
+    if direct.strip():
+        return direct.strip()
+    for item in body.get("output") or []:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        text = _flatten_responses_text(item.get("content"))
+        if text.strip():
+            return text.strip()
+    return None
+
+
 def _set_chat_content(response: Any, content: str) -> Any:
     if hasattr(response, "model_dump"):
         response = response.model_dump()
@@ -272,6 +340,24 @@ def _set_chat_content(response: Any, content: str) -> Any:
         message.pop(field, None)
     first.pop("reasoning", None)
     return response
+
+
+def _set_responses_content(response: Any, content: str) -> Any:
+    body = _response_to_dict(response)
+    if not body:
+        return response
+    body["output"] = [
+        {
+            "id": body.get("id", "resp_task_json"),
+            "type": "message",
+            "role": "assistant",
+            "status": "completed",
+            "content": [{"type": "output_text", "text": content, "annotations": []}],
+        }
+    ]
+    body["output_text"] = content
+    body.pop("reasoning", None)
+    return body
 
 
 def _is_task_json_request(data: dict[str, Any]) -> bool:
@@ -299,11 +385,24 @@ async def _repair_once(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         return None
     transcript = _extract_transcript(data.get("messages"))
     if not transcript:
+        transcript = _extract_transcript_from_input(data.get("input"))
+    if not transcript:
         return None
     headers = {"Content-Type": "application/json"}
     api_key = data.get("api_key")
     if isinstance(api_key, str) and api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    if data.get("_task_json_call_type") in {"responses", "aresponses"}:
+        payload = {
+            "model": PROVIDER_MODEL.removeprefix("openai/"),
+            "input": _render_prompt_messages({"user_message": transcript}),
+            "temperature": 0.0,
+            "max_output_tokens": RESPONSES_MAX_OUTPUT_TOKENS,
+            "reasoning": {"effort": "low"},
+            "text": {"format": TASK_JSON_SCHEMA["json_schema"]},
+        }
+        return await _post_json(f"{api_base}/responses", headers, payload)
+
     payload = {
         "model": PROVIDER_MODEL,
         "messages": _render_prompt_messages({"user_message": transcript}),
@@ -349,22 +448,32 @@ class TaskJsonGuardrail(CustomGuardrail):
         if data.get("model") != TASK_JSON_ALIAS:
             return data
 
-        transcript = _extract_user_text(data.get("messages"))
-        data["model"] = PROVIDER_MODEL
-        data["messages"] = _render_prompt_messages({"user_message": transcript})
+        data["_task_json_call_type"] = call_type
+        if call_type in {"responses", "aresponses"}:
+            transcript = _extract_input_text(data.get("input"))
+            data["input"] = _render_prompt_messages({"user_message": transcript})
+            data.pop("messages", None)
+            data["temperature"] = 0.0
+            current_budget = data.get("max_output_tokens")
+            if not isinstance(current_budget, int) or current_budget < RESPONSES_MAX_OUTPUT_TOKENS:
+                data["max_output_tokens"] = RESPONSES_MAX_OUTPUT_TOKENS
+            data["text"] = {"format": TASK_JSON_SCHEMA["json_schema"]}
+        else:
+            transcript = _extract_user_text(data.get("messages"))
+            data["messages"] = _render_prompt_messages({"user_message": transcript})
+            data["temperature"] = 0.0
+            data["top_p"] = 1.0
+            data["max_tokens"] = 1024
+            data["presence_penalty"] = 0.0
+            data["frequency_penalty"] = 0.0
+            data["stream"] = False
+            data["response_format"] = TASK_JSON_SCHEMA
         data.pop("prompt_variables", None)
         data.pop("tools", None)
         data.pop("tool_choice", None)
         data.pop("parallel_tool_calls", None)
         data.pop("functions", None)
         data.pop("function_call", None)
-        data["temperature"] = 0.0
-        data["top_p"] = 1.0
-        data["max_tokens"] = 1024
-        data["presence_penalty"] = 0.0
-        data["frequency_penalty"] = 0.0
-        data["stream"] = False
-        data["response_format"] = TASK_JSON_SCHEMA
         logger.info("task-json pre_call transcript_len=%s", len(transcript))
         return data
 
@@ -377,7 +486,8 @@ class TaskJsonGuardrail(CustomGuardrail):
         if not _is_task_json_request(data):
             return response
 
-        content = _extract_chat_content(response)
+        body = _response_to_dict(response)
+        content = _extract_responses_content(body) if body and body.get("object") == "response" else _extract_chat_content(response)
         normalized = _parse_and_normalize_content(content) if isinstance(content, str) else None
         if normalized is None:
             try:
@@ -401,4 +511,6 @@ class TaskJsonGuardrail(CustomGuardrail):
             len(normalized["purchase"]),
             len(normalized["other"]["items"]),
         )
+        if body and body.get("object") == "response":
+            return _set_responses_content(body, minified)
         return _set_chat_content(response, minified)

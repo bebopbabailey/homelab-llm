@@ -47,6 +47,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         data = {
             "model": "chatgpt-5",
             "stream": True,
+            "input": "hello",
             "tools": [{"type": "function", "name": "noop"}],
             "tool_choice": "auto",
         }
@@ -110,6 +111,44 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertIn("model chatgpt-5 only accepts /v1/responses requests", str(ctx.exception))
         self.assertEqual(captured[0]["decision"], "rejected")
 
+    async def test_passthrough_for_non_responses_when_not_responses_only(self):
+        guardrail = ResponsesContractGuardrail(
+            guardrail_name="responses-contract-pre",
+            event_hook="pre_call",
+            default_on=True,
+            target_models="fast",
+            responses_only="false",
+        )
+        data = {"model": "fast", "messages": [{"role": "user", "content": "hi"}]}
+        captured = []
+        with patch.object(responses_contract_guardrail, "emit_policy_event", side_effect=captured.append):
+            out = await guardrail.async_pre_call_hook(
+                user_api_key_dict=None,
+                cache=None,
+                data=data,
+                call_type="completion",
+            )
+        self.assertIs(out, data)
+        self.assertEqual(captured[0]["decision"], "passthrough")
+
+    async def test_rejects_responses_without_input(self):
+        guardrail = ResponsesContractGuardrail(
+            guardrail_name="responses-contract-pre",
+            event_hook="pre_call",
+            default_on=True,
+            target_models="fast",
+            responses_only="false",
+        )
+        data = {"model": "fast", "messages": [{"role": "user", "content": "hi"}]}
+        with self.assertRaises(Exception) as ctx:
+            await guardrail.async_pre_call_hook(
+                user_api_key_dict=None,
+                cache=None,
+                data=data,
+                call_type="responses",
+            )
+        self.assertIn("requires native /v1/responses input", str(ctx.exception))
+
     async def test_post_call_logs_response_ids(self):
         guardrail = ResponsesContractGuardrail(
             guardrail_name="responses-contract-pre",
@@ -119,6 +158,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         data = {
             "model": "chatgpt-5",
             "stream": True,
+            "input": "hello",
         }
         await guardrail.async_pre_call_hook(
             user_api_key_dict=None,

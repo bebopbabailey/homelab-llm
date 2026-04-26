@@ -93,6 +93,25 @@ class TestRouterDropParams(unittest.TestCase):
                 "deep,fast,code-reasoning",
             )
 
+    def test_public_responses_contract_guardrails_target_gpt_oss_aliases(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        guardrails = config.get("guardrails", [])
+        names = {}
+        for item in guardrails:
+            name = item.get("guardrail_name")
+            if name in {"responses-contract-public-pre", "responses-contract-public-post"}:
+                names[name] = item.get("litellm_params", {})
+        self.assertEqual(
+            set(names),
+            {"responses-contract-public-pre", "responses-contract-public-post"},
+        )
+        for params in names.values():
+            self.assertEqual(
+                params.get("target_models"),
+                "deep,fast,task-transcribe,task-transcribe-vivid,task-json",
+            )
+            self.assertEqual(params.get("responses_only"), False)
+
 
 if __name__ == "__main__":
     unittest.main()

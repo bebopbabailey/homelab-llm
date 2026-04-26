@@ -10,6 +10,10 @@ from litellm.types.guardrails import GuardrailEventHooks
 
 
 TASK_TRANSCRIBE_MODELS = {"task-transcribe", "task-transcribe-vivid"}
+RESPONSES_MIN_OUTPUT_TOKENS = {
+    "task-transcribe": 384,
+    "task-transcribe-vivid": 256,
+}
 logger = logging.getLogger("transcribe_guardrail")
 
 try:
@@ -45,6 +49,41 @@ def _extract_user_text(messages: Any) -> str:
     return "\n\n".join(parts).strip()
 
 
+def _flatten_responses_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_flatten_responses_text(item) for item in value)
+    if isinstance(value, dict):
+        if value.get("type") in {"input_text", "output_text", "text"}:
+            return _flatten_responses_text(value.get("text") or value.get("value"))
+        if "content" in value:
+            return _flatten_responses_text(value.get("content"))
+        if "input" in value:
+            return _flatten_responses_text(value.get("input"))
+        return _flatten_responses_text(value.get("text"))
+    return str(value)
+
+
+def _extract_responses_input_text(input_value: Any) -> str:
+    if isinstance(input_value, str):
+        return input_value.strip()
+    if not isinstance(input_value, list):
+        return ""
+    parts: list[str] = []
+    for item in input_value:
+        if not isinstance(item, dict):
+            continue
+        if item.get("role") != "user":
+            continue
+        text = _flatten_responses_text(item.get("content"))
+        if text.strip():
+            parts.append(text.strip())
+    return "\n\n".join(parts).strip()
+
+
 def _extract_chat_message(response: Any) -> dict[str, Any] | None:
     if hasattr(response, "model_dump"):
         try:
@@ -67,6 +106,31 @@ def _extract_chat_message(response: Any) -> dict[str, Any] | None:
     return message if isinstance(message, dict) else None
 
 
+def _response_to_dict(response: Any) -> dict[str, Any] | None:
+    if hasattr(response, "model_dump"):
+        try:
+            response = response.model_dump()
+        except Exception:
+            pass
+    return response if isinstance(response, dict) else None
+
+
+def _extract_responses_output_text(response: Any) -> str | None:
+    body = _response_to_dict(response)
+    if not body:
+        return None
+    direct = _flatten_responses_text(body.get("output_text"))
+    if direct.strip():
+        return direct.strip()
+    for item in body.get("output") or []:
+        if not isinstance(item, dict) or item.get("type") != "message":
+            continue
+        text = _flatten_responses_text(item.get("content"))
+        if text.strip():
+            return text.strip()
+    return None
+
+
 def _set_chat_content(response: Any, content: str) -> Any:
     if hasattr(response, "model_dump"):
         response = response.model_dump()
@@ -83,6 +147,24 @@ def _set_chat_content(response: Any, content: str) -> Any:
     message.pop("reasoning_content", None)
     message.pop("provider_specific_fields", None)
     return response
+
+
+def _set_responses_output_text(response: Any, content: str) -> Any:
+    body = _response_to_dict(response)
+    if not body:
+        return response
+    body["output"] = [
+        {
+            "id": body.get("id", "resp_task_alias"),
+            "type": "message",
+            "role": "assistant",
+            "status": "completed",
+            "content": [{"type": "output_text", "text": content, "annotations": []}],
+        }
+    ]
+    body["output_text"] = content
+    body.pop("reasoning", None)
+    return body
 
 _strip_wrappers = strip_wrappers
 _preprocess_transcript = strip_punct_outside_words
@@ -109,7 +191,14 @@ class TranscribeGuardrail(CustomGuardrail):
         if model not in TASK_TRANSCRIBE_MODELS:
             return data
 
-        transcript = _extract_user_text(data.get("messages") or [])
+        if call_type in {"responses", "aresponses"}:
+            transcript = _extract_responses_input_text(data.get("input"))
+            current_budget = data.get("max_output_tokens")
+            minimum = RESPONSES_MIN_OUTPUT_TOKENS[model]
+            if not isinstance(current_budget, int) or current_budget < minimum:
+                data["max_output_tokens"] = minimum
+        else:
+            transcript = _extract_user_text(data.get("messages") or [])
         transcript = _preprocess_transcript(transcript) if transcript else ""
 
         prompt_variables = dict(data.get("prompt_variables") or {})
@@ -140,6 +229,20 @@ class TranscribeGuardrail(CustomGuardrail):
         model = data.get("model")
         if model not in TASK_TRANSCRIBE_MODELS:
             return response
+
+        body = _response_to_dict(response)
+        if body and body.get("object") == "response":
+            content = _extract_responses_output_text(body)
+            if not isinstance(content, str):
+                return response
+            cleaned = _strip_wrappers(content)
+            logger.info(
+                "transcribe post_call alias=%s content_len=%s cleaned_len=%s",
+                model,
+                len(content),
+                len(cleaned),
+            )
+            return _set_responses_output_text(body, cleaned)
 
         message = _extract_chat_message(response)
         if not isinstance(message, dict):

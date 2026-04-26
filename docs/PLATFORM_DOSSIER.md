@@ -71,10 +71,11 @@ Networking note:
   Current package baseline: `litellm[proxy]==1.83.4`.
   Additional task aliases: `task-transcribe` routes to `fast` and
   `task-transcribe-vivid` routes to `deep` for transcript cleanup through
-  `POST /v1/chat/completions`; they are not speech STT endpoints and no longer
-  carry a `fast` -> `deep` retry shim.
+  `POST /v1/responses`; `POST /v1/chat/completions` remains compatibility-only.
+  They are not speech STT endpoints and no longer carry a `fast` -> `deep`
+  retry shim.
   Utility alias: `task-json` routes to the current `fast` backend through
-  `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
+  `POST /v1/responses` and returns canonical transcript-to-JSON output.
   Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
   deployment before `/key/generate` and `/v1/mcp/*` worked again. The
   repo-managed systemd unit now must keep
@@ -85,14 +86,12 @@ Networking note:
   `qwen-agent-proxy` sidecar and is intended only for operator validation.
   Worker-scoped `model/info` is still blocked on that shadow LiteLLM instance,
   so the lane is not yet a full OpenHands handoff path.
-  Open WebUI human chat is Chat Completions-first again on the LiteLLM path.
-  Utility alias: `task-json` routes to the current `fast` backend through
-  `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
+  Public GPT-OSS lanes are Responses-first on the LiteLLM path.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `fast` and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
-  `reasoning_effort` on `fast`/`deep`.
-  GPT human-chat lanes are Chat Completions-first on the LiteLLM/Open WebUI path.
+  reasoning defaults on GPT-OSS public lanes plus `code-reasoning`.
+  `code-reasoning` remains Chat Completions-first and `/v1/responses`-denied.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.

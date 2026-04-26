@@ -48,15 +48,19 @@
   contract.
 - `main` is retired from the current LiteLLM alias surface.
 - Resilience baseline: `fast -> deep`.
-- GPT request-default exception: LiteLLM still injects
-  `reasoning_effort=low` for `fast`, `deep`, and `code-reasoning` when callers
-  omit it because the direct shared `8126` GPT-OSS Chat Completions lane still
-  shows raw Harmony protocol or truncation on some omitted-effort probes.
-- GPT human-chat lanes are Chat Completions-first in the current Open WebUI
-  contract.
-- `deep`, `fast`, and `chatgpt-5` are accepted on
-  `POST /v1/chat/completions`.
-- `/v1/responses` remains available for direct callers on compatible lanes.
+- GPT request-default exception: LiteLLM still injects omitted reasoning
+  defaults for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
+  `task-json`, and `code-reasoning` because the direct shared `8126` GPT-OSS
+  endpoints still degrade on some omitted-effort probes.
+- Public GPT-OSS lanes are now Responses-first:
+  - `fast`
+  - `deep`
+  - `task-transcribe`
+  - `task-transcribe-vivid`
+  - `task-json`
+- `POST /v1/chat/completions` remains a temporary compatibility path for the
+  public GPT-OSS lanes.
+- `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
   - refresh raw standalone llama.cpp while live `llmster` remained untouched
@@ -157,14 +161,16 @@ if a param is rejected by the backend.
   - vivid: `task-transcribe-vivid` on the `deep` lane
 - LiteLLM experimental Codex-backed alias:
   - `chatgpt-5`
-- `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
+- `task-transcribe*` is a `POST /v1/responses` text-cleanup contract first.
+  `POST /v1/chat/completions` remains temporary compatibility only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path. LiteLLM renders
   the local transcribe dotprompts through its generic prompt-template path and
   uses only a narrow transcript pre/post sanitizer around them; it does not
   switch backends or retry onto another lane.
 - LiteLLM transcript-to-JSON utility alias:
   - `task-json`
-- `task-json` is also a `POST /v1/chat/completions` utility contract only.
+- `task-json` is also a `POST /v1/responses` utility contract first.
+  `POST /v1/chat/completions` remains temporary compatibility only.
   It returns canonical JSON extraction output and is not part of the Open WebUI
   `AUDIO_STT_*` speech path.
 - `chatgpt-5` is now backed by Mini-local experimental `ccproxy-api` on

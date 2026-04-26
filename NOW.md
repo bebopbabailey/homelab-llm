@@ -1,10 +1,9 @@
 # NOW
 
 Active
-- Re-center GPT-OSS correctness in shared `llmster` on `8126`, keep only the
-  LiteLLM GPT shims still justified by direct upstream defects, and rebuild the
-  `task-*` aliases on that corrected backend contract.
+- Move the public GPT-OSS LiteLLM surface (`fast`, `deep`, `task-*`) to a
+  Responses-first contract on top of the corrected shared `llmster` backend.
 
 NEXT UP
-- Close out the older Harmony-fix worktree once the refreshed `llmster` and
-  task-alias contract is validated and landed.
+- Revisit the remaining `fast`-lane transcribe prompt budget/shape only if the
+  Responses-first contract still shows direct upstream defects after landing.
