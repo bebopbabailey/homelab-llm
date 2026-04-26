@@ -51,6 +51,7 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(result["model"], "task-transcribe")
         self.assertEqual(result["prompt_id"], "task-transcribe")
         self.assertFalse(result["stream"])
+        self.assertEqual(result["max_tokens"], 384)
         self.assertEqual(
             result["prompt_variables"]["user_message"],
             "um i i think this should probably work maybe yes",

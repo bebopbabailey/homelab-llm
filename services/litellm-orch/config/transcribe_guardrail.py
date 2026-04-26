@@ -199,6 +199,10 @@ class TranscribeGuardrail(CustomGuardrail):
                 data["max_output_tokens"] = minimum
         else:
             transcript = _extract_user_text(data.get("messages") or [])
+            current_budget = data.get("max_tokens")
+            minimum = RESPONSES_MIN_OUTPUT_TOKENS[model]
+            if not isinstance(current_budget, int) or current_budget < minimum:
+                data["max_tokens"] = minimum
         transcript = _preprocess_transcript(transcript) if transcript else ""
 
         prompt_variables = dict(data.get("prompt_variables") or {})

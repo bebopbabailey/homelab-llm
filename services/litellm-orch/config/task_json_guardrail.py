@@ -79,6 +79,10 @@ TASK_JSON_SCHEMA = {
         },
     },
 }
+TASK_JSON_RESPONSES_FORMAT = {
+    "type": "json_schema",
+    **TASK_JSON_SCHEMA["json_schema"],
+}
 
 
 def _is_scalar(value: Any) -> bool:
@@ -399,7 +403,7 @@ async def _repair_once(data: dict[str, Any]) -> Optional[dict[str, Any]]:
             "temperature": 0.0,
             "max_output_tokens": RESPONSES_MAX_OUTPUT_TOKENS,
             "reasoning": {"effort": "low"},
-            "text": {"format": TASK_JSON_SCHEMA["json_schema"]},
+            "text": {"format": TASK_JSON_RESPONSES_FORMAT},
         }
         return await _post_json(f"{api_base}/responses", headers, payload)
 
@@ -457,7 +461,7 @@ class TaskJsonGuardrail(CustomGuardrail):
             current_budget = data.get("max_output_tokens")
             if not isinstance(current_budget, int) or current_budget < RESPONSES_MAX_OUTPUT_TOKENS:
                 data["max_output_tokens"] = RESPONSES_MAX_OUTPUT_TOKENS
-            data["text"] = {"format": TASK_JSON_SCHEMA["json_schema"]}
+            data["text"] = {"format": TASK_JSON_RESPONSES_FORMAT}
         else:
             transcript = _extract_user_text(data.get("messages"))
             data["messages"] = _render_prompt_messages({"user_message": transcript})

@@ -73,6 +73,7 @@ class TestTaskJsonGuardrail(unittest.TestCase):
         self.assertEqual(result["model"], "task-json")
         self.assertEqual(result["max_output_tokens"], 512)
         self.assertNotIn("messages", result)
+        self.assertEqual(result["text"]["format"]["type"], "json_schema")
         self.assertEqual(result["text"]["format"]["name"], "task_json_payload")
         self.assertIn("Transcript:\ncall mom tomorrow, buy milk, pick up paper towels", result["input"][-1]["content"])
 
