@@ -54,8 +54,8 @@ model_list:
 
 - model_name: task-transcribe-vivid
   litellm_params:
-    model: os.environ/LLMSTER_FAST_MODEL
-    api_base: os.environ/LLMSTER_FAST_API_BASE
+    model: os.environ/LLMSTER_DEEP_MODEL
+    api_base: os.environ/LLMSTER_DEEP_API_BASE
     api_key: dummy
     max_tokens: 4096
   model_info:
@@ -101,6 +101,11 @@ litellm_settings:
   set_verbose: true
   callbacks: ["prometheus"]
 guardrails:
+  - guardrail_name: "transcribe-pre"
+    litellm_params:
+      guardrail: "transcribe_guardrail.TranscribeGuardrail"
+      mode: "pre_call"
+      default_on: true
   - guardrail_name: "prompt-pre"
     litellm_params:
       guardrail: "prompt_guardrail.PromptGuardrail"
@@ -124,11 +129,6 @@ guardrails:
       mode: "post_call"
       default_on: true
       target_models: "deep,fast,code-reasoning"
-  - guardrail_name: "transcribe-pre"
-    litellm_params:
-      guardrail: "transcribe_guardrail.TranscribeGuardrail"
-      mode: "pre_call"
-      default_on: true
   - guardrail_name: "transcribe-post"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"

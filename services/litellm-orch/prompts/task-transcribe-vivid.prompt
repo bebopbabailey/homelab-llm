@@ -1,5 +1,4 @@
 ---
-model: openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct
 input:
   schema:
     user_message: string

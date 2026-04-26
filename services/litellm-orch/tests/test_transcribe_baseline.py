@@ -24,12 +24,16 @@ transcribe_guardrail = _load_module(
     REPO_ROOT / "services/litellm-orch/config/transcribe_guardrail.py",
     "transcribe_guardrail",
 )
+prompt_guardrail = _load_module(
+    REPO_ROOT / "services/litellm-orch/config/prompt_guardrail.py",
+    "prompt_guardrail",
+)
 strip_wrappers = transcribe_utils.strip_wrappers
 strip_punct_outside_words = transcribe_utils.strip_punct_outside_words
 
 
 class TestTranscribeBaseline(unittest.TestCase):
-    def test_pre_call_task_transcribe_renders_provider_model_and_defaults(self):
+    def test_pre_call_task_transcribe_sets_prompt_id_and_keeps_alias_model(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
         result = asyncio.run(
             guardrail.async_pre_call_hook(
@@ -44,12 +48,13 @@ class TestTranscribeBaseline(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertEqual(result["model"], "task-transcribe")
+        self.assertEqual(result["prompt_id"], "task-transcribe")
         self.assertFalse(result["stream"])
-        self.assertEqual(result["temperature"], 0.05)
-        self.assertEqual(result["max_tokens"], 4096)
-        self.assertNotIn("prompt_variables", result)
-        self.assertEqual(result["messages"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
+        self.assertEqual(
+            result["prompt_variables"]["user_message"],
+            "um i i think this should probably work maybe yes",
+        )
 
     def test_pre_call_task_transcribe_vivid_accepts_optional_prompt_variables(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
@@ -66,15 +71,37 @@ class TestTranscribeBaseline(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result["model"], "openai/mlx-qwen3-next-80b-mxfp4-a3b-instruct")
+        self.assertEqual(result["model"], "task-transcribe-vivid")
+        self.assertEqual(result["prompt_id"], "task-transcribe-vivid")
         self.assertFalse(result["stream"])
-        self.assertEqual(result["temperature"], 0.4)
-        self.assertEqual(result["frequency_penalty"], 0.2)
-        self.assertNotIn("prompt_variables", result)
         self.assertEqual(
-            result["messages"][-1]["content"],
-            "Transcript:\nuh okay this is kind of sudden but it matters a lot actually",
+            result["prompt_variables"]["user_message"],
+            "uh okay this is kind of sudden but it matters a lot actually",
         )
+        self.assertEqual(result["prompt_variables"]["audience"], "internal notes")
+        self.assertEqual(result["prompt_variables"]["tone"], "lightly polished")
+
+    def test_prompt_guardrail_renders_transcribe_template_without_model_override(self):
+        pre_guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        prompt_pre = prompt_guardrail.PromptGuardrail("prompt-pre", "pre_call", True)
+        request = asyncio.run(
+            pre_guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "messages": [{"role": "user", "content": "um i i think this should probably work maybe yes"}],
+                    "prompt_variables": {},
+                },
+                "chat.completions",
+            )
+        )
+
+        rendered = asyncio.run(prompt_pre.async_pre_call_hook(None, None, request, "chat.completions"))
+        self.assertEqual(rendered["model"], "task-transcribe")
+        self.assertNotIn("prompt_id", rendered)
+        self.assertNotIn("prompt_variables", rendered)
+        self.assertEqual(rendered["messages"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
 
     def test_preprocess_preserves_internal_apostrophes_and_hyphens(self):
         raw = "it's a well-known thing — right? wow!"
@@ -115,6 +142,27 @@ class TestTranscribeBaseline(unittest.TestCase):
     def test_guardrail_uses_shared_helpers(self):
         self.assertIs(transcribe_guardrail._strip_wrappers, strip_wrappers)
         self.assertIs(transcribe_guardrail._preprocess_transcript, strip_punct_outside_words)
+
+    def test_post_call_strips_reasoning_and_wrappers(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "**Cleaned Transcript**: Hello there.",
+                        "reasoning": "hidden",
+                        "reasoning_content": "hidden",
+                        "provider_specific_fields": {"reasoning": "hidden"},
+                    }
+                }
+            ]
+        }
+        result = asyncio.run(guardrail.async_post_call_success_hook(None, {"model": "task-transcribe"}, response))
+        message = result["choices"][0]["message"]
+        self.assertEqual(message["content"], "Hello there.")
+        self.assertNotIn("reasoning", message)
+        self.assertNotIn("reasoning_content", message)
+        self.assertNotIn("provider_specific_fields", message)
 
     def test_golden_output_matches_expectations(self):
         raw = (REPO_ROOT / "services/litellm-orch/tests/fixtures_transcribe_raw.txt").read_text().strip()

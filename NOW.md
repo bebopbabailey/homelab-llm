@@ -1,11 +1,10 @@
 # NOW
 
 Active
-- Implement failed-worktree journal salvage so abandoned experiment branches can
-  be pruned without losing append-only `docs/journal/` records.
-- Recover stranded journal entries found in abandoned March/April branch
-  history.
+- Simplify `task-transcribe*` so routing owns lane choice, the generic prompt
+  renderer owns transcribe dotprompts, and the transcribe guardrail only does
+  narrow transcript cleanup/sanitizing.
 
 NEXT UP
-- Close out `codex/journal-salvage-abandon-20260421` after local script and
-  journal hygiene checks pass.
+- Return to journal-salvage closeout once the transcribe alias contract is
+  working again.

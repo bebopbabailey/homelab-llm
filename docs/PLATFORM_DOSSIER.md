@@ -67,10 +67,10 @@ Networking note:
   DB-backed auth requirement: runtime must include `DATABASE_URL`; if readiness
   reports `db: "Not connected"`, non-master keys, groups, service accounts,
   and `/key/generate` are effectively down even if the endpoint still returns `200`.
-  Runtime lock baseline: `drop_params=true`, `fast -> main`.
+  Runtime lock baseline: `drop_params=true`, `fast -> deep`.
   Current package baseline: `litellm[proxy]==1.83.4`.
-  Additional task aliases: `task-transcribe` and `task-transcribe-vivid` route
-  to the current `8101` Qwen lane for transcript cleanup through
+  Additional task aliases: `task-transcribe` routes to `fast` and
+  `task-transcribe-vivid` routes to `deep` for transcript cleanup through
   `POST /v1/chat/completions`; they are not speech STT endpoints.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
