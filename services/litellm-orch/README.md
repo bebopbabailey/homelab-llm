@@ -20,8 +20,8 @@ only; it does not implement inference.
 
 ## Backends
 - Studio `llmster` GPT service on `8126` for `fast` and `deep`
-- `task-transcribe` and `task-transcribe-vivid` reuse the same `fast` GPT lane
-  as text-cleanup aliases
+- `task-transcribe` is a text-cleanup alias on `fast`
+- `task-transcribe-vivid` is a text-cleanup alias on `deep`
 - Voice Gateway on the Orin for speech aliases
 - SearXNG on the Mini for generic search tooling
 
@@ -34,6 +34,9 @@ only; it does not implement inference.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
 - `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
   not part of the public human chat-lane trio.
+- Their prompts are rendered through the generic `prompt-pre` dotprompt path;
+  the transcribe guardrail only normalizes transcript input and strips wrapper
+  fields from the final response.
 - `task-json` is an additional utility alias, not part of the public human
   chat-lane trio.
 

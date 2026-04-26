@@ -27,6 +27,30 @@ class TestRouterDropParams(unittest.TestCase):
             "router_settings.fallbacks must preserve fast -> deep",
         )
 
+    def test_transcribe_aliases_use_fast_and_deep_lanes(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        aliases = {
+            item.get("model_name"): item.get("litellm_params", {})
+            for item in config.get("model_list", [])
+            if isinstance(item, dict)
+        }
+        self.assertEqual(
+            aliases["task-transcribe"].get("model"),
+            "os.environ/LLMSTER_FAST_MODEL",
+        )
+        self.assertEqual(
+            aliases["task-transcribe"].get("api_base"),
+            "os.environ/LLMSTER_FAST_API_BASE",
+        )
+        self.assertEqual(
+            aliases["task-transcribe-vivid"].get("model"),
+            "os.environ/LLMSTER_DEEP_MODEL",
+        )
+        self.assertEqual(
+            aliases["task-transcribe-vivid"].get("api_base"),
+            "os.environ/LLMSTER_DEEP_API_BASE",
+        )
+
     def test_operator_only_chatgpt_alias_exists(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         model_names = {

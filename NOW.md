@@ -1,9 +1,10 @@
 # NOW
 
 Active
-- Retire stale LiteLLM `main`/Qwen assumptions in `services/litellm-orch`.
-- Make `task-transcribe*` honor the `fast` GPT-OSS 20B backend end to end.
+- Simplify `task-transcribe*` so routing owns lane choice, the generic prompt
+  renderer owns transcribe dotprompts, and the transcribe guardrail only does
+  narrow transcript cleanup/sanitizing.
 
 NEXT UP
-- Return to failed-worktree journal salvage after the LiteLLM transcribe fix
-  and contract docs are landed.
+- Return to journal-salvage closeout once the transcribe alias contract is
+  working again.

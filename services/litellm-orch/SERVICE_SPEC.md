@@ -61,8 +61,8 @@ implement inference or web-search business logic.
   Mini-local `qwen-agent-proxy` sidecar (`qwen-agent-coder-next-shadow`)
 - `task-transcribe` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the standard transcript-cleanup prompt
-- `task-transcribe-vivid` -> Studio `llmster` fast lane `8126`
-  (`llmster-gpt-oss-20b-mxfp4-gguf`) with the vivid transcript-cleanup prompt
+- `task-transcribe-vivid` -> Studio `llmster` deep lane `8126`
+  (`llmster-gpt-oss-120b-mxfp4-gguf`) with the vivid transcript-cleanup prompt
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -100,13 +100,15 @@ implement inference or web-search business logic.
 
 ## Guardrails
 - `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
-  It strips wrappers/labels and removes reasoning fields from transcript outputs.
+  Its pre-call path only normalizes transcript punctuation, sets the
+  transcribe `prompt_id`, and forces non-streaming; its post-call path strips
+  wrappers/labels and removes reasoning fields from transcript outputs.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
   They are invoked through `POST /v1/chat/completions`, not `POST /v1/audio/transcriptions`,
   and must not be reused for Open WebUI speech wiring.
-- `task-transcribe*` rewrites to the same concrete GPT-OSS 20B provider model
-  used by the `fast` lane so the pre-call prompt render and the router target
-  stay aligned.
+- The transcribe dotprompt files are rendered through the generic
+  `prompt-pre` template path. They do not select a backend model; router alias
+  selection stays authoritative.
 - `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
   `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
 - `task-json` is a transcript-to-JSON utility alias only.

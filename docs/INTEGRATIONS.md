@@ -149,14 +149,14 @@ if a param is rejected by the backend.
   - canary: `voice-stt-canary`, `voice-tts-canary`
   - stable: `voice-stt`, `voice-tts`
 - LiteLLM transcript-cleanup aliases:
-  - standard: `task-transcribe`
-  - vivid: `task-transcribe-vivid`
+  - standard: `task-transcribe` on the `fast` lane
+  - vivid: `task-transcribe-vivid` on the `deep` lane
 - LiteLLM experimental Codex-backed alias:
   - `chatgpt-5`
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
-  It is not part of the Open WebUI `AUDIO_STT_*` speech path.
-- `task-transcribe*` now uses the same GPT-OSS 20B backend path as `fast`;
-  the transcribe pre-call guardrail no longer rewrites to the retired Qwen lane.
+  It is not part of the Open WebUI `AUDIO_STT_*` speech path. LiteLLM renders
+  the local transcribe dotprompts through its generic prompt-template path and
+  uses only a narrow transcript pre/post sanitizer around them.
 - LiteLLM transcript-to-JSON utility alias:
   - `task-json`
 - `task-json` is also a `POST /v1/chat/completions` utility contract only.
