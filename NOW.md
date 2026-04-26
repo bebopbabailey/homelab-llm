@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Simplify `task-transcribe*` so routing owns lane choice, the generic prompt
-  renderer owns transcribe dotprompts, and the transcribe guardrail only does
-  narrow transcript cleanup/sanitizing.
+- Re-center GPT-OSS correctness in shared `llmster` on `8126`, keep only the
+  LiteLLM GPT shims still justified by direct upstream defects, and rebuild the
+  `task-*` aliases on that corrected backend contract.
 
 NEXT UP
-- Return to journal-salvage closeout once the transcribe alias contract is
-  working again.
+- Close out the older Harmony-fix worktree once the refreshed `llmster` and
+  task-alias contract is validated and landed.

@@ -71,7 +71,8 @@ Networking note:
   Current package baseline: `litellm[proxy]==1.83.4`.
   Additional task aliases: `task-transcribe` routes to `fast` and
   `task-transcribe-vivid` routes to `deep` for transcript cleanup through
-  `POST /v1/chat/completions`; they are not speech STT endpoints.
+  `POST /v1/chat/completions`; they are not speech STT endpoints and no longer
+  carry a `fast` -> `deep` retry shim.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
@@ -232,7 +233,10 @@ Networking note:
   mirrors remain loopback-only diagnostic seams and are not the public path.
   Shared `8126` is the accepted working posture for public `fast` and `deep`,
   with explicit residency proof and post-load idle memory evidence captured
-  before the `deep` cutover.
+  before the `deep` cutover. The accepted direct GPT-OSS posture on `8126`
+  includes visible answer text in Chat Completions `message.content`,
+  separated reasoning in `message.reasoning`, working `/v1/responses`, and
+  native `json_schema` structured output on the LM Studio path.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools:

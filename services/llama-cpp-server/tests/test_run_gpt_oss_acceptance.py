@@ -35,6 +35,14 @@ class RunGptOssAcceptanceTests(unittest.TestCase):
         }
         self.assertEqual(mod._extract_responses_text(body), "hello-world")
 
+    def test_raw_harmony_snippets_recurses_response_body(self):
+        body = {"choices": [{"message": {"content": "<|channel|>final <|message|>done"}}]}
+        self.assertEqual(mod._raw_harmony_snippets(body), ["<|channel|>final <|message|>done"])
+
+    def test_raw_harmony_snippets_ignores_normal_response_body(self):
+        body = {"choices": [{"message": {"content": "done"}}]}
+        self.assertEqual(mod._raw_harmony_snippets(body), [])
+
     def test_expect_tool_call_requires_named_function(self):
         checker = mod._expect_tool_call("noop", "value")
         good = {

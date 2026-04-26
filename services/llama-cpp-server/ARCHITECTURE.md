@@ -27,6 +27,13 @@ This service boundary codifies the repo-owned GPT serving family for `fast` and
 - GPT formatting ownership is upstream-first at this boundary.
 - Accepted direct responses on the current `llmster` path are already the
   canonical formatting truth for `fast` and `deep`.
+- Accepted direct GPT-OSS Chat Completions behavior on `8126` is:
+  - final answer in `message.content`
+  - reasoning in `message.reasoning`
+  - no raw Harmony protocol markers in visible text
+- Direct `/v1/responses` is part of the upstream truth-path for GPT-OSS
+  reasoning behavior even though the public caller contract remains Chat
+  Completions-first.
 - Named/object-form forced-tool choice is still unsupported on the current
   backend family and remains out of contract.
 - Strict structured-output guarantees are not part of the supported GPT

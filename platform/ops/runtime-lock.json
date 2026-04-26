@@ -151,12 +151,14 @@
     "auto_evict": false,
     "lifecycle_mode": "thin_daemon_aware_wrapper",
     "lms_binary_path": "/Users/thestudio/.lmstudio/llmster/0.0.7-4/.bundle/lms",
+    "lms_cli_commit": "f26090f",
     "stable_residency": {
       "explicit_load_required": true,
       "ttl_allowed": false,
       "proof_required": [
         "lms_ps_json",
         "v1_models",
+        "api_v1_models",
         "post_load_idle_memory_snapshot",
         "post_load_idle_memory_snapshot_plus_5m"
       ]
@@ -165,10 +167,22 @@
       "llmster-gpt-oss-20b-mxfp4-gguf",
       "llmster-gpt-oss-120b-mxfp4-gguf"
     ],
+    "expected_loaded_config": {
+      "context_length": 32768,
+      "eval_batch_size": 512,
+      "flash_attention": true,
+      "num_experts": 4,
+      "offload_kv_cache_to_gpu": true
+    },
     "post_load_shared_posture": {
       "estimate_only_required": true,
       "actual_proof_required_before_public_deep_cutover": true,
       "fast_regression_required_under_dual_load": true
+    },
+    "accepted_openai_behavior": {
+      "chat_completions_reasoning_field": "message.reasoning",
+      "responses_api": "supported_direct_truth_path",
+      "structured_outputs": "json_schema_supported_no_strict_public_guarantee"
     },
     "artifact_policy": {
       "required_quantization": "mxfp4-gguf",

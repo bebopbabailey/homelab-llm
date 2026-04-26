@@ -50,7 +50,11 @@
   contract.
 - `main` is closed as an active backend project and remains accepted for public
   use with known limitations on forced-tool semantics and structured outputs.
-- Resilience baseline: `fast -> main`.
+- Resilience baseline: `fast -> deep`.
+- GPT request-default exception: LiteLLM still injects
+  `reasoning_effort=low` for `fast`, `deep`, and `code-reasoning` when callers
+  omit it because the direct shared `8126` GPT-OSS Chat Completions lane still
+  shows raw Harmony protocol or truncated output on some omitted-effort probes.
 - GPT human-chat lanes are Chat Completions-first in the current Open WebUI
   contract.
 - `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on
@@ -159,7 +163,8 @@ if a param is rejected by the backend.
 - `task-transcribe*` is a `POST /v1/chat/completions` text-cleanup contract only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path. LiteLLM renders
   the local transcribe dotprompts through its generic prompt-template path and
-  uses only a narrow transcript pre/post sanitizer around them.
+  uses only a narrow transcript pre/post sanitizer around them; it does not
+  switch backends or retry onto another lane.
 - LiteLLM transcript-to-JSON utility alias:
   - `task-json`
 - `task-json` is also a `POST /v1/chat/completions` utility contract only.

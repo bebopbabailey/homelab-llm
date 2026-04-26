@@ -22,9 +22,9 @@
     <string>--api-key-env</string>
     <string>LLMSTER_API_KEY</string>
     <string>--load-spec</string>
-    <string>gpt-oss-20b|llmster-gpt-oss-20b-mxfp4-gguf|32768|4</string>
+    <string>gpt-oss-20b|llmster-gpt-oss-20b-mxfp4-gguf|32768|4|512|true|4|true</string>
     <string>--load-spec</string>
-    <string>gpt-oss-120b|llmster-gpt-oss-120b-mxfp4-gguf|32768|2</string>
+    <string>gpt-oss-120b|llmster-gpt-oss-120b-mxfp4-gguf|32768|2|512|true|4|true</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>

@@ -10,6 +10,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
+_RAW_HARMONY_MARKERS = ("<|channel|>", "<|constrain|>", "<|message|>", "<|end|>")
+
 
 def _post(url: str, payload: dict, api_key: str | None, timeout: float) -> tuple[int, dict, float]:
     data = json.dumps(payload).encode()
@@ -126,6 +128,28 @@ def _extract_responses_text(body: dict[str, Any]) -> str:
     return "".join(chunks)
 
 
+def _raw_harmony_snippets(value: Any, *, limit: int = 3) -> list[str]:
+    snippets: list[str] = []
+
+    def visit(item: Any) -> None:
+        if len(snippets) >= limit:
+            return
+        if isinstance(item, str):
+            if any(marker in item for marker in _RAW_HARMONY_MARKERS):
+                snippets.append(item[:240])
+            return
+        if isinstance(item, dict):
+            for child in item.values():
+                visit(child)
+            return
+        if isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return snippets
+
+
 def _expect_text(content: str) -> Callable[[dict], bool]:
     def check(body: dict) -> bool:
         message = body["choices"][0]["message"]["content"]
@@ -184,19 +208,27 @@ def _run_case(
     successes = 0
     latencies = []
     failures = []
+    raw_harmony_leaks = []
     for _ in range(attempts):
         status, body, latency = _post(url, payload, api_key, timeout)
         latencies.append(latency)
-        if status == 200 and checker(body):
+        harmony_snippets = _raw_harmony_snippets(body)
+        if harmony_snippets:
+            raw_harmony_leaks.append({"status": status, "snippets": harmony_snippets})
+        if status == 200 and checker(body) and not harmony_snippets:
             successes += 1
         else:
-            failures.append({"status": status, "body": body})
+            failure = {"status": status, "body": body}
+            if harmony_snippets:
+                failure["raw_harmony_snippets"] = harmony_snippets
+            failures.append(failure)
     ordered = sorted(latencies)
     return {
         "attempts": attempts,
         "successes": successes,
         "p50_latency_s": statistics.median(ordered) if ordered else None,
         "p95_latency_s": ordered[max(0, int(len(ordered) * 0.95) - 1)] if ordered else None,
+        "raw_harmony_leaks": raw_harmony_leaks[:3],
         "failures": failures[:3],
     }
 

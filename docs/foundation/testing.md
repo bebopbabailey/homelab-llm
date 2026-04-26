@@ -101,6 +101,7 @@ Actual shared-posture proof before any public `deep` cutover:
 ```bash
 ssh studio '/Users/thestudio/.lmstudio/bin/lms ps --json'
 ssh studio 'curl -fsS http://192.168.1.72:8126/v1/models | jq .'
+ssh studio 'curl -fsS http://192.168.1.72:8126/api/v1/models | jq .'
 ssh studio 'memory_pressure -Q'
 ssh studio 'vm_stat'
 ssh studio 'top -l 1 -stats pid,command,mem,cpu'
@@ -682,7 +683,15 @@ Verify GPT‑OSS content channel is present on the canonical shared `8126` backe
 curl -fsS http://192.168.1.72:8126/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"llmster-gpt-oss-20b-mxfp4-gguf","messages":[{"role":"user","content":"ping"}],"reasoning_effort":"low","max_tokens":256}' \
-  | jq -r '.choices[0].message | {content, reasoning_content}'
+  | jq -r '.choices[0].message | {content, reasoning}'
+```
+
+Verify `/v1/responses` on the canonical shared `8126` backend:
+```bash
+curl -fsS http://192.168.1.72:8126/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llmster-gpt-oss-20b-mxfp4-gguf","input":"Reply with exactly: responses-ok","reasoning":{"effort":"low"}}' \
+  | jq .
 ```
 
 Smoke check for raw Harmony-tag leakage (should return no `<|channel|>`):

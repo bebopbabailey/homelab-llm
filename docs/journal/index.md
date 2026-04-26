@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-04-22-gptoss-harmony-upstream-fix](2026-04-22-gptoss-harmony-upstream-fix.md)
 - [2026-04-21-omlx-litellm-shadow-alias-result](2026-04-21-omlx-litellm-shadow-alias-result.md)
 - [2026-04-21-abandoned-branch-journal-salvage](2026-04-21-abandoned-branch-journal-salvage.md)
 - [2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe](2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md)

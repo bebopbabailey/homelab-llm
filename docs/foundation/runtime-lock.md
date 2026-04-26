@@ -62,8 +62,9 @@ Compatibility-first note:
 - `fast` is currently live on Studio `8126` through `llmster` and is part of
   the canonical shared GPT runtime stack on `8126`.
 - Public GPT lanes are Chat Completions-first in the current hardening phase.
-- `/v1/responses` remains in validation scope for GPT lanes, but it is advisory
-  unless a defect there also affects the public Chat Completions lane.
+- `/v1/responses` remains advisory for the public caller contract, but direct
+  GPT validation must keep it healthy because the accepted `llmster` GPT-OSS
+  runtime exposes separated reasoning there as part of the upstream truth path.
 - No temporary GPT rollout aliases are part of the active gateway contract.
 - Historical note: a temporary non-public canary alias was used before
   canonical public `deep` was repointed.
@@ -95,11 +96,18 @@ Compatibility-first note:
   artifact`; stale weights are pruned before GPT lane cutovers.
 - Canonical GPT lane invariants:
   - explicit `lms load` residency
+  - native `api/v1/models` load-config verification after bootstrap
   - JIT loading disabled
   - auto-evict disabled
   - no TTL-based auto-unload for canonical lanes
   - no repetition penalties for GPT-OSS
   - raw standalone launchers use `--jinja`
+  - shared `llmster` load config on both GPT identifiers:
+    - `context_length=32768`
+    - `eval_batch_size=512`
+    - `flash_attention=true`
+    - `num_experts=4`
+    - `offload_kv_cache_to_gpu=true`
 - The GPT migration path is complete on shared `8126`.
 - Shared `8126` was accepted only after both:
   - preflight `lms load --estimate-only`

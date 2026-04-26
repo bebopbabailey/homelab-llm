@@ -147,6 +147,9 @@ implement inference or web-search business logic.
   - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`, and
     `code-reasoning`
   - behavior: inject `reasoning_effort=low` only when the caller omitted it
+  - justification: direct shared `8126` GPT-OSS Chat Completions still show
+    raw Harmony protocol or truncated output on some requests when
+    `reasoning_effort` is omitted
   - no assistant-history rewriting
   - no post-call content extraction
   - no provider reasoning-field stripping

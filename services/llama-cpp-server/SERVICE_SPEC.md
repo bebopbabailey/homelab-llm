@@ -17,6 +17,7 @@ serving using `llmster` with llama.cpp architecture behind it.
 - Inference engine: llama.cpp architecture
 - Intended bind: `192.168.1.72:8126`
 - Intended launchd label: `com.bebop.llmster-gpt.8126`
+- Observed CLI commit on the current deployed Studio runtime: `f26090f`
 
 ## Logical lanes served
 - `fast` -> `llmster-gpt-oss-20b-mxfp4-gguf`
@@ -49,8 +50,15 @@ to a separate public Studio port in a later slice.
 - auto-evict disabled
 - explicit loaded identifiers
 - stable model residency with explicit `lms load`
+- explicit load posture validated through native `GET /api/v1/models`
 - no TTL-based auto-unload for canonical lanes
 - intended loaded set visible in both `lms ps --json` and `/v1/models`
+- expected shared load config on both GPT identifiers:
+  - `context_length=32768`
+  - `eval_batch_size=512`
+  - `flash_attention=true`
+  - `num_experts=4`
+  - `offload_kv_cache_to_gpu=true`
 - per-request MCP disabled
 - `mcp.json` calling disabled
 - no repetition penalties for GPT-OSS
@@ -66,8 +74,11 @@ to a separate public Studio port in a later slice.
 - at least one strong constrained tool mode (`required` or named-tool forcing)
 - concurrency / parallel serving behavior
 - OpenAI-compatible serving behavior
-- `/v1/responses` remains advisory for this slice unless it exposes a defect
-  that also matters to the public Chat Completions lane
+- direct Chat Completions keeps GPT-OSS reasoning separated in
+  `choices[0].message.reasoning`
+- `/v1/responses` remains advisory for the public caller contract, but direct
+  backend validation must keep it healthy because LM Studio exposes first-class
+  GPT-OSS reasoning support there
 - large-schema tool integrity remains a diagnostic and tuning seam, not a hard
   promotion gate by itself unless it reproduces a public-lane defect
 - public `deep` cutover was preceded by:
@@ -85,6 +96,7 @@ to a separate public Studio port in a later slice.
   - named forced-tool choice unsupported on the current backend path
   - no raw Harmony wire tags in client-visible content on the accepted direct
     `llmster` path
+  - direct `/v1/responses` returns separated reasoning plus final output text
 
 ## Non-goals
 - MAIN replacement

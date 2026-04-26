@@ -157,7 +157,7 @@ class TestTranscribeBaseline(unittest.TestCase):
                 }
             ]
         }
-        result = asyncio.run(guardrail.async_post_call_success_hook(None, {"model": "task-transcribe"}, response))
+        result = asyncio.run(guardrail.async_post_call_success_hook({"model": "task-transcribe"}, None, response))
         message = result["choices"][0]["message"]
         self.assertEqual(message["content"], "Hello there.")
         self.assertNotIn("reasoning", message)

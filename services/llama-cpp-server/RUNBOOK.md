@@ -11,6 +11,8 @@ Canonical GPT service boundary for `fast` and `deep` rollout.
 ## Health checks
 ```bash
 ssh studio 'curl -fsS http://192.168.1.72:8126/v1/models | jq .'
+ssh studio 'curl -fsS http://192.168.1.72:8126/api/v1/models | jq .'
+ssh studio 'curl -fsS http://192.168.1.72:8126/v1/responses -H "Content-Type: application/json" -d "{\"model\":\"llmster-gpt-oss-20b-mxfp4-gguf\",\"input\":\"Reply with exactly: responses-ok\",\"reasoning\":{\"effort\":\"low\"}}" | jq .'
 ```
 
 ## Rollback
