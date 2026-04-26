@@ -83,11 +83,11 @@ Expected post-repair checks:
 - Studio `8100-8119`: team lanes managed by `mlxctl`.
 - Studio `8120-8139`: experimental lanes (no `mlxctl` requirement).
 - Active canonical Mini -> Studio MLX transport uses the Studio LAN IP
-  `192.168.1.72` for `8101` (public `main`) and `8126` (public `fast` + `deep`).
+  `192.168.1.72` for `8126` (public `fast` + `deep`).
 
 ## Direct Studio backend reachability (Mini)
 ```bash
-for p in 8101 8126; do
+for p in 8126; do
   curl -fsS "http://192.168.1.72:${p}/v1/models" | jq .
 done
 ```
@@ -130,14 +130,12 @@ uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scri
 ```
 
 Current GPT public-lane posture:
-- Responses-first
-- `/v1/responses` is the accepted human-chat contract for `main`, `deep`,
-  `fast`, and `chatgpt-5`
+- Chat Completions-first
+- `/v1/responses` remains available for direct callers on compatible lanes
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
-- GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
-  `deep`; LiteLLM only injects omitted `reasoning_effort=low` for GPT `llmster`
-  lanes
+- GPT formatting/tool-call parsing is upstream-owned for `fast` and `deep`;
+  LiteLLM only injects omitted `reasoning_effort=low` for GPT `llmster` lanes
 
 Temporary GPT canary alias:
 - no temporary GPT canary alias is active in the current gateway contract
@@ -153,7 +151,7 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 ```
 Expected:
 - request succeeds
-- LiteLLM logs show `fast` falling back to `main`
+- LiteLLM logs show `fast` falling back to `deep`
 
 ## Active alias checks
 ```bash
@@ -169,12 +167,12 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 ```
 
 Expected:
-- `/v1/models` includes `main`, `deep`, `fast`, and `code-reasoning`.
+- `/v1/models` includes `deep`, `fast`, and `code-reasoning`.
 - `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
 - `/v1/models` includes `task-json`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
-- Current resilience baseline keeps `fast -> main`.
+- Current resilience baseline keeps `fast -> deep`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
 Experimental ChatGPT/Codex alias checks:
@@ -304,112 +302,10 @@ Expected:
 - the parsed object has exact top-level keys `todo`, `grocery`, `purchase`, and `other`
 - `other` contains only `items` and `attributes`
 
-## Main tool-calling validation
-```bash
-source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
-
-python3 - <<'PY'
-import json, os, urllib.request
-payload={
-  'model':'main',
-  'messages':[{'role':'user','content':'Use the noop tool once, then stop.'}],
-  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{}}}}],
-  'tool_choice':'auto',
-  'stream':False,
-  'max_tokens':128
-}
-req=urllib.request.Request(
-  'http://127.0.0.1:4000/v1/chat/completions',
-  data=json.dumps(payload).encode(),
-  headers={'Authorization': f"Bearer {os.environ['LITELLM_MASTER_KEY']}", 'Content-Type':'application/json'},
-  method='POST'
-)
-with urllib.request.urlopen(req, timeout=60) as r:
-  body=json.loads(r.read().decode())
-print(json.dumps(body['choices'][0]['message'], indent=2))
-PY
-```
-
-Expected:
-- `tool_calls` is present and names `noop`
-- `content` does not contain raw `<tool_call>`
-- LiteLLM returns the structured tool call natively from the `8101` backend
-
-Argument-bearing `main` tool-calling validation:
-```bash
-source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
-
-python3 - <<'PY'
-import json, os, urllib.request
-payload={
-  'model':'main',
-  'messages':[{'role':'user','content':'Use the noop tool exactly once with a short JSON object argument.'}],
-  'tools':[{'type':'function','function':{'name':'noop','description':'noop','parameters':{'type':'object','properties':{'value':{'type':'string'}},'required':['value'],'additionalProperties':False}}}],
-  'tool_choice':'auto',
-  'stream':False,
-  'max_tokens':128
-}
-req=urllib.request.Request(
-  'http://127.0.0.1:4000/v1/chat/completions',
-  data=json.dumps(payload).encode(),
-  headers={'Authorization': f"Bearer {os.environ['LITELLM_MASTER_KEY']}", 'Content-Type':'application/json'},
-  method='POST'
-)
-with urllib.request.urlopen(req, timeout=60) as r:
-  body=json.loads(r.read().decode())
-print(json.dumps(body['choices'][0]['message'], indent=2))
-PY
-```
-
-Expected:
-- `tool_calls` is present and names `noop`
-- parsed `tool_calls[0].function.arguments` contains a JSON object with key `value`
-- `content` does not contain raw `<tool_call>`
-- this is produced natively by the locked `8101` backend render
-
-Structured-output reality check:
-```bash
-source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
-
-python3 - <<'PY'
-import json, os, urllib.request
-payload={
-  'model':'main',
-  'messages':[{'role':'user','content':'Return JSON matching the schema.'}],
-  'response_format':{
-    'type':'json_schema',
-    'json_schema':{
-      'name':'status_payload',
-      'schema':{
-        'type':'object',
-        'properties':{'status':{'type':'string'}},
-        'required':['status'],
-        'additionalProperties':False
-      },
-      'strict':True
-    }
-  },
-  'max_tokens':64,
-  'temperature':0
-}
-req=urllib.request.Request(
-  'http://127.0.0.1:4000/v1/chat/completions',
-  data=json.dumps(payload).encode(),
-  headers={'Authorization': f"Bearer {os.environ['LITELLM_MASTER_KEY']}", 'Content-Type':'application/json'},
-  method='POST'
-)
-with urllib.request.urlopen(req, timeout=60) as r:
-  body=json.loads(r.read().decode())
-print(json.dumps(body['choices'][0]['message'], indent=2))
-PY
-```
-
-Current expected result:
-- this exact `response_format.json_schema` shape is still failing on the current
-  Qwen `main` path and returns a backend-produced error payload
-- do not treat `main` structured outputs as fully hardened until that exact
-  request shape is repaired
-  post-call success hook if the backend returns the strict recoverable raw form
+## Retired main lane
+- `main` is not part of the current public LiteLLM contract.
+- Do not use `main` in smoke checks, fallback validation, or transcript task
+  probes for this service slice.
 
 ## OpenHands worker contract
 OpenHands Phase B is gated by one reserved internal worker alias only:

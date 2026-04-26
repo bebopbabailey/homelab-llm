@@ -30,7 +30,6 @@ PROMPT_ID_BY_MODEL = {
     "task-transcribe-vivid": "task-transcribe-vivid",
 }
 
-
 def _extract_user_text(messages: Any) -> str:
     if not isinstance(messages, list):
         return ""

@@ -3,8 +3,7 @@
 ## LiteLLM routing
 - Config: `services/litellm-orch/config/router.yaml` + `services/litellm-orch/config/env.local`.
 - Router settings: retries and cooldowns in `services/litellm-orch/config/router.yaml`.
-- Upstreams: active Studio MLX lane `http://192.168.1.72:8101/v1`,
-  active `llmster` GPT service on `8126`,
+- Upstreams: active `llmster` GPT service on `8126`,
   AFM (planned) `http://192.168.1.72:9999/v1`.
 - Model naming: canonical model IDs with prefix `mlx-`.
   Format: `mlx-<family>-<params>-<quant>-<variant>` in that order (dash-only,
@@ -18,7 +17,6 @@
 - Health timeout: `HEALTH_CHECK_TIMEOUT_SECONDS` (env) controls `/health` probe timeout (set to 5s).
 - Current live lane mapping:
   - `deep` -> `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
-  - `main` -> `8101` (`mlx-qwen3-next-80b-mxfp4-a3b-instruct`)
   - `fast` -> `8126` (`llmster-gpt-oss-20b-mxfp4-gguf`)
   `8120-8139` remain approved experimental/canary space, with `8126` now
   active for the shared canonical GPT service carrying `fast` and `deep`.
@@ -44,20 +42,19 @@
   artifact”; stale model weights should be pruned before GPT cutovers.
 - Health policy: use `/health/readiness` as the default health signal. `/health` is
   a deep probe that can report unhealthy when backends are intentionally offline.
-- Stable local public LLM aliases: `main`, `deep`, `fast`.
+- Stable local public human-chat aliases: `deep`, `fast`.
 - Additive experimental Codex-backed alias: `chatgpt-5`.
 - There are no active temporary GPT rollout aliases in the current gateway
   contract.
-- `main` is closed as an active backend project and remains accepted for public
-  use with known limitations on forced-tool semantics and structured outputs.
+- `main` is retired from the current LiteLLM alias surface.
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects
   `reasoning_effort=low` for `fast`, `deep`, and `code-reasoning` when callers
   omit it because the direct shared `8126` GPT-OSS Chat Completions lane still
-  shows raw Harmony protocol or truncated output on some omitted-effort probes.
+  shows raw Harmony protocol or truncation on some omitted-effort probes.
 - GPT human-chat lanes are Chat Completions-first in the current Open WebUI
   contract.
-- `main`, `deep`, `fast`, and `chatgpt-5` are all accepted on
+- `deep`, `fast`, and `chatgpt-5` are accepted on
   `POST /v1/chat/completions`.
 - `/v1/responses` remains available for direct callers on compatible lanes.
 - `deep` cutover evidence was:
@@ -247,7 +244,7 @@ if a param is rejected by the backend.
   - On LAN devices: `baseURL=http://192.168.1.71:4000/v1`
   - Optional remote operator path: `https://gateway.tailfd1400.ts.net/v1`
 - User-global config must already expose the `litellm` provider and the direct
-  lanes `litellm/deep`, `litellm/main`, and `litellm/fast`.
+  lanes `litellm/deep` and `litellm/fast`.
 - Repo-local OpenCode behavior in this repo is controlled by:
   - `opencode.json`
   - `.opencode/instructions/`
@@ -255,16 +252,10 @@ if a param is rejected by the backend.
   - `.opencode/skills/`
 - Repo-local defaults:
   - default lane: `deep`
-  - canary lane: `main`
+  - canary lane: `fast`
   - synthesis-only lane: `fast`
   - approval prompts stay `ask` for `bash` and `edit`
-- Current lane note: `main` (`qwen3-next-80b`) is the validated canary lane under
-  `mlxctl` vLLM arg compilation.
-  The locked live `8101` lane uses `tool_choice=auto`,
-  `tool_call_parser=hermes`, and `reasoning_parser=null`.
 - Approved rollout note:
-  - MAIN canonical target is `Qwen3-Next-80B-A3B-Instruct` on `vllm-metal` at `8101`
-  - explicit MAIN fallback remains dormant recovery metadata only
   - FAST and DEEP are now the settled GPT lanes on the shared `llmster`/llama.cpp service at `8126`
 - Repo-shared OpenCode workflow and verification live in `docs/OPENCODE.md` and
   `docs/foundation/testing.md`.
@@ -342,8 +333,6 @@ and where this repo uses callbacks vs guardrails.
 
 ### GPT formatting ownership policy
 - GPT formatting/tool-call parsing is upstream-first.
-- `main` keeps the locked upstream `vllm-metal` parser render on `8101`
-  (`tool_call_parser=hermes`, no reasoning parser).
 - `fast`, `deep`, and reserved/internal worker alias `code-reasoning` keep the
   direct `llmster` / llama.cpp response shape as the canonical truth path.
 - LiteLLM is no longer the canonical GPT response normalizer for these lanes.

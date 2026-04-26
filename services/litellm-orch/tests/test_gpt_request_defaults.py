@@ -63,7 +63,7 @@ class TestGPTRequestDefaults(unittest.IsolatedAsyncioTestCase):
             default_on=True,
         )
         data = {
-            "model": "main",
+            "model": "task-transcribe",
             "messages": [{"role": "user", "content": "Ping"}],
         }
         out = await guardrail.async_pre_call_hook(

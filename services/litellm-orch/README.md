@@ -19,7 +19,7 @@ only; it does not implement inference.
   the current runtime contract
 
 ## Backends
-- MLX `vllm-metal` lanes on the Studio: `deep`, `main`, and `fast`
+- Studio `llmster` GPT service on `8126` for `fast` and `deep`
 - `task-transcribe` is a text-cleanup alias on `fast`
 - `task-transcribe-vivid` is a text-cleanup alias on `deep`
 - Voice Gateway on the Orin for speech aliases
@@ -28,9 +28,9 @@ only; it does not implement inference.
 ## OpenCode Note
 - Repo-local OpenCode defaults and agent/skill behavior are documented in
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
-- The local canonical public LLM trio remains `fast`, `main`, and `deep`.
-- Human-chat traffic is Chat Completions-first through LiteLLM for `main`,
-  `deep`, `fast`, and the experimental `chatgpt-5` lane.
+- The local canonical public human lanes remain `fast` and `deep`.
+- Human-chat traffic is Chat Completions-first through LiteLLM for `fast`,
+  `deep`, and the experimental `chatgpt-5` lane.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
 - `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
   not part of the public human chat-lane trio.

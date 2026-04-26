@@ -219,7 +219,7 @@ class TestLlmsterToolcallGuardrail(unittest.IsolatedAsyncioTestCase):
             default_on=True,
         )
         data = {
-            "model": "main",
+            "model": "task-transcribe",
             "tool_choice": "auto",
             "tools": [{"type": "function", "function": {"name": "noop"}}],
         }

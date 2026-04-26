@@ -12,8 +12,8 @@
   (`8100-8119`, with active public MLX lane `192.168.1.72:8101`).
   Retired GPT rollback slots `8100` and `8102` remain in the `mlxctl` domain
   but are unloaded.
-  Public LLM canon is `deep`, `main`, and `fast`, with `main` on Qwen3-Next at `8101`
-  and `fast` plus `deep` on shared `llmster` at `8126`.
+  Public LiteLLM human-chat canon is `deep` and `fast`, both on shared
+  `llmster` at `8126`.
   Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
   gateway, but now via the localhost-only experimental `ccproxy-api` sidecar.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
@@ -89,7 +89,7 @@ Networking note:
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/chat/completions` and returns canonical transcript-to-JSON output.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
-  GPT formatting/tool-call parsing is upstream-owned for `main`, `fast`, and
+  GPT formatting/tool-call parsing is upstream-owned for `fast` and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
   `reasoning_effort` on `fast`/`deep`.
   GPT human-chat lanes are Chat Completions-first on the LiteLLM/Open WebUI path.
@@ -233,10 +233,7 @@ Networking note:
   mirrors remain loopback-only diagnostic seams and are not the public path.
   Shared `8126` is the accepted working posture for public `fast` and `deep`,
   with explicit residency proof and post-load idle memory evidence captured
-  before the `deep` cutover. The accepted direct GPT-OSS posture on `8126`
-  includes visible answer text in Chat Completions `message.content`,
-  separated reasoning in `message.reasoning`, working `/v1/responses`, and
-  native `json_schema` structured output on the LM Studio path.
+  before the `deep` cutover.
 - Ollama: systemd unit `/etc/systemd/system/ollama.service`.
 - Home Assistant: OS package on DietPi, systemd-managed, root-run (owner confirmation).
 - MCP tools:
