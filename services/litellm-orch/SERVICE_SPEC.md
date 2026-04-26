@@ -103,6 +103,8 @@ implement inference or web-search business logic.
   Its pre-call path only normalizes transcript punctuation, sets the
   transcribe `prompt_id`, and forces non-streaming; its post-call path strips
   wrappers/labels and removes reasoning fields from transcript outputs.
+  `task-transcribe` also retries once on `deep` if the primary `fast` response
+  comes back with empty assistant content.
 - `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
   They are invoked through `POST /v1/chat/completions`, not `POST /v1/audio/transcriptions`,
   and must not be reused for Open WebUI speech wiring.

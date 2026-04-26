@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
+import httpx
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
 
@@ -67,6 +69,52 @@ def _extract_chat_message(response: Any) -> dict[str, Any] | None:
     return message if isinstance(message, dict) else None
 
 
+def _set_chat_content(response: Any, content: str) -> Any:
+    if hasattr(response, "model_dump"):
+        response = response.model_dump()
+    if not isinstance(response, dict):
+        return response
+    choices = response.get("choices")
+    if not (isinstance(choices, list) and choices and isinstance(choices[0], dict)):
+        return response
+    message = choices[0].get("message")
+    if not isinstance(message, dict):
+        return response
+    message["content"] = content
+    message.pop("reasoning", None)
+    message.pop("reasoning_content", None)
+    message.pop("provider_specific_fields", None)
+    return response
+
+
+async def _retry_on_deep(data: dict[str, Any]) -> str | None:
+    api_base = os.getenv("LLMSTER_DEEP_API_BASE")
+    model = os.getenv("LLMSTER_DEEP_MODEL")
+    messages = data.get("messages")
+    if not api_base or not model or not isinstance(messages, list):
+        return None
+    provider_model = model.removeprefix("openai/")
+
+    payload = {
+        "model": provider_model,
+        "messages": messages,
+        "stream": False,
+        "max_tokens": data.get("max_tokens") or 4096,
+    }
+    headers = {"Content-Type": "application/json", "Authorization": "Bearer dummy"}
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(f"{api_base}/chat/completions", headers=headers, json=payload)
+        response.raise_for_status()
+        body = response.json()
+
+    message = _extract_chat_message(body)
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content")
+    return content if isinstance(content, str) and content.strip() else None
+
+
 _strip_wrappers = strip_wrappers
 _preprocess_transcript = strip_punct_outside_words
 
@@ -116,8 +164,8 @@ class TranscribeGuardrail(CustomGuardrail):
 
     async def async_post_call_success_hook(
         self,
-        user_api_key_dict: Any,
         data: dict,
+        user_api_key_dict: Any,
         response: Any,
     ) -> Any:
         model = data.get("model")
@@ -133,10 +181,10 @@ class TranscribeGuardrail(CustomGuardrail):
             return response
 
         cleaned = _strip_wrappers(content)
-        message["content"] = cleaned
-        message.pop("reasoning", None)
-        message.pop("reasoning_content", None)
-        message.pop("provider_specific_fields", None)
+        if model == "task-transcribe" and not cleaned.strip():
+            retry_content = await _retry_on_deep(data)
+            if isinstance(retry_content, str) and retry_content.strip():
+                cleaned = _strip_wrappers(retry_content)
 
         logger.info(
             "transcribe post_call alias=%s content_len=%s cleaned_len=%s",
@@ -144,4 +192,4 @@ class TranscribeGuardrail(CustomGuardrail):
             len(content),
             len(cleaned),
         )
-        return response
+        return _set_chat_content(response, cleaned)

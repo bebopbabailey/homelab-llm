@@ -3,6 +3,7 @@ import unittest
 import importlib.util
 import sys
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -157,10 +158,36 @@ class TestTranscribeBaseline(unittest.TestCase):
                 }
             ]
         }
-        result = asyncio.run(guardrail.async_post_call_success_hook(None, {"model": "task-transcribe"}, response))
+        result = asyncio.run(guardrail.async_post_call_success_hook({"model": "task-transcribe"}, None, response))
         message = result["choices"][0]["message"]
         self.assertEqual(message["content"], "Hello there.")
         self.assertNotIn("reasoning", message)
+        self.assertNotIn("reasoning_content", message)
+        self.assertNotIn("provider_specific_fields", message)
+
+    def test_post_call_retries_task_transcribe_on_empty_content(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "hidden",
+                        "provider_specific_fields": {"reasoning": "hidden"},
+                    }
+                }
+            ]
+        }
+        with mock.patch.object(
+            transcribe_guardrail,
+            "_retry_on_deep",
+            new=mock.AsyncMock(return_value="I think this should probably work, maybe."),
+        ):
+            result = asyncio.run(
+                guardrail.async_post_call_success_hook({"model": "task-transcribe", "messages": []}, None, response)
+            )
+        message = result["choices"][0]["message"]
+        self.assertEqual(message["content"], "I think this should probably work, maybe.")
         self.assertNotIn("reasoning_content", message)
         self.assertNotIn("provider_specific_fields", message)
 

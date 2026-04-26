@@ -282,7 +282,7 @@ Expected:
 - both aliases succeed through `POST /v1/chat/completions`
 - outputs are plain cleaned transcript text with no wrapper label or commentary
 - outputs do not expose `reasoning`, `reasoning_content`, or `provider_specific_fields`
-- `task-transcribe` routes through the `fast` lane and `task-transcribe-vivid` routes through the `deep` lane
+- `task-transcribe` is fast-first and retries once on `deep` if `fast` returns empty assistant content; `task-transcribe-vivid` routes through `deep`
 - `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
 
 ## Task JSON alias check
