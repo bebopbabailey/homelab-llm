@@ -1,8 +1,13 @@
 # MLX Registry and Controller (Current)
 
 ## Purpose
-Keep Studio MLX inference stable and repeatable with registry-driven model mapping,
-Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM alias wiring.
+Keep the Studio `mlxctl`-governed MLX team-lane control surface stable and
+repeatable with registry-driven model mapping, parser/template defaults, and
+deterministic public gateway wiring where that wiring is actually part of the
+current contract.
+
+This document governs the public/team-lane MLX control surface only. It does
+not define specialized runtime-plane services such as `omlx-runtime`.
 
 ## Runtime Reality (2026-03-19)
 - Active public Studio MLX inference listener:
@@ -18,7 +23,7 @@ Harmony-safe parser/template defaults for GPT-OSS, and deterministic LiteLLM ali
   - `com.bebop.mlx-lane.8100`
   - `com.bebop.mlx-lane.8101`
   - `com.bebop.mlx-lane.8102`
-- `mlxctl` remains the supported control plane for model/port lifecycle + gateway sync.
+- `mlxctl` remains the supported control plane for model/port lifecycle + gateway sync for the team-lane/public MLX surface.
 
 ## Registry
 - Location (Studio): `/Users/thestudio/models/hf/hub/registry.json`
@@ -188,6 +193,12 @@ Current alias intent:
 - `main` -> qwen3-next-80b (`8101`)
 - public GPT aliases `fast` and `deep` are no longer backed by MLX team lanes;
   they now route to shared `llmster` on `8126`
+
+Explicit exclusion:
+- `mlxctl sync-gateway` and the MLX registry do not define or promote
+  `omlx-runtime`.
+- Specialized runtime-plane services are outside the current public alias and
+  gateway-sync contract.
 
 ## Port Policy
 - Team ports: `8100-8119`

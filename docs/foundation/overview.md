@@ -1,42 +1,55 @@
 # System Overview
 
 ## Mission
-Provide a single OpenAI-compatible entry point (LiteLLM) for all clients while
-routing requests to multiple specialist backends. This keeps clients stable
-while allowing backend models to evolve independently.
+Provide a boring commodity inference surface for ordinary clients while keeping
+specialized runtimes and future orchestration as separate architectural planes.
+This keeps public contracts stable without forcing every useful runtime to
+pretend it is just another generic gateway backend.
 
 ## Architecture (current + planned)
-1) Front Door (current)
-   - LiteLLM proxy is the single gateway for all clients.
-2) Orchestration (planned)
-   - TinyAgents will act as a client of LiteLLM, not a backend caller.
-   - Orchestration owns task-level routing/retries; LiteLLM owns transport health
-     checks and request logging.
-3) Tooling (planned)
+Reference: `docs/foundation/runtime-planes.md`
+
+1) Commodity inference plane (current)
+   - LiteLLM is the public gateway for ordinary clients.
+   - Open WebUI, OpenCode, and current OpenHands worker traffic live here.
+2) Specialized runtime plane (current, narrow)
+   - Studio-local specialized runtimes may exist outside the commodity gateway
+     contract when their value is runtime behavior rather than broad
+     compatibility.
+   - Current architectural representative: `omlx-runtime`.
+3) Orchestration plane (planned)
+   - TinyAgents is the current repo-owned orchestration foothold.
+   - Future orchestration owns task-level routing, retries, state, and
+     evaluation rather than flattening those concerns into the commodity
+     gateway.
+4) Tooling (planned)
    - MCP servers provide tool access (search, ops, repo actions).
    - TinyAgents connects to MCP servers; LiteLLM remains the LLM gateway.
    - `search.web` and `web.fetch` run as stdio MCP tools for search + cleaning.
-4) Optimization proxy (current)
+5) Optimization proxy (current)
    - OptiLLM runs on the Studio (`192.168.1.72:4020`) and is consumed through LiteLLM `boost` handles over the LAN contract.
    - Clients include `optillm_approach` in the request body when they want to override default router behavior.
    - Single OptiLLM instance serves both `boost` and `boost-deep`.
-5) Specialist Backends (current)
+6) Specialist backends (current)
    - OpenVINO LLM server on the Mac Mini (standalone backend; not currently wired as active LiteLLM handles).
    - MLX `vllm-metal` lanes on the Mac Studio (`8100/8101/8102`, registry-driven via `mlxctl` + `com.bebop.mlx-launch`).
    - AFM OpenAI-compatible API on the Studio (planned).
    - OpenVINO strength evaluation (planned): STT/vision/async throughput vs LLM latency.
    - Non-LLM model evaluation (planned): routing/classification, summarization, cleaning.
-6) Search (current)
+7) Search (current)
    - SearXNG runs locally on the Mini (127.0.0.1:8888) and is exposed via LiteLLM `/v1/search`.
    - `web.fetch` is the next step after search for clean content extraction.
 
 ## Data Flow (current)
-1) Client sends an OpenAI-compatible request to LiteLLM.
-2) LiteLLM maps a logical model name to a backend.
+1) Commodity-plane clients send OpenAI-compatible requests to LiteLLM.
+2) LiteLLM maps logical names to commodity-plane backends.
 3) LiteLLM forwards to the backend and returns the response.
+4) Specialized runtimes are not assumed to traverse the same public alias path.
 
 ## Guiding Principles
-- LiteLLM is the single gateway; clients must not call backends directly.
+- LiteLLM is the commodity-plane gateway; ordinary clients must not call
+  commodity backends directly.
+- Not every useful runtime belongs in the commodity plane.
 - Tool calls are a separate plane from LLM calls; localhost-only Open WebUI
   tool connections are allowed when they use a documented MCP or terminal
   server, not a model backend.
@@ -68,3 +81,5 @@ while allowing backend models to evolve independently.
 - OptiLLM proxy (Studio): optimization proxy on port 4020; used primarily via LiteLLM `boost`.
 - OptiLLM local: not deployed on Orin. The host is available, but any Orin-local inference work still requires a separate approved plan.
 - TinyAgents: planned orchestration client that calls LiteLLM only.
+- `omlx-runtime`: specialized runtime-plane service identity for oMLX-style
+  workloads; not part of the public commodity gateway contract.

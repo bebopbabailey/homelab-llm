@@ -14,6 +14,9 @@
   but are unloaded.
   Public LiteLLM human-chat canon is `deep` and `fast`, both on shared
   `llmster` at `8126`.
+  The Studio also owns the specialized runtime plane in the repo architecture.
+  That plane is represented by `omlx-runtime`, but no repo-managed oMLX runtime
+  deployment or public route is claimed in phase 1.
   Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
   gateway, but now via the localhost-only experimental `ccproxy-api` sidecar.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
@@ -55,6 +58,21 @@
 Networking note:
 - The canonical Mini -> Studio MLX transport is the Studio LAN IP `192.168.1.72`.
 - Tailscale hostnames are not part of the active MLX lane transport contract.
+
+## Plane ownership (current)
+- Commodity inference plane:
+  - Mini-owned gateway/control surface
+  - public client contract through LiteLLM
+- Specialized runtime plane:
+  - Studio-owned private runtime surface
+  - represented in repo canon by `omlx-runtime`
+  - not part of the active public LiteLLM alias contract
+- Orchestration plane:
+  - Mini-owned by default for repo-managed orchestrators
+  - current foothold: `tiny-agents`
+- Execution boundary:
+  - OpenHands remains a sandboxed operator/execution surface, not the
+    orchestration plane and not the specialized runtime plane
 
 ### Port immutability
 - Do not change or reuse ports without an explicit port-migration phase.
@@ -104,6 +122,8 @@ Networking note:
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.
   GPT lanes now preserve caller streaming intent by default (no forced `stream=false`).
+  The specialized runtime plane is explicitly outside this gateway contract in
+  phase 1.
 - Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
@@ -235,6 +255,9 @@ Networking note:
   restart between them.
   Scheduling policy contract (strict two-lane + fail-closed allowlist):
   `docs/foundation/studio-scheduling-policy.md`.
+- `omlx-runtime`: specialized runtime-plane service identity only in phase 1.
+  It is Studio-owned, experimental, private by default, and not part of the
+  active `mlxctl`-governed public gateway path.
 - llmster GPT service boundary: canonical public path is LiteLLM on Mini ->
   `llmster` on Studio -> llama.cpp runtime. Raw standalone `llama-server`
   mirrors remain loopback-only diagnostic seams and are not the public path.

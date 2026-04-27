@@ -1,8 +1,8 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): LiteLLM, Open WebUI, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
-- Mac Studio: MLX inference host (`mlxctl`-governed team-lane domain on `:8100-:8119`, with the active public MLX listener now at `:8101`), OptiLLM proxy (`:4020`), the shared `llmster` GPT listener on `:8126`, and Studio main vector-store services (localhost-only Postgres + memory API).
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
+- Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
   `fast` and `deep` both routed through `8126`. Shadow ports `8123-8125` are
@@ -14,7 +14,7 @@
 Each host entry: role, access path, source-of-truth docs, and safe validation commands.
 
 ### Mini (Ubuntu 24.04)
-- Role: gateway + UI + search + orchestration + LAN file sharing.
+- Role: commodity inference plane + UI + search + orchestration + LAN file sharing.
 - Access: local repo on Mini.
 - Sources of truth: `docs/foundation/topology.md`, `docs/foundation/overview.md`, per-service `SERVICE_SPEC.md`.
 - Safe checks: prefer `curl http://127.0.0.1:4000/health/readiness` (current deployment requires bearer auth for `/v1/*` and `/health`; readiness/liveliness and `/metrics/` are open).
@@ -25,7 +25,7 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
-- Role: MLX inference host.
+- Role: public inference host plus specialized runtime-plane host.
 - Access: `ssh studio`.
 - Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.
 - Safe checks: `mlxctl status`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8126/v1/models`.
@@ -36,6 +36,8 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
 - Current networking note: the canonical Mini -> Studio MLX path is the Studio
   LAN IP `192.168.1.72`; Tailscale hostnames are not part of the locked MLX lane
   transport contract.
+  The specialized runtime plane is not assumed to share the same public gateway
+  contract as the active `mlxctl` team lanes.
 
 ### Orin AGX
 - Role: canonical speech appliance host + future edge inference / performance experiments.
@@ -96,6 +98,9 @@ Studio scheduling contract:
 
 Note: on the Studio, `GET /v1/models` may return a local snapshot path as the model `id`.
 Use `mlxctl status` as the canonical “which mlx-* model is on which port” signal for `8100-8119`.
+This section governs the public/team-lane MLX control surface only. It does not
+define the contract for specialized runtime-plane services such as
+`omlx-runtime`.
 
 ### Orin speech appliance (status)
 - `voice-gateway` is the approved LAN-visible speech facade on Orin.

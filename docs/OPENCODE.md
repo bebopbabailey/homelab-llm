@@ -150,34 +150,20 @@ Repo-local durability posture:
 - internal markdown-link integrity is enforced by `scripts/docs_link_audit.py`
 
 Lane note:
-- `main` (`qwen3-next-80b`) supports `tool_choice:"auto"` via `mlxctl`-managed
-  vLLM launch settings.
-  The active `8101` runtime uses `--tool-call-parser hermes` and no
-  `--reasoning-parser`.
-- `main` is currently accepted for public repo work on the basis of
-  `tool_choice:"auto"`, long-context sanity, and concurrency validation.
-  Forced-tool semantics remain unsupported on the current build, and
-  structured outputs remain outside the accepted public `main` contract on the
-  current backend path.
-- `fast` remains the canonical small-model alias for repo-local OpenCode policy,
-  and the settled GPT backend family is `llmster`/llama.cpp on shared `8126`.
-
-Backend flag tuning for `main` and `deep` is separate from repo-local OpenCode
-hardening.
+- `fast` remains the canonical small-model alias for repo-local OpenCode policy.
+- `deep` remains the default repo-work lane.
+- Specialized runtime-plane services such as `omlx-runtime` are outside the
+  repo-local OpenCode commodity lane policy unless a later phase explicitly
+  adopts them.
 
 ## Lane policy
 - `deep`: trusted default repo-work lane
-- `main`: canary repo-work lane with a fail-closed repo-evidence rule
 - `fast`: synthesis-only lane
 
 Approved runtime contract:
-- active public LLM aliases are `fast`, `main`, and `deep`
-- `main` is the hardened Qwen3-Next canary on canonical Studio port `8101`
-- MAIN validation is currently satisfied by `tool_choice:"auto"`, long-context
-  sanity, branch-generation suitability, and concurrency posture
-- structured outputs are a known accepted limitation on the current runtime and
-  are not part of the closed public `main` contract
-- MAIN forced-tool semantics are intentionally not part of the accepted baseline
+- active repo-work aliases are `fast` and `deep`
+- specialized runtime-plane services are not part of the default repo-work lane
+  contract
 
 Repo-local OpenCode defaults in this repo:
 - default model: `litellm/deep`

@@ -47,6 +47,9 @@
 - There are no active temporary GPT rollout aliases in the current gateway
   contract.
 - `main` is retired from the current LiteLLM alias surface.
+- `omlx-runtime` is not part of the current LiteLLM alias surface.
+- The current repo evidence for oMLX is direct specialized-runtime use only,
+  not public gateway aliasing.
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects omitted reasoning
   defaults for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
@@ -87,6 +90,13 @@
 - Experimental aliases remain opt-in and additive. They do not replace the
   stable local alias contract and are not used as automatic fallback targets.
 - LiteLLM `/v1/models` is **alias-only** (canonical `mlx-*` IDs are omitted from the list).
+
+## Specialized runtime plane
+- `omlx-runtime` is represented in repo canon as a Studio-owned specialized
+  runtime-plane service.
+- It is intentionally outside the current LiteLLM routing contract.
+- It must not be documented as “the next alias” or as a generic OpenAI-style
+  public backend unless a later phase proves and promotes that path.
 
 ### LiteLLM Prometheus metrics (enabled)
 - `/metrics/` endpoint is exposed by the LiteLLM proxy on the same port (4000).
