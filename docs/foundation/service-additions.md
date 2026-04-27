@@ -1,17 +1,22 @@
 # Adding Services and Backends
 
-This repo treats LiteLLM as the only client-facing entry point. New services
-should either be:
-- A backend that LiteLLM routes to, or
-- A client/orchestrator that calls LiteLLM (never backends directly).
-Optimization proxies (e.g., OptiLLM) bind to localhost only.
-Experimental auth-backed translation sidecars such as `ccproxy-api` also bind
-to localhost only and must stay behind LiteLLM.
+This repo now distinguishes three planes:
+- commodity inference
+- specialized runtime
+- orchestration
 
-Current preferred usage: clients call LiteLLM only and select OptiLLM techniques
-via the LiteLLM `boost` handle (with `optillm_approach` in the request body).
-Direct calls to the proxy port are reserved for operator debugging on the host
-that runs the proxy.
+LiteLLM remains the public commodity inference gateway. That does **not** mean
+every useful runtime or orchestration surface must sit behind LiteLLM.
+
+Current preferred usage:
+- ordinary clients call LiteLLM for commodity inference
+- specialized runtime services keep a narrow private contract
+- orchestration services may call a specialized runtime directly when that
+  direct path is the validated contract
+
+Optimization proxies (e.g., OptiLLM) bind to localhost only. Experimental
+auth-backed translation sidecars such as `ccproxy-api` also bind to localhost
+only and must stay behind LiteLLM when they participate in commodity routing.
 
 Compatibility-first service taxonomy:
 - Register or update the service in `platform/registry/services.jsonl` before
@@ -30,6 +35,7 @@ Compatibility-first service taxonomy:
 - `SERVICE_SPEC.md` present with run/health/env details.
 - `ARCHITECTURE.md` updated with role in the mesh.
 - `AGENTS.md` created with service-scoped guidance.
+- `CONSTRAINTS.md` created with service-scoped limits.
 - `platform/ops/scripts/healthcheck.sh` updated if new endpoints exist.
 - `platform/ops/scripts/restart-all.sh` updated if new systemd service added.
 - Systemd unit added under `platform/ops/systemd/` when applicable.
@@ -86,6 +92,14 @@ Compatibility-first service taxonomy:
 2) Add env vars for model selection (`*_API_BASE`, `*_MODEL`) and
    keep them out of git.
 3) Document the client contract in `docs/` and its service folder.
+
+## Add a New Orchestration Prototype (Local Operator Cockpit)
+1) Keep the service localhost-only and experimental.
+2) Do not claim public gateway ownership unless a later phase promotes it.
+3) If the service drives a specialized runtime, preserve that runtime's narrow
+   validated contract rather than adding a generic compatibility layer.
+4) If the prototype uses a third-party GUI such as Agent Chat UI, prefer
+   repo-owned config/docs wrappers before vendoring the full app source.
 
 ## Config Sources of Truth
 - LiteLLM routing: `services/litellm-orch/config/router.yaml`.

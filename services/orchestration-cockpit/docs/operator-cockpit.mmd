@@ -1,0 +1,27 @@
+<!-- generated from services/orchestration-cockpit/src/orchestration_cockpit/graph.py; do not edit by hand -->
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	intake(intake)
+	route(route)
+	ordinary_placeholder(ordinary_placeholder)
+	specialized_prepare(specialized_prepare)
+	specialized_invoke(specialized_invoke)
+	finalize(finalize)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> intake;
+	intake --> route;
+	ordinary_placeholder --> finalize;
+	route -.-> finalize;
+	route -.-> ordinary_placeholder;
+	route -.-> specialized_prepare;
+	specialized_invoke --> finalize;
+	specialized_prepare --> specialized_invoke;
+	finalize --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

@@ -1,0 +1,15 @@
+[Unit]
+Description=orchestration-cockpit Agent Chat UI
+After=network-online.target orchestration-cockpit-graph.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/orchestration-cockpit
+EnvironmentFile=/etc/orchestration-cockpit/ui.env
+ExecStart=/bin/bash /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_agent_chat_ui.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

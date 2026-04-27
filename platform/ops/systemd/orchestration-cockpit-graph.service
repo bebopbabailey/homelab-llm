@@ -1,0 +1,15 @@
+[Unit]
+Description=orchestration-cockpit LangGraph local Agent Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/orchestration-cockpit
+EnvironmentFile=/etc/orchestration-cockpit/graph.env
+ExecStart=/bin/bash /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_langgraph_dev.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

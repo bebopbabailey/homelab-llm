@@ -1,5 +1,7 @@
 # Journal Index
 
+- [2026-04-27-orchestration-cockpit-service-ownership](2026-04-27-orchestration-cockpit-service-ownership.md)
+- [2026-04-27-orchestration-cockpit-bringup](2026-04-27-orchestration-cockpit-bringup.md)
 - [2026-04-27-omlx-runtime-phase3-validation](2026-04-27-omlx-runtime-phase3-validation.md)
 - [2026-04-27-gpt-oss-responses-followup-contract](2026-04-27-gpt-oss-responses-followup-contract.md)
 - [2026-04-22-gptoss-harmony-upstream-fix](2026-04-22-gptoss-harmony-upstream-fix.md)

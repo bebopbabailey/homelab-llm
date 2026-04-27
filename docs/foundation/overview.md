@@ -19,6 +19,8 @@ Reference: `docs/foundation/runtime-planes.md`
    - Current architectural representative: `omlx-runtime`.
 3) Orchestration plane (planned)
    - TinyAgents is the current repo-owned orchestration foothold.
+   - `orchestration-cockpit` is the current local operator-cockpit prototype
+     for LangGraph + Agent Chat UI against `omlx-runtime`.
    - Future orchestration owns task-level routing, retries, state, and
      evaluation rather than flattening those concerns into the commodity
      gateway.
@@ -83,3 +85,5 @@ Reference: `docs/foundation/runtime-planes.md`
 - TinyAgents: planned orchestration client that calls LiteLLM only.
 - `omlx-runtime`: specialized runtime-plane service identity for oMLX-style
   workloads; not part of the public commodity gateway contract.
+- `orchestration-cockpit`: localhost-only Mini-side orchestration prototype for
+  browser-driven graph missions; not a public gateway.

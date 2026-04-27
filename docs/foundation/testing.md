@@ -20,6 +20,24 @@ Expected:
 - control-plane sync remains aligned
 - internal markdown links on the supported doc surface resolve cleanly
 
+## Orchestration cockpit (phase 4 prototype)
+Service-local checks:
+```bash
+uv run --project services/orchestration-cockpit python -m unittest discover -s services/orchestration-cockpit/tests -p 'test_*.py'
+```
+
+Optional local dev smoke, only when the bounded local LangGraph tooling
+prerequisite is satisfied:
+```bash
+cd services/orchestration-cockpit
+uv run --project . langgraph dev --host 127.0.0.1 --port 2024
+```
+
+Expected:
+- deterministic ordinary placeholder route works without LiteLLM
+- specialized route preserves the frozen `omlx-runtime` request shape
+- local GUI uses `127.0.0.1:3030` so it does not collide with Open WebUI on `:3000`
+
 ## Runtime Lock
 FAST validator:
 ```bash

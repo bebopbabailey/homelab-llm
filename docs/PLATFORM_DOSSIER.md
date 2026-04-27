@@ -2,6 +2,7 @@
 
 ## Topology (current)
 - Mac Mini: LiteLLM :4000 (LAN + localhost; tailnet optional for remote operator access), Open WebUI :3000 (LAN + tailnet),
+  orchestration-cockpit prototype (localhost-only when launched: LangGraph dev :2024, Agent Chat UI :3030),
   OpenCode Web :4096 (LAN + tailnet-reachable if network policy allows, Basic Auth at app layer),
   OpenHands Phase A :4031 (localhost + tailnet via `hands`, systemd-managed Docker service),
   Samba SMB :139/:445 (LAN-only authenticated Finder access to `mini-root` and `seagate`),
@@ -37,6 +38,7 @@
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
 | Qwen-Agent proxy (experimental) | Mini | 4021 | 127.0.0.1 | http://127.0.0.1:4021 | /health, /v1/models, /v1/chat/completions | `platform/ops/systemd/qwen-agent-proxy.service`, `ss -ltnp`, direct curl |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
+| orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | 127.0.0.1 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only | `services/orchestration-cockpit/SERVICE_SPEC.md`, local `langgraph dev`, local Agent Chat UI |
 | CCProxy API (experimental) | Mini | 4010 | 127.0.0.1 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models | `/etc/systemd/system/ccproxy-api.service`, `ss -ltnp`, direct curl |
 | OpenCode Web | Mini | 4096 | 0.0.0.0 | http://127.0.0.1:4096 | UI root (401 unauthenticated) | `/etc/systemd/system/opencode-web.service`, `systemctl show opencode-web.service -p ExecStart`, `ss -ltnp` |
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | 127.0.0.1 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root | `/etc/systemd/system/openhands.service`, `systemctl show openhands.service -p ExecStart`, `ss -ltnp`, `tailscale serve status --json` |
@@ -69,7 +71,7 @@ Networking note:
   - not part of the active public LiteLLM alias contract
 - Orchestration plane:
   - Mini-owned by default for repo-managed orchestrators
-  - current foothold: `tiny-agents`
+  - current footholds: `tiny-agents` and the localhost-only `orchestration-cockpit` prototype
 - Execution boundary:
   - OpenHands remains a sandboxed operator/execution surface, not the
     orchestration plane and not the specialized runtime plane
@@ -255,9 +257,13 @@ Networking note:
   restart between them.
   Scheduling policy contract (strict two-lane + fail-closed allowlist):
   `docs/foundation/studio-scheduling-policy.md`.
-- `omlx-runtime`: specialized runtime-plane service identity only in phase 1.
-  It is Studio-owned, experimental, private by default, and not part of the
-  active `mlxctl`-governed public gateway path.
+- `omlx-runtime`: specialized runtime-plane service with a validated thin
+  Mini-side ingress client and a proven private Studio runtime path. It remains
+  Studio-owned, experimental, private by default, and outside the active
+  `mlxctl`-governed public gateway path.
+- `orchestration-cockpit`: localhost-only Mini-side LangGraph + Agent Chat UI
+  prototype for the orchestration plane. It does not own public gateway
+  routing, does not replace LiteLLM, and does not participate in Open WebUI.
 - llmster GPT service boundary: canonical public path is LiteLLM on Mini ->
   `llmster` on Studio -> llama.cpp runtime. Raw standalone `llama-server`
   mirrors remain loopback-only diagnostic seams and are not the public path.

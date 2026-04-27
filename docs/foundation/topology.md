@@ -1,7 +1,7 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama.
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama, plus the localhost-only `orchestration-cockpit` prototype when launched.
 - Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
@@ -22,6 +22,9 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
   operator access at `https://hands.tailfd1400.ts.net/`.
   OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
+  `orchestration-cockpit` is localhost-only and inactive by default; when
+  launched it uses LangGraph dev on `127.0.0.1:2024` and Agent Chat UI on
+  `127.0.0.1:3030`.
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
@@ -57,6 +60,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
+| orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only |
 | CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
 | Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |

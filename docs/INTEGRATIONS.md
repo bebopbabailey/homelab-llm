@@ -98,6 +98,16 @@
 - It must not be documented as “the next alias” or as a generic OpenAI-style
   public backend unless a later phase proves and promotes that path.
 
+## Local orchestration cockpit
+- `orchestration-cockpit` is the current localhost-only Mini-side LangGraph +
+  Agent Chat UI prototype for the orchestration plane.
+- It is intentionally outside the LiteLLM alias surface and outside Open WebUI.
+- The ordinary branch is a deterministic placeholder in phase 4.
+- The specialized branch uses `OmlxRuntimeClient` directly through the validated
+  Mini `127.0.0.1:8129` -> Studio `127.0.0.1:8120` path.
+- Agent Chat UI connects to the local LangGraph dev server by graph ID
+  `operator-cockpit`; no public cockpit route is defined in phase 4.
+
 ### LiteLLM Prometheus metrics (enabled)
 - `/metrics/` endpoint is exposed by the LiteLLM proxy on the same port (4000).
 - Endpoint is currently reachable without bearer auth in this deployment.

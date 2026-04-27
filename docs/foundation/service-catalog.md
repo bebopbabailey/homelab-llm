@@ -9,6 +9,9 @@ Current posture:
   placeholders
 - localhost-only experimental backends may also live under `experiments/` when
   they sit behind LiteLLM and are not part of the public client contract
+- localhost-only experimental operator/orchestration prototypes may live under
+  `services/` when they are repo-owned contract surfaces but not public
+  deployments
 - `parent_service_id` allows explicit child-service relationships such as
   `mcp-tools/web-fetch`
 - `layer-*` is taxonomy/navigation only and is not a live service-root surface

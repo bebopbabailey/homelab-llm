@@ -1,12 +1,12 @@
 # NOW
 
 Active
-- Move the public GPT-OSS LiteLLM surface (`fast`, `deep`, `task-*`) to a
-  Responses-first contract on top of the corrected shared `llmster` backend,
-  then codify the direct `8126` follow-up/cached-token contract and the client
-  usage pattern for `task-transcribe-vivid`.
+- Promote `orchestration-cockpit` into a repo-owned localhost-only Mini
+  service: preserve the working LangGraph + Agent Chat UI prototype, add
+  generated Mermaid and a small correlated run ledger, and define local service
+  ownership targets.
 
 NEXT UP
-- Start using `previous_response_id` in client follow-up flows and observe
-  `usage.input_tokens_details.cached_tokens` before considering any deeper
-  backend/runtime tuning.
+- If phase 5 lands cleanly, close out the worktree and decide whether the next
+  orchestration slice should add bounded capability or a production-shaped
+  runtime path without widening the commodity lane.

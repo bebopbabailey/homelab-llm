@@ -10,6 +10,7 @@ Current, canonical statements of the system, its contracts, and its integration 
     - `docs/foundation/studio-scheduling-policy.md`
     - `docs/foundation/constraints-and-decisions.md`
     - `docs/foundation/overview.md`
+    - `docs/foundation/runtime-planes.md`
     - `docs/INTEGRATIONS.md`
     - `docs/foundation/mlx-registry.md`
     - `docs/foundation/runtime-lock.md`
@@ -42,6 +43,8 @@ Current, canonical statements of the system, its contracts, and its integration 
 ## Operational
 How to run, test, or validate the current system.
 - `docs/foundation/testing.md`
+- `docs/foundation/service-additions.md`
+- `docs/foundation/service-catalog.md`
 - `DOCS_CONTRACT.md`
 - `CONSTRAINTS.md`
 - `SYSTEM_OVERVIEW.md`
