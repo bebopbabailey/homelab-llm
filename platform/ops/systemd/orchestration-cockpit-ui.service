@@ -5,9 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/christopherbailey/homelab-llm/services/orchestration-cockpit
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey
 EnvironmentFile=/etc/orchestration-cockpit/ui.env
-ExecStart=/bin/bash /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_agent_chat_ui.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ExecStart=/bin/bash -lc 'exec "$ORCHESTRATION_COCKPIT_REPO_ROOT/services/orchestration-cockpit/scripts/run_agent_chat_ui.sh"'
 Restart=on-failure
 RestartSec=5
 

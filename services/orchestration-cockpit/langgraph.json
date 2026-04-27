@@ -5,6 +5,5 @@
   ],
   "graphs": {
     "operator-cockpit": "./src/orchestration_cockpit/graph.py:graph"
-  },
-  "env": "./.env"
+  }
 }

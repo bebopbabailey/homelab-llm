@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-04-27-orchestration-cockpit-phase6-durable-service](2026-04-27-orchestration-cockpit-phase6-durable-service.md)
 - [2026-04-27-orchestration-cockpit-service-ownership](2026-04-27-orchestration-cockpit-service-ownership.md)
 - [2026-04-27-orchestration-cockpit-bringup](2026-04-27-orchestration-cockpit-bringup.md)
 - [2026-04-27-omlx-runtime-phase3-validation](2026-04-27-omlx-runtime-phase3-validation.md)

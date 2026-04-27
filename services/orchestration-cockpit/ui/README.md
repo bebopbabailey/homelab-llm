@@ -27,6 +27,21 @@ Phase 5 ownership rule:
   insufficient
 - the repo owns only config, env templates, runbook steps, and service wrappers
 
+Phase 6 ownership target:
+- supported external UI root:
+  - `/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui`
+- installed runtime env:
+  - `/etc/orchestration-cockpit/ui.env`
+- systemd unit target:
+  - `orchestration-cockpit-ui.service`
+- the UI remains a localhost-only dev-mode `next dev` service in this phase; it
+  is not a production Next.js deployment
+- the supported host env should pin a durable launcher path, preferably the
+  scaffold-local `next` binary, for example:
+  - `ORCHESTRATION_COCKPIT_NEXT_BIN=/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui/apps/web/node_modules/.bin/next`
+- if that is unavailable, fall back to `corepack`, for example:
+  - `ORCHESTRATION_COCKPIT_COREPACK_BIN=/home/christopherbailey/.volta/tools/image/node/24.13.0/bin/corepack`
+
 LangSmith note:
 - Agent Chat UI itself does **not** require a LangSmith API key for local
   server use.

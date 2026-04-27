@@ -9,6 +9,7 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
 - Local/dev Agent Server posture only
 - No production deployment in this phase
 - No public route
+- systemd-owned local service target in phase 6
 
 ## Host & ownership
 - Owner host: Mini
@@ -17,10 +18,11 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
 
 ## Runtime shape
 - Current runtime:
-  - LangGraph local/dev Agent Server
-  - stock Agent Chat UI from an external scaffold or local checkout
-  - repo-owned wrappers, env templates, runbook, generated Mermaid, and local
-    artifacts
+  - LangGraph local/dev Agent Server under a repo-managed systemd unit
+  - stock Agent Chat UI from an external scaffold or local checkout under a
+    repo-managed systemd unit
+  - repo-owned wrappers, tracked `langgraph.json`, env templates, runbook,
+    generated Mermaid, and local artifacts
 - Later production-shaped path is documented but deferred:
   - LangGraph standalone Agent Server / Docker image
   - non-dev persistence/runtime backing
@@ -43,8 +45,16 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
   - `platform/ops/systemd/orchestration-cockpit-graph.service`
 - Repo-managed unit target:
   - `platform/ops/systemd/orchestration-cockpit-ui.service`
-- Phase 5 defines those ownership targets and launch/env expectations, but does
-  not require enabling or boot-persisting them yet.
+- Installed host env files:
+  - `/etc/orchestration-cockpit/graph.env`
+  - optional `/etc/orchestration-cockpit/graph.secret.env`
+  - `/etc/orchestration-cockpit/ui.env`
+- Supported host-owned paths:
+  - Agent Chat UI root:
+    - `/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui`
+  - runtime state/artifacts:
+    - `/home/christopherbailey/.local/state/orchestration-cockpit`
+- Phase 6 installs and validates the units, but does not enable them on boot.
 
 ## Mission contract
 - Required graph state includes:
@@ -104,8 +114,19 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
 ## Local observability
 - Canonical static graph artifact: generated Mermaid from the compiled graph
 - Canonical runtime artifact: small local JSONL run ledger
-- Default artifact root: `/tmp/orchestration-cockpit-phase5`
-- No cloud observability dependency is required for phase 5 success
+- Default artifact root:
+  `/home/christopherbailey/.local/state/orchestration-cockpit`
+- No cloud observability dependency is required for phase 6 success
+
+## Runtime hygiene
+- Repo-local `.env` is for manual local use only and is not the service runtime
+  authority.
+- The tracked `langgraph.json` remains the config source of truth.
+- The live runtime `langgraph.json` copy under
+  `~/.local/state/orchestration-cockpit/langgraph-runtime/` is generated from
+  repo truth only and must not be edited by hand.
+- `uv.lock` is committed for reproducibility and is not a disposable runtime
+  artifact.
 
 ## Explicit non-goals
 - Public routing

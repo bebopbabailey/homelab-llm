@@ -20,6 +20,8 @@ the repo a real local service boundary around:
   - Mini `127.0.0.1:8129`
   - SSH forward
   - Studio `127.0.0.1:8120`
+- Phase 6 makes the graph and UI normal localhost-only `systemd` services while
+  keeping the specialized forward external.
 
 ## Graph boundary
 - Graph ID: `operator-cockpit`
@@ -35,7 +37,7 @@ the repo a real local service boundary around:
 - Canonical static artifact:
   - `services/orchestration-cockpit/docs/operator-cockpit.mmd`
 - Runtime correlation stays local:
-  - graph run ledger under `/tmp/orchestration-cockpit-phase5/`
+  - graph run ledger under `~/.local/state/orchestration-cockpit/`
   - `omlx-runtime` adapter telemetry under the same artifact root
 - The service does not build a custom dashboard in this phase.
 
@@ -44,7 +46,8 @@ the repo a real local service boundary around:
   - `orchestration-cockpit-graph.service`
 - UI unit target:
   - `orchestration-cockpit-ui.service`
-- These target units define the repo-owned local launch shape, but phase 5 does
+- These units define the repo-owned local launch shape.
+- Phase 6 validates them as disabled-by-default localhost-only services; it does
   not turn them into a production deployment contract.
 
 ## LangSmith posture
@@ -64,13 +67,13 @@ production-shaped runtime:
   durable
 
 That path is documented here to keep the service shape honest, but it is
-explicitly deferred in phase 5.
+explicitly deferred in phase 6.
 
 ## Langflow posture
 Langflow is a later workflow-lab comparison candidate only.
 - It is not the source of truth for orchestration.
 - It is not part of this service implementation.
-- It is not allowed to create a second workflow definition in phase 5.
+- It is not allowed to create a second workflow definition in phase 6.
 
 ## Non-goals
 - Public operator surface

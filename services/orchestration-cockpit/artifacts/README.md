@@ -3,7 +3,7 @@
 `orchestration-cockpit` keeps runtime artifacts local by default.
 
 Default artifact root:
-- `/tmp/orchestration-cockpit-phase5`
+- `/home/christopherbailey/.local/state/orchestration-cockpit`
 
 Current artifacts:
 - `run-ledger.jsonl`

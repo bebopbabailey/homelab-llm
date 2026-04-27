@@ -12,7 +12,7 @@ from omlx_runtime_client import append_jsonl_record
 
 from orchestration_cockpit.state import CockpitState
 
-DEFAULT_ARTIFACT_DIR = "/tmp/orchestration-cockpit-phase5"
+DEFAULT_ARTIFACT_DIR = str(Path.home() / ".local" / "state" / "orchestration-cockpit")
 DEFAULT_GRAPH_ID = "operator-cockpit"
 
 

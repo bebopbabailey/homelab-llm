@@ -5,9 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/christopherbailey/homelab-llm/services/orchestration-cockpit
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey
 EnvironmentFile=/etc/orchestration-cockpit/graph.env
-ExecStart=/bin/bash /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_langgraph_dev.sh
+EnvironmentFile=-/etc/orchestration-cockpit/graph.secret.env
+NoNewPrivileges=true
+PrivateTmp=true
+ExecStart=/bin/bash -lc 'exec "$ORCHESTRATION_COCKPIT_REPO_ROOT/services/orchestration-cockpit/scripts/run_langgraph_dev.sh"'
 Restart=on-failure
 RestartSec=5
 

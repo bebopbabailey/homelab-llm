@@ -12,19 +12,48 @@ shape without changing the commodity chat surface.
   - Studio oMLX listener on `127.0.0.1:8120`
   - Mini SSH forward on `127.0.0.1:8129`
 
-## Local config
-Copy the service env template locally and keep it out of git:
+## Runtime ownership
+Phase 6 defines the supported host-owned paths:
+- Agent Chat UI root:
+  - `/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui`
+- runtime state/artifacts:
+  - `/home/christopherbailey/.local/state/orchestration-cockpit`
+- installed env files:
+  - `/etc/orchestration-cockpit/graph.env`
+  - optional `/etc/orchestration-cockpit/graph.secret.env`
+  - `/etc/orchestration-cockpit/ui.env`
+
+Repo-local `.env` remains manual-only convenience for non-systemd runs. It is
+not the durable service authority.
+
+## Env templates
+Copy the repo-managed templates into `/etc/orchestration-cockpit/` and edit
+them locally:
 ```bash
-cp services/orchestration-cockpit/.env.example services/orchestration-cockpit/.env
+sudo install -d -m 0755 /etc/orchestration-cockpit
+sudo install -m 0644 platform/ops/templates/orchestration-cockpit.graph.env.example /etc/orchestration-cockpit/graph.env
+sudo install -m 0644 platform/ops/templates/orchestration-cockpit.graph.secret.env.example /etc/orchestration-cockpit/graph.secret.env
+sudo install -m 0644 platform/ops/templates/orchestration-cockpit.ui.env.example /etc/orchestration-cockpit/ui.env
 ```
 
-Expected local env values:
+Required graph env values:
+- `ORCHESTRATION_COCKPIT_REPO_ROOT=/home/christopherbailey/homelab-llm`
 - `OMLX_RUNTIME_BASE_URL=http://127.0.0.1:8129`
 - `OMLX_RUNTIME_BEARER_TOKEN=...`
 - `OMLX_RUNTIME_MODEL=Qwen3-4B-Instruct-2507-4bit`
-- `ORCHESTRATION_COCKPIT_ARTIFACT_DIR=/tmp/orchestration-cockpit-phase5`
-- `PYTHONPATH=./src:../omlx-runtime/src`
+- `ORCHESTRATION_COCKPIT_STATE_DIR=/home/christopherbailey/.local/state/orchestration-cockpit`
+- optional `UV_PROJECT_ENVIRONMENT=/home/christopherbailey/.local/share/orchestration-cockpit/graph-venv`
+
+Optional graph secret env:
 - `LANGSMITH_API_KEY=...` only if `langgraph dev` still requires it locally
+
+Required UI env values:
+- `ORCHESTRATION_COCKPIT_UI_ROOT=/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui`
+- `NEXT_PUBLIC_API_URL=http://127.0.0.1:2024`
+- `NEXT_PUBLIC_ASSISTANT_ID=operator-cockpit`
+- `ORCHESTRATION_COCKPIT_UI_PORT=3030`
+- `ORCHESTRATION_COCKPIT_NEXT_BIN=/home/christopherbailey/.local/share/orchestration-cockpit/agent-chat-ui/apps/web/node_modules/.bin/next`
+- `ORCHESTRATION_COCKPIT_COREPACK_BIN=/home/christopherbailey/.volta/tools/image/node/24.13.0/bin/corepack`
 
 ## Python setup
 ```bash
@@ -53,17 +82,22 @@ uv tool install "langgraph-cli[inmem]"
 ```
 
 Important:
-- launch from the service root or use the wrapper so `PYTHONPATH` resolves
-  `./src:../omlx-runtime/src` for the local checkout layout
+- the tracked `langgraph.json` remains the source of truth, but the wrapper
+  generates a runtime config copy with absolute paths under
+  `~/.local/state/orchestration-cockpit/langgraph-runtime/langgraph.json`
+- the wrapper redirects the `uv` project environment and LangGraph runtime
+  working directory outside the repo
 - the graph must not compile with a custom checkpointer; `langgraph dev`
   rejects that shape and manages persistence itself
 
 ## Agent Chat UI (not vendored)
-Option 1: local scaffold
+Option 1: local scaffold in the supported durable root
 ```bash
-npx create-agent-chat-app --project-name orchestration-cockpit-ui
-cd orchestration-cockpit-ui
-cp /home/christopherbailey/homelab-llm/services/orchestration-cockpit/ui/.env.example .env.local
+mkdir -p /home/christopherbailey/.local/share/orchestration-cockpit
+cd /home/christopherbailey/.local/share/orchestration-cockpit
+npx create-agent-chat-app --project-name agent-chat-ui
+cd agent-chat-ui
+cp /home/christopherbailey/homelab-llm/services/orchestration-cockpit/ui/.env.example apps/web/.env.local
 corepack pnpm install
 export ORCHESTRATION_COCKPIT_UI_ROOT="$PWD"
 /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_agent_chat_ui.sh
@@ -82,18 +116,25 @@ Important:
 - for this repo, point the web app at the existing local LangGraph server on
   `127.0.0.1:2024` and bind the UI itself to `127.0.0.1:3030`
 
-## Local service ownership target
-Phase 5 defines, but does not require enabling, these repo-managed unit targets:
-- `platform/ops/systemd/orchestration-cockpit-graph.service`
-- `platform/ops/systemd/orchestration-cockpit-ui.service`
+## systemd install/start/stop
+Install the repo-managed units:
+```bash
+sudo install -m 0644 platform/ops/systemd/orchestration-cockpit-graph.service /etc/systemd/system/orchestration-cockpit-graph.service
+sudo install -m 0644 platform/ops/systemd/orchestration-cockpit-ui.service /etc/systemd/system/orchestration-cockpit-ui.service
+sudo systemctl daemon-reload
+```
 
-Expected env file ownership:
-- graph unit: `/etc/orchestration-cockpit/graph.env`
-- UI unit: `/etc/orchestration-cockpit/ui.env`
+Start and verify them:
+```bash
+sudo systemctl start orchestration-cockpit-graph.service
+sudo systemctl start orchestration-cockpit-ui.service
+systemctl status orchestration-cockpit-graph.service --no-pager
+systemctl status orchestration-cockpit-ui.service --no-pager
+curl -fsS http://127.0.0.1:2024/docs >/dev/null && echo "langgraph ok"
+curl -fsS http://127.0.0.1:3030 >/dev/null && echo "ui ok"
+```
 
-Expected installed host units:
-- `/etc/systemd/system/orchestration-cockpit-graph.service`
-- `/etc/systemd/system/orchestration-cockpit-ui.service`
+Do not enable them on boot in phase 6.
 
 ## Manual browser checks
 1. ordinary mission:
@@ -110,13 +151,38 @@ Expected:
 - invalid specialized command returns out-of-scope without invoking the adapter
 
 ## Local artifacts
-Phase 5 keeps artifacts local by default:
+Phase 6 keeps artifacts local by default:
 - run ledger:
-  - `/tmp/orchestration-cockpit-phase5/run-ledger.jsonl`
+  - `/home/christopherbailey/.local/state/orchestration-cockpit/run-ledger.jsonl`
 - correlated `omlx-runtime` telemetry:
-  - `/tmp/orchestration-cockpit-phase5/omlx-runtime-telemetry.jsonl`
+  - `/home/christopherbailey/.local/state/orchestration-cockpit/omlx-runtime-telemetry.jsonl`
 
 These are local service artifacts, not repo-tracked runtime outputs.
+
+## Rollback / cleanup
+Stop the services:
+```bash
+sudo systemctl stop orchestration-cockpit-ui.service
+sudo systemctl stop orchestration-cockpit-graph.service
+```
+
+Remove the installed units:
+```bash
+sudo rm -f /etc/systemd/system/orchestration-cockpit-graph.service
+sudo rm -f /etc/systemd/system/orchestration-cockpit-ui.service
+sudo systemctl daemon-reload
+```
+
+Verify ports are clear:
+```bash
+ss -ltn '( sport = :2024 or sport = :3030 )'
+```
+
+State/share directories remain by default:
+- `/home/christopherbailey/.local/share/orchestration-cockpit/`
+- `/home/christopherbailey/.local/state/orchestration-cockpit/`
+
+Do not delete local state automatically unless explicitly requested.
 
 ## Later production-shaped path (deferred)
 Do not treat `langgraph dev` as the long-term deployment shape.
