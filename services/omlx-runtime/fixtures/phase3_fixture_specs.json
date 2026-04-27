@@ -1,0 +1,55 @@
+{
+  "system_template": "You are a coding-agent assistant validating repeated-prefix runtime behavior. Read the shared repository-style context carefully, preserve exact wording, and answer only the requested task for the specific variant.",
+  "shared_block": "FILE: src/module_{index}.py\\n```python\\ndef helper_{index}(value):\\n    return value * 2 + {index}\\n```\\nDOC: This pseudo-repository excerpt is repeated to emulate shared long-context coding-agent state. Preserve details when reasoning about behavior and avoid inventing files.\\n",
+  "suffix_template": "TASK VARIANT {variant}: Review the shared repository context above. Produce a concise explanation of how helper_{helper_index} behaves, call out one edge case, and suggest a minimal follow-up test. Keep the answer short and deterministic.\\n",
+  "fixtures": [
+    {
+      "id": "G01",
+      "kind": "guardrail",
+      "shared_block_repetitions": 4,
+      "variant_suffix_repetitions": 1,
+      "concurrency": 1,
+      "max_tokens": 256
+    },
+    {
+      "id": "G02",
+      "kind": "guardrail",
+      "shared_block_repetitions": 48,
+      "variant_suffix_repetitions": 2,
+      "concurrency": 1,
+      "max_tokens": 512
+    },
+    {
+      "id": "S01",
+      "kind": "repeated_prefix",
+      "shared_block_repetitions": 96,
+      "variant_suffix_repetitions": 2,
+      "concurrency": 1,
+      "max_tokens": 512
+    },
+    {
+      "id": "S02",
+      "kind": "repeated_prefix",
+      "shared_block_repetitions": 96,
+      "variant_suffix_repetitions": 2,
+      "concurrency": 2,
+      "max_tokens": 512
+    },
+    {
+      "id": "S03",
+      "kind": "repeated_prefix",
+      "shared_block_repetitions": 144,
+      "variant_suffix_repetitions": 2,
+      "concurrency": 1,
+      "max_tokens": 512
+    },
+    {
+      "id": "S04",
+      "kind": "repeated_prefix",
+      "shared_block_repetitions": 144,
+      "variant_suffix_repetitions": 2,
+      "concurrency": 2,
+      "max_tokens": 512
+    }
+  ]
+}

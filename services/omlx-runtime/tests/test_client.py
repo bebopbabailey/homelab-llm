@@ -91,6 +91,28 @@ class OmlxRuntimeClientTests(unittest.TestCase):
         with self.assertRaises(OmlxRuntimeContractError):
             client.chat_completions(bad)
 
+    def test_rejects_tool_choice_shape(self) -> None:
+        client = OmlxRuntimeClient(base_url="http://127.0.0.1:1", bearer_token="token")
+        bad = dict(VALID_PAYLOAD)
+        bad["tool_choice"] = "required"
+        with self.assertRaises(OmlxRuntimeContractError):
+            client.chat_completions(bad)
+
+    def test_rejects_structured_output_shape(self) -> None:
+        client = OmlxRuntimeClient(base_url="http://127.0.0.1:1", bearer_token="token")
+        bad = dict(VALID_PAYLOAD)
+        bad["response_format"] = {"type": "json_schema"}
+        with self.assertRaises(OmlxRuntimeContractError):
+            client.chat_completions(bad)
+
+    def test_rejects_responses_api_shape(self) -> None:
+        client = OmlxRuntimeClient(base_url="http://127.0.0.1:1", bearer_token="token")
+        bad = dict(VALID_PAYLOAD)
+        del bad["messages"]
+        bad["input"] = "responses api style input"
+        with self.assertRaises(OmlxRuntimeContractError):
+            client.chat_completions(bad)
+
     def test_rejects_non_string_message_content(self) -> None:
         client = OmlxRuntimeClient(base_url="http://127.0.0.1:1", bearer_token="token")
         bad = dict(VALID_PAYLOAD)
