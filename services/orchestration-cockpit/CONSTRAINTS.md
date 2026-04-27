@@ -3,8 +3,8 @@
 This service inherits global constraints from `../../AGENTS.md`.
 
 ## Hard constraints
-- Keep this service localhost-only in phase 4.
-- Do not expose the cockpit publicly or via tailnet in phase 4.
+- Keep this service localhost-only.
+- Do not expose the cockpit publicly or via tailnet.
 - Do not route ordinary chat to `omlx-runtime`.
 - Do not add LiteLLM aliasing, Open WebUI integration, or OpenHands integration.
 - Do not vendor the full Agent Chat UI source unless stock UI proves insufficient.
@@ -20,7 +20,7 @@ This service inherits global constraints from `../../AGENTS.md`.
 - New LAN exposure, host-binding changes, or public routing.
 - MCP additions.
 - LangGraph production deployment.
-- Interrupt/human-approval flow in phase 4.
+- Interrupt/human-approval flow.
 
 ## Validation pointers
 - `uv run --project services/orchestration-cockpit python -m unittest discover -s services/orchestration-cockpit/tests -p 'test_*.py'`
