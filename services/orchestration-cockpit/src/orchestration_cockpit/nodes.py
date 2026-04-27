@@ -44,10 +44,18 @@ def intake_node(
 ) -> dict[str, Any]:
     return {
         "thread_id": resolve_thread_id(state, config),
-        "run_id": state.get("run_id") or new_run_id(),
-        "started_at": state.get("started_at") or now_utc(),
+        "run_id": new_run_id(),
+        "started_at": now_utc(),
         "mission_mode": "ordinary",
-        "node_sequence": append_node_sequence(state, "intake"),
+        "route_decision": "",
+        "route_reason": "",
+        "fixture_id": "",
+        "node_sequence": ["intake"],
+        "adapter_request_id": "",
+        "specialized_payload": {},
+        "specialized_result": {},
+        "final_text": "",
+        "error": "",
         "messages": [AIMessage(content="Intake: mission received")],
     }
 

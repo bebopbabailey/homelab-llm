@@ -172,6 +172,48 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(result["node_sequence"], ["intake", "route", "finalize"])
         self.assertFalse(Path(adapter_telemetry_path()).exists())
 
+    def test_same_thread_turns_reset_run_context_and_do_not_leak_adapter_correlation(self) -> None:
+        def fake_runner(payload: Mapping[str, Any]):
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "deterministic specialized reply"
+                        }
+                    }
+                ]
+            }
+
+        graph = build_test_graph(fake_runner)
+
+        first = graph.invoke(
+            {
+                "messages": [
+                    HumanMessage(content="/specialized S02 explain the repeated-prefix runtime path briefly")
+                ]
+            },
+            config=TEST_CONFIG,
+        )
+        second = graph.invoke(
+            {"messages": [HumanMessage(content="/specialized TOOL please run tools")]},
+            config=TEST_CONFIG,
+        )
+
+        self.assertNotEqual(first["run_id"], second["run_id"])
+        self.assertEqual(
+            first["node_sequence"],
+            ["intake", "route", "specialized_prepare", "specialized_invoke", "finalize"],
+        )
+        self.assertEqual(second["node_sequence"], ["intake", "route", "finalize"])
+        self.assertEqual(second.get("adapter_request_id", ""), "")
+        self.assertEqual(second["route_decision"], "out-of-scope")
+
+        ledger = _load_jsonl(run_ledger_path())
+        self.assertEqual(len(ledger), 2)
+        self.assertEqual(ledger[0]["adapter_request_id"], first["adapter_request_id"])
+        self.assertEqual(ledger[1]["adapter_request_id"], "")
+        self.assertEqual(ledger[1]["node_sequence"], ["intake", "route", "finalize"])
+
 
 class PayloadTests(unittest.TestCase):
     def test_specialized_payload_matches_frozen_contract(self) -> None:
