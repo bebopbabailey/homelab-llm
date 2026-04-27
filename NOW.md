@@ -2,8 +2,11 @@
 
 Active
 - Move the public GPT-OSS LiteLLM surface (`fast`, `deep`, `task-*`) to a
-  Responses-first contract on top of the corrected shared `llmster` backend.
+  Responses-first contract on top of the corrected shared `llmster` backend,
+  then codify the direct `8126` follow-up/cached-token contract and the client
+  usage pattern for `task-transcribe-vivid`.
 
 NEXT UP
-- Revisit the remaining `fast`-lane transcribe prompt budget/shape only if the
-  Responses-first contract still shows direct upstream defects after landing.
+- Start using `previous_response_id` in client follow-up flows and observe
+  `usage.input_tokens_details.cached_tokens` before considering any deeper
+  backend/runtime tuning.

@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-04-27-gpt-oss-responses-followup-contract](2026-04-27-gpt-oss-responses-followup-contract.md)
 - [2026-04-22-gptoss-harmony-upstream-fix](2026-04-22-gptoss-harmony-upstream-fix.md)
 - [2026-04-21-omlx-litellm-shadow-alias-result](2026-04-21-omlx-litellm-shadow-alias-result.md)
 - [2026-04-21-abandoned-branch-journal-salvage](2026-04-21-abandoned-branch-journal-salvage.md)

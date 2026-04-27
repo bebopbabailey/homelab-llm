@@ -60,6 +60,14 @@
   - `task-json`
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   public GPT-OSS lanes.
+- Direct raw `llmster` clients should treat the Responses `output` message
+  surface as canonical text. `output_text` is useful when present, but it is
+  not the upstream truth-path requirement for `fast` / `deep`.
+- LiteLLM keeps the task aliases more ergonomic by preserving `id`,
+  `previous_response_id`, and `usage`, while also returning stable
+  `output_text` on `task-transcribe*` and `task-json`. Callers may reuse the
+  public response `id` on the next request, but should not depend on the
+  echoed `previous_response_id` string matching that public `id` verbatim.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
@@ -167,6 +175,10 @@ if a param is rejected by the backend.
   the local transcribe dotprompts through its generic prompt-template path and
   uses only a narrow transcript pre/post sanitizer around them; it does not
   switch backends or retry onto another lane.
+- `task-transcribe-vivid` is the supported follow-up lane for conversational
+  transcript manipulation. Reuse the prior Responses `id` as
+  `previous_response_id` and optionally observe
+  `usage.input_tokens_details.cached_tokens` to confirm reuse behavior.
 - LiteLLM transcript-to-JSON utility alias:
   - `task-json`
 - `task-json` is also a `POST /v1/responses` utility contract first.

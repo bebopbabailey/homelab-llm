@@ -129,6 +129,8 @@ The GPT acceptance harness now reports:
 - `named_tool_arg`
 - `large_schema_tool_stress`
 - `responses_smoke`
+- `responses_structured_simple`
+- `responses_followup_state`
 - `concurrency_smoke`
 
 Deep usable-success gate:
@@ -1758,6 +1760,47 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Content-Type: application/json" \
   -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":256}' | jq -r '.output[0].content[0].text'
 
+python3 - <<'PY'
+import json, urllib.request
+
+key = None
+for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local", encoding="utf-8"):
+    if line.startswith("LITELLM_MASTER_KEY="):
+        key = line.split("=", 1)[1].strip().strip('"').strip("'")
+        break
+
+url = "http://127.0.0.1:4000/v1/responses"
+headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+first = {
+    "model": "task-transcribe-vivid",
+    "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
+    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+    "max_output_tokens": 256,
+}
+req = urllib.request.Request(url, data=json.dumps(first).encode(), headers=headers, method="POST")
+with urllib.request.urlopen(req, timeout=90) as resp:
+    first_body = json.loads(resp.read().decode())
+
+second = {
+    "model": "task-transcribe-vivid",
+    "previous_response_id": first_body["id"],
+    "input": [{"role": "user", "content": "Make that a little more formal."}],
+    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+    "max_output_tokens": 192,
+}
+req = urllib.request.Request(url, data=json.dumps(second).encode(), headers=headers, method="POST")
+with urllib.request.urlopen(req, timeout=90) as resp:
+    second_body = json.loads(resp.read().decode())
+
+print(json.dumps({
+    "first_id": first_body.get("id"),
+    "first_cached_tokens": ((first_body.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
+    "second_previous_response_id": second_body.get("previous_response_id"),
+    "second_cached_tokens": ((second_body.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
+    "second_output_text": second_body.get("output_text"),
+}, indent=2))
+PY
+
 SMOKE_KEY_JSON="$(curl -fsS http://127.0.0.1:4000/key/generate \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
@@ -1782,6 +1825,11 @@ Pass guidance:
 - both aliases succeed through `POST /v1/responses`
 - outputs are plain cleaned transcript text with no wrapper heading, label, or commentary
 - `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
+- vivid follow-up accepts the prior public response `id` as
+  `previous_response_id`
+- the echoed `previous_response_id` does not need to equal that public `id`
+  byte-for-byte
+- vivid follow-up exposes `usage.input_tokens_details.cached_tokens`
 
 ## Legacy Path Removal Checks (Mini)
 Service removal and active-surface grep:

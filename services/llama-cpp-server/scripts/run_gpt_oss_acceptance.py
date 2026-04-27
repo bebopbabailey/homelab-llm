@@ -128,6 +128,27 @@ def _extract_responses_text(body: dict[str, Any]) -> str:
     return "".join(chunks)
 
 
+def _extract_cached_tokens(body: dict[str, Any]) -> int | None:
+    usage = body.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    details = usage.get("input_tokens_details")
+    if not isinstance(details, dict):
+        return None
+    value = details.get("cached_tokens")
+    return value if isinstance(value, int) else None
+
+
+def _extract_response_id(body: dict[str, Any]) -> str | None:
+    value = body.get("id")
+    return value if isinstance(value, str) and value else None
+
+
+def _extract_previous_response_id(body: dict[str, Any]) -> str | None:
+    value = body.get("previous_response_id")
+    return value if isinstance(value, str) and value else None
+
+
 def _raw_harmony_snippets(value: Any, *, limit: int = 3) -> list[str]:
     snippets: list[str] = []
 
@@ -197,6 +218,18 @@ def _expect_responses_text(content: str) -> Callable[[dict], bool]:
     return check
 
 
+def _expect_responses_json_keys(required_keys: list[str]) -> Callable[[dict], bool]:
+    def check(body: dict) -> bool:
+        message = _extract_responses_text(body)
+        try:
+            parsed = json.loads(message)
+        except Exception:
+            return False
+        return all(key in parsed for key in required_keys)
+
+    return check
+
+
 def _run_case(
     url: str,
     payload: dict,
@@ -258,6 +291,68 @@ def _run_concurrency(
         "p95_latency_s": ordered[max(0, int(len(ordered) * 0.95) - 1)] if ordered else None,
         "status_counts": {str(status): statuses.count(status) for status in sorted(set(statuses))},
     }
+
+
+def _run_responses_followup(
+    url: str,
+    model: str,
+    timeout: float,
+    api_key: str | None,
+) -> dict[str, Any]:
+    initial_payload = _response_payload(model, "Reply with exactly: followup-seed", max_output_tokens=128)
+    initial_status, initial_body, initial_latency = _post(url, initial_payload, api_key, timeout)
+    initial_id = _extract_response_id(initial_body)
+    initial_text = _extract_responses_text(initial_body)
+
+    result: dict[str, Any] = {
+        "initial_status": initial_status,
+        "initial_latency_s": initial_latency,
+        "initial_response_id_present": bool(initial_id),
+        "initial_cached_tokens": _extract_cached_tokens(initial_body),
+        "initial_text": initial_text,
+        "followup_attempted": False,
+        "followup_status": None,
+        "followup_latency_s": None,
+        "previous_response_id_matches": False,
+        "followup_cached_tokens": None,
+        "followup_text": "",
+        "ok": False,
+        "failures": [],
+    }
+    if initial_status != 200:
+        result["failures"].append({"phase": "initial", "status": initial_status, "body": initial_body})
+        return result
+    if not initial_id:
+        result["failures"].append({"phase": "initial", "reason": "missing_response_id", "body": initial_body})
+        return result
+
+    followup_payload = {
+        **_response_payload(model, "Reply with exactly: followup-ok", max_output_tokens=128),
+        "previous_response_id": initial_id,
+    }
+    followup_status, followup_body, followup_latency = _post(url, followup_payload, api_key, timeout)
+    result["followup_attempted"] = True
+    result["followup_status"] = followup_status
+    result["followup_latency_s"] = followup_latency
+    result["followup_cached_tokens"] = _extract_cached_tokens(followup_body)
+    result["followup_text"] = _extract_responses_text(followup_body)
+    result["previous_response_id_matches"] = _extract_previous_response_id(followup_body) == initial_id
+    if followup_status != 200:
+        result["failures"].append({"phase": "followup", "status": followup_status, "body": followup_body})
+        return result
+
+    if not result["previous_response_id_matches"]:
+        result["failures"].append({"phase": "followup", "reason": "previous_response_id_mismatch", "body": followup_body})
+        return result
+    if result["followup_cached_tokens"] is None:
+        result["failures"].append({"phase": "followup", "reason": "missing_cached_tokens", "body": followup_body})
+        return result
+    if "followup-ok" not in result["followup_text"]:
+        result["failures"].append({"phase": "followup", "reason": "missing_followup_text", "body": followup_body})
+        return result
+
+    result["ok"] = True
+    return result
 
 
 def _chat_payload(model: str, prompt: str, *, max_tokens: int = 256) -> dict[str, Any]:
@@ -423,6 +518,31 @@ def main() -> int:
             _response_payload(args.model, "Reply with exactly: responses-ok"),
             _expect_responses_text("responses-ok"),
             1,
+            args.timeout,
+            args.api_key,
+        ),
+        "responses_structured_simple": _run_case(
+            responses_url,
+            {
+                **_response_payload(args.model, "Return JSON with a status field.", max_output_tokens=256),
+                "temperature": 0.0,
+                "text": {
+                    "format": {
+                        "type": "json_schema",
+                        "name": "status_payload",
+                        "schema": _object_schema({"status": {"type": "string"}}, ["status"]),
+                        "strict": True,
+                    }
+                },
+            },
+            _expect_responses_json_keys(["status"]),
+            1,
+            args.timeout,
+            args.api_key,
+        ),
+        "responses_followup_state": _run_responses_followup(
+            responses_url,
+            args.model,
             args.timeout,
             args.api_key,
         ),

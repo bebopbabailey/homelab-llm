@@ -79,6 +79,9 @@ to a separate public Studio port in a later slice.
 - `/v1/responses` remains advisory for the public caller contract, but direct
   backend validation must keep it healthy because LM Studio exposes first-class
   GPT-OSS reasoning support there
+- direct `/v1/responses` must return a stable response `id`, preserve
+  `previous_response_id` on follow-up turns, and expose
+  `usage.input_tokens_details.cached_tokens`
 - large-schema tool integrity remains a diagnostic and tuning seam, not a hard
   promotion gate by itself unless it reproduces a public-lane defect
 - public `deep` cutover was preceded by:
@@ -96,7 +99,9 @@ to a separate public Studio port in a later slice.
   - named forced-tool choice unsupported on the current backend path
   - no raw Harmony wire tags in client-visible content on the accepted direct
     `llmster` path
-  - direct `/v1/responses` returns separated reasoning plus final output text
+  - direct `/v1/responses` returns separated reasoning plus final assistant text
+    in the `output` message surface; `output_text` may be null on the raw
+    backend and is not the direct truth-path requirement
 
 ## Non-goals
 - MAIN replacement

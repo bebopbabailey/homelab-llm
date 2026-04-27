@@ -116,6 +116,11 @@ implement inference or web-search business logic.
   selection stays authoritative.
 - `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
   `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
+  It is also the supported multi-turn transcript-manipulation lane:
+  callers may reuse the returned response `id` as `previous_response_id` on
+  later `/v1/responses` calls. The echoed `previous_response_id` in gateway
+  responses is not a stable public identity surface and may differ from the
+  public `id` string that the caller originally stored.
 - `task-json` is a transcript-to-JSON utility alias only.
   Its canonical contract is `POST /v1/responses` with native Responses `input`.
   It removes tool-calling fields and returns minified JSON with exact top-level keys
@@ -158,6 +163,13 @@ implement inference or web-search business logic.
   - `deep`, `fast`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
     all accept `POST /v1/responses`
   - `POST /v1/chat/completions` remains compatibility-only during the current migration window
+  - raw upstream `fast` / `deep` callers should treat the Responses `output`
+    message surface as canonical text; `output_text` is advisory-only on direct
+    `llmster`
+  - task aliases preserve response `id`, `previous_response_id`, and `usage`
+    while also returning stable `output_text` for client ergonomics; callers
+    may reuse the public `id` on follow-up input, but should not require the
+    echoed `previous_response_id` string to match that public value verbatim
   - `chatgpt-5` follows its adapter-backed dual-endpoint path rather than the local GPT request-default shim
   - `chatgpt-5` follows the Codex-backed sidecar path rather than the local GPT
     request-default shim

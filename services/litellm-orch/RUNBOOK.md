@@ -155,6 +155,8 @@ Expected:
 - both responses complete with a final assistant message in `output`
 - requests are normalized to `temperature=0.0`
 - omitted reasoning defaults are injected upstream for GPT-OSS lanes
+- direct-style clients should treat `output` as the canonical text surface for
+  raw `fast` / `deep`; `output_text` is not guaranteed upstream
 
 Temporary GPT canary alias:
 - no temporary GPT canary alias is active in the current gateway contract
@@ -217,6 +219,62 @@ Expected:
 - `task-transcribe` returns cleaned transcript text in the final Responses `message`
 - `task-transcribe-vivid` returns cleaned vivid transcript text in the final Responses `message`
 - `task-json` returns minified canonical JSON in the final Responses `message`
+
+Task-alias follow-up/state smoke:
+```bash
+python3 - <<'PY'
+import json, urllib.request
+
+key = None
+for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local", encoding="utf-8"):
+    if line.startswith("LITELLM_MASTER_KEY="):
+        key = line.split("=", 1)[1].strip().strip('"').strip("'")
+        break
+
+url = "http://127.0.0.1:4000/v1/responses"
+headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+initial = {
+    "model": "task-transcribe-vivid",
+    "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
+    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+    "max_output_tokens": 256,
+}
+req = urllib.request.Request(url, data=json.dumps(initial).encode(), headers=headers, method="POST")
+with urllib.request.urlopen(req, timeout=90) as resp:
+    first = json.loads(resp.read().decode())
+
+followup = {
+    "model": "task-transcribe-vivid",
+    "previous_response_id": first["id"],
+    "input": [{"role": "user", "content": "Make that a little more formal."}],
+    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+    "max_output_tokens": 192,
+}
+req = urllib.request.Request(url, data=json.dumps(followup).encode(), headers=headers, method="POST")
+with urllib.request.urlopen(req, timeout=90) as resp:
+    second = json.loads(resp.read().decode())
+
+print(json.dumps(
+    {
+        "first_id": first.get("id"),
+        "first_output_text": first.get("output_text"),
+        "first_cached_tokens": ((first.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
+        "second_previous_response_id": second.get("previous_response_id"),
+        "second_output_text": second.get("output_text"),
+        "second_cached_tokens": ((second.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
+    },
+    indent=2,
+))
+PY
+```
+
+Expected:
+- the initial task response returns a stable `id`
+- the follow-up accepts the prior public `id` as input
+- the echoed `previous_response_id` may be an internal/raw form and should not
+  be compared byte-for-byte against the public `id`
+- both responses expose `usage.input_tokens_details.cached_tokens`
+- `task-transcribe-vivid` keeps stable `output_text` for Shortcut-style clients
 
 Experimental ChatGPT/Codex alias checks:
 ```bash

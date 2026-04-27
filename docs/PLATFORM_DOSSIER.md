@@ -87,11 +87,19 @@ Networking note:
   Worker-scoped `model/info` is still blocked on that shadow LiteLLM instance,
   so the lane is not yet a full OpenHands handoff path.
   Public GPT-OSS lanes are Responses-first on the LiteLLM path.
+  Direct raw `llmster` Responses truth-path uses the `output` message surface
+  as canonical assistant text; upstream `output_text` can still be null.
   Prometheus metrics: `/metrics/` (same port; use trailing slash).
   GPT formatting/tool-call parsing is upstream-owned for `fast` and
   `deep`; LiteLLM retains only a narrow request-default shim for omitted
   reasoning defaults on GPT-OSS public lanes plus `code-reasoning`.
   `code-reasoning` remains Chat Completions-first and `/v1/responses`-denied.
+  Task aliases preserve Responses stateful fields (`id`,
+  `previous_response_id`, `usage`) while exposing stable `output_text` for
+  Shortcut-style clients. Follow-up requests may reuse the public response
+  `id`, but the echoed `previous_response_id` is not a stable public identity
+  string. `task-transcribe-vivid` is the supported multi-turn transcript
+  manipulation lane.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.

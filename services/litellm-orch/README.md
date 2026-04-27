@@ -40,6 +40,15 @@ only; it does not implement inference.
 - Their prompts are rendered through the generic `prompt-pre` dotprompt path;
   the transcribe guardrail only normalizes transcript input and strips wrapper
   fields from the final response payload.
+- Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
+  upstream `output_text` is not guaranteed to be populated on every direct
+  `llmster` response.
+- The task aliases keep a more ergonomic contract by returning stable
+  `output_text`, preserving response `id`, and passing through `usage` so
+  clients can chain `previous_response_id` follow-ups and observe
+  `cached_tokens`. The follow-up request may reuse the public response `id`,
+  but callers should not depend on the echoed `previous_response_id` string
+  matching that public value byte-for-byte.
 - `task-json` is an additional utility alias, not part of the public human
   chat-lane trio.
 
