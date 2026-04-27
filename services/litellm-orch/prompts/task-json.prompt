@@ -1,5 +1,4 @@
 ---
-model: openai/llmster-gpt-oss-20b-mxfp4-gguf
 input:
   schema:
     user_message: string
@@ -30,11 +29,19 @@ Meaning of each bucket:
 Hard rules:
 - Output JSON only.
 - No markdown, code fences, prose, notes, or extra top-level keys.
-- Keep strings short and useful.
+- Keep strings short, concrete, and useful.
 - Deduplicate repeated items.
-- If the transcript suggests a category not listed above, salvage it into other.
+- Do not speculate or invent missing tasks, items, people, dates, or intent.
+- If something is ambiguous, prefer omission over guessing.
+- If the transcript suggests a category not listed above, salvage it conservatively into other.
+- Keep other.attributes sparse and simple.
 - If nothing is present for a bucket, return an empty array.
 - If there are no attributes, return an empty object for other.attributes.
+
+Output discipline:
+- Prefer exact phrases from the transcript when they are already short and clear.
+- Normalize only enough to make an item useful.
+- Do not explain your choices.
 
 User: Transcript:
 {{user_message}}

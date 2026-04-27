@@ -21,9 +21,32 @@ task_json_guardrail = _load_module(
     REPO_ROOT / "services/litellm-orch/config/task_json_guardrail.py",
     "task_json_guardrail",
 )
+prompt_guardrail = _load_module(
+    REPO_ROOT / "services/litellm-orch/config/prompt_guardrail.py",
+    "prompt_guardrail",
+)
 
 
 class TestTaskJsonGuardrail(unittest.TestCase):
+    def test_prompt_guardrail_keeps_task_json_alias_model(self):
+        prompt_pre = prompt_guardrail.PromptGuardrail("prompt-pre", "pre_call", True)
+        rendered = asyncio.run(
+            prompt_pre.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-json",
+                    "prompt_id": "task-json",
+                    "prompt_variables": {"user_message": "call mom tomorrow, buy milk"},
+                },
+                "chat.completions",
+            )
+        )
+
+        self.assertEqual(rendered["model"], "task-json")
+        self.assertNotIn("prompt_id", rendered)
+        self.assertIn("Transcript:\ncall mom tomorrow, buy milk", rendered["messages"][-1]["content"])
+
     def test_pre_call_shapes_request_for_task_json(self):
         guardrail = task_json_guardrail.TaskJsonGuardrail("task-json-pre", "pre_call", True)
         result = asyncio.run(
