@@ -6,6 +6,8 @@ import logging
 import math
 import os
 import re
+import sys
+import types
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -40,8 +42,13 @@ FINAL_SUMMARY_MAX_OUTPUT_TOKENS = 2400
 _YOUTUBE_URL_RE = re.compile(r"https?://[^\s<>()\[\]{}]+", re.IGNORECASE)
 _YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 logger = logging.getLogger("youtube_summary_guardrail")
-_REQUEST_CONTEXTS: dict[int, dict[str, Any]] = {}
-_LOCK = Lock()
+_STATE_MODULE_NAME = "_youtube_summary_guardrail_state"
+_STATE = sys.modules.get(_STATE_MODULE_NAME)
+if _STATE is None:
+    _STATE = types.SimpleNamespace(request_contexts={}, lock=Lock())
+    sys.modules[_STATE_MODULE_NAME] = _STATE
+_REQUEST_CONTEXTS: dict[int, dict[str, Any]] = _STATE.request_contexts
+_LOCK: Lock = _STATE.lock
 
 
 class TranscriptFetchResult:

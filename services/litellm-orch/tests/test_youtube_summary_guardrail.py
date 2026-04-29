@@ -92,6 +92,18 @@ class DummyTranscriptApi:
 
 
 class TestYouTubeSummaryHelpers(unittest.TestCase):
+    def test_loader_style_double_import_shares_request_context_state(self):
+        module_a = _load_module(
+            REPO_ROOT / "services/litellm-orch/config/youtube_summary_guardrail.py",
+            "youtube_summary_guardrail_loader_a",
+        )
+        module_b = _load_module(
+            REPO_ROOT / "services/litellm-orch/config/youtube_summary_guardrail.py",
+            "youtube_summary_guardrail_loader_b",
+        )
+        self.assertIs(module_a._REQUEST_CONTEXTS, module_b._REQUEST_CONTEXTS)
+        self.assertIs(module_a._LOCK, module_b._LOCK)
+
     def test_extract_url_and_focus_request(self):
         url, video_id, focus = youtube_summary_guardrail._extract_url_and_focus_request(
             "https://youtu.be/dQw4w9WgXcQ focus on claims and examples"
