@@ -292,6 +292,50 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertEqual(result["id"], "resp_final")
         self.assertEqual(result["output_text"], "chunked final summary")
 
+    def test_run_chunked_summary_uses_env_fallbacks_when_callback_data_lacks_provider_fields(self):
+        transcript = youtube_summary_guardrail.TranscriptFetchResult(
+            video_id="dQw4w9WgXcQ",
+            transcript_text="[00:00] hello world",
+            transcript_language="English",
+            transcript_language_code="en",
+            caption_type="manual",
+            was_translated=False,
+            token_estimate=30000,
+            segments=[{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+        )
+        captured = []
+
+        async def fake_post(api_base, api_key, payload):
+            captured.append((api_base, api_key, payload["model"]))
+            return {
+                "object": "response",
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": "ok", "annotations": []}],
+                    }
+                ],
+            }
+
+        with patch.dict(
+            youtube_summary_guardrail.os.environ,
+            {"LLMSTER_DEEP_API_BASE": "http://deep.example/v1", "LLMSTER_DEEP_MODEL": "openai/deep-model"},
+            clear=False,
+        ):
+            with patch.object(youtube_summary_guardrail, "_post_responses", side_effect=fake_post):
+                result = asyncio.run(
+                    youtube_summary_guardrail._run_chunked_summary(
+                        {"model": "task-youtube-summary", "api_key": "dummy", "_youtube_summary_focus_request": ""},
+                        transcript,
+                    )
+                )
+        self.assertEqual(result["object"], "response")
+        self.assertTrue(captured)
+        self.assertEqual(captured[0][0], "http://deep.example/v1")
+        self.assertEqual(captured[0][2], "openai/deep-model")
+
 
 if __name__ == "__main__":
     unittest.main()

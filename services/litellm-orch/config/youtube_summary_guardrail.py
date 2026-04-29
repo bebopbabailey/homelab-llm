@@ -4,6 +4,7 @@ import importlib.util
 import json
 import logging
 import math
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -459,8 +460,11 @@ async def _post_responses(api_base: str, api_key: str | None, payload: dict[str,
 
 
 async def _run_chunked_summary(data: dict[str, Any], transcript: TranscriptFetchResult) -> dict[str, Any]:
-    api_base = data.get("api_base")
+    api_base = data.get("api_base") or os.getenv("LLMSTER_DEEP_API_BASE")
     provider_model = data.get("model")
+    if _is_target_model(provider_model):
+        provider_model = None
+    provider_model = provider_model or os.getenv("LLMSTER_DEEP_MODEL")
     if not isinstance(api_base, str) or not api_base:
         raise HTTPException(status_code=502, detail="task-youtube-summary chunking requires provider api_base")
     if not isinstance(provider_model, str) or not provider_model:
