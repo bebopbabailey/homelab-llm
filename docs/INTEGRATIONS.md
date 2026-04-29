@@ -53,14 +53,15 @@
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects omitted reasoning
   defaults for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
-  `task-json`, and `code-reasoning` because the direct shared `8126` GPT-OSS
-  endpoints still degrade on some omitted-effort probes.
+  `task-json`, `task-youtube-summary`, and `code-reasoning` because the direct
+  shared `8126` GPT-OSS endpoints still degrade on some omitted-effort probes.
 - Public GPT-OSS lanes are now Responses-first:
   - `fast`
   - `deep`
   - `task-transcribe`
   - `task-transcribe-vivid`
   - `task-json`
+  - `task-youtube-summary`
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   public GPT-OSS lanes.
 - Direct raw `llmster` clients should treat the Responses `output` message
@@ -68,9 +69,10 @@
   not the upstream truth-path requirement for `fast` / `deep`.
 - LiteLLM keeps the task aliases more ergonomic by preserving `id`,
   `previous_response_id`, and `usage`, while also returning stable
-  `output_text` on `task-transcribe*` and `task-json`. Callers may reuse the
-  public response `id` on the next request, but should not depend on the
-  echoed `previous_response_id` string matching that public `id` verbatim.
+  `output_text` on `task-transcribe*`, `task-json`, and
+  `task-youtube-summary`. Callers may reuse the public response `id` on the
+  next request, but should not depend on the echoed `previous_response_id`
+  string matching that public `id` verbatim.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
@@ -205,6 +207,20 @@ if a param is rejected by the backend.
   `POST /v1/chat/completions` remains temporary compatibility only.
   It returns canonical JSON extraction output and is not part of the Open WebUI
   `AUDIO_STT_*` speech path.
+- LiteLLM YouTube transcript-summary alias:
+  - `task-youtube-summary`
+- `task-youtube-summary` is a `POST /v1/responses` utility contract first.
+  `POST /v1/chat/completions` remains temporary compatibility only for
+  chat-style clients.
+- First turn: send one supported YouTube video URL plus an optional short ask.
+  The guardrail fetches captions via `youtube-transcript-api`, prefers manual
+  English captions over generated English captions, falls back to YouTube
+  translation only when needed, and returns adaptive markdown with a compact
+  metadata line and sparse timestamps.
+- Follow-up: direct callers may reuse the returned response `id` as
+  `previous_response_id`. Short-video runs remain transcript-grounded; rare
+  chunked long-video runs stay grounded in the final synthesis response.
+- It is not part of the Open WebUI `AUDIO_STT_*` speech path.
 - `chatgpt-5` is now backed by Mini-local experimental `ccproxy-api` on
   `127.0.0.1:4010/codex/v1`, with LiteLLM still serving as the only user-facing
   gateway.

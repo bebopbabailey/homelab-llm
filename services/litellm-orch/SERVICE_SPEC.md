@@ -35,8 +35,8 @@ implement inference or web-search business logic.
 - Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected
-  upstream supports them. `task-json` is the only current fixed-schema utility
-  alias owned by LiteLLM guardrails in this service.
+  upstream supports them. `task-json` remains the fixed-schema utility alias
+  owned by LiteLLM guardrails in this service.
 - LiteLLM does not inject web-search schemas, repair loops, or citation rendering.
 - `drop_params=true` is part of the current runtime baseline.
 - Active router fallback baseline is `fast -> deep`.
@@ -65,6 +65,8 @@ implement inference or web-search business logic.
   (`llmster-gpt-oss-120b-mxfp4-gguf`) with the vivid transcript-cleanup prompt
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
+- `task-youtube-summary` -> Studio `llmster` deep lane `8126`
+  (`llmster-gpt-oss-120b-mxfp4-gguf`) with the YouTube transcript-summary prompt
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
 - `voice-tts-canary` -> Orin `voice-gateway` facade (`tts-1`)
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`)
@@ -88,8 +90,8 @@ implement inference or web-search business logic.
 - The current validated upstream model for that alias is `gpt-5.3-codex`.
 - Public GPT-OSS lanes are Responses-first on the LiteLLM path.
 - `POST /v1/chat/completions` remains temporarily available as a compatibility
-  path for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`, and
-  `task-json`.
+  path for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
+  `task-json`, and `task-youtube-summary`.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -129,6 +131,30 @@ implement inference or web-search business logic.
   fixed strict `json_schema`, normalize malformed/provider-sloppy payloads,
   salvage unknown categories into `other`, and fall back once to the canonical
   empty payload with `other.attributes.guardrail_status="repair_failed"` if repair fails.
+- `task-youtube-summary` is a YouTube transcript-summary utility alias.
+  Its canonical initial contract is `POST /v1/responses` with native Responses
+  `input` containing one supported YouTube video URL and an optional short ask.
+  `POST /v1/chat/completions` remains compatibility-only for Open WebUI and
+  other chat-style clients.
+- `task-youtube-summary` uses a LiteLLM-owned pre-call guardrail to normalize
+  the first-turn URL, fetch captions with `youtube-transcript-api`, prefer
+  manual English captions over generated English captions, fall back to YouTube
+  translation only when needed, and render the adaptive summary dotprompt
+  through the generic `prompt-pre` path.
+- `task-youtube-summary` emits readable markdown with a compact metadata line,
+  adaptive sections, and sparse timestamps. Successful Responses payloads are
+  rewritten into stable `output_text` while preserving response `id`,
+  `previous_response_id`, and `usage`.
+- `task-youtube-summary` accepts common single-video YouTube watch, short-link,
+  Shorts, and live URLs. Playlist-only, channel, search, and other non-video
+  pages are rejected.
+- `task-youtube-summary` fails closed when YouTube does not expose a usable
+  caption track. v1 does not add ASR fallback or metadata-only summary mode.
+- `task-youtube-summary` supports direct follow-up Q&A on the same alias.
+  Short videos remain transcript-grounded through `previous_response_id`.
+  Rare oversized transcripts are chunked and synthesized internally on `deep`;
+  those follow-ups are grounded in the final synthesis response rather than the
+  full raw transcript.
 - GPT formatting ownership is upstream-first:
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the
@@ -141,7 +167,8 @@ implement inference or web-search business logic.
     instead of leaving Open WebUI in a half-finished tool turn.
 - LiteLLM retains one narrow GPT request-default shim only:
   - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`,
-    `code-reasoning`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
+    `code-reasoning`, `task-transcribe`, `task-transcribe-vivid`, `task-json`,
+    and `task-youtube-summary`
   - behavior:
     - inject `reasoning_effort=low` only when omitted on Chat Completions
     - inject `reasoning: {"effort":"low"}` only when omitted on Responses
@@ -160,8 +187,8 @@ implement inference or web-search business logic.
     error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
 - Current supported public GPT-OSS contract is Responses-first:
-  - `deep`, `fast`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`
-    all accept `POST /v1/responses`
+  - `deep`, `fast`, `task-transcribe`, `task-transcribe-vivid`, `task-json`,
+    and `task-youtube-summary` all accept `POST /v1/responses`
   - `POST /v1/chat/completions` remains compatibility-only during the current migration window
   - raw upstream `fast` / `deep` callers should treat the Responses `output`
     message surface as canonical text; `output_text` is advisory-only on direct

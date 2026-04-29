@@ -1,12 +1,11 @@
 # NOW
 
 Active
-- Make `orchestration-cockpit` a durable Mini-owned localhost-only experimental
-  service: preserve the working LangGraph + Agent Chat UI behavior, install
-  systemd ownership, move runtime state out of the repo, and eliminate the
-  PTY-held LangGraph process.
+- Add a durable `task-youtube-summary` LiteLLM lane that accepts a YouTube URL,
+  fetches captions through `youtube-transcript-api`, returns a comprehensive
+  summary, and supports follow-up Q&A through the existing Responses-first
+  gateway contract.
 
 NEXT UP
-- If phase 6 lands cleanly, decide whether the next cockpit slice should add
-  visible operator value in the browser or just promote the local service path
-  further without widening the graph/runtime contract.
+- After the lane lands, decide whether long-video follow-up should stay
+  synthesis-grounded or gain a separate durable transcript storage path.

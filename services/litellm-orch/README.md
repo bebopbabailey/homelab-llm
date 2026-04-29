@@ -22,6 +22,7 @@ only; it does not implement inference.
 - Studio `llmster` GPT service on `8126` for `fast` and `deep`
 - `task-transcribe` is a text-cleanup alias on `fast`
 - `task-transcribe-vivid` is a text-cleanup alias on `deep`
+- `task-youtube-summary` is a YouTube transcript-summary alias on `deep`
 - Voice Gateway on the Orin for speech aliases
 - SearXNG on the Mini for generic search tooling
 
@@ -30,7 +31,8 @@ only; it does not implement inference.
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The local canonical public human lanes remain `fast` and `deep`.
 - Public GPT-OSS traffic is Responses-first through LiteLLM for `fast`,
-  `deep`, `task-transcribe`, `task-transcribe-vivid`, and `task-json`.
+  `deep`, `task-transcribe`, `task-transcribe-vivid`, `task-json`, and
+  `task-youtube-summary`.
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   GPT-OSS public aliases during the current migration window.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
@@ -40,6 +42,11 @@ only; it does not implement inference.
 - Their prompts are rendered through the generic `prompt-pre` dotprompt path;
   the transcribe guardrail only normalizes transcript input and strips wrapper
   fields from the final response payload.
+- `task-youtube-summary` is also an additional task alias, not part of the
+  public human chat-lane trio. Its guardrail resolves one supported YouTube
+  video URL on the first turn, fetches captions via `youtube-transcript-api`,
+  renders an adaptive summary prompt, and rewrites Responses output into stable
+  `output_text`.
 - Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
   upstream `output_text` is not guaranteed to be populated on every direct
   `llmster` response.
@@ -51,6 +58,10 @@ only; it does not implement inference.
   matching that public value byte-for-byte.
 - `task-json` is an additional utility alias, not part of the public human
   chat-lane trio.
+- For short videos, direct callers can reuse the returned `task-youtube-summary`
+  response `id` as `previous_response_id` for transcript-grounded follow-up.
+  For rare chunked long-video runs, the returned response stays summary-grounded
+  because the final synthesis response becomes the public follow-up surface.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.

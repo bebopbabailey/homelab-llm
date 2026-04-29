@@ -12,6 +12,7 @@ dependencies = [
     "prometheus-client==0.20.0",
     "pyyaml==6.0.3",
     "uvicorn[standard]==0.33.0",
+    "youtube-transcript-api==1.2.4",
 ]
 
 [tool.uv]

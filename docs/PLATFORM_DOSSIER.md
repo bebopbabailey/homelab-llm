@@ -89,11 +89,12 @@ Networking note:
   and `/key/generate` are effectively down even if the endpoint still returns `200`.
   Runtime lock baseline: `drop_params=true`, `fast -> deep`.
   Current package baseline: `litellm[proxy]==1.83.4`.
-  Additional task aliases: `task-transcribe` routes to `fast` and
-  `task-transcribe-vivid` routes to `deep` for transcript cleanup through
-  `POST /v1/responses`; `POST /v1/chat/completions` remains compatibility-only.
-  They are not speech STT endpoints and no longer carry a `fast` -> `deep`
-  retry shim.
+  Additional task aliases: `task-transcribe` routes to `fast`,
+  `task-transcribe-vivid` routes to `deep` for transcript cleanup, and
+  `task-youtube-summary` routes to `deep` for YouTube transcript summaries
+  through `POST /v1/responses`; `POST /v1/chat/completions` remains
+  compatibility-only. They are not speech STT endpoints and no longer carry a
+  `fast` -> `deep` retry shim.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/responses` and returns canonical transcript-to-JSON output.
   Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
@@ -119,7 +120,8 @@ Networking note:
   Shortcut-style clients. Follow-up requests may reuse the public response
   `id`, but the echoed `previous_response_id` is not a stable public identity
   string. `task-transcribe-vivid` is the supported multi-turn transcript
-  manipulation lane.
+  manipulation lane, and `task-youtube-summary` uses the same direct follow-up
+  pattern after the initial summary.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.

@@ -75,6 +75,18 @@ model_list:
     max_output_tokens: 1024
     supports_function_calling: false
     supports_system_messages: true
+
+- model_name: task-youtube-summary
+  litellm_params:
+    model: os.environ/LLMSTER_DEEP_MODEL
+    api_base: os.environ/LLMSTER_DEEP_API_BASE
+    api_key: dummy
+    max_tokens: 4096
+  model_info:
+    mode: chat
+    max_output_tokens: 4096
+    supports_function_calling: false
+    supports_system_messages: true
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -106,6 +118,11 @@ guardrails:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
       mode: "pre_call"
       default_on: true
+  - guardrail_name: "youtube-summary-pre"
+    litellm_params:
+      guardrail: "youtube_summary_guardrail.YouTubeSummaryGuardrail"
+      mode: "pre_call"
+      default_on: true
   - guardrail_name: "prompt-pre"
     litellm_params:
       guardrail: "prompt_guardrail.PromptGuardrail"
@@ -116,7 +133,7 @@ guardrails:
       guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json"
+      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
       responses_only: false
   - guardrail_name: "llmster-toolcall-pre"
     litellm_params:
@@ -129,7 +146,12 @@ guardrails:
       guardrail: "gpt_request_defaults.GPTRequestDefaults"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,code-reasoning,task-transcribe,task-transcribe-vivid,task-json"
+      target_models: "deep,fast,code-reasoning,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
+  - guardrail_name: "youtube-summary-post"
+    litellm_params:
+      guardrail: "youtube_summary_guardrail.YouTubeSummaryGuardrail"
+      mode: "post_call"
+      default_on: true
   - guardrail_name: "llmster-toolcall-post"
     litellm_params:
       guardrail: "llmster_toolcall_guardrail.LlmsterToolcallGuardrail"
@@ -141,7 +163,7 @@ guardrails:
       guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
       mode: "post_call"
       default_on: true
-      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json"
+      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
       responses_only: false
   - guardrail_name: "transcribe-post"
     litellm_params:
