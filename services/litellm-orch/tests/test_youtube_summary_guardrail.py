@@ -339,6 +339,52 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             )
         self.assertEqual(result["output_text"], "chunked final summary")
 
+    def test_post_call_chunked_uses_saved_request_context_when_model_is_rewritten_to_provider(self):
+        guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
+        data = {"model": "openai/llmster-gpt-oss-120b-mxfp4-gguf"}
+        youtube_summary_guardrail._REQUEST_CONTEXTS[id(data)] = {
+            "chunked": True,
+            "focus_request": "",
+            "transcript_meta": {
+                "video_id": "dQw4w9WgXcQ",
+                "transcript_language": "English",
+                "transcript_language_code": "en",
+                "caption_type": "manual",
+                "was_translated": False,
+                "token_estimate": 30000,
+                "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+            },
+            "model": "task-youtube-summary",
+            "api_base": "http://127.0.0.1:8126/v1",
+            "api_key": "dummy",
+        }
+        with patch.object(
+            youtube_summary_guardrail,
+            "_run_chunked_summary",
+            AsyncMock(
+                return_value={
+                    "object": "response",
+                    "id": "resp_final_provider",
+                    "output": [
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "status": "completed",
+                            "content": [{"type": "output_text", "text": "provider rewrite fixed", "annotations": []}],
+                        }
+                    ],
+                }
+            ),
+        ):
+            result = asyncio.run(
+                guardrail.async_post_call_success_hook(
+                    data,
+                    None,
+                    {"object": "response", "id": "resp_placeholder"},
+                )
+            )
+        self.assertEqual(result["output_text"], "provider rewrite fixed")
+
     def test_run_chunked_summary_uses_env_fallbacks_when_callback_data_lacks_provider_fields(self):
         transcript = youtube_summary_guardrail.TranscriptFetchResult(
             video_id="dQw4w9WgXcQ",

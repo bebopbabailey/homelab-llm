@@ -626,11 +626,11 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
         user_api_key_dict: Any,
         response: Any,
     ) -> Any:
-        if not _is_target_model(data.get("model")):
-            return response
-
         with _LOCK:
             request_context = _REQUEST_CONTEXTS.pop(id(data), None)
+
+        if not _is_target_model(data.get("model")) and not request_context:
+            return response
 
         chunked = bool(data.pop("_youtube_summary_chunked", False))
         transcript_meta = data.pop("_youtube_summary_transcript_meta", None)
