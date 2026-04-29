@@ -368,9 +368,28 @@ def _extract_chat_text(response: Any) -> str | None:
     return text or None
 
 
+def _response_to_dict(response: Any) -> dict[str, Any] | None:
+    if hasattr(response, "model_dump"):
+        try:
+            response = response.model_dump()
+        except Exception:
+            pass
+    return response if isinstance(response, dict) else None
+
+
+def _restore_response_type(template: Any, body: dict[str, Any]) -> Any:
+    model_validate = getattr(getattr(template, "__class__", None), "model_validate", None)
+    if callable(model_validate):
+        try:
+            return model_validate(body)
+        except Exception:
+            return body
+    return body
+
+
 def _set_responses_text(response: Any, content: str) -> Any:
-    body = response.model_dump() if hasattr(response, "model_dump") else response
-    if not isinstance(body, dict):
+    body = _response_to_dict(response)
+    if not body:
         return response
     body["output"] = [
         {
@@ -383,12 +402,12 @@ def _set_responses_text(response: Any, content: str) -> Any:
     ]
     body["output_text"] = content
     body.pop("reasoning", None)
-    return body
+    return _restore_response_type(response, body)
 
 
 def _set_chat_text(response: Any, content: str) -> Any:
-    body = response.model_dump() if hasattr(response, "model_dump") else response
-    if not isinstance(body, dict):
+    body = _response_to_dict(response)
+    if not body:
         return response
     choices = body.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
@@ -400,7 +419,7 @@ def _set_chat_text(response: Any, content: str) -> Any:
     message.pop("reasoning", None)
     message.pop("reasoning_content", None)
     message.pop("provider_specific_fields", None)
-    return body
+    return _restore_response_type(response, body)
 
 
 def _build_chunk_summary_messages(chunk: dict[str, Any], focus_request: str) -> list[dict[str, str]]:
@@ -653,6 +672,8 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
                 data["api_key"] = request_context.get("api_key")
             if _is_target_model(data.get("model")) and request_context.get("model"):
                 data["model"] = request_context.get("model")
+        response_body = _response_to_dict(response)
+
         if chunked and isinstance(transcript_meta, dict):
             transcript = TranscriptFetchResult(
                 video_id=str(transcript_meta["video_id"]),
@@ -668,11 +689,11 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             text = _extract_responses_text(final_response)
             if not text:
                 raise HTTPException(status_code=502, detail="task-youtube-summary final synthesis returned empty output")
-            if isinstance(response, dict) and response.get("object") == "response":
-                return _set_responses_text(final_response, text)
+            if response_body and response_body.get("object") == "response":
+                return _set_responses_text(response, text)
             return _set_chat_text(response, text)
 
-        if isinstance(response, dict) and response.get("object") == "response":
+        if response_body and response_body.get("object") == "response":
             text = _extract_responses_text(response)
             if not text:
                 return response

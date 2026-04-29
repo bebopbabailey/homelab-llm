@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from litellm.types.llms.openai import ResponsesAPIResponse
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -302,8 +304,78 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     {"object": "response", "id": "resp_placeholder"},
                 )
             )
-        self.assertEqual(result["id"], "resp_final")
+        self.assertEqual(result["id"], "resp_placeholder")
         self.assertEqual(result["output_text"], "chunked final summary")
+
+    def test_post_call_chunked_rewrites_typed_responses_object(self):
+        guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
+        transcript_meta = {
+            "video_id": "dQw4w9WgXcQ",
+            "transcript_language": "English",
+            "transcript_language_code": "en",
+            "caption_type": "manual",
+            "was_translated": False,
+            "token_estimate": 30000,
+            "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+        }
+        internal_final = {
+            "object": "response",
+            "id": "resp_final",
+            "previous_response_id": None,
+            "usage": {"input_tokens_details": {"cached_tokens": 0}},
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_text", "text": "typed chunked final summary", "annotations": []}],
+                }
+            ],
+        }
+        typed_placeholder = ResponsesAPIResponse.model_validate(
+            {
+                "id": "resp_placeholder",
+                "created_at": 1,
+                "model": "task-youtube-summary",
+                "object": "response",
+                "output": [
+                    {
+                        "id": "msg_placeholder",
+                        "type": "message",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [{"type": "output_text", "text": "youtube-summary-chunked-placeholder", "annotations": []}],
+                    }
+                ],
+                "parallel_tool_calls": True,
+                "temperature": 0.0,
+                "tool_choice": "auto",
+                "tools": [],
+                "top_p": 1.0,
+                "max_output_tokens": 64,
+                "status": "completed",
+                "text": {"format": {"type": "text"}},
+                "truncation": "auto",
+            }
+        )
+        with patch.object(youtube_summary_guardrail, "_run_chunked_summary", AsyncMock(return_value=internal_final)):
+            result = asyncio.run(
+                guardrail.async_post_call_success_hook(
+                    {
+                        "model": "task-youtube-summary",
+                        "_youtube_summary_chunked": True,
+                        "_youtube_summary_focus_request": "",
+                        "_youtube_summary_transcript_meta": transcript_meta,
+                        "api_base": "http://127.0.0.1:8126/v1",
+                        "api_key": "dummy",
+                    },
+                    None,
+                    typed_placeholder,
+                )
+            )
+        self.assertIsInstance(result, ResponsesAPIResponse)
+        self.assertEqual(result.id, "resp_placeholder")
+        self.assertEqual(result.output_text, "typed chunked final summary")
 
     def test_post_call_chunked_uses_saved_request_context_when_custom_fields_are_missing(self):
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
