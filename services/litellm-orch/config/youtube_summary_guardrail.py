@@ -5,7 +5,6 @@ import json
 import logging
 import math
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -41,16 +40,27 @@ _YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 logger = logging.getLogger("youtube_summary_guardrail")
 
 
-@dataclass(frozen=True)
 class TranscriptFetchResult:
-    video_id: str
-    transcript_text: str
-    transcript_language: str
-    transcript_language_code: str
-    caption_type: str
-    was_translated: bool
-    token_estimate: int
-    segments: list[dict[str, Any]]
+    def __init__(
+        self,
+        *,
+        video_id: str,
+        transcript_text: str,
+        transcript_language: str,
+        transcript_language_code: str,
+        caption_type: str,
+        was_translated: bool,
+        token_estimate: int,
+        segments: list[dict[str, Any]],
+    ) -> None:
+        self.video_id = video_id
+        self.transcript_text = transcript_text
+        self.transcript_language = transcript_language
+        self.transcript_language_code = transcript_language_code
+        self.caption_type = caption_type
+        self.was_translated = was_translated
+        self.token_estimate = token_estimate
+        self.segments = segments
 
 
 def _normalize_model_name(model: Any) -> str:
