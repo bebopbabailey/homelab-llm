@@ -73,6 +73,10 @@ def _normalize_model_name(model: Any) -> str:
     return normalized
 
 
+def _strip_provider_prefix(model: str) -> str:
+    return model.rsplit("/", 1)[-1] if "/" in model else model
+
+
 def _is_target_model(model: Any) -> bool:
     return _normalize_model_name(model) == TASK_YOUTUBE_SUMMARY_ALIAS
 
@@ -469,6 +473,7 @@ async def _run_chunked_summary(data: dict[str, Any], transcript: TranscriptFetch
         raise HTTPException(status_code=502, detail="task-youtube-summary chunking requires provider api_base")
     if not isinstance(provider_model, str) or not provider_model:
         raise HTTPException(status_code=502, detail="task-youtube-summary chunking requires provider model")
+    provider_model = _strip_provider_prefix(provider_model)
     api_key = data.get("api_key") if isinstance(data.get("api_key"), str) else None
     focus_request = str(data.get("_youtube_summary_focus_request") or "")
 

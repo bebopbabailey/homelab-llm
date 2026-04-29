@@ -334,7 +334,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertEqual(result["object"], "response")
         self.assertTrue(captured)
         self.assertEqual(captured[0][0], "http://deep.example/v1")
-        self.assertEqual(captured[0][2], "openai/deep-model")
+        self.assertEqual(captured[0][2], "deep-model")
 
 
 if __name__ == "__main__":
