@@ -120,7 +120,7 @@ guardrails:
       default_on: true
   - guardrail_name: "youtube-summary-pre"
     litellm_params:
-      guardrail: "youtube_summary_guardrail.YouTubeSummaryGuardrail"
+      guardrail: "config.youtube_summary_guardrail.YouTubeSummaryGuardrail"
       mode: "pre_call"
       default_on: true
   - guardrail_name: "prompt-pre"
@@ -149,7 +149,7 @@ guardrails:
       target_models: "deep,fast,code-reasoning,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
   - guardrail_name: "youtube-summary-post"
     litellm_params:
-      guardrail: "youtube_summary_guardrail.YouTubeSummaryGuardrail"
+      guardrail: "config.youtube_summary_guardrail.YouTubeSummaryGuardrail"
       mode: "post_call"
       default_on: true
   - guardrail_name: "llmster-toolcall-post"
