@@ -7,6 +7,7 @@ import math
 import os
 import re
 from pathlib import Path
+from threading import Lock
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -39,6 +40,8 @@ FINAL_SUMMARY_MAX_OUTPUT_TOKENS = 2400
 _YOUTUBE_URL_RE = re.compile(r"https?://[^\s<>()\[\]{}]+", re.IGNORECASE)
 _YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 logger = logging.getLogger("youtube_summary_guardrail")
+_REQUEST_CONTEXTS: dict[int, dict[str, Any]] = {}
+_LOCK = Lock()
 
 
 class TranscriptFetchResult:
@@ -562,6 +565,15 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             "token_estimate": transcript.token_estimate,
             "segments": transcript.segments,
         }
+        with _LOCK:
+            _REQUEST_CONTEXTS[id(data)] = {
+                "chunked": data["_youtube_summary_chunked"],
+                "focus_request": focus_request,
+                "transcript_meta": dict(data["_youtube_summary_transcript_meta"]),
+                "model": data.get("model"),
+                "api_base": data.get("api_base"),
+                "api_key": data.get("api_key"),
+            }
 
         if call_type in {"responses", "aresponses"}:
             current_budget = data.get("max_output_tokens")
@@ -617,8 +629,23 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
         if not _is_target_model(data.get("model")):
             return response
 
+        with _LOCK:
+            request_context = _REQUEST_CONTEXTS.pop(id(data), None)
+
         chunked = bool(data.pop("_youtube_summary_chunked", False))
         transcript_meta = data.pop("_youtube_summary_transcript_meta", None)
+        if request_context:
+            chunked = bool(request_context.get("chunked", chunked))
+            if transcript_meta is None:
+                transcript_meta = request_context.get("transcript_meta")
+            if "_youtube_summary_focus_request" not in data and request_context.get("focus_request") is not None:
+                data["_youtube_summary_focus_request"] = request_context.get("focus_request")
+            if not data.get("api_base") and request_context.get("api_base"):
+                data["api_base"] = request_context.get("api_base")
+            if not data.get("api_key") and request_context.get("api_key"):
+                data["api_key"] = request_context.get("api_key")
+            if _is_target_model(data.get("model")) and request_context.get("model"):
+                data["model"] = request_context.get("model")
         if chunked and isinstance(transcript_meta, dict):
             transcript = TranscriptFetchResult(
                 video_id=str(transcript_meta["video_id"]),
