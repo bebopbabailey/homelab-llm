@@ -67,6 +67,10 @@
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.pgvector-main.plist"
     },
+    "com.bebop.elasticsearch-memory-main": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist"
+    },
     "com.bebop.memory-api-main": {
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.memory-api-main.plist"

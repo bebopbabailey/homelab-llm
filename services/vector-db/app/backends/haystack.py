@@ -155,6 +155,8 @@ class HaystackBackend:
         }
 
     def _store(self, model_space: str):
+        if model_space == "nomic":
+            model_space = "qwen"
         if model_space == "qwen":
             return self._store_qwen
         if model_space == "mxbai":
@@ -239,7 +241,7 @@ class HaystackBackend:
         }
 
     def search(self, args: SearchArgs) -> list[dict[str, Any]]:
-        space = args.model_space
+        space = "qwen" if args.model_space == "nomic" else args.model_space
         qemb = self._query_embedder[space].run(text=args.query)["embedding"]
 
         kw_docs = self._kw[space].run(query=args.query, top_k=max(1, args.lexical_k)).get("documents", [])
@@ -256,8 +258,45 @@ class HaystackBackend:
                 log.warning("rerank failed; returning fused results: %s", exc)
                 final_docs = joined
 
-        top_docs = final_docs[: max(1, args.top_k)]
-        return [self._map_hit(i + 1, d, space) for i, d in enumerate(top_docs)]
+        top_docs = final_docs[: max(1, args.final_k)]
+        hits = [self._map_hit(i + 1, d, space) for i, d in enumerate(top_docs)]
+        for hit in hits:
+            hit["retrieval_profile"] = args.profile
+            hit["citations_rendered"] = args.render_citations
+            hit["vector_search_mode"] = "approximate"
+        return hits
+
+    def delete(self, source: str | None = None, document_id: str | None = None) -> int:
+        if document_id is not None:
+            raise RuntimeError("haystack backend does not support delete by document_id")
+        if not source:
+            raise ValueError("haystack delete requires source")
+        with connect(self._db_cfg) as conn:
+            conn.execute(
+                f"DELETE FROM {CFG.hs_schema}.{CFG.hs_table_qwen} WHERE meta->>'source' = %s",
+                (source,),
+            )
+            qwen_deleted = conn.rowcount or 0
+            conn.execute(
+                f"DELETE FROM {CFG.hs_schema}.{CFG.hs_table_mxbai} WHERE meta->>'source' = %s",
+                (source,),
+            )
+            mxbai_deleted = conn.rowcount or 0
+            conn.commit()
+        return int(max(qwen_deleted, mxbai_deleted))
+
+    def upsert_response_mapping(
+        self,
+        *,
+        response_id: str,
+        document_id: str,
+        source_type: str,
+        summary_mode: str,
+    ) -> dict[str, Any]:
+        raise RuntimeError("haystack backend does not support response mappings")
+
+    def resolve_response_mapping(self, response_id: str) -> dict[str, Any] | None:
+        return None
 
     def delete(self, source: str) -> int:
         filt = {"field": "meta.source", "operator": "==", "value": source}

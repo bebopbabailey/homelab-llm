@@ -226,6 +226,10 @@ Expected:
 - `task-transcribe-vivid` returns cleaned vivid transcript text in the final Responses `message`
 - `task-json` returns minified canonical JSON in the final Responses `message`
 - `task-youtube-summary` returns markdown with a compact metadata line plus a comprehensive summary in the final Responses `message`
+- long-video follow-ups are expected to resolve through the retrieval service's
+  durable `response_id -> document_id` mapping rather than raw provider state
+- `config/env.local` must include `MEMORY_API_BEARER_TOKEN=<studio token>` for
+  the write-side transcript upserts used by `task-youtube-summary`
 
 Task-alias follow-up/state smoke:
 ```bash
@@ -331,6 +335,8 @@ PY
 Expected:
 - the initial response starts with the compact metadata line for the video
 - the follow-up accepts the prior public `id` as `previous_response_id`
+- successful follow-ups no longer depend on upstream placeholder lineage for
+  chunked runs; they should resolve through the memory API mapping layer
 - short-video runs stay transcript-grounded through the returned response `id`
 - chunked long-video runs stay synthesis-grounded because the final synthesis response becomes the public follow-up surface
 

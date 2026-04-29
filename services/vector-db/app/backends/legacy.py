@@ -71,21 +71,47 @@ class LegacyBackend:
         return {"documents": docs, "chunks": chunks}
 
     def search(self, args: SearchArgs) -> list[dict[str, Any]]:
-        model_name = "studio-qwen-embed-0.6b" if args.model_space == "qwen" else fallback_model()
+        requested_space = args.model_space
+        if requested_space == "nomic":
+            requested_space = "qwen"
+        model_name = "studio-qwen-embed-0.6b" if requested_space == "qwen" else fallback_model()
         qv = self._embed.embed(model_name, [args.query])[0]
         with connect(self._db_cfg) as conn:
-            return hybrid_search(
+            hits = hybrid_search(
                 conn,
                 query=args.query,
                 query_vector=qv,
-                model_space=args.model_space,
-                top_k=max(1, args.top_k),
+                model_space=requested_space,
+                top_k=max(1, args.final_k),
                 lexical_k=max(1, args.lexical_k),
                 vector_k=max(1, args.vector_k),
             )
+        for hit in hits:
+            hit["model_space"] = requested_space
+            hit["retrieval_profile"] = args.profile
+            hit["citations_rendered"] = args.render_citations
+            hit["vector_search_mode"] = "approximate"
+        return hits
 
-    def delete(self, source: str) -> int:
+    def delete(self, source: str | None = None, document_id: str | None = None) -> int:
+        if document_id is not None:
+            raise RuntimeError("legacy backend does not support delete by document_id")
+        if source is None:
+            raise ValueError("legacy delete requires source")
         with connect(self._db_cfg) as conn:
             n = delete_documents_by_source(conn, source)
             conn.commit()
         return n
+
+    def upsert_response_mapping(
+        self,
+        *,
+        response_id: str,
+        document_id: str,
+        source_type: str,
+        summary_mode: str,
+    ) -> dict[str, Any]:
+        raise RuntimeError("legacy backend does not support response mappings")
+
+    def resolve_response_mapping(self, response_id: str) -> dict[str, Any] | None:
+        return None

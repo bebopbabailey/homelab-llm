@@ -73,6 +73,14 @@
   `task-youtube-summary`. Callers may reuse the public response `id` on the
   next request, but should not depend on the echoed `previous_response_id`
   string matching that public `id` verbatim.
+- Long-form `task-youtube-summary` follow-ups no longer depend on provider
+  conversation lineage alone. LiteLLM resolves the public response id through
+  the Studio memory API response-map index and retrieves document-scoped
+  transcript chunks from the Elastic-backed store on Studio.
+- The Studio memory API is Mini-facing on `http://192.168.1.72:55440`. Read and
+  search routes are open to Mini through pf allowlisting; write routes use a
+  shared bearer token so transcript upserts and response-map writes stay
+  controlled.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack

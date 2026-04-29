@@ -1,30 +1,58 @@
-# Architecture: Studio Main Vector Store (v1)
+# Architecture: Studio Main Retrieval Store (v1)
 
 ## High-level flow
-1. Nightly ingest job reads normalized JSONL from configured Studio-local path.
-2. Records are normalized to document/chunk rows with stable provenance keys.
-3. Embeddings are generated for both spaces (`qwen`, `mxbai`).
-4. Lexical and vector indexes are maintained in Postgres + pgvector.
-5. API serves health, upsert, search, delete, and stats endpoints.
+1. A caller or helper script normalizes source content into explicit chunks with
+   provenance and span data.
+2. The service generates local embeddings with the active model.
+3. Documents and chunks are written into Elasticsearch:
+   - shared chunk index
+   - document metadata index
+   - response-map index
+4. Search runs a lexical branch plus a vector branch, then fuses the results
+   through native or client-side RRF.
+5. Long-form clients reuse a public `response_id`, which the retrieval layer
+   resolves into a durable `document_id` before searching.
 
-## Why dual embedding spaces
-Different embedding models map text into different latent spaces.
-Distance comparisons are only meaningful within the same model space.
-Therefore, v1 stores vectors in separate tables and queries one space at a time.
+## Shared chunk schema
+- `document_id`
+- `chunk_id`
+- `source_type`
+- `text`
+- `title`
+- `source_uri`
+- `section_title`
+- transcript spans: `timestamp_label`, `start_ms`, `end_ms`
+- publication spans: `page_start`, `page_end`
+- optional offsets: `char_start`, `char_end`
+- filterable `metadata`
+- `dense_vector` embedding
 
-## Retrieval plan (hybrid)
-- Lexical candidate set: Postgres FTS rank.
-- Vector candidate set: cosine distance in selected vector table.
-- Merge strategy: reciprocal-rank fusion (RRF) with deterministic weighting.
-- Output: top-k chunk hits with provenance and score breakdown.
+## Retrieval plan
+- Lexical branch: BM25-style text search over `text`, `title`, and
+  `section_title`.
+- Vector branch:
+  - exact `script_score` cosine search for small single-document scopes
+  - filtered HNSW kNN for larger scopes
+- Fusion:
+  - native Elastic retriever-tree RRF when available and enabled
+  - deterministic client-side RRF otherwise
+- Output: top chunk hits with provenance and stored spans. Citation rendering is
+  a caller choice, not a storage concern.
 
-## Data integrity
-- Provenance-first schema for traceability:
-  `source`, `source_thread_id`, `source_message_id`, `timestamp`, `raw_ref`.
-- Idempotent upsert keys prevent duplicate ingest on reruns.
-- Ingest runs are tracked for audit/debug.
+## Versioned HNSW discipline
+- The active chunk index is versioned by embedding model, dims, and index type.
+- v1 explicit mapping baseline:
+  - `similarity=cosine`
+  - `index=true`
+  - `index_options.type=int8_hnsw`
+  - `m=16`
+  - `ef_construction=100`
+- Mapping/index-option changes are evaluated on fresh physical indexes and
+  promoted via alias swap.
 
 ## Boundaries
-- This service does not alter MLX lane behavior.
-- This service does not implement Mini web-search retrieval.
-- Cross-host gateway wiring is a separate phase.
+- This service owns retrieval durability, embedding generation, and response-id
+  document mapping.
+- This service does not own model inference.
+- LiteLLM or other gateways may use it as a retrieval backend, but they should
+  not treat provider conversation state as the durable memory layer.

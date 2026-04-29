@@ -32,6 +32,10 @@ implement inference or web-search business logic.
 - `DATABASE_URL` is required in the runtime environment for DB-backed LiteLLM
   auth/key-management features such as teams, groups, service accounts, and
   `/key/generate`.
+- `MEMORY_API_BEARER_TOKEN` is required in the Mini LiteLLM runtime for
+  `task-youtube-summary` transcript upserts and response-map writes against the
+  Studio memory API. The token value must match the Studio-side file
+  `MEMORY_API_WRITE_BEARER_TOKEN_FILE`.
 - Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected
@@ -139,7 +143,8 @@ implement inference or web-search business logic.
 - `task-youtube-summary` uses a LiteLLM-owned pre-call guardrail to normalize
   the first-turn URL, fetch captions with `youtube-transcript-api`, prefer
   manual English captions over generated English captions, fall back to YouTube
-  translation only when needed, and render the adaptive summary dotprompt
+  translation only when needed, synchronously upsert a durable transcript
+  document through the memory API, and render the adaptive summary dotprompt
   through the generic `prompt-pre` path.
 - `task-youtube-summary` emits readable markdown with a compact metadata line,
   adaptive sections, and sparse timestamps. Successful Responses payloads are
@@ -151,10 +156,12 @@ implement inference or web-search business logic.
 - `task-youtube-summary` fails closed when YouTube does not expose a usable
   caption track. v1 does not add ASR fallback or metadata-only summary mode.
 - `task-youtube-summary` supports direct follow-up Q&A on the same alias.
-  Short videos remain transcript-grounded through `previous_response_id`.
-  Rare oversized transcripts are chunked and synthesized internally on `deep`;
-  those follow-ups are grounded in the final synthesis response rather than the
-  full raw transcript.
+  `previous_response_id` is treated as an ergonomic handle only; LiteLLM
+  resolves it into a retrieval-owned `document_id` mapping and asks the memory
+  API for document-scoped transcript chunks before follow-up synthesis.
+  Oversized transcripts are still summarized internally on `deep`, but their
+  follow-ups now ground against the indexed transcript document rather than
+  provider-side placeholder lineage.
 - GPT formatting ownership is upstream-first:
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the

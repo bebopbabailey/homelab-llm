@@ -281,10 +281,54 @@ def _p95_latency_ms(cases: list[dict[str, Any]]) -> float:
     return round(statistics.quantiles(latency_vals, n=100, method="inclusive")[94], 3)
 
 
+def _hit_has_span(hit: dict[str, Any]) -> bool:
+    spans = hit.get("spans")
+    if not isinstance(spans, dict):
+        return False
+    return any(
+        spans.get(key) not in {None, "", []}
+        for key in ("timestamp_label", "start_ms", "end_ms", "page_start", "page_end", "char_start", "char_end")
+    )
+
+
+def _citation_span_correctness(cases: list[dict[str, Any]], labels: dict[tuple[str, str], int]) -> float:
+    judged = 0
+    correct = 0
+    for case in cases:
+        qid = str(case.get("query_id", "")).strip()
+        hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+        for hit in hits[:5]:
+            grade = labels.get((qid, stable_chunk_docno(hit)), 0)
+            if grade <= 0:
+                continue
+            judged += 1
+            if _hit_has_span(hit):
+                correct += 1
+    if judged == 0:
+        return 1.0
+    return round(correct / judged, 4)
+
+
+def _absent_answer_refusal_accuracy(cases: list[dict[str, Any]], labels: dict[tuple[str, str], int]) -> float:
+    absent_cases = [case for case in cases if not bool(case.get("answerable", True))]
+    if not absent_cases:
+        return 1.0
+    correct = 0
+    for case in absent_cases:
+        qid = str(case.get("query_id", "")).strip()
+        hits = case.get("hits", []) if isinstance(case.get("hits", []), list) else []
+        top5_grades = [labels.get((qid, stable_chunk_docno(hit)), 0) for hit in hits[:5]]
+        if not any(grade > 0 for grade in top5_grades):
+            correct += 1
+    return round(correct / len(absent_cases), 4)
+
+
 def _metric_bundle(cases: list[dict[str, Any]], labels: dict[tuple[str, str], int]) -> tuple[dict[str, float], dict[str, float]]:
     base_metrics, per_query_success = calculate_ir_metrics(cases, labels)
     metrics = dict(base_metrics)
     metrics["p95_latency_ms"] = _p95_latency_ms(cases)
+    metrics["citation_span_correctness"] = _citation_span_correctness(cases, labels)
+    metrics["absent_answer_refusal_accuracy"] = _absent_answer_refusal_accuracy(cases, labels)
     return metrics, _bucket_hit_at_5(cases, per_query_success)
 
 
@@ -580,6 +624,9 @@ def _score(args: argparse.Namespace) -> int:
     support_bucket_floor = all(value >= 0.75 for value in bucket_support.values()) if bucket_support else True
     disconfirm_hit = metrics_disconfirm["hit_at_5"] if disconfirm_cases else 1.0
     p95_latency = metrics_all["p95_latency_ms"]
+    span_correctness = metrics_all["citation_span_correctness"]
+    absent_refusal = metrics_all["absent_answer_refusal_accuracy"]
+    ingest_latency = float(run.get("ingest_latency_ms", 0.0) or 0.0)
 
     summary = {
         "run_id": run.get("run_id", ""),
@@ -602,6 +649,9 @@ def _score(args: argparse.Namespace) -> int:
         "bucket_hit_at_5_disconfirm": bucket_disconfirm,
         "diagnostics": {
             "bad_hit_rate_at_5": metrics_all["bad_hit_rate_at_5"],
+            "citation_span_correctness": span_correctness,
+            "absent_answer_refusal_accuracy": absent_refusal,
+            "ingest_latency_ms": ingest_latency,
         },
         "gates": {
             "hit_at_5": metrics_support["hit_at_5"] >= 0.85,
@@ -609,6 +659,9 @@ def _score(args: argparse.Namespace) -> int:
             "ndcg_at_10": metrics_support["ndcg_at_10"] >= 0.70,
             "bucket_floor": support_bucket_floor,
             "disconfirm_hit_at_5": disconfirm_hit >= 0.67,
+            "citation_span_correctness": span_correctness >= 0.95,
+            "absent_answer_refusal_accuracy": absent_refusal >= 0.90,
+            "ingest_latency_ms": ingest_latency <= 30_000.0,
             "p95_latency_ms": p95_latency <= 800.0,
         },
     }
@@ -641,6 +694,8 @@ def _compare(args: argparse.Namespace) -> int:
             "ndcg_at_10": _d(bm_support, cm_support, "ndcg_at_10"),
             "bad_hit_rate_at_5": _d(base.get("metrics", {}), cand.get("metrics", {}), "bad_hit_rate_at_5"),
             "p95_latency_ms": _d(base.get("metrics", {}), cand.get("metrics", {}), "p95_latency_ms"),
+            "citation_span_correctness": _d(base.get("metrics", {}), cand.get("metrics", {}), "citation_span_correctness"),
+            "absent_answer_refusal_accuracy": _d(base.get("metrics", {}), cand.get("metrics", {}), "absent_answer_refusal_accuracy"),
             "disconfirm_hit_at_5": _d(bm_disconfirm, cm_disconfirm, "hit_at_5"),
         },
     }
@@ -662,7 +717,7 @@ def parse_args() -> argparse.Namespace:
     p_run = sub.add_parser("run-pack", help="Run query pack against memory API")
     p_run.add_argument("--pack", required=True)
     p_run.add_argument("--api-base", default="http://127.0.0.1:55440")
-    p_run.add_argument("--model-space", choices=["qwen", "mxbai"], default="qwen")
+    p_run.add_argument("--model-space", choices=["nomic", "qwen", "mxbai"], default="nomic")
     p_run.add_argument("--top-k", type=int, default=10)
     p_run.add_argument("--lexical-k", type=int, default=30)
     p_run.add_argument("--vector-k", type=int, default=30)

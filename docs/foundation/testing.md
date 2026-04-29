@@ -583,7 +583,7 @@ Staged apply order:
 
 ### Studio main vector-store labels (background lane)
 Studio memory store labels included in policy checks:
-- `com.bebop.pgvector-main`
+- `com.bebop.elasticsearch-memory-main`
 - `com.bebop.memory-api-main`
 - `com.bebop.memory-ingest-nightly`
 - `com.bebop.memory-backup-nightly`
@@ -593,13 +593,38 @@ Read-only audit checks:
 uv run python platform/ops/scripts/validate_studio_policy.py --json
 uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --json
 ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.pgvector-main.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
+ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
 ssh studio "sudo -n plutil -convert json -o - /Library/LaunchDaemons/com.bebop.memory-api-main.plist | jq '{ProcessType, Nice, LowPriorityIO, LowPriorityBackgroundIO}'"
 ```
 
 Runtime smoke checks:
 ```bash
-ssh studio "lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'"
-ssh studio "curl -fsS http://127.0.0.1:55440/health | jq ."
+ssh studio "lsof -nP -iTCP -sTCP:LISTEN | egrep ':9200|:55440'"
+ssh studio "curl -fsS http://127.0.0.1:9200/_cluster/health?pretty"
+curl -fsS http://192.168.1.72:55440/health | jq .
+curl -fsS http://192.168.1.72:55440/v1/memory/stats | jq .
+```
+
+Write-auth smoke:
+```bash
+curl -sS -o /tmp/memory-unauth.json -w '%{http_code}\n' \
+  -X POST http://192.168.1.72:55440/v1/memory/upsert \
+  -H 'Content-Type: application/json' \
+  -d '{"documents":[{"source":"memory://unauth","text":"probe"}]}'
+TOKEN="$(ssh studio 'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
+curl -fsS http://192.168.1.72:55440/v1/memory/upsert \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"documents":[{"source":"memory://auth","text":"probe"}]}' | jq .
+```
+
+Snapshot smoke:
+```bash
+ssh studio "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \
+  MEMORY_ELASTIC_URL=http://127.0.0.1:9200 \
+  MEMORY_ELASTIC_SNAPSHOT_DIR=/Users/thestudio/optillm-proxy/layer-data/vector-db/runtime/elasticsearch-snapshots \
+  ./scripts/register_snapshot_repo.sh"
+ssh studio "curl -fsS -X PUT http://127.0.0.1:9200/_snapshot/memory-main-repo/manual-\$(date +%Y%m%d)?wait_for_completion=true -H 'Content-Type: application/json' -d '{}'"
 ```
 
 ### Studio vector-store retrieval quality gate (QG1)

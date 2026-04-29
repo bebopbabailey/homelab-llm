@@ -11,7 +11,7 @@
     <string>uvicorn</string>
     <string>app.main:app</string>
     <string>--host</string>
-    <string>127.0.0.1</string>
+    <string>192.168.1.72</string>
     <string>--port</string>
     <string>55440</string>
     <string>--workers</string>
@@ -29,10 +29,22 @@
     <string>memory_main</string>
     <key>MEMORY_DB_AUTO_INIT</key>
     <string>false</string>
+    <key>MEMORY_BACKEND</key>
+    <string>elastic</string>
+    <key>MEMORY_ELASTIC_URL</key>
+    <string>http://127.0.0.1:9200</string>
     <key>MEMORY_EMBED_PRIMARY</key>
-    <string>studio-qwen-embed-0.6b</string>
+    <string>studio-nomic-embed-text-v1.5</string>
+    <key>MEMORY_EMBED_NOMIC_DIM</key>
+    <string>768</string>
+    <key>MEMORY_EMBED_NOMIC_QUERY_PREFIX</key>
+    <string>search_query:</string>
+    <key>MEMORY_EMBED_NOMIC_DOCUMENT_PREFIX</key>
+    <string>search_document:</string>
     <key>MEMORY_EMBED_FALLBACK</key>
     <string>studio-mxbai-embed-large-v1</string>
+    <key>MEMORY_API_WRITE_BEARER_TOKEN_FILE</key>
+    <string>/Users/thestudio/data/memory-main/secrets/memory-api-write-token</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>

@@ -1,10 +1,11 @@
 # Vector DB (Studio Main Store)
 
-Purpose: Studio-hosted durable memory store for general-use retrieval over
-personal data exports.
+Purpose: Studio-hosted durable retrieval service for long transcripts and
+publication-style documents.
 
-Status: active v1 baseline, Studio-local only, with internal `legacy|haystack`
-backend selection via `MEMORY_BACKEND`.
+Status: active v1 cutover. Elasticsearch is now the primary retrieval backend.
+`pgvector` remains only as a temporary rollback path behind
+`MEMORY_BACKEND=legacy`.
 
 ## Ownership and deploy contract
 - Canonical source of truth: this monorepo service directory.
@@ -13,24 +14,27 @@ backend selection via `MEMORY_BACKEND`.
   path relocation is part of the current contract.
 
 ## v1 contract
-- Engine: Postgres 16 + pgvector.
-- Exposure: localhost only (`127.0.0.1`).
-- Scope: personal/export corpus first (no web-search coupling in this service).
-- Retrieval: hybrid lexical + vector.
-- Internal backend mode: `legacy` or `haystack` (API contract unchanged).
-- Embeddings: dual-space indexing:
-  - primary: `studio-qwen-embed-0.6b`
-  - fallback: `studio-mxbai-embed-large-v1`
+- Engine: single-node Elasticsearch on Studio with one shared chunk index plus
+  document and response-map metadata indexes.
+- Exposure: API remains at the existing memory API surface; LAN reachability is
+  an operator deployment choice, not a code-path assumption.
+- Scope: YouTube transcripts, PDFs, and plain/article text with one shared
+  chunk schema.
+- Retrieval: lexical + vector hybrid search with explicit retrieval profiles
+  (`precise`, `balanced`, `broad`).
+- Embeddings: BYO local embeddings, active default
+  `studio-nomic-embed-text-v1.5`.
+- Follow-up state: `previous_response_id` is ergonomic only and resolves to a
+  durable `document_id` mapping in the retrieval layer.
 
 ## Components
 - API service: `app/main.py`
 - Backend implementations: `app/backends/*`
 - Service config/env parser: `app/config.py`
-- DB and schema bootstrap helpers: `app/db.py`, `sql/*.sql`
 - Embedding loader wrappers: `app/embed.py`
-- Legacy hybrid retrieval planner: `app/retrieval.py`
+- Legacy Postgres helpers: `app/db.py`, `app/retrieval.py`, `sql/*.sql`
 - Batch ingest runner: `app/ingest.py`
-- Haystack schema bootstrap: `scripts/init_haystack_schema.py`
+- Retrieval/eval scripts: `scripts/eval_ir.py`, `scripts/eval_memory_quality.py`
 - Studio launchd templates: `launchd/*.plist`
 - Studio operational scripts: `scripts/*`
 

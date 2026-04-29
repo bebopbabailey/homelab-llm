@@ -48,6 +48,10 @@ def _load_backend() -> MemoryBackend:
         from .backends.haystack import HaystackBackend
 
         return HaystackBackend()
+    if CFG.backend == "elastic":
+        from .backends.elastic import ElasticBackend
+
+        return ElasticBackend()
     from .backends.legacy import LegacyBackend
 
     return LegacyBackend()
@@ -156,19 +160,20 @@ def run_ingest() -> dict[str, Any]:
     chunks = int(counts.get("chunks", 0))
 
     # Preserve ingest run audit trail for both backends.
-    cfg = load_db_config()
-    with connect(cfg) as conn:
-        run = {
-            "run_id": run_id,
-            "status": "ok",
-            "docs": docs,
-            "chunks": chunks,
-            "input": ingest_input,
-            "backend": CFG.backend,
-            "ingest_mode": CFG.ingest_mode,
-        }
-        record_ingest_run(conn, run)
-        conn.commit()
+    run = {
+        "run_id": run_id,
+        "status": "ok",
+        "docs": docs,
+        "chunks": chunks,
+        "input": ingest_input,
+        "backend": CFG.backend,
+        "ingest_mode": CFG.ingest_mode,
+    }
+    if CFG.backend == "legacy":
+        cfg = load_db_config()
+        with connect(cfg) as conn:
+            record_ingest_run(conn, run)
+            conn.commit()
 
     return run
 

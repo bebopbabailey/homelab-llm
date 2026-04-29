@@ -318,6 +318,12 @@ def _split_into_chunks(segments: list[dict[str, Any]], max_tokens: int = CHUNK_T
                 {
                     "start_timestamp": current_segments[0]["timestamp"],
                     "end_timestamp": current_segments[-1]["timestamp"],
+                    "start_ms": int(round(float(current_segments[0]["start"]) * 1000.0)),
+                    "end_ms": int(
+                        round(
+                            (float(current_segments[-1]["start"]) + float(current_segments[-1]["duration"])) * 1000.0
+                        )
+                    ),
                     "transcript_text": _render_transcript_text(current_segments),
                     "token_estimate": current_tokens,
                 }
@@ -331,11 +337,145 @@ def _split_into_chunks(segments: list[dict[str, Any]], max_tokens: int = CHUNK_T
             {
                 "start_timestamp": current_segments[0]["timestamp"],
                 "end_timestamp": current_segments[-1]["timestamp"],
+                "start_ms": int(round(float(current_segments[0]["start"]) * 1000.0)),
+                "end_ms": int(
+                    round((float(current_segments[-1]["start"]) + float(current_segments[-1]["duration"])) * 1000.0)
+                ),
                 "transcript_text": _render_transcript_text(current_segments),
                 "token_estimate": current_tokens,
             }
         )
     return chunks
+
+
+def _memory_api_base() -> str:
+    return os.getenv("MEMORY_API_BASE", "http://192.168.1.72:55440").rstrip("/")
+
+
+def _memory_api_headers(path: str) -> dict[str, str]:
+    token = os.getenv("MEMORY_API_BEARER_TOKEN", "").strip()
+    if not token:
+        return {}
+    if path in {"/v1/memory/upsert", "/v1/memory/delete", "/v1/memory/response-map/upsert"}:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def _youtube_document_id(video_id: str) -> str:
+    return f"youtube:{video_id}"
+
+
+async def _post_memory_api(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(f"{_memory_api_base()}{path}", json=payload, headers=_memory_api_headers(path))
+        response.raise_for_status()
+        body = response.json()
+        return body if isinstance(body, dict) else {}
+
+
+async def _upsert_transcript_document(transcript: TranscriptFetchResult) -> str:
+    document_id = _youtube_document_id(transcript.video_id)
+    payload = {
+        "documents": [
+            {
+                "document_id": document_id,
+                "source_type": "youtube",
+                "source": "youtube",
+                "source_thread_id": transcript.video_id,
+                "source_message_id": transcript.video_id,
+                "title": transcript.video_id,
+                "uri": f"https://youtu.be/{transcript.video_id}",
+                "metadata": {
+                    "caption_type": transcript.caption_type,
+                    "transcript_language": transcript.transcript_language,
+                    "transcript_language_code": transcript.transcript_language_code,
+                    "was_translated": transcript.was_translated,
+                },
+                "chunks": [
+                    {
+                        "chunk_index": idx,
+                        "text": chunk["transcript_text"],
+                        "timestamp_label": chunk["start_timestamp"],
+                        "start_ms": chunk["start_ms"],
+                        "end_ms": chunk["end_ms"],
+                        "metadata": {
+                            "caption_type": transcript.caption_type,
+                            "transcript_language": transcript.transcript_language,
+                            "transcript_language_code": transcript.transcript_language_code,
+                            "was_translated": transcript.was_translated,
+                        },
+                    }
+                    for idx, chunk in enumerate(_split_into_chunks(transcript.segments))
+                ],
+            }
+        ]
+    }
+    await _post_memory_api("/v1/memory/upsert", payload)
+    return document_id
+
+
+async def _upsert_response_mapping(response_id: str, document_id: str, summary_mode: str) -> None:
+    await _post_memory_api(
+        "/v1/memory/response-map/upsert",
+        {
+            "response_id": response_id,
+            "document_id": document_id,
+            "source_type": "youtube",
+            "summary_mode": summary_mode,
+        },
+    )
+
+
+async def _resolve_response_mapping(previous_response_id: str) -> dict[str, Any] | None:
+    try:
+        return await _post_memory_api("/v1/memory/response-map/resolve", {"response_id": previous_response_id})
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            return None
+        raise
+
+
+async def _search_document(question: str, document_id: str) -> list[dict[str, Any]]:
+    body = await _post_memory_api(
+        "/v1/memory/search",
+        {
+            "query": question,
+            "profile": "balanced",
+            "document_id": document_id,
+            "source_type": "youtube",
+            "render_citations": False,
+        },
+    )
+    hits = body.get("hits")
+    return list(hits) if isinstance(hits, list) else []
+
+
+def _build_followup_retrieval_messages(question: str, hits: list[dict[str, Any]]) -> list[dict[str, str]]:
+    excerpts: list[str] = []
+    for idx, hit in enumerate(hits, start=1):
+        if not isinstance(hit, dict):
+            continue
+        text = str(hit.get("text") or "").strip()
+        if not text:
+            continue
+        spans = hit.get("spans") or {}
+        excerpts.append(
+            f"Excerpt {idx}\nTimestamp: {spans.get('timestamp_label') or ''}\nText:\n{text}"
+        )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "Answer the question using only the retrieved transcript excerpts. "
+                "If the excerpts do not support a confident answer, say that directly. "
+                "Do not render citations unless the user explicitly asks for them."
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"Question: {question}\n\nRetrieved transcript excerpts:\n\n" + "\n\n".join(excerpts),
+        },
+    ]
 
 
 def _extract_responses_text(response: Any) -> str | None:
@@ -567,6 +707,33 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             else _extract_latest_user_text_from_messages(data.get("messages"))
         )
         if isinstance(previous_response_id, str) and previous_response_id.strip():
+            mapping = await _resolve_response_mapping(previous_response_id)
+            if mapping and latest_user_text:
+                document_id = str(mapping.get("document_id") or "").strip()
+                hits = await _search_document(latest_user_text, document_id)
+                messages = _build_followup_retrieval_messages(latest_user_text, hits)
+                data.pop("previous_response_id", None)
+                if call_type in {"responses", "aresponses"}:
+                    data["input"] = messages
+                    data.pop("messages", None)
+                    current_budget = data.get("max_output_tokens")
+                    if not isinstance(current_budget, int) or current_budget < MIN_RESPONSE_OUTPUT_TOKENS:
+                        data["max_output_tokens"] = MIN_RESPONSE_OUTPUT_TOKENS
+                else:
+                    data["messages"] = messages
+                    data.pop("input", None)
+                    current_budget = data.get("max_tokens")
+                    if not isinstance(current_budget, int) or current_budget < MIN_CHAT_OUTPUT_TOKENS:
+                        data["max_tokens"] = MIN_CHAT_OUTPUT_TOKENS
+                data["stream"] = False
+                logger.info(
+                    "youtube-summary retrieval-followup alias=%s previous_response_id=%s document_id=%s hits=%s",
+                    data.get("model"),
+                    previous_response_id,
+                    document_id,
+                    len(hits),
+                )
+                return data
             logger.info("youtube-summary follow-up alias=%s previous_response_id=%s", data.get("model"), previous_response_id)
             return data
 
@@ -575,6 +742,7 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
 
         _, video_id, focus_request = _extract_url_and_focus_request(latest_user_text)
         transcript = _fetch_transcript(video_id)
+        document_id = _youtube_document_id(transcript.video_id)
 
         data["_youtube_summary_initial"] = True
         data["_youtube_summary_focus_request"] = focus_request
@@ -590,6 +758,7 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             "was_translated": transcript.was_translated,
             "token_estimate": transcript.token_estimate,
             "segments": transcript.segments,
+            "document_id": document_id,
         }
         with _LOCK:
             _REQUEST_CONTEXTS[id(data)] = {
@@ -600,6 +769,8 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
                 "api_base": data.get("api_base"),
                 "api_key": data.get("api_key"),
             }
+
+        await _upsert_transcript_document(transcript)
 
         if call_type in {"responses", "aresponses"}:
             current_budget = data.get("max_output_tokens")
@@ -690,16 +861,39 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             if not text:
                 raise HTTPException(status_code=502, detail="task-youtube-summary final synthesis returned empty output")
             if response_body and response_body.get("object") == "response":
-                return _set_responses_text(response, text)
-            return _set_chat_text(response, text)
+                rewritten = _set_responses_text(response, text)
+            else:
+                rewritten = _set_chat_text(response, text)
+            rewritten_body = _response_to_dict(rewritten)
+            response_id = str(rewritten_body.get("id") or response_body.get("id") or "").strip()
+            document_id = str(transcript_meta.get("document_id") or "").strip()
+            if response_id and document_id:
+                await _upsert_response_mapping(response_id, document_id, "indexed_long")
+            return rewritten
 
         if response_body and response_body.get("object") == "response":
             text = _extract_responses_text(response)
             if not text:
                 return response
-            return _set_responses_text(response, text)
+            rewritten = _set_responses_text(response, text)
+            rewritten_body = _response_to_dict(rewritten)
+            response_id = str(rewritten_body.get("id") or response_body.get("id") or "").strip()
+            document_id = str((transcript_meta or {}).get("document_id") or "").strip() if isinstance(transcript_meta, dict) else ""
+            if response_id and document_id:
+                await _upsert_response_mapping(response_id, document_id, "direct_short")
+            return rewritten
 
         text = _extract_chat_text(response)
         if not text:
             return response
-        return _set_chat_text(response, text)
+        rewritten = _set_chat_text(response, text)
+        rewritten_body = _response_to_dict(rewritten)
+        response_id = str(rewritten_body.get("id") or response_body.get("id") or "").strip()
+        document_id = str((transcript_meta or {}).get("document_id") or "").strip() if isinstance(transcript_meta, dict) else ""
+        if response_id and document_id:
+            await _upsert_response_mapping(
+                response_id,
+                document_id,
+                "indexed_long" if chunked else "direct_short",
+            )
+        return rewritten

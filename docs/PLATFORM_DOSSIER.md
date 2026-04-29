@@ -48,8 +48,8 @@
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `services/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
 | OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `services/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
-| Studio main vector DB | Studio | 55432 | 127.0.0.1 | http://127.0.0.1:55432 | n/a | `com.bebop.pgvector-main`, policy-managed launchd |
-| Studio main memory API | Studio | 55440 | 127.0.0.1 | http://127.0.0.1:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd |
+| Studio main retrieval store | Studio | 9200 | 127.0.0.1 | http://127.0.0.1:9200 | `/`, `/_cluster/health` | `com.bebop.elasticsearch-memory-main`, policy-managed launchd |
+| Studio main memory API | Studio | 55440 | 192.168.1.72 (Mini-only firewall scope) | http://192.168.1.72:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd, write-token protected routes |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX inference lane (active) | Studio | 8101 | 192.168.1.72 | http://192.168.1.72:8101/v1 | /v1/models | `com.bebop.mlx-lane.8101`, runtime `vllm serve`, `mlxctl status` |
 | llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | 192.168.1.72 | http://192.168.1.72:8126/v1 | /v1/models | `com.bebop.llmster-gpt.8126`, runtime `llmster`, `lms ps --json` |
@@ -299,7 +299,9 @@ Networking note:
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, CCProxy API 4010.
 - Local-only bind with tailnet-only operator access: OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
-- Local-only (Studio): main vector DB 55432, memory API 55440.
+- Local-only (Studio): Elasticsearch `127.0.0.1:9200`.
+- Mini-to-Studio LAN retrieval path: memory API `192.168.1.72:55440`, reads open
+  to Mini and writes gated by bearer token plus pf allowlist.
 - Tailnet HTTPS (Tailscale Serve on Mini):
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)

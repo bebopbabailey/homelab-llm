@@ -26,15 +26,20 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - Team ports: `8100–8119` (`mlxctl`-managed); experimental: `8120–8139` (no `mlxctl` requirement)
 - **Active non-MLX inference labels**:
   `com.bebop.llmster-gpt.8126`, `com.bebop.optillm-proxy`
+- **Active background data-service labels**:
+  `com.bebop.elasticsearch-memory-main`, `com.bebop.memory-api-main`
 - **Active non-MLX listeners**:
   `192.168.1.72:4020/:8126`
   with `8126` live for shared `fast` + `deep`; `4020` remains non-core
   operator infrastructure
 - **OptiLLM proxy**: `192.168.1.72:4020` (active LiteLLM `boost` path)
-- **Main vector store (active, Studio-local)**:
-  - Postgres+pgvector `127.0.0.1:55432` (`com.bebop.pgvector-main`)
-  - Memory API `127.0.0.1:55440` (`com.bebop.memory-api-main`)
-  - Internal retrieval backend mode: `MEMORY_BACKEND=legacy|haystack` (no port change)
+- **Main retrieval stack (active, Studio-local + Mini-facing API)**:
+  - Elasticsearch `127.0.0.1:9200` (`com.bebop.elasticsearch-memory-main`)
+  - Memory API `192.168.1.72:55440` (`com.bebop.memory-api-main`)
+  - pf scope: Mini `192.168.1.71` allowed; broader LAN blocked
+  - write routes require the Studio-managed bearer token file
+  - Internal retrieval backend mode: `MEMORY_BACKEND=elastic|legacy|haystack`
+  - Snapshot repository path is repo-managed under the vector-db runtime tree
   - Nightly ingest/backup jobs (`com.bebop.memory-ingest-nightly`, `com.bebop.memory-backup-nightly`)
 
 ## Orin (speech appliance)

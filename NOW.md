@@ -1,11 +1,10 @@
 # NOW
 
 Active
-- Add a durable `task-youtube-summary` LiteLLM lane that accepts a YouTube URL,
-  fetches captions through `youtube-transcript-api`, returns a comprehensive
-  summary, and supports follow-up Q&A through the existing Responses-first
-  gateway contract.
+- Cut over `services/vector-db` to Elastic-backed retrieval with explicit HNSW
+  mappings, durable `response_id -> document_id` state, and retrieval-backed
+  follow-up grounding for long-form YouTube/publication content.
 
 NEXT UP
-- After the lane lands, decide whether long-video follow-up should stay
-  synthesis-grounded or gain a separate durable transcript storage path.
+- Validate the new Elastic backend against the retrieval/eval gates and decide
+  when to retire the temporary pgvector rollback path.

@@ -80,4 +80,7 @@ fi
 log "Syncing vector-db venv"
 run_remote "cd '$SERVICE_DIR' && uv venv .venv && uv sync --no-dev"
 
+log "Running Studio install/bootstrap helper"
+run_remote "cd '$SERVICE_DIR' && ./scripts/studio_install.sh"
+
 log "Deploy script complete (no launchctl mutation performed)"

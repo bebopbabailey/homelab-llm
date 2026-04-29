@@ -15,7 +15,13 @@ if [[ ! -x "$VENV/bin/python" ]]; then
   (cd "$ROOT_DIR" && uv sync --no-dev)
 fi
 
+if [[ "${MEMORY_BACKEND:-elastic}" == "elastic" ]]; then
+  "$ROOT_DIR/scripts/install_elasticsearch.sh"
+  "$ROOT_DIR/scripts/ensure_memory_api_write_token.sh"
+fi
+
 cd "$ROOT_DIR"
+if [[ "${MEMORY_BACKEND:-elastic}" == "legacy" ]]; then
 ROOT_DIR="$ROOT_DIR" "$VENV/bin/python" - <<'PY'
 import os
 from pathlib import Path
@@ -28,3 +34,4 @@ with connect(load_db_config()) as conn:
     ensure_schema(conn, sql_dir)
 print("schema_initialized")
 PY
+fi

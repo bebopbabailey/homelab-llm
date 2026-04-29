@@ -73,8 +73,8 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | Voice Gateway | Orin | 18080 | http://192.168.1.93:18080/v1 | /health, /health/readiness |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
-| Studio main vector DB (postgres+pgvector) | Studio | 55432 | http://127.0.0.1:55432 | n/a |
-| Studio main memory API | Studio | 55440 | http://127.0.0.1:55440 | /health |
+| Studio main retrieval store (Elasticsearch) | Studio | 9200 | http://127.0.0.1:9200 | `/`, `/_cluster/health` |
+| Studio main memory API | Studio | 55440 | http://192.168.1.72:55440 | /health |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX inference lane (active) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
 | llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | http://192.168.1.72:8126/v1 | /v1/models |
@@ -94,9 +94,11 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - Approved additional owned labels for active service work:
   - `com.bebop.llmster-gpt.8126`
   - `com.bebop.optillm-proxy`
+  - `com.bebop.elasticsearch-memory-main`
 
 Studio scheduling contract:
 - inference lane labels: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`, `com.bebop.optillm-proxy`
+- background data-service labels: `com.bebop.elasticsearch-memory-main`, `com.bebop.memory-api-main`
 - non-inference transient automation runs with taskpolicy utility clamp
 - strict allowlist policy for owned labels (`com.bebop.*`, `com.deploy.*`)
 - details: `docs/foundation/studio-scheduling-policy.md`

@@ -45,7 +45,8 @@ only; it does not implement inference.
 - `task-youtube-summary` is also an additional task alias, not part of the
   public human chat-lane trio. Its guardrail resolves one supported YouTube
   video URL on the first turn, fetches captions via `youtube-transcript-api`,
-  renders an adaptive summary prompt, and rewrites Responses output into stable
+  indexes a durable transcript document through the memory API, renders an
+  adaptive summary prompt, and rewrites Responses output into stable
   `output_text`.
 - Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
   upstream `output_text` is not guaranteed to be populated on every direct
@@ -58,10 +59,9 @@ only; it does not implement inference.
   matching that public value byte-for-byte.
 - `task-json` is an additional utility alias, not part of the public human
   chat-lane trio.
-- For short videos, direct callers can reuse the returned `task-youtube-summary`
-  response `id` as `previous_response_id` for transcript-grounded follow-up.
-  For rare chunked long-video runs, the returned response stays summary-grounded
-  because the final synthesis response becomes the public follow-up surface.
+- `task-youtube-summary` follow-ups are retrieval-grounded through a durable
+  `response_id -> document_id` mapping in the memory API rather than trusting
+  provider conversation state alone.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.

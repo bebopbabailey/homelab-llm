@@ -1,7 +1,8 @@
 # Runbook: Vector DB (Studio Main Store)
 
 ## Scope
-Studio-local operations for Postgres + pgvector and memory API.
+Studio-hosted retrieval operations for the memory API and its Elastic-backed
+primary backend.
 
 Canonical source tree:
 - `/home/christopherbailey/homelab-llm/services/vector-db`
@@ -32,172 +33,181 @@ cd /home/christopherbailey/homelab-llm
 ./services/vector-db/scripts/deploy_studio.sh --dry-run
 ```
 
-## Initialize DB on Studio (legacy schema)
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/studio_install.sh"
-```
-
-## Initialize Haystack schema/tables (new backend)
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \
-   uv run python scripts/init_haystack_schema.py"
-```
-
-## Start/restart Studio launchd labels
+## Start/restart Studio launchd label
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
-  "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.pgvector-main.plist || true"
+  "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist || true"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "launchctl kickstart -k system/com.bebop.elasticsearch-memory-main"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.memory-api-main.plist || true"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
-  "launchctl kickstart -k system/com.bebop.pgvector-main"
-platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl kickstart -k system/com.bebop.memory-api-main"
 ```
+
+## Elastic/version preflight
+Run this before treating the Elastic backend as active:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "curl -fsS ${MEMORY_ELASTIC_URL:-http://127.0.0.1:9200}/ | jq '{version:.version.number,cluster_name}'"
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "curl -fsS ${MEMORY_ELASTIC_URL:-http://127.0.0.1:9200}/_license | jq .license"
+```
+
+Expected:
+- version is at least `8.19.x`
+- preferred path is pinned `9.3.3`
+- license probe succeeds and is reported in `/health` and `/v1/memory/stats`
 
 ## Health checks
 ```bash
+curl -fsS http://192.168.1.72:55440/health | jq .
+curl -fsS http://192.168.1.72:55440/v1/memory/stats | jq .
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "curl -fsS http://127.0.0.1:55440/health | jq ."
+  "curl -fsS http://127.0.0.1:9200/_cluster/health?pretty"
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "curl -fsS http://127.0.0.1:55440/v1/memory/stats | jq ."
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'"
+  "lsof -nP -iTCP -sTCP:LISTEN | egrep ':9200|:55440'"
 ```
 
-## Ingestion run (JSONL)
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \
-   MEMORY_BACKEND=haystack \
-   MEMORY_INGEST_MODE=jsonl \
-   MEMORY_INGEST_PATH=/Users/thestudio/data/memory-main/ingest/events.codex-history.pilot.normalized.jsonl \
-   ./scripts/run_ingest.sh"
-```
-
-## Ingestion run (manuals PDF lane)
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \
-   MEMORY_BACKEND=haystack \
-   MEMORY_INGEST_MODE=manuals_pdf \
-   MEMORY_MANUALS_PDF_GLOB='/Users/thestudio/data/memory-main/manuals/**/*.pdf' \
-   MEMORY_MANUALS_SOURCE=manuals_pdf \
-   ./scripts/run_ingest.sh"
-```
+Expected stats fields:
+- `index_alias`
+- `index_name`
+- `documents`
+- `chunks`
+- `response_maps`
+- `embedding_model`
+- `embedding_dims`
+- `vector_index_type`
+- `hnsw_m`
+- `hnsw_ef_construction`
+- `single_doc_exact_max_chunks`
+- `retriever_mode`
 
 ## Retrieval smoke
 ```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "curl -fsS http://127.0.0.1:55440/v1/memory/search \
-    -H 'Content-Type: application/json' \
-    -d '{\"query\":\"mlxctl sync-gateway\",\"top_k\":5,\"model_space\":\"qwen\"}' | jq ."
+curl -fsS http://192.168.1.72:55440/v1/memory/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"mlxctl sync-gateway","profile":"balanced","document_id":"ops:mlxctl-guide"}' | jq .
 ```
 
+## Response-map smoke
+```bash
+TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
+curl -fsS http://192.168.1.72:55440/v1/memory/response-map/upsert \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"response_id":"resp_test","document_id":"youtube:test","source_type":"youtube","summary_mode":"indexed_long"}' | jq .
+curl -fsS http://192.168.1.72:55440/v1/memory/response-map/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{"response_id":"resp_test"}' | jq .
+```
+
+## Ingestion runs
+JSONL/manual ingest still flows through `app/ingest.py`. The preferred v1
+upsert surface is explicit chunk records with spans.
+
+Example direct upsert:
+```bash
+TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
+curl -fsS http://192.168.1.72:55440/v1/memory/upsert \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "documents":[
+      {
+        "document_id":"youtube:test",
+        "source_type":"youtube",
+        "source":"youtube",
+        "title":"test video",
+        "uri":"https://youtu.be/test",
+        "chunks":[
+          {"chunk_index":0,"text":"hello world","timestamp_label":"00:00","start_ms":0,"end_ms":1000}
+        ]
+      }
+    ]
+  }' | jq .
+```
+
+Write-auth smoke:
+```bash
+curl -sS -o /tmp/memory-unauth.json -w '%{http_code}\n' \
+  -X POST http://192.168.1.72:55440/v1/memory/upsert \
+  -H 'Content-Type: application/json' \
+  -d '{"documents":[{"source":"memory://unauth","text":"probe"}]}'
+cat /tmp/memory-unauth.json
+```
+Expected:
+- `401` without a bearer token
+
+## Reindex path
+Use a fresh physical chunk index whenever any of these change:
+- embedding model
+- embedding dims
+- vector `index_options.type`
+- HNSW `m`
+- HNSW `ef_construction`
+
+Operator sequence:
+1. Create a fresh physical index generation with the new mapping.
+2. Re-embed or `_reindex` into the new target as appropriate.
+3. Validate retrieval quality and latency on the new generation.
+4. Move the `memory-chunks-current` alias to the new index.
+5. Retire the old generation only after rollback confidence is no longer needed.
+
+Important:
+- changing `index_options` on the mapping does not retroactively rebuild
+  already-indexed vectors
+- clean evaluation requires a fresh index generation
+
 ## Cutover
-1) Keep default in service env: `MEMORY_BACKEND=legacy` until validation passes.
-2) Enable haystack mode in service env and restart `com.bebop.memory-api-main`.
-3) Verify `/health`, `/v1/memory/stats`, and retrieval smoke.
+1. Set `MEMORY_BACKEND=elastic` in the Studio service env.
+2. Ensure `com.bebop.elasticsearch-memory-main` is healthy on `127.0.0.1:9200`.
+3. Restart `com.bebop.memory-api-main`.
+4. Verify `/health`, `/v1/memory/stats`, retrieval smoke, and response-map
+   resolution.
+5. Run the eval gates before treating the backend as accepted.
 
 ## Rollback
 ```bash
-# 1) Set MEMORY_BACKEND=legacy in service env
-# 2) Restart memory API label
+# 1) Set MEMORY_BACKEND=legacy in the service env
+# 2) Restart the memory API label
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl kickstart -k system/com.bebop.memory-api-main"
 ```
 
-## Backup run
+## Snapshots
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/run_backup.sh"
+  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && \
+   MEMORY_ELASTIC_URL=http://127.0.0.1:9200 \
+   MEMORY_ELASTIC_SNAPSHOT_DIR=/Users/thestudio/optillm-proxy/layer-data/vector-db/runtime/elasticsearch-snapshots \
+   ./scripts/register_snapshot_repo.sh"
+
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "curl -fsS -X PUT http://127.0.0.1:9200/_snapshot/memory-main-repo/manual-\$(date +%Y%m%d)?wait_for_completion=true \
+    -H 'Content-Type: application/json' -d '{}'"
 ```
-
-## Docs retrieval quality gate
-Canonical flow:
-1. `run-pack`
-2. `autolabel`
-3. `triage`
-4. optional flagged-only `label`
-5. `score`
-
-Canonical eval artifacts are:
-- ranked retrieval output (`run.json`)
-- judgments keyed by `chunk_id` in `judgments.csv`
-
-`score` converts those artifacts internally into TREC-style `run` + `qrels`
-structures and computes canonical IR metrics through `ir-measures`
-(`Success@5`, `RR@10`, `nDCG@10`, `P@5`). Only these remain custom:
-- `p95_latency_ms`
-- `bad_hit_rate_at_5`
-
-Run the docs pack on Studio:
+Restore reference:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy && \
-   uv run python services/vector-db/scripts/eval_memory_quality.py run-pack \
-     --pack services/vector-db/eval/query_pack.docs.v1.jsonl \
-     --api-base http://127.0.0.1:55440 \
-     --model-space qwen \
-     --top-k 10 \
-     --lexical-k 30 \
-     --vector-k 30 \
-     --run-id D1 \
-     --out /Users/thestudio/data/memory-main/eval/D1.run.json"
+  "curl -fsS -X POST http://127.0.0.1:9200/_snapshot/memory-main-repo/<snapshot-name>/_restore \
+    -H 'Content-Type: application/json' -d '{\"indices\":\"memory-*\",\"include_global_state\":true}'"
 ```
 
-Auto-label conservatively:
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy && \
-   uv run python services/vector-db/scripts/eval_memory_quality.py autolabel \
-     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
-     --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
-     --mode conservative_graded \
-     --labeler codex-auto \
-     --run-id D1"
-```
+## Eval gates
+Canonical retrieval acceptance now includes:
+- `hit@5`
+- `MRR@10`
+- citation/span correctness
+- absent-answer refusal accuracy
+- ingest latency
+- query latency
 
-Flag only the cases that need human review:
+Use the existing eval scripts as the reporting surface:
 ```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy && \
-   uv run python services/vector-db/scripts/eval_memory_quality.py triage \
-     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
-     --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
-     --out /Users/thestudio/data/memory-main/eval/D1.triage.json"
-```
-
-Review only flagged cases when triage output is non-empty:
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio --tty -- \
-  "cd /Users/thestudio/optillm-proxy && \
-   uv run python services/vector-db/scripts/eval_memory_quality.py label \
-     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
-     --seed-judgments /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
-     --triage-json /Users/thestudio/data/memory-main/eval/D1.triage.json \
-     --out-csv /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
-     --labeler chris \
-     --run-id D1"
-```
-
-If there are no triage flags, promote auto labels directly:
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cp /Users/thestudio/data/memory-main/eval/D1.judgments.auto.csv \
-      /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv"
-```
-
-Score the run:
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "cd /Users/thestudio/optillm-proxy && \
-   uv run python services/vector-db/scripts/eval_memory_quality.py score \
-     --run-json /Users/thestudio/data/memory-main/eval/D1.run.json \
-     --judgments /Users/thestudio/data/memory-main/eval/D1.judgments.final.csv \
-     --out /Users/thestudio/data/memory-main/eval/D1.score.json && \
-   jq '{metrics_support,metrics_disconfirm,gates,diagnostics,bucket_hit_at_5_support}' \
-      /Users/thestudio/data/memory-main/eval/D1.score.json"
+cd /home/christopherbailey/homelab-llm/services/vector-db
+uv run python scripts/eval_memory_quality.py --help
+uv run python scripts/eval_ir.py
 ```

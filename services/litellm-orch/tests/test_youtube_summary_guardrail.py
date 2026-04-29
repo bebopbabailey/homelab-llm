@@ -149,6 +149,14 @@ class TestYouTubeSummaryHelpers(unittest.TestCase):
         self.assertEqual(result.transcript_language_code, "en")
         self.assertIn("[00:00] Hello world", result.transcript_text)
 
+    def test_memory_api_headers_only_attach_bearer_for_write_routes(self):
+        with patch.dict(youtube_summary_guardrail.os.environ, {"MEMORY_API_BEARER_TOKEN": "secret-token"}, clear=False):
+            self.assertEqual(
+                youtube_summary_guardrail._memory_api_headers("/v1/memory/upsert"),
+                {"Authorization": "Bearer secret-token"},
+            )
+            self.assertEqual(youtube_summary_guardrail._memory_api_headers("/v1/memory/search"), {})
+
 
 class TestYouTubeSummaryGuardrail(unittest.TestCase):
     def test_pre_call_initial_responses_sets_prompt_id_and_prompt_variables(self):
@@ -163,7 +171,11 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             segments=[{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
         )
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript):
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_transcript_document",
+            AsyncMock(return_value="youtube:dQw4w9WgXcQ"),
+        ) as upsert_mock:
             result = asyncio.run(
                 guardrail.async_pre_call_hook(
                     None,
@@ -175,6 +187,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     "responses",
                 )
             )
+        upsert_mock.assert_awaited_once()
         self.assertEqual(result["prompt_id"], "task-youtube-summary")
         self.assertEqual(result["prompt_variables"]["video_id"], "dQw4w9WgXcQ")
         self.assertEqual(result["prompt_variables"]["focus_request"], "focus on the conclusion")
@@ -192,9 +205,13 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertIn("Video ID: dQw4w9WgXcQ", rendered["input"][-1]["content"])
         self.assertIn("Transcript:\n[00:00] hello world", rendered["input"][-1]["content"])
 
-    def test_pre_call_followup_passthroughs_without_refetch(self):
+    def test_pre_call_followup_passthroughs_without_refetch_when_mapping_is_missing(self):
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript") as fetch_mock:
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript") as fetch_mock, patch.object(
+            youtube_summary_guardrail,
+            "_resolve_response_mapping",
+            AsyncMock(return_value=None),
+        ):
             result = asyncio.run(
                 guardrail.async_pre_call_hook(
                     None,
@@ -211,6 +228,34 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertEqual(result["previous_response_id"], "resp_123")
         self.assertNotIn("prompt_id", result)
 
+    def test_pre_call_followup_rehydrates_from_retrieval_mapping(self):
+        guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
+        with patch.object(
+            youtube_summary_guardrail,
+            "_resolve_response_mapping",
+            AsyncMock(return_value={"document_id": "youtube:dQw4w9WgXcQ"}),
+        ), patch.object(
+            youtube_summary_guardrail,
+            "_search_document",
+            AsyncMock(return_value=[{"text": "retrieved transcript slice", "spans": {"timestamp_label": "00:42"}}]),
+        ):
+            result = asyncio.run(
+                guardrail.async_pre_call_hook(
+                    None,
+                    None,
+                    {
+                        "model": "task-youtube-summary",
+                        "previous_response_id": "resp_123",
+                        "input": [{"role": "user", "content": "What was the core workflow?"}],
+                    },
+                    "responses",
+                )
+            )
+        self.assertNotIn("previous_response_id", result)
+        self.assertIn("input", result)
+        self.assertIn("retrieved transcript slice", result["input"][-1]["content"])
+        self.assertFalse(result["stream"])
+
     def test_pre_call_chunked_uses_placeholder(self):
         transcript = youtube_summary_guardrail.TranscriptFetchResult(
             video_id="dQw4w9WgXcQ",
@@ -223,7 +268,11 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             segments=[{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
         )
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript):
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_transcript_document",
+            AsyncMock(return_value="youtube:dQw4w9WgXcQ"),
+        ) as upsert_mock:
             result = asyncio.run(
                 guardrail.async_pre_call_hook(
                     None,
@@ -235,6 +284,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     "chat.completions",
                 )
             )
+        upsert_mock.assert_awaited_once()
         self.assertTrue(result["_youtube_summary_chunked"])
         self.assertEqual(result["messages"][0]["content"], "Reply with exactly: youtube-summary-chunked-placeholder")
         self.assertEqual(result["max_tokens"], 64)
@@ -274,6 +324,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             "was_translated": False,
             "token_estimate": 30000,
             "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+            "document_id": "youtube:dQw4w9WgXcQ",
         }
         internal_final = {
             "object": "response",
@@ -289,7 +340,11 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                 }
             ],
         }
-        with patch.object(youtube_summary_guardrail, "_run_chunked_summary", AsyncMock(return_value=internal_final)):
+        with patch.object(youtube_summary_guardrail, "_run_chunked_summary", AsyncMock(return_value=internal_final)), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_response_mapping",
+            AsyncMock(),
+        ) as upsert_map_mock:
             result = asyncio.run(
                 guardrail.async_post_call_success_hook(
                     {
@@ -304,6 +359,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     {"object": "response", "id": "resp_placeholder"},
                 )
             )
+        upsert_map_mock.assert_awaited_once_with("resp_placeholder", "youtube:dQw4w9WgXcQ", "indexed_long")
         self.assertEqual(result["id"], "resp_placeholder")
         self.assertEqual(result["output_text"], "chunked final summary")
 
@@ -317,6 +373,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             "was_translated": False,
             "token_estimate": 30000,
             "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+            "document_id": "youtube:dQw4w9WgXcQ",
         }
         internal_final = {
             "object": "response",
@@ -358,7 +415,11 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                 "truncation": "auto",
             }
         )
-        with patch.object(youtube_summary_guardrail, "_run_chunked_summary", AsyncMock(return_value=internal_final)):
+        with patch.object(youtube_summary_guardrail, "_run_chunked_summary", AsyncMock(return_value=internal_final)), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_response_mapping",
+            AsyncMock(),
+        ) as upsert_map_mock:
             result = asyncio.run(
                 guardrail.async_post_call_success_hook(
                     {
@@ -373,6 +434,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     typed_placeholder,
                 )
             )
+        upsert_map_mock.assert_awaited_once_with("resp_placeholder", "youtube:dQw4w9WgXcQ", "indexed_long")
         self.assertIsInstance(result, ResponsesAPIResponse)
         self.assertEqual(result.id, "resp_placeholder")
         self.assertEqual(result.output_text, "typed chunked final summary")
@@ -391,6 +453,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                 "was_translated": False,
                 "token_estimate": 30000,
                 "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+                "document_id": "youtube:dQw4w9WgXcQ",
             },
             "model": "task-youtube-summary",
             "api_base": None,
@@ -413,6 +476,10 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     ],
                 }
             ),
+        ), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_response_mapping",
+            AsyncMock(),
         ):
             result = asyncio.run(
                 guardrail.async_post_call_success_hook(
@@ -437,6 +504,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                 "was_translated": False,
                 "token_estimate": 30000,
                 "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+                "document_id": "youtube:dQw4w9WgXcQ",
             },
             "model": "task-youtube-summary",
             "api_base": "http://127.0.0.1:8126/v1",
@@ -459,6 +527,10 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     ],
                 }
             ),
+        ), patch.object(
+            youtube_summary_guardrail,
+            "_upsert_response_mapping",
+            AsyncMock(),
         ):
             result = asyncio.run(
                 guardrail.async_post_call_success_hook(
@@ -512,6 +584,47 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertTrue(captured)
         self.assertEqual(captured[0][0], "http://deep.example/v1")
         self.assertEqual(captured[0][2], "deep-model")
+
+    def test_post_call_direct_response_upserts_response_mapping(self):
+        guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
+        response = {
+            "object": "response",
+            "id": "resp_short",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_text", "text": "short summary", "annotations": []}],
+                }
+            ],
+        }
+        with patch.object(
+            youtube_summary_guardrail,
+            "_upsert_response_mapping",
+            AsyncMock(),
+        ) as upsert_map_mock:
+            result = asyncio.run(
+                guardrail.async_post_call_success_hook(
+                    {
+                        "model": "task-youtube-summary",
+                        "_youtube_summary_transcript_meta": {
+                            "video_id": "dQw4w9WgXcQ",
+                            "transcript_language": "English",
+                            "transcript_language_code": "en",
+                            "caption_type": "manual",
+                            "was_translated": False,
+                            "token_estimate": 1000,
+                            "segments": [{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
+                            "document_id": "youtube:dQw4w9WgXcQ",
+                        },
+                    },
+                    None,
+                    response,
+                )
+            )
+        upsert_map_mock.assert_awaited_once_with("resp_short", "youtube:dQw4w9WgXcQ", "direct_short")
+        self.assertEqual(result["output_text"], "short summary")
 
 
 if __name__ == "__main__":

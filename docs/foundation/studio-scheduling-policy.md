@@ -115,6 +115,10 @@ Approved active/persistent inference labels:
 - `com.bebop.llmster-gpt.8126` for the shared GPT `llmster` service
 - `com.bebop.optillm-proxy` for the non-core Studio optimization proxy
 
+Approved active/persistent background data-service labels:
+- `com.bebop.elasticsearch-memory-main` for the localhost-only retrieval store
+- `com.bebop.memory-api-main` for the Mini-facing retrieval API
+
 Retired shadow labels:
 - `com.bebop.mlx-shadow.8123`
 - `com.bebop.mlx-shadow.8124`
