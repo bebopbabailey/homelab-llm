@@ -149,7 +149,8 @@ Networking note:
   Admin UI audio state overrides the env-backed audio settings.
 - Open Terminal:
   - native human-UX API container remains on `127.0.0.1:8010`
-  - canonical shared MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
+  - canonical Open Terminal MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
+  - transcript/media retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
   - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
   - first slice mount scope is repo-root only:
     `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`

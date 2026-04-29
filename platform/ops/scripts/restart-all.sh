@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SERVICES=(open-terminal-mcp ccproxy-api litellm-orch open-webui openhands ov-server optillm-proxy searxng)
+SERVICES=(open-terminal-mcp media-fetch-mcp ccproxy-api litellm-orch open-webui openhands ov-server optillm-proxy searxng)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HEALTHCHECK="$REPO_ROOT/platform/ops/scripts/healthcheck.sh"
 

@@ -1,0 +1,12 @@
+[project]
+name = "media-fetch-mcp"
+version = "0.1.0"
+description = "Localhost MCP backend for media retrieval tools"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.0.0",
+  "youtube-transcript-api==1.2.4",
+]
+
+[project.scripts]
+media-fetch-mcp = "media_fetch_mcp:main"

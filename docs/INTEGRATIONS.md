@@ -465,6 +465,9 @@ Example:
 - Keep tool calls separate from LiteLLM model calls.
 - Plan a sandboxed `python.run` tool for future workflows; avoid unsandboxed
   execution by default.
+- `media-fetch-mcp` is a separate localhost-only Streamable HTTP MCP backend on
+  the Mini for Open WebUI-facing media retrieval tools. It is not part of the
+  TinyAgents stdio registry in the first slice.
 
 ## Open Terminal MCP (implemented locally)
 - Current live path for terminal-style repo inspection is the localhost-only
@@ -493,6 +496,27 @@ Example:
 - OpenHands remains excluded:
   - worker alias `code-reasoning` stays MCP-denied
   - `/v1/responses` stays denied for the worker key
+
+## Media Fetch MCP (implemented locally)
+- Current live target path for transcript retrieval is the localhost-only
+  `media-fetch-mcp` backend:
+  - backend: `http://127.0.0.1:8012/mcp`
+  - transport: MCP Streamable HTTP
+- Intended first client:
+  - Open WebUI direct MCP registration on the Mini
+- Current tool surface:
+  - `youtube.transcript`
+- `youtube.transcript` accepts one supported single-video YouTube URL and
+  returns:
+  - `video_id`
+  - `transcript_text`
+  - `language`
+  - `caption_type`
+- Behavior:
+  - preserve source caption language
+  - prefer the first manual transcript YouTube exposes, else the first generated transcript
+  - return full transcript text as timestamped lines
+  - no translation, summarization, chunking, or storage in this slice
 
 ## Client base URL recommendation
 - Prefer LAN when local: `http://192.168.1.71:4000/v1`.

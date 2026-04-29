@@ -239,6 +239,45 @@ Format:
 ]
 ```
 
+## youtube.transcript
+- status: active
+- transport: mcp (http via `127.0.0.1:8012/mcp`)
+- endpoint: `media-fetch` (MCP server name)
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["url"],
+  "additionalProperties": false,
+  "properties": {
+    "url": { "type": "string", "format": "uri" }
+  }
+}
+```
+- output_schema:
+```json
+{
+  "type": "object",
+  "required": ["video_id", "transcript_text", "language", "caption_type"],
+  "additionalProperties": false,
+  "properties": {
+    "video_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+    "transcript_text": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 1 },
+    "caption_type": { "type": "string", "enum": ["manual", "generated"] }
+  }
+}
+```
+- errors:
+```json
+[
+  { "code": "invalid_url", "http_status": 400 },
+  { "code": "unsupported_url", "http_status": 400 },
+  { "code": "no_transcript", "http_status": 404 },
+  { "code": "upstream_failure", "http_status": 502 }
+]
+```
+
 ## health_check
 - status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
 - transport: mcp (http via `127.0.0.1:8011/mcp`)

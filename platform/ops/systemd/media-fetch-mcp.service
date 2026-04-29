@@ -1,0 +1,16 @@
+[Unit]
+Description=Media Fetch MCP (localhost-only transcript backend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/media-fetch-mcp
+EnvironmentFile=/etc/homelab-llm/media-fetch-mcp.env
+ExecStart=/home/christopherbailey/.local/bin/uv run --directory /home/christopherbailey/homelab-llm/services/media-fetch-mcp python -m media_fetch_mcp --transport streamable-http --host ${MEDIA_FETCH_MCP_HOST} --port ${MEDIA_FETCH_MCP_PORT}
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

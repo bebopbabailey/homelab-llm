@@ -94,6 +94,7 @@ check_port 3000
 check_port 4010
 check_port 4031
 check_port 8011
+check_port 8012
 
 if [[ -z "${LITELLM_API_KEY}" ]]; then
   echo "missing LITELLM_API_KEY (set env or update ${LITELLM_ENV_LOCAL})" >&2

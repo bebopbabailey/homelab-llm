@@ -64,6 +64,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
 | Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
+| Media Fetch MCP | Mini | 8012 | http://127.0.0.1:8012/mcp | MCP handshake |
 | OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
@@ -121,6 +122,9 @@ define the contract for specialized runtime-plane services such as
   read-only MCP tool server while preserving the native Open Terminal UI path
   on `127.0.0.1:8010`. A shared LiteLLM read-only alias is follow-on work and
   is not part of the current live runtime.
+- Media Fetch MCP — HTTP MCP backend on the Mini at `127.0.0.1:8012/mcp`,
+  currently localhost-only. Open WebUI is the intended first client. The first
+  tool is `youtube.transcript`, a read-only full-transcript retrieval helper.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
@@ -134,7 +138,7 @@ define the contract for specialized runtime-plane services such as
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
 - Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
-  8010, Open Terminal MCP 8011, CCProxy API 4010.
+  8010, Open Terminal MCP 8011, Media Fetch MCP 8012, CCProxy API 4010.
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
   operator access at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
   Studio local-only: main vector DB 55432, memory API 55440.
