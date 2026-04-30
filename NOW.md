@@ -1,8 +1,9 @@
 # NOW
 
 Active
-- Document `task-youtube-summary` clearly for both callers and operators so the
-  MCP transcript path, retrieval flow, and ergonomic handles are easy to use.
+- Document `services/vector-db` clearly so the retrieval substrate, API
+  surface, integration model, and operator knobs are easy to use beyond the
+  YouTube lane.
 
 NEXT UP
 - Build the first tiny judged retrieval pack on the known long video and

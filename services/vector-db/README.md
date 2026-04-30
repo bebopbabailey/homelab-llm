@@ -43,3 +43,5 @@ Status: active v1 cutover. Elasticsearch is now the primary retrieval backend.
 - `ARCHITECTURE.md`
 - `RUNBOOK.md`
 - `CONSTRAINTS.md`
+- `docs/vector-db-guide.md` for a practical user/operator walkthrough of the
+  retrieval service, API surface, and pipeline integration model
