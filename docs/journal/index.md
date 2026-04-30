@@ -1,6 +1,7 @@
 # Journal Index
 
 - [2026-04-29-elastic-vector-db-cutover-runtime](2026-04-29-elastic-vector-db-cutover-runtime.md)
+- [2026-04-27-searxng-runtime-recovery](2026-04-27-searxng-runtime-recovery.md)
 - [2026-04-27-owui-websearch-first-pass-tuning](2026-04-27-owui-websearch-first-pass-tuning.md)
 - [2026-04-27-orchestration-cockpit-ledger-fix](2026-04-27-orchestration-cockpit-ledger-fix.md)
 - [2026-04-27-orchestration-cockpit-phase6-durable-service](2026-04-27-orchestration-cockpit-phase6-durable-service.md)
