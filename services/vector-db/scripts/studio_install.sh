@@ -17,6 +17,9 @@ fi
 
 if [[ "${MEMORY_BACKEND:-elastic}" == "elastic" ]]; then
   "$ROOT_DIR/scripts/install_elasticsearch.sh"
+  if [[ "${MEMORY_KIBANA_ENABLE:-true}" == "true" ]]; then
+    "$ROOT_DIR/scripts/install_kibana.sh"
+  fi
   "$ROOT_DIR/scripts/ensure_memory_api_write_token.sh"
 fi
 

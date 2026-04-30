@@ -38,7 +38,11 @@ cd /home/christopherbailey/homelab-llm
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist || true"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.kibana-memory-main.plist || true"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl kickstart -k system/com.bebop.elasticsearch-memory-main"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "launchctl kickstart -k system/com.bebop.kibana-memory-main"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.memory-api-main.plist || true"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
@@ -66,7 +70,9 @@ curl -fsS http://192.168.1.72:55440/v1/memory/stats | jq .
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "curl -fsS http://127.0.0.1:9200/_cluster/health?pretty"
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
-  "lsof -nP -iTCP -sTCP:LISTEN | egrep ':9200|:55440'"
+  "curl -fsS http://127.0.0.1:5601/api/status | jq '{name:.name,overall:.status.overall.level}'"
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "lsof -nP -iTCP -sTCP:LISTEN | egrep ':9200|:5601|:55440'"
 ```
 
 Expected stats fields:
@@ -194,6 +200,21 @@ Restore reference:
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "curl -fsS -X POST http://127.0.0.1:9200/_snapshot/memory-main-repo/<snapshot-name>/_restore \
     -H 'Content-Type: application/json' -d '{\"indices\":\"memory-*\",\"include_global_state\":true}'"
+```
+
+## Kibana install
+Kibana stays operator-only and localhost-bound on Studio. The install artifact
+must match the Elasticsearch stack version.
+
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && MEMORY_KIBANA_ENABLE=true ./scripts/install_kibana.sh"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "cd /Users/thestudio/optillm-proxy/layer-data/vector-db && ./scripts/stage_launchd_plists.sh"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.kibana-memory-main.plist || true"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "launchctl kickstart -k system/com.bebop.kibana-memory-main"
 ```
 
 ## Eval gates

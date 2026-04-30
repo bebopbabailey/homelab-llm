@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .backends import MemoryBackend, SearchArgs
 from .config import CFG, memory_api_write_bearer_token, retrieval_profile
@@ -20,7 +20,15 @@ _BACKEND: MemoryBackend | None = None
 
 class EmbeddingsRequest(BaseModel):
     model: str
-    input: list[str]
+    input: list[str] | str
+    prefix: str | None = None
+
+    @field_validator("input", mode="after")
+    @classmethod
+    def normalize_input(cls, value: list[str] | str) -> list[str]:
+        if isinstance(value, str):
+            return [value]
+        return value
 
 
 class ChunkRecord(BaseModel):
@@ -159,7 +167,16 @@ def get_stats() -> dict[str, Any]:
 
 @app.post("/v1/embeddings")
 def embeddings(req: EmbeddingsRequest) -> dict[str, Any]:
-    vectors = _embed.embed(req.model, req.input)
+    cfg = _embed.model_config(req.model)
+    if req.prefix and req.prefix == cfg.query_prefix:
+        vectors = _embed.embed_query(req.model, req.input)
+    elif req.prefix and req.prefix == cfg.document_prefix:
+        vectors = _embed.embed_document(req.model, req.input)
+    elif req.prefix:
+        prepared = [f"{req.prefix} {text}".strip() for text in req.input]
+        vectors = _embed.embed(req.model, prepared)
+    else:
+        vectors = _embed.embed(req.model, req.input)
     return {
         "object": "list",
         "model": req.model,

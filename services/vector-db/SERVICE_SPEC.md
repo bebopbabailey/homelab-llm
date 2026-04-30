@@ -18,11 +18,13 @@ through the existing memory API contract.
 - Domain: `system`
 - Managed labels:
   - `com.bebop.elasticsearch-memory-main`
+  - `com.bebop.kibana-memory-main`
   - `com.bebop.memory-api-main`
   - `com.bebop.memory-ingest-nightly`
   - `com.bebop.memory-backup-nightly`
 - Plist paths:
   - `/Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist`
+  - `/Library/LaunchDaemons/com.bebop.kibana-memory-main.plist`
   - `/Library/LaunchDaemons/com.bebop.memory-api-main.plist`
   - `/Library/LaunchDaemons/com.bebop.memory-ingest-nightly.plist`
   - `/Library/LaunchDaemons/com.bebop.memory-backup-nightly.plist`
@@ -40,6 +42,7 @@ through the existing memory API contract.
 ## Network bindings
 - Existing public API contract remains `55440`.
 - Elasticsearch is localhost-only on `127.0.0.1:9200`.
+- Kibana is localhost-only on `127.0.0.1:5601`.
 - The Studio memory API binds to `192.168.1.72:55440`.
 - v1 firewall posture allows Mini `192.168.1.71` only; broader LAN access is
   blocked.
@@ -56,6 +59,11 @@ through the existing memory API contract.
 
 ## Embeddings
 - Public embedding endpoint remains `POST /v1/embeddings`.
+- `POST /v1/embeddings` accepts an optional `prefix` field for OWUI native
+  Knowledge compatibility:
+  - `search_query:` -> query embedding path
+  - `search_document:` -> document embedding path
+  - other non-empty prefixes -> deterministic raw-prefix fallback
 - Active embedding default:
   - `studio-nomic-embed-text-v1.5`
   - repo default source: `nomic-ai/nomic-embed-text-v1.5`

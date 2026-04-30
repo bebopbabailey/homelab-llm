@@ -7,7 +7,7 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-for name in com.bebop.elasticsearch-memory-main.plist com.bebop.memory-api-main.plist; do
+for name in com.bebop.elasticsearch-memory-main.plist com.bebop.memory-api-main.plist com.bebop.kibana-memory-main.plist; do
   cp "${ROOT_DIR}/launchd/${name}" "/Library/LaunchDaemons/${name}"
   chown root:wheel "/Library/LaunchDaemons/${name}"
   chmod 644 "/Library/LaunchDaemons/${name}"

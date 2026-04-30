@@ -71,6 +71,10 @@
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.elasticsearch-memory-main.plist"
     },
+    "com.bebop.kibana-memory-main": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.kibana-memory-main.plist"
+    },
     "com.bebop.memory-api-main": {
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.memory-api-main.plist"

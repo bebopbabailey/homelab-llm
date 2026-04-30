@@ -22,10 +22,15 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - Local Open Terminal integrations on the Mini:
   - native terminal server at `http://127.0.0.1:8010`
   - read-only MCP tool server at `http://127.0.0.1:8011/mcp`
+- Open WebUI native Knowledge:
+  - Elasticsearch via Mini-local bridge at `http://127.0.0.1:19200`
+  - OpenAI-compatible embeddings via `vector-db` at
+    `http://192.168.1.72:55440/v1/embeddings`
 
 ## Configuration
 - `/etc/open-webui/env` (systemd `EnvironmentFile`)
 - `/etc/systemd/system/open-webui.service.d/*.conf` (service overrides)
+- `/etc/systemd/system/open-webui-elasticsearch-bridge.service`
 - data stored in `/home/christopherbailey/.open-webui`
 - terminal/tool server registrations are currently persisted through the Open
   WebUI admin config API, not env-only authority
@@ -59,6 +64,24 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 
 ## Config authority
 - Audio env in `/etc/open-webui/env` remains the authority for the speech path.
+- Knowledge backend wiring is backend-canonical through systemd env and
+  drop-ins:
+  - `VECTOR_DB=elasticsearch`
+  - `ELASTICSEARCH_URL=http://127.0.0.1:19200`
+  - `ELASTICSEARCH_INDEX_PREFIX=open_webui_collections`
+  - `RAG_EMBEDDING_ENGINE=openai`
+  - `RAG_OPENAI_API_BASE_URL=http://192.168.1.72:55440/v1`
+  - `RAG_EMBEDDING_MODEL=studio-nomic-embed-text-v1.5`
+  - `RAG_EMBEDDING_PREFIX_FIELD_NAME=prefix`
+  - `RAG_EMBEDDING_QUERY_PREFIX=search_query:`
+  - `RAG_EMBEDDING_CONTENT_PREFIX=search_document:`
+  - `ENABLE_RAG_HYBRID_SEARCH=true`
+  - `ENABLE_RAG_HYBRID_SEARCH_ENRICHED_TEXTS=true`
+  - `RAG_FULL_CONTEXT=false`
+  - `RAG_TOP_K=5`
+  - `RAG_RELEVANCE_THRESHOLD=0.0`
+  - `CHUNK_SIZE=1000`
+  - `CHUNK_OVERLAP=100`
 - Terminal/tool server registrations currently use Open WebUI persistent config.
 - The LiteLLM/OpenAI provider connection also persists in Open WebUI state in
   practice. `ENABLE_PERSISTENT_CONFIG=False` does not prevent stale provider
@@ -76,10 +99,14 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
   must not re-default `chatgpt-5` back onto `open-terminal`.
 - The gateway alias remains available for plain chat/text generation through the
   existing LiteLLM path.
+- Retrieval/admin runtime reflection is enforced after restart by:
+  - `services/open-webui/scripts/openwebui_knowledge_sync.py`
 
 ## Ownership boundary
 - Open WebUI owns the human UI and audio UX.
 - Open WebUI also owns the direct localhost Open Terminal tool/terminal
   registrations on the Mini.
 - LiteLLM remains the single client-facing gateway for LLM, STT, and TTS.
+- Open WebUI may call the Studio retrieval stack directly only for native
+  Knowledge embeddings and Elasticsearch-backed document retrieval.
 - `voice-gateway` remains the repo-owned speech boundary on the Orin.

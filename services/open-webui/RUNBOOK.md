@@ -5,6 +5,7 @@
 sudo systemctl start open-webui.service
 sudo systemctl stop open-webui.service
 sudo systemctl restart open-webui.service
+sudo systemctl restart open-webui-elasticsearch-bridge.service
 ```
 
 ## Logs
@@ -14,6 +15,7 @@ journalctl -u open-webui.service -f
 
 ## Config authority
 Audio env still comes from `/etc/open-webui/env`.
+Knowledge backend wiring now comes from systemd drop-ins, not ad-hoc UI edits.
 Terminal/tool server registrations currently come from the Open WebUI config
 API and persist in Open WebUI state.
 The LiteLLM/OpenAI provider connection also persists through Open WebUI config
@@ -183,6 +185,85 @@ Then verify in the Admin UI audio page after restart:
 
 Promotion is blocked if the restarted UI shows stale audio settings that do not
 match the env-driven values.
+
+## Knowledge backend install
+Install the bridge and reconciliation drop-ins from the repo:
+
+```bash
+sudo install -D -m 644 services/open-webui/systemd/open-webui-elasticsearch-bridge.service \
+  /etc/systemd/system/open-webui-elasticsearch-bridge.service
+sudo install -D -m 644 services/open-webui/systemd/80-knowledge-backend-sync.conf \
+  /etc/systemd/system/open-webui.service.d/80-knowledge-backend-sync.conf
+sudo install -D -m 644 services/open-webui/systemd/81-knowledge-bridge-dependency.conf \
+  /etc/systemd/system/open-webui.service.d/81-knowledge-bridge-dependency.conf
+sudo systemctl daemon-reload
+sudo systemctl enable --now open-webui-elasticsearch-bridge.service
+sudo systemctl restart open-webui.service
+```
+
+Canonical runtime values:
+- `VECTOR_DB=elasticsearch`
+- `ELASTICSEARCH_URL=http://127.0.0.1:19200`
+- `ELASTICSEARCH_INDEX_PREFIX=open_webui_collections`
+- `RAG_EMBEDDING_ENGINE=openai`
+- `RAG_OPENAI_API_BASE_URL=http://192.168.1.72:55440/v1`
+- `RAG_EMBEDDING_MODEL=studio-nomic-embed-text-v1.5`
+- `RAG_EMBEDDING_PREFIX_FIELD_NAME=prefix`
+- `RAG_EMBEDDING_QUERY_PREFIX=search_query:`
+- `RAG_EMBEDDING_CONTENT_PREFIX=search_document:`
+- `ENABLE_RAG_HYBRID_SEARCH=true`
+- `ENABLE_RAG_HYBRID_SEARCH_ENRICHED_TEXTS=true`
+- `RAG_FULL_CONTEXT=false`
+- `RAG_TOP_K=5`
+- `RAG_RELEVANCE_THRESHOLD=0.0`
+- `CHUNK_SIZE=1000`
+- `CHUNK_OVERLAP=100`
+
+## Knowledge backend verification
+Bridge health and bind:
+
+```bash
+systemctl is-active open-webui-elasticsearch-bridge.service
+ss -ltn '( sport = :19200 )'
+curl -fsS http://127.0.0.1:19200/_cluster/health | jq .
+```
+
+Reconciliation helper:
+
+```bash
+python3 services/open-webui/scripts/openwebui_knowledge_sync.py --check-only
+```
+
+Admin API verification:
+
+```bash
+python3 - <<'PY'
+import json, sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+headers = {'Authorization': f'Bearer {api_key}'}
+for path in ['api/v1/retrieval/embedding', 'api/v1/retrieval/config']:
+    req = urllib.request.Request(f'http://127.0.0.1:3000/{path}', headers=headers)
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read().decode())
+    print(path, json.dumps(data, indent=2))
+PY
+```
+
+Expected:
+- embedding engine/model point at `vector-db` + `studio-nomic-embed-text-v1.5`
+- `TOP_K=5`
+- hybrid search enabled
+- `CHUNK_SIZE=1000`
+- `CHUNK_OVERLAP=100`
+
+## Everyday Knowledge flow
+1. Create a collection in `Workspace -> Knowledge`.
+2. Upload manuals, study PDFs, or AI/IT docs.
+3. Open `deep` or `fast`.
+4. Attach the collection or reference it with `#`.
+5. Use Focused Retrieval by default.
 
 ## `chatgpt-5` text-only canary
 Use a direct text-only probe and verify:

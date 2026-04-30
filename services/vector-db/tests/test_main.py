@@ -100,6 +100,58 @@ class MainApiTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
+    def test_embeddings_uses_query_prefix_mode(self) -> None:
+        with (
+            unittest.mock.patch.object(main_mod._embed, "model_config") as model_config,
+            unittest.mock.patch.object(main_mod._embed, "embed_query") as embed_query,
+            unittest.mock.patch.object(main_mod._embed, "embed_document") as embed_document,
+            unittest.mock.patch.object(main_mod._embed, "embed") as embed_raw,
+        ):
+            model_config.return_value = unittest.mock.Mock(
+                query_prefix="search_query:",
+                document_prefix="search_document:",
+            )
+            embed_query.return_value = [[0.1, 0.2]]
+            response = self.client.post(
+                "/v1/embeddings",
+                json={
+                    "model": "studio-nomic-embed-text-v1.5",
+                    "input": ["how do i send midi clock"],
+                    "prefix": "search_query:",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        embed_query.assert_called_once_with(
+            "studio-nomic-embed-text-v1.5",
+            ["how do i send midi clock"],
+        )
+        embed_document.assert_not_called()
+        embed_raw.assert_not_called()
+
+    def test_embeddings_accept_string_input_and_unknown_prefix(self) -> None:
+        with (
+            unittest.mock.patch.object(main_mod._embed, "model_config") as model_config,
+            unittest.mock.patch.object(main_mod._embed, "embed") as embed_raw,
+        ):
+            model_config.return_value = unittest.mock.Mock(
+                query_prefix="search_query:",
+                document_prefix="search_document:",
+            )
+            embed_raw.return_value = [[0.9, 0.3]]
+            response = self.client.post(
+                "/v1/embeddings",
+                json={
+                    "model": "studio-nomic-embed-text-v1.5",
+                    "input": "patch bay routing",
+                    "prefix": "manual:",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        embed_raw.assert_called_once_with(
+            "studio-nomic-embed-text-v1.5",
+            ["manual: patch bay routing"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

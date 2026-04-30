@@ -53,6 +53,16 @@
 ## Boundaries
 - This service owns retrieval durability, embedding generation, and response-id
   document mapping.
+- This service also provides the OpenAI-compatible embedding surface used by
+  Open WebUI native Knowledge. Query/document prefix mode is selected through
+  the optional `prefix` field on `POST /v1/embeddings`.
 - This service does not own model inference.
 - LiteLLM or other gateways may use it as a retrieval backend, but they should
   not treat provider conversation state as the durable memory layer.
+
+## Operator visibility
+- Elasticsearch remains localhost-only on Studio.
+- Kibana is the operator GUI, also localhost-only on Studio.
+- Open WebUI does not use Kibana in the user path; it uses direct Elasticsearch
+  storage/query access through a Mini-local bridge and `vector-db` only for
+  embeddings.
