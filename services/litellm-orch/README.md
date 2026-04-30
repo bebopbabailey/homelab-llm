@@ -80,3 +80,5 @@ only; it does not implement inference.
 - `SERVICE_SPEC.md` for endpoint/auth/runtime details
 - `RUNBOOK.md` for health checks and restart boundaries
 - `CONSTRAINTS.md` for non-negotiables
+- `docs/task-youtube-summary.md` for caller usage and operator architecture of
+  the YouTube summary lane

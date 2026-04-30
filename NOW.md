@@ -1,11 +1,9 @@
 # NOW
 
 Active
-- Redesign `task-youtube-summary` to use `services/media-fetch-mcp` as the
-  authoritative YouTube transcript source while preserving the Elastic-backed
-  retrieval, response-map durability, and document-scoped follow-up flow.
+- Document `task-youtube-summary` clearly for both callers and operators so the
+  MCP transcript path, retrieval flow, and ergonomic handles are easy to use.
 
 NEXT UP
-- Deploy the MCP-backed transcript path, re-run the Open WebUI long-video
-  smoke, and then build the first tiny judged retrieval pack on the known
-  long video.
+- Build the first tiny judged retrieval pack on the known long video and
+  improve vague follow-up answer quality without regressing fail-closed behavior.
