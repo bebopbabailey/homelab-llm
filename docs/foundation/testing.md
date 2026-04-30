@@ -1549,6 +1549,22 @@ systemctl show -p Environment open-webui.service --no-pager | rg -n \
   'EXTERNAL_WEB_LOADER_URL|SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>|WEB_LOADER_ENGINE=external'
 ```
 
+Query-generation policy checks:
+```bash
+sudo sed -n '1,120p' /etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf
+
+python3 - <<'PY'
+import json, sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+req = urllib.request.Request('http://127.0.0.1:3000/api/v1/tasks/config', headers={'Authorization': f'Bearer {api_key}'})
+with urllib.request.urlopen(req, timeout=30) as resp:
+    data = json.loads(resp.read().decode())
+print(data['QUERY_GENERATION_PROMPT_TEMPLATE'])
+PY
+```
+
 SearXNG JSON smoke:
 ```bash
 curl -fsS "http://127.0.0.1:8888/search?q=openwebui+searxng&format=json" \
@@ -1597,6 +1613,8 @@ Pass guidance:
 - `WEB_SEARCH_ENGINE=searxng` and `WEB_LOADER_ENGINE=safe_web` are present.
 - Result count, concurrency, and filter-list controls are visible in the service environment.
 - No `EXTERNAL_WEB_LOADER_URL`, `WEB_LOADER_ENGINE=external`, or `:8899/search` reference remains.
+- The live task config shows a non-empty `QUERY_GENERATION_PROMPT_TEMPLATE`
+  matching the `25-querygen-prompt-policy.conf` override.
 - The runtime marker checks return `True` for both patched files.
 - The SearXNG smoke returns at least one result.
 - The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.

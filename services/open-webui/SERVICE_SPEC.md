@@ -29,6 +29,8 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - data stored in `/home/christopherbailey/.open-webui`
 - terminal/tool server registrations are currently persisted through the Open
   WebUI admin config API, not env-only authority
+- the current global web-search query-generation policy is injected via
+  `/etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf`
 - restart-time runtime patching currently targets:
   - `open_webui/utils/middleware.py`
   - `open_webui/routers/retrieval.py`

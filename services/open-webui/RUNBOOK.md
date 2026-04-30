@@ -21,6 +21,10 @@ state, and the DB remains the practical authority for provider mode even though
 the live service sets `ENABLE_PERSISTENT_CONFIG=False`. Keep the active LiteLLM
 connection on the standard Chat Completions path.
 
+The current global web-search query-generation prompt is owned by the systemd
+drop-in:
+- `/etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf`
+
 ## Web search hardening
 The supported Mini path stays:
 - `WEB_SEARCH_ENGINE=searxng`
@@ -33,6 +37,27 @@ WebUI runtime in place to:
 - normalize generated rewrites so month/year prefixes do not dominate the query
 - add a narrow pre-fetch result hygiene pass that drops obvious zero-overlap
   junk before page loading/embedding
+
+The current prompt override also tells query generation to:
+- keep queries topic-first and date-last
+- never start with a standalone month name
+- avoid generic community/forum/discussion/sentiment-only rewrites unless the
+  concrete topic is included
+
+Check the live prompt body here:
+```bash
+sudo sed -n '1,120p' /etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf
+python3 - <<'PY'
+import json, sqlite3, urllib.request
+conn = sqlite3.connect('/home/christopherbailey/.open-webui/webui.db')
+cur = conn.cursor()
+api_key = cur.execute('select key from api_key order by created_at asc limit 1').fetchone()[0]
+req = urllib.request.Request('http://127.0.0.1:3000/api/v1/tasks/config', headers={'Authorization': f'Bearer {api_key}'})
+with urllib.request.urlopen(req, timeout=30) as resp:
+    data = json.loads(resp.read().decode())
+print(data['QUERY_GENERATION_PROMPT_TEMPLATE'])
+PY
+```
 
 Use this to verify the patch landed:
 ```bash

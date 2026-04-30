@@ -147,6 +147,8 @@ Networking note:
   The live Open WebUI restart path also hotfixes query generation and pre-fetch
   search-result hygiene inside the installed runtime while keeping the same
   supported `searxng` + `safe_web` topology.
+  The global query-generation prompt policy is currently injected through
+  `/etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf`.
   Audio env/drop-ins remain authoritative for the speech path in current
   practice. Speech canary promotion requires a post-restart check that no stale
   Admin UI audio state overrides the env-backed audio settings.
