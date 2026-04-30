@@ -21,6 +21,38 @@ state, and the DB remains the practical authority for provider mode even though
 the live service sets `ENABLE_PERSISTENT_CONFIG=False`. Keep the active LiteLLM
 connection on the standard Chat Completions path.
 
+## Web search hardening
+The supported Mini path stays:
+- `WEB_SEARCH_ENGINE=searxng`
+- `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`
+- `WEB_LOADER_ENGINE=safe_web`
+
+On restart, `scripts/openwebui_querygen_hotfix.py` patches the installed Open
+WebUI runtime in place to:
+- keep the raw user query as the first search query
+- normalize generated rewrites so month/year prefixes do not dominate the query
+- add a narrow pre-fetch result hygiene pass that drops obvious zero-overlap
+  junk before page loading/embedding
+
+Use this to verify the patch landed:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+
+targets = [
+    Path('/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/lib/python3.12/site-packages/open_webui/utils/middleware.py'),
+    Path('/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/lib/python3.12/site-packages/open_webui/routers/retrieval.py'),
+]
+markers = [
+    'querygen-hardening: avoid poisoned queries fallback; normalize generated search queries',
+    'web-search-result-hygiene: drop low-overlap junk before fetch',
+]
+for target, marker in zip(targets, markers):
+    text = target.read_text(encoding='utf-8')
+    print(target.name, marker in text)
+PY
+```
+
 ## Canonical speech canary env
 ```dotenv
 AUDIO_STT_ENGINE=openai

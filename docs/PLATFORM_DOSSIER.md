@@ -137,13 +137,16 @@ Networking note:
   Current web-search contract is the documented native path:
   `WEB_SEARCH_ENGINE=searxng`,
   `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`,
-  `WEB_SEARCH_RESULT_COUNT=6`,
+  `WEB_SEARCH_RESULT_COUNT=3`,
   `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
   `WEB_LOADER_ENGINE=safe_web`,
-  `WEB_LOADER_TIMEOUT=15`,
+  `WEB_LOADER_TIMEOUT=10`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
+  The live Open WebUI restart path also hotfixes query generation and pre-fetch
+  search-result hygiene inside the installed runtime while keeping the same
+  supported `searxng` + `safe_web` topology.
   Audio env/drop-ins remain authoritative for the speech path in current
   practice. Speech canary promotion requires a post-restart check that no stale
   Admin UI audio state overrides the env-backed audio settings.

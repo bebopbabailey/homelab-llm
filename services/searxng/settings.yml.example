@@ -17,3 +17,15 @@ server:
   port: 8888
   limiter: true
   image_proxy: false
+
+engines:
+  - name: bing
+    disabled: false
+  - name: bing news
+    disabled: false
+  - name: mojeek
+    disabled: true
+  - name: karmasearch
+    disabled: true
+  - name: karmasearch videos
+    disabled: true

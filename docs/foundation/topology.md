@@ -162,13 +162,16 @@ define the contract for specialized runtime-plane services such as
 - Current Mini deployment uses documented native Open WebUI settings:
   `WEB_SEARCH_ENGINE=searxng`,
   `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`,
-  `WEB_SEARCH_RESULT_COUNT=6`,
+  `WEB_SEARCH_RESULT_COUNT=3`,
   `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
   `WEB_LOADER_ENGINE=safe_web`,
-  `WEB_LOADER_TIMEOUT=15`,
+  `WEB_LOADER_TIMEOUT=10`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
+- Open WebUI keeps that topology but applies a restart-time runtime hotfix to
+  normalize generated rewrites and filter obvious zero-overlap search junk
+  before `safe_web` fetch/embedding.
 - LiteLLM owns routing/auth/retries/fallbacks and generic `/v1/search/<tool_name>` access only.
 - `websearch-orch` is not part of the supported runtime path.
 

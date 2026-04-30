@@ -26,6 +26,9 @@ without explicit approval.
 - Environment: `SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml`
 - Required: `server.secret_key`
 - Search formats must include `json` for API usage.
+- Current Mini posture uses a small override set to keep `bing` / `bing news`
+  active while explicitly disabling repeatedly suspended engines such as
+  `mojeek`, `karmasearch`, and `karmasearch videos`.
 
 ## LiteLLM Integration
 - Add a `search_tools` entry for SearXNG in

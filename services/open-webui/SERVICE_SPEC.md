@@ -16,6 +16,9 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
   - LiteLLM -> Orin `voice-gateway` only
   - Open WebUI must not call the Orin directly for STT or TTS
 - Local SearXNG JSON endpoint via documented Open WebUI config
+- Restart-time hotfix script at `scripts/openwebui_querygen_hotfix.py`, which
+  hardens query generation and pre-fetch result hygiene inside the installed
+  Open WebUI runtime without changing the supported topology
 - Local Open Terminal integrations on the Mini:
   - native terminal server at `http://127.0.0.1:8010`
   - read-only MCP tool server at `http://127.0.0.1:8011/mcp`
@@ -26,6 +29,9 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - data stored in `/home/christopherbailey/.open-webui`
 - terminal/tool server registrations are currently persisted through the Open
   WebUI admin config API, not env-only authority
+- restart-time runtime patching currently targets:
+  - `open_webui/utils/middleware.py`
+  - `open_webui/routers/retrieval.py`
 
 ## Audio configuration surface
 - `AUDIO_STT_ENGINE`

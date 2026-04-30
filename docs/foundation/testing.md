@@ -1543,7 +1543,7 @@ If pass criteria fail, fix retrieval/extraction baseline first and re-run Phase 
 Config authority checks:
 ```bash
 systemctl show -p Environment open-webui.service --no-pager | rg -n \
-  'ENABLE_WEB_SEARCH=True|WEB_SEARCH_ENGINE=searxng|SEARXNG_QUERY_URL=http://127.0.0.1:8888/search\\?q=<query>&format=json|WEB_SEARCH_RESULT_COUNT=6|WEB_SEARCH_CONCURRENT_REQUESTS=1|WEB_LOADER_ENGINE=safe_web|WEB_LOADER_TIMEOUT=15|WEB_LOADER_CONCURRENT_REQUESTS=2|WEB_FETCH_FILTER_LIST=|WEB_SEARCH_DOMAIN_FILTER_LIST='
+  'ENABLE_WEB_SEARCH=True|WEB_SEARCH_ENGINE=searxng|SEARXNG_QUERY_URL=http://127.0.0.1:8888/search\\?q=<query>&format=json|WEB_SEARCH_RESULT_COUNT=3|WEB_SEARCH_CONCURRENT_REQUESTS=1|WEB_LOADER_ENGINE=safe_web|WEB_LOADER_TIMEOUT=10|WEB_LOADER_CONCURRENT_REQUESTS=2|WEB_FETCH_FILTER_LIST=|WEB_SEARCH_DOMAIN_FILTER_LIST='
 
 systemctl show -p Environment open-webui.service --no-pager | rg -n \
   'EXTERNAL_WEB_LOADER_URL|SEARXNG_QUERY_URL=http://127.0.0.1:8899/search\\?q=<query>|WEB_LOADER_ENGINE=external'
@@ -1572,10 +1572,32 @@ rg -n '"type": "web_search"|"type":"web_search"|"sources": \\[' /tmp/owui-websea
 rg -n '"content"|"delta"' /tmp/owui-websearch-smoke.ndjson | tail -n 40
 ```
 
+Hardening marker checks:
+```bash
+python3 - <<'PY'
+from pathlib import Path
+
+targets = {
+    'middleware': (
+        Path('/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/lib/python3.12/site-packages/open_webui/utils/middleware.py'),
+        'querygen-hardening: avoid poisoned queries fallback; normalize generated search queries',
+    ),
+    'retrieval': (
+        Path('/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/lib/python3.12/site-packages/open_webui/routers/retrieval.py'),
+        'web-search-result-hygiene: drop low-overlap junk before fetch',
+    ),
+}
+
+for name, (target, marker) in targets.items():
+    print(name, marker in target.read_text(encoding='utf-8'))
+PY
+```
+
 Pass guidance:
 - `WEB_SEARCH_ENGINE=searxng` and `WEB_LOADER_ENGINE=safe_web` are present.
 - Result count, concurrency, and filter-list controls are visible in the service environment.
 - No `EXTERNAL_WEB_LOADER_URL`, `WEB_LOADER_ENGINE=external`, or `:8899/search` reference remains.
+- The runtime marker checks return `True` for both patched files.
 - The SearXNG smoke returns at least one result.
 - The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.
 - If this host is not running `ENABLE_PERSISTENT_CONFIG=False`, treat any

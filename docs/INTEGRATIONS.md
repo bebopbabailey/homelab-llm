@@ -240,11 +240,14 @@ if a param is rejected by the backend.
   facade. `voice-gateway` then forwards to localhost-only Speaches.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
 - Result and loader policy is explicit in documented Open WebUI env vars:
-  `WEB_SEARCH_RESULT_COUNT=6`, `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
-  `WEB_LOADER_ENGINE=safe_web`, `WEB_LOADER_TIMEOUT=15`,
+  `WEB_SEARCH_RESULT_COUNT=3`, `WEB_SEARCH_CONCURRENT_REQUESTS=1`,
+  `WEB_LOADER_ENGINE=safe_web`, `WEB_LOADER_TIMEOUT=10`,
   `WEB_LOADER_CONCURRENT_REQUESTS=2`,
   `WEB_FETCH_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`,
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
+- Open WebUI also applies a restart-time runtime hotfix that keeps the raw user
+  query first, normalizes month-leading rewrites, and drops obvious zero-overlap
+  search junk before `safe_web` fetch/embedding.
 - LiteLLM `/v1/search/searxng-search` remains available for direct callers and MCP tools.
 - Open WebUI audio settings for this path still come from systemd env/drop-ins,
   but the deployment currently uses persistent config for other settings such as
