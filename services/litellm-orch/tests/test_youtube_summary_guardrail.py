@@ -124,6 +124,10 @@ class TestYouTubeSummaryHelpers(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(detail, "no usable transcript")
 
+    def test_followup_messages_fail_closed_when_no_excerpts_exist(self):
+        messages = youtube_summary_guardrail._build_followup_retrieval_messages("What was the core workflow?", [])
+        self.assertIn("No transcript excerpts were retrieved", messages[-1]["content"])
+
     def test_fetch_transcript_uses_structured_mcp_payload(self):
         payload = {
             "video_id": "dQw4w9WgXcQ",

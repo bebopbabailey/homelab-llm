@@ -497,7 +497,7 @@ async def _search_document(question: str, document_id: str) -> list[dict[str, An
         "/v1/memory/search",
         {
             "query": question,
-            "profile": "balanced",
+            "profile": "broad",
             "document_id": document_id,
             "source_type": "youtube",
             "render_citations": False,
@@ -519,11 +519,14 @@ def _build_followup_retrieval_messages(question: str, hits: list[dict[str, Any]]
         excerpts.append(
             f"Excerpt {idx}\nTimestamp: {spans.get('timestamp_label') or ''}\nText:\n{text}"
         )
+    if not excerpts:
+        excerpts.append("No transcript excerpts were retrieved for this question.")
     return [
         {
             "role": "system",
             "content": (
-                "Answer the question using only the retrieved transcript excerpts. "
+                "Answer the question using only the retrieved transcript excerpts from this specific video. "
+                "Do not answer with a generic workflow or background explanation unless the excerpts explicitly support it. "
                 "If the excerpts do not support a confident answer, say that directly. "
                 "Do not render citations unless the user explicitly asks for them."
             ),
