@@ -102,10 +102,12 @@ durable enough for `task-youtube-summary` follow-up grounding.
 - The manual snapshot remains in the registered repository as the v1 restore
   proof.
 
-## Remaining work
-- Land the linked worktree to `master`.
-- Wire the Mini LiteLLM runtime with the Studio memory API write token in the
-  local env file and restart `litellm-orch.service`.
-- Run the end-to-end live `task-youtube-summary` smoke against the merged
-  runtime and confirm `previous_response_id` follow-up grounding on the live
-  gateway path.
+## Completion note
+- The linked rollout lane was later merged to `master`, pushed to `origin`,
+  and restarted on both Studio and Mini.
+- The Studio memory API write token was wired into the Mini LiteLLM runtime
+  before the live gateway restart.
+- Initial `task-youtube-summary` live validation passed after the retrieval
+  cutover, and the subsequent follow-up lane now redesigns transcript
+  acquisition around `media-fetch-mcp` rather than revisiting the Elastic
+  retrieval substrate itself.

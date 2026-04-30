@@ -44,10 +44,10 @@ only; it does not implement inference.
   fields from the final response payload.
 - `task-youtube-summary` is also an additional task alias, not part of the
   public human chat-lane trio. Its guardrail resolves one supported YouTube
-  video URL on the first turn, fetches captions via `youtube-transcript-api`,
-  indexes a durable transcript document through the memory API, renders an
-  adaptive summary prompt, and rewrites Responses output into stable
-  `output_text`.
+  video URL on the first turn, fetches structured transcript data from the
+  localhost-only `media-fetch-mcp` service on `127.0.0.1:8012/mcp`, indexes a
+  durable transcript document through the memory API, renders an adaptive
+  summary prompt, and rewrites Responses output into stable `output_text`.
 - Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
   upstream `output_text` is not guaranteed to be populated on every direct
   `llmster` response.

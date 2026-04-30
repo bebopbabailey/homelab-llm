@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from fastapi import HTTPException
 from litellm.types.llms.openai import ResponsesAPIResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -29,68 +30,40 @@ youtube_summary_guardrail = _load_module(
 )
 
 
-class DummyFetchedTranscript:
-    def __init__(self, rows):
-        self._rows = rows
-
-    def to_raw_data(self):
-        return list(self._rows)
+class DummyToolText:
+    def __init__(self, text):
+        self.text = text
 
 
-class DummyTranscript:
-    def __init__(self, language, language_code, is_generated, rows, *, is_translatable=False, translated_rows=None):
-        self.video_id = "dQw4w9WgXcQ"
-        self.language = language
-        self.language_code = language_code
-        self.is_generated = is_generated
-        self.is_translatable = is_translatable
-        self.translation_languages = [{"language_code": "en"}] if is_translatable else []
-        self._rows = rows
-        self._translated_rows = translated_rows or rows
-
-    def fetch(self):
-        return DummyFetchedTranscript(self._rows)
-
-    def translate(self, language_code):
-        if language_code != "en" or not self.is_translatable:
-            raise RuntimeError("translation unavailable")
-        return DummyTranscript(
-            "English",
-            "en",
-            self.is_generated,
-            self._translated_rows,
-            is_translatable=False,
-        )
+class DummyToolResult:
+    def __init__(self, *, text, is_error=False):
+        self.content = [DummyToolText(text)]
+        self.isError = is_error
 
 
-class DummyTranscriptList:
-    def __init__(self, *, manual_en=None, generated_en=None, manual_other=None, generated_other=None):
-        self.manual_en = manual_en
-        self.generated_en = generated_en
-        self.manual_other = manual_other or []
-        self.generated_other = generated_other or []
+class DummyTransportContext:
+    async def __aenter__(self):
+        return object(), object(), lambda: None
 
-    def find_manually_created_transcript(self, languages):
-        if "en" in languages and self.manual_en is not None:
-            return self.manual_en
-        raise RuntimeError("manual missing")
-
-    def find_generated_transcript(self, languages):
-        if "en" in languages and self.generated_en is not None:
-            return self.generated_en
-        raise RuntimeError("generated missing")
-
-    def __iter__(self):
-        return iter([*self.manual_other, *self.generated_other])
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
 
-class DummyTranscriptApi:
-    def __init__(self, transcript_list):
-        self._transcript_list = transcript_list
+class DummySessionContext:
+    def __init__(self, result):
+        self._result = result
 
-    def list(self, video_id):
-        self.video_id = video_id
-        return self._transcript_list
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def initialize(self):
+        return None
+
+    async def call_tool(self, *_args, **_kwargs):
+        return self._result
 
 
 class TestYouTubeSummaryHelpers(unittest.TestCase):
@@ -114,6 +87,24 @@ class TestYouTubeSummaryHelpers(unittest.TestCase):
         self.assertEqual(video_id, "dQw4w9WgXcQ")
         self.assertEqual(focus, "focus on claims and examples")
 
+    def test_extract_document_id_and_recover_from_messages(self):
+        self.assertEqual(
+            youtube_summary_guardrail._extract_document_id("Document: youtube:dQw4w9WgXcQ"),
+            "youtube:dqw4w9wgxcq",
+        )
+        messages = [
+            {"role": "user", "content": "https://youtu.be/dQw4w9WgXcQ"},
+            {
+                "role": "assistant",
+                "content": "Video: dQw4w9WgXcQ | Document: youtube:dQw4w9WgXcQ | Transcript: English | Captions: manual",
+            },
+            {"role": "user", "content": "What was the core workflow?"},
+        ]
+        self.assertEqual(
+            youtube_summary_guardrail._recover_document_id_from_messages(messages),
+            "youtube:dqw4w9wgxcq",
+        )
+
     def test_split_into_chunks_respects_boundaries(self):
         segments = [
             {"timestamp": "00:00", "text": "alpha " * 400, "start": 0.0, "duration": 10.0},
@@ -126,28 +117,44 @@ class TestYouTubeSummaryHelpers(unittest.TestCase):
         self.assertEqual(chunks[0]["end_timestamp"], "01:00")
         self.assertEqual(chunks[1]["start_timestamp"], "02:00")
 
-    def test_fetch_transcript_falls_back_to_translated_manual(self):
-        transcript_list = DummyTranscriptList(
-            manual_other=[
-                DummyTranscript(
-                    "German",
-                    "de",
-                    False,
-                    [{"text": "Hallo Welt", "start": 0.0, "duration": 1.0}],
-                    is_translatable=True,
-                    translated_rows=[{"text": "Hello world", "start": 0.0, "duration": 1.0}],
-                )
-            ]
+    def test_parse_transcript_tool_error(self):
+        status, detail = youtube_summary_guardrail._parse_transcript_tool_error(
+            "Error executing tool youtube.transcript: no_transcript: no usable transcript"
         )
-        with patch.object(
+        self.assertEqual(status, 404)
+        self.assertEqual(detail, "no usable transcript")
+
+    def test_fetch_transcript_uses_structured_mcp_payload(self):
+        payload = {
+            "video_id": "dQw4w9WgXcQ",
+            "source_url": "https://youtu.be/dQw4w9WgXcQ",
+            "language": "German",
+            "language_code": "de",
+            "caption_type": "manual",
+            "transcript_text": "[00:00] Hallo Welt",
+            "segments": [{"text": "Hallo Welt", "start": 0.0, "duration": 1.0, "timestamp_label": "00:00"}],
+        }
+        with patch.object(youtube_summary_guardrail, "streamable_http_client", return_value=DummyTransportContext()), patch.object(
             youtube_summary_guardrail,
-            "YouTubeTranscriptApi",
-            return_value=DummyTranscriptApi(transcript_list),
+            "ClientSession",
+            side_effect=lambda *args, **kwargs: DummySessionContext(DummyToolResult(text=__import__("json").dumps(payload))),
         ):
-            result = youtube_summary_guardrail._fetch_transcript("dQw4w9WgXcQ")
-        self.assertEqual(result.caption_type, "translated-manual")
-        self.assertEqual(result.transcript_language_code, "en")
-        self.assertIn("[00:00] Hello world", result.transcript_text)
+            result = asyncio.run(youtube_summary_guardrail._fetch_transcript("https://youtu.be/dQw4w9WgXcQ"))
+        self.assertEqual(result.source_url, "https://youtu.be/dQw4w9WgXcQ")
+        self.assertEqual(result.transcript_language_code, "de")
+        self.assertEqual(result.segments[0]["timestamp"], "00:00")
+
+    def test_fetch_transcript_maps_mcp_tool_error_to_http(self):
+        with patch.object(youtube_summary_guardrail, "streamable_http_client", return_value=DummyTransportContext()), patch.object(
+            youtube_summary_guardrail,
+            "ClientSession",
+            side_effect=lambda *args, **kwargs: DummySessionContext(
+                DummyToolResult(text="Error executing tool youtube.transcript: no_transcript: no usable transcript", is_error=True)
+            ),
+        ):
+            with self.assertRaises(HTTPException) as excinfo:
+                asyncio.run(youtube_summary_guardrail._fetch_transcript("https://youtu.be/dQw4w9WgXcQ"))
+        self.assertEqual(excinfo.exception.status_code, 404)
 
     def test_memory_api_headers_only_attach_bearer_for_write_routes(self):
         with patch.dict(youtube_summary_guardrail.os.environ, {"MEMORY_API_BEARER_TOKEN": "secret-token"}, clear=False):
@@ -162,6 +169,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
     def test_pre_call_initial_responses_sets_prompt_id_and_prompt_variables(self):
         transcript = youtube_summary_guardrail.TranscriptFetchResult(
             video_id="dQw4w9WgXcQ",
+            source_url="https://youtu.be/dQw4w9WgXcQ",
             transcript_text="[00:00] hello world",
             transcript_language="English",
             transcript_language_code="en",
@@ -171,7 +179,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             segments=[{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
         )
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript), patch.object(
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript", AsyncMock(return_value=transcript)), patch.object(
             youtube_summary_guardrail,
             "_upsert_transcript_document",
             AsyncMock(return_value="youtube:dQw4w9WgXcQ"),
@@ -207,7 +215,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
 
     def test_pre_call_followup_passthroughs_without_refetch_when_mapping_is_missing(self):
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript") as fetch_mock, patch.object(
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript", AsyncMock()) as fetch_mock, patch.object(
             youtube_summary_guardrail,
             "_resolve_response_mapping",
             AsyncMock(return_value=None),
@@ -256,9 +264,42 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         self.assertIn("retrieved transcript slice", result["input"][-1]["content"])
         self.assertFalse(result["stream"])
 
+    def test_pre_call_chat_followup_recovers_document_id_from_history(self):
+        guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
+        with patch.object(
+            youtube_summary_guardrail,
+            "_search_document",
+            AsyncMock(return_value=[{"text": "retrieved transcript slice", "spans": {"timestamp_label": "00:42"}}]),
+        ):
+            result = asyncio.run(
+                guardrail.async_pre_call_hook(
+                    None,
+                    None,
+                    {
+                        "model": "task-youtube-summary",
+                        "messages": [
+                            {"role": "user", "content": "https://youtu.be/dQw4w9WgXcQ"},
+                            {
+                                "role": "assistant",
+                                "content": (
+                                    "Video: dQw4w9WgXcQ | Document: youtube:dQw4w9WgXcQ | "
+                                    "Transcript: English | Captions: manual"
+                                ),
+                            },
+                            {"role": "user", "content": "What was the core workflow?"},
+                        ],
+                    },
+                    "chat.completions",
+                )
+            )
+        self.assertEqual(result["messages"][0]["role"], "system")
+        self.assertIn("retrieved transcript slice", result["messages"][-1]["content"])
+        self.assertFalse(result["stream"])
+
     def test_pre_call_chunked_uses_placeholder(self):
         transcript = youtube_summary_guardrail.TranscriptFetchResult(
             video_id="dQw4w9WgXcQ",
+            source_url="https://youtu.be/dQw4w9WgXcQ",
             transcript_text="[00:00] hello world",
             transcript_language="English",
             transcript_language_code="en",
@@ -268,7 +309,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             segments=[{"timestamp": "00:00", "text": "hello world", "start": 0.0, "duration": 1.0}],
         )
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-pre", "pre_call", True)
-        with patch.object(youtube_summary_guardrail, "_fetch_transcript", return_value=transcript), patch.object(
+        with patch.object(youtube_summary_guardrail, "_fetch_transcript", AsyncMock(return_value=transcript)), patch.object(
             youtube_summary_guardrail,
             "_upsert_transcript_document",
             AsyncMock(return_value="youtube:dQw4w9WgXcQ"),
@@ -300,7 +341,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                     "type": "message",
                     "role": "assistant",
                     "status": "completed",
-                    "content": [{"type": "output_text", "text": "Video: dQw4w9WgXcQ | Transcript: English | Captions: manual", "annotations": []}],
+                    "content": [{"type": "output_text", "text": "Video: dQw4w9WgXcQ | Document: youtube:dQw4w9WgXcQ | Transcript: English | Captions: manual", "annotations": []}],
                 }
             ],
         }
@@ -312,12 +353,13 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             )
         )
         self.assertEqual(result["id"], "resp_123")
-        self.assertEqual(result["output_text"], "Video: dQw4w9WgXcQ | Transcript: English | Captions: manual")
+        self.assertEqual(result["output_text"], "Video: dQw4w9WgXcQ | Document: youtube:dQw4w9WgXcQ | Transcript: English | Captions: manual")
 
     def test_post_call_chunked_returns_internal_final_response(self):
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
         transcript_meta = {
             "video_id": "dQw4w9WgXcQ",
+            "source_url": "https://youtu.be/dQw4w9WgXcQ",
             "transcript_language": "English",
             "transcript_language_code": "en",
             "caption_type": "manual",
@@ -367,6 +409,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
         guardrail = youtube_summary_guardrail.YouTubeSummaryGuardrail("youtube-summary-post", "post_call", True)
         transcript_meta = {
             "video_id": "dQw4w9WgXcQ",
+            "source_url": "https://youtu.be/dQw4w9WgXcQ",
             "transcript_language": "English",
             "transcript_language_code": "en",
             "caption_type": "manual",
@@ -447,6 +490,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             "focus_request": "focus on examples",
             "transcript_meta": {
                 "video_id": "dQw4w9WgXcQ",
+                "source_url": "https://youtu.be/dQw4w9WgXcQ",
                 "transcript_language": "English",
                 "transcript_language_code": "en",
                 "caption_type": "manual",
@@ -498,6 +542,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
             "focus_request": "",
             "transcript_meta": {
                 "video_id": "dQw4w9WgXcQ",
+                "source_url": "https://youtu.be/dQw4w9WgXcQ",
                 "transcript_language": "English",
                 "transcript_language_code": "en",
                 "caption_type": "manual",
@@ -544,6 +589,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
     def test_run_chunked_summary_uses_env_fallbacks_when_callback_data_lacks_provider_fields(self):
         transcript = youtube_summary_guardrail.TranscriptFetchResult(
             video_id="dQw4w9WgXcQ",
+            source_url="https://youtu.be/dQw4w9WgXcQ",
             transcript_text="[00:00] hello world",
             transcript_language="English",
             transcript_language_code="en",
@@ -610,6 +656,7 @@ class TestYouTubeSummaryGuardrail(unittest.TestCase):
                         "model": "task-youtube-summary",
                         "_youtube_summary_transcript_meta": {
                             "video_id": "dQw4w9WgXcQ",
+                            "source_url": "https://youtu.be/dQw4w9WgXcQ",
                             "transcript_language": "English",
                             "transcript_language_code": "en",
                             "caption_type": "manual",

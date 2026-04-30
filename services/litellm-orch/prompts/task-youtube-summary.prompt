@@ -22,7 +22,7 @@ Core requirements:
 
 Output requirements:
 - Start with one compact metadata line in markdown:
-  `Video: {{video_id}} | Transcript: {{transcript_language}} | Captions: {{caption_type}}`
+  `Video: {{video_id}} | Document: youtube:{{video_id}} | Transcript: {{transcript_language}} | Captions: {{caption_type}}`
 - Then write a concise overview.
 - Then write key takeaways.
 - Add whatever additional sections best fit the content, such as:

@@ -226,6 +226,10 @@ Expected:
 - `task-transcribe-vivid` returns cleaned vivid transcript text in the final Responses `message`
 - `task-json` returns minified canonical JSON in the final Responses `message`
 - `task-youtube-summary` returns markdown with a compact metadata line plus a comprehensive summary in the final Responses `message`
+- `task-youtube-summary` depends on the localhost-only `media-fetch-mcp`
+  transcript service at `http://127.0.0.1:8012/mcp`; if first-turn transcript
+  acquisition fails unexpectedly, check that service before deeper LiteLLM
+  routing triage
 - long-video follow-ups are expected to resolve through the retrieval service's
   durable `response_id -> document_id` mapping rather than raw provider state
 - `config/env.local` must include `MEMORY_API_BEARER_TOKEN=<studio token>` for

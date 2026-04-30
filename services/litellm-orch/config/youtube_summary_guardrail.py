@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import types
+from datetime import timedelta
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -17,7 +18,8 @@ import httpx
 from fastapi import HTTPException
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
-from youtube_transcript_api import YouTubeTranscriptApi
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
 
 try:
     from config.prompt_guardrail import _render_prompt_messages
@@ -41,6 +43,8 @@ CHUNK_SUMMARY_MAX_OUTPUT_TOKENS = 900
 FINAL_SUMMARY_MAX_OUTPUT_TOKENS = 2400
 _YOUTUBE_URL_RE = re.compile(r"https?://[^\s<>()\[\]{}]+", re.IGNORECASE)
 _YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_DOCUMENT_ID_RE = re.compile(r"\byoutube:[A-Za-z0-9_-]{11}\b", re.IGNORECASE)
+_MCP_TOOL_ERROR_RE = re.compile(r"(?P<code>invalid_url|unsupported_url|no_transcript|upstream_failure):\s*(?P<message>.+)")
 logger = logging.getLogger("youtube_summary_guardrail")
 _STATE_MODULE_NAME = "_youtube_summary_guardrail_state"
 _STATE = sys.modules.get(_STATE_MODULE_NAME)
@@ -56,6 +60,7 @@ class TranscriptFetchResult:
         self,
         *,
         video_id: str,
+        source_url: str,
         transcript_text: str,
         transcript_language: str,
         transcript_language_code: str,
@@ -65,6 +70,7 @@ class TranscriptFetchResult:
         segments: list[dict[str, Any]],
     ) -> None:
         self.video_id = video_id
+        self.source_url = source_url
         self.transcript_text = transcript_text
         self.transcript_language = transcript_language
         self.transcript_language_code = transcript_language_code
@@ -193,6 +199,45 @@ def _extract_url_and_focus_request(text: str) -> tuple[str, str, str]:
     return url, video_id, focus_request
 
 
+def _extract_document_id(text: str) -> str:
+    match = _DOCUMENT_ID_RE.search(text or "")
+    return match.group(0).lower() if match else ""
+
+
+def _remove_document_ids(text: str) -> str:
+    return _DOCUMENT_ID_RE.sub(" ", text or "")
+
+
+def _clean_followup_question(text: str) -> str:
+    cleaned = _remove_document_ids(_remove_urls(text or ""))
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _recover_document_id_from_messages(messages: Any) -> str:
+    if not isinstance(messages, list):
+        return ""
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+        text = _coerce_text(message.get("content")).strip()
+        if not text:
+            continue
+        document_id = _extract_document_id(text)
+        if document_id:
+            return document_id
+    for message in reversed(messages):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        text = _coerce_text(message.get("content")).strip()
+        if not text:
+            continue
+        for url in reversed(_extract_urls(text)):
+            video_id = _extract_video_id(url)
+            if video_id:
+                return _youtube_document_id(video_id)
+    return ""
+
+
 def _format_timestamp(seconds: float) -> str:
     total = max(0, int(seconds))
     hours, remainder = divmod(total, 3600)
@@ -202,10 +247,9 @@ def _format_timestamp(seconds: float) -> str:
     return f"{minutes:02d}:{secs:02d}"
 
 
-def _normalize_segments(fetched: Any) -> list[dict[str, Any]]:
-    raw_segments = fetched.to_raw_data() if hasattr(fetched, "to_raw_data") else list(fetched)
+def _normalize_segments(raw_segments: Any) -> list[dict[str, Any]]:
     segments: list[dict[str, Any]] = []
-    for item in raw_segments:
+    for item in raw_segments or []:
         if not isinstance(item, dict):
             continue
         text = str(item.get("text") or "").strip()
@@ -232,78 +276,91 @@ def _render_transcript_text(segments: list[dict[str, Any]]) -> str:
     return "\n".join(f"[{segment['timestamp']}] {segment['text']}" for segment in segments)
 
 
-def _fetch_transcript(video_id: str) -> TranscriptFetchResult:
-    api = YouTubeTranscriptApi()
+def _media_fetch_mcp_url() -> str:
+    return os.getenv("MEDIA_FETCH_MCP_URL", "http://127.0.0.1:8012/mcp").strip()
+
+
+def _parse_transcript_tool_error(message: str) -> tuple[int, str]:
+    matched = _MCP_TOOL_ERROR_RE.search(message or "")
+    if not matched:
+        return 502, f"transcript service failure: {message or 'unknown error'}"
+    code = matched.group("code")
+    detail = matched.group("message").strip()
+    status_map = {
+        "invalid_url": 400,
+        "unsupported_url": 400,
+        "no_transcript": 404,
+        "upstream_failure": 502,
+    }
+    return status_map.get(code, 502), detail or code
+
+
+def _extract_tool_text_content(content_items: Any) -> str:
+    if not isinstance(content_items, list):
+        return ""
+    for item in content_items:
+        text = getattr(item, "text", None)
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+        if isinstance(item, dict):
+            text = item.get("text")
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+    return ""
+
+
+async def _fetch_transcript(url: str) -> TranscriptFetchResult:
+    mcp_url = _media_fetch_mcp_url()
     try:
-        transcript_list = api.list(video_id)
-    except Exception as exc:  # pragma: no cover - exercised through error mapping
-        message = str(exc)
-        status = 404 if "No transcripts" in message or "Subtitles are disabled" in message else 502
-        raise HTTPException(status_code=status, detail=f"failed to fetch transcript for video {video_id}: {message}") from exc
+        async with streamable_http_client(mcp_url) as (read, write, _get_session_id):
+            async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=90)) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "youtube.transcript",
+                    {"url": url},
+                    read_timeout_seconds=timedelta(seconds=90),
+                )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"failed to reach transcript service: {exc.__class__.__name__}: {exc}") from exc
 
-    def fetch_result(transcript: Any, caption_type: str, was_translated: bool) -> TranscriptFetchResult:
-        fetched = transcript.fetch()
-        segments = _normalize_segments(fetched)
-        transcript_text = _render_transcript_text(segments)
-        language = getattr(transcript, "language", "") or "Unknown"
-        language_code = getattr(transcript, "language_code", "") or ""
-        return TranscriptFetchResult(
-            video_id=video_id,
-            transcript_text=transcript_text,
-            transcript_language=language,
-            transcript_language_code=language_code,
-            caption_type=caption_type,
-            was_translated=was_translated,
-            token_estimate=_estimate_token_count(transcript_text),
-            segments=segments,
-        )
+    tool_text = _extract_tool_text_content(getattr(result, "content", None))
+    if getattr(result, "isError", False):
+        status, detail = _parse_transcript_tool_error(tool_text)
+        raise HTTPException(status_code=status, detail=detail)
+    if not tool_text:
+        raise HTTPException(status_code=502, detail="transcript service returned no payload")
 
-    def try_select(fetcher_name: str, languages: list[str], caption_type: str, translated: bool = False) -> TranscriptFetchResult | None:
-        fetcher = getattr(transcript_list, fetcher_name, None)
-        if fetcher is None:
-            return None
-        try:
-            transcript = fetcher(languages)
-        except Exception:
-            return None
-        if translated:
-            try:
-                transcript = transcript.translate("en")
-            except Exception:
-                return None
-        return fetch_result(transcript, caption_type, translated)
+    try:
+        payload = json.loads(tool_text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="transcript service returned malformed JSON") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="transcript service returned malformed payload")
 
-    direct_manual = try_select("find_manually_created_transcript", ["en"], "manual", translated=False)
-    if direct_manual:
-        return direct_manual
-    direct_generated = try_select("find_generated_transcript", ["en"], "generated", translated=False)
-    if direct_generated:
-        return direct_generated
+    video_id = str(payload.get("video_id") or "").strip()
+    source_url = str(payload.get("source_url") or "").strip()
+    language = str(payload.get("language") or "Unknown").strip() or "Unknown"
+    language_code = str(payload.get("language_code") or "").strip()
+    caption_type = str(payload.get("caption_type") or "unknown").strip() or "unknown"
+    raw_segments = payload.get("segments")
+    if not video_id or not source_url or not isinstance(raw_segments, list):
+        raise HTTPException(status_code=502, detail="transcript service payload missing required fields")
 
-    manual_candidates: list[Any] = []
-    generated_candidates: list[Any] = []
-    for transcript in transcript_list:
-        if getattr(transcript, "is_generated", False):
-            generated_candidates.append(transcript)
-        else:
-            manual_candidates.append(transcript)
-
-    for transcript in manual_candidates:
-        if not getattr(transcript, "is_translatable", False):
-            continue
-        try:
-            return fetch_result(transcript.translate("en"), "translated-manual", True)
-        except Exception:
-            continue
-    for transcript in generated_candidates:
-        if not getattr(transcript, "is_translatable", False):
-            continue
-        try:
-            return fetch_result(transcript.translate("en"), "translated-generated", True)
-        except Exception:
-            continue
-
-    raise HTTPException(status_code=404, detail=f"no usable English transcript was available for video {video_id}")
+    segments = _normalize_segments(raw_segments)
+    if not segments:
+        raise HTTPException(status_code=502, detail=f"transcript service returned no usable segments for video {video_id}")
+    transcript_text = str(payload.get("transcript_text") or "").strip() or _render_transcript_text(segments)
+    return TranscriptFetchResult(
+        video_id=video_id,
+        source_url=source_url,
+        transcript_text=transcript_text,
+        transcript_language=language,
+        transcript_language_code=language_code,
+        caption_type=caption_type,
+        was_translated=False,
+        token_estimate=_estimate_token_count(transcript_text),
+        segments=segments,
+    )
 
 
 def _split_into_chunks(segments: list[dict[str, Any]], max_tokens: int = CHUNK_TARGET_TOKENS) -> list[dict[str, Any]]:
@@ -384,7 +441,7 @@ async def _upsert_transcript_document(transcript: TranscriptFetchResult) -> str:
                 "source_thread_id": transcript.video_id,
                 "source_message_id": transcript.video_id,
                 "title": transcript.video_id,
-                "uri": f"https://youtu.be/{transcript.video_id}",
+                "uri": transcript.source_url,
                 "metadata": {
                     "caption_type": transcript.caption_type,
                     "transcript_language": transcript.transcript_language,
@@ -603,7 +660,7 @@ def _build_final_synthesis_messages(
             "content": (
                 "You are creating a comprehensive summary of a YouTube video from chunk summaries. "
                 "Write readable markdown with adaptive sections. Start with a compact metadata line "
-                "for the video id, transcript language, and caption type. Include a concise overview, "
+                "for the video id, document id, transcript language, and caption type. Include a concise overview, "
                 "key takeaways, and any additional sections that best fit the content. Use sparse timestamps only."
             ),
         },
@@ -611,6 +668,7 @@ def _build_final_synthesis_messages(
             "role": "user",
             "content": (
                 f"Video ID: {transcript.video_id}\n"
+                f"Document ID: {_youtube_document_id(transcript.video_id)}\n"
                 f"Transcript language: {transcript.transcript_language}\n"
                 f"Caption type: {transcript.caption_type}\n"
                 f"Focus request: {focus_line}\n\n"
@@ -706,12 +764,13 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             if call_type in {"responses", "aresponses"}
             else _extract_latest_user_text_from_messages(data.get("messages"))
         )
+        question_text = _clean_followup_question(latest_user_text)
         if isinstance(previous_response_id, str) and previous_response_id.strip():
             mapping = await _resolve_response_mapping(previous_response_id)
-            if mapping and latest_user_text:
+            if mapping and question_text:
                 document_id = str(mapping.get("document_id") or "").strip()
-                hits = await _search_document(latest_user_text, document_id)
-                messages = _build_followup_retrieval_messages(latest_user_text, hits)
+                hits = await _search_document(question_text, document_id)
+                messages = _build_followup_retrieval_messages(question_text, hits)
                 data.pop("previous_response_id", None)
                 if call_type in {"responses", "aresponses"}:
                     data["input"] = messages
@@ -737,11 +796,48 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
             logger.info("youtube-summary follow-up alias=%s previous_response_id=%s", data.get("model"), previous_response_id)
             return data
 
+        if question_text:
+            if call_type in {"chat.completions", "acompletion"}:
+                document_id = _recover_document_id_from_messages(data.get("messages"))
+            else:
+                document_id = _extract_document_id(latest_user_text)
+            if document_id:
+                hits = await _search_document(question_text, document_id)
+                messages = _build_followup_retrieval_messages(question_text, hits)
+                if call_type in {"responses", "aresponses"}:
+                    data["input"] = messages
+                    data.pop("messages", None)
+                    current_budget = data.get("max_output_tokens")
+                    if not isinstance(current_budget, int) or current_budget < MIN_RESPONSE_OUTPUT_TOKENS:
+                        data["max_output_tokens"] = MIN_RESPONSE_OUTPUT_TOKENS
+                else:
+                    data["messages"] = messages
+                    data.pop("input", None)
+                    current_budget = data.get("max_tokens")
+                    if not isinstance(current_budget, int) or current_budget < MIN_CHAT_OUTPUT_TOKENS:
+                        data["max_tokens"] = MIN_CHAT_OUTPUT_TOKENS
+                data["stream"] = False
+                logger.info(
+                    "youtube-summary recovered-followup alias=%s document_id=%s hits=%s",
+                    data.get("model"),
+                    document_id,
+                    len(hits),
+                )
+                return data
+
         if not latest_user_text:
             raise HTTPException(status_code=400, detail=f"model {TASK_YOUTUBE_SUMMARY_ALIAS} requires a YouTube URL on the first turn")
+        if question_text and not _extract_urls(latest_user_text):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"model {TASK_YOUTUBE_SUMMARY_ALIAS} could not recover prior video context; "
+                    "send the original YouTube URL or an explicit document handle like youtube:<video_id>"
+                ),
+            )
 
-        _, video_id, focus_request = _extract_url_and_focus_request(latest_user_text)
-        transcript = _fetch_transcript(video_id)
+        url, _video_id, focus_request = _extract_url_and_focus_request(latest_user_text)
+        transcript = await _fetch_transcript(url)
         document_id = _youtube_document_id(transcript.video_id)
 
         data["_youtube_summary_initial"] = True
@@ -752,6 +848,7 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
         data["_youtube_summary_chunked"] = transcript.token_estimate > SINGLE_PASS_TRANSCRIPT_TOKENS
         data["_youtube_summary_transcript_meta"] = {
             "video_id": transcript.video_id,
+            "source_url": transcript.source_url,
             "transcript_language": transcript.transcript_language,
             "transcript_language_code": transcript.transcript_language_code,
             "caption_type": transcript.caption_type,
@@ -848,6 +945,7 @@ class YouTubeSummaryGuardrail(CustomGuardrail):
         if chunked and isinstance(transcript_meta, dict):
             transcript = TranscriptFetchResult(
                 video_id=str(transcript_meta["video_id"]),
+                source_url=str(transcript_meta["source_url"]),
                 transcript_text=_render_transcript_text(list(transcript_meta["segments"])),
                 transcript_language=str(transcript_meta["transcript_language"]),
                 transcript_language_code=str(transcript_meta["transcript_language_code"]),

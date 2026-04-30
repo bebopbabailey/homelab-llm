@@ -81,6 +81,20 @@ def _normalize_segment(item: dict[str, Any]) -> str | None:
     return f"[{_format_timestamp(start)}] {text}"
 
 
+def _normalize_segment_payload(item: dict[str, Any]) -> dict[str, Any] | None:
+    text = _collapse_whitespace(str(item.get("text") or ""))
+    if not text or _NOISE_RE.fullmatch(text):
+        return None
+    start = float(item.get("start") or 0.0)
+    duration = float(item.get("duration") or 0.0)
+    return {
+        "text": text,
+        "start": start,
+        "duration": duration,
+        "timestamp_label": _format_timestamp(start),
+    }
+
+
 def _fetch_transcript_payload(url: str) -> dict[str, Any]:
     video_id = _extract_video_id(url)
     api = YouTubeTranscriptApi()
@@ -113,21 +127,27 @@ def _fetch_transcript_payload(url: str) -> dict[str, Any]:
         raise ToolContractError("upstream_failure", f"{exc.__class__.__name__}: {exc}") from exc
 
     raw_segments = fetched.to_raw_data() if hasattr(fetched, "to_raw_data") else list(fetched)
+    segments = []
     lines = []
     for item in raw_segments:
         if not isinstance(item, dict):
             continue
-        line = _normalize_segment(item)
-        if line:
-            lines.append(line)
-    if not lines:
+        normalized = _normalize_segment_payload(item)
+        if not normalized:
+            continue
+        segments.append(normalized)
+        lines.append(f"[{normalized['timestamp_label']}] {normalized['text']}")
+    if not segments:
         raise ToolContractError("no_transcript", f"no non-empty transcript lines for video {video_id}")
 
     return {
         "video_id": video_id,
+        "source_url": f"https://youtu.be/{video_id}",
         "transcript_text": "\n".join(lines),
         "language": getattr(transcript, "language", "") or "Unknown",
+        "language_code": getattr(transcript, "language_code", "") or "",
         "caption_type": caption_type or "unknown",
+        "segments": segments,
     }
 
 

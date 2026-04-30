@@ -1,10 +1,11 @@
 # NOW
 
 Active
-- Cut over `services/vector-db` to Elastic-backed retrieval with explicit HNSW
-  mappings, durable `response_id -> document_id` state, and retrieval-backed
-  follow-up grounding for long-form YouTube/publication content.
+- Redesign `task-youtube-summary` to use `services/media-fetch-mcp` as the
+  authoritative YouTube transcript source while preserving the Elastic-backed
+  retrieval, response-map durability, and document-scoped follow-up flow.
 
 NEXT UP
-- Validate the new Elastic backend against the retrieval/eval gates and decide
-  when to retire the temporary pgvector rollback path.
+- Deploy the MCP-backed transcript path, re-run the Open WebUI long-video
+  smoke, and then build the first tiny judged retrieval pack on the known
+  long video.

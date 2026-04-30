@@ -13,8 +13,9 @@ class DummyFetchedTranscript:
 
 
 class DummyTranscript:
-    def __init__(self, language, is_generated, rows):
+    def __init__(self, language, is_generated, rows, *, language_code=""):
         self.language = language
+        self.language_code = language_code
         self.is_generated = is_generated
         self._rows = rows
 
@@ -57,16 +58,19 @@ class MediaFetchMcpTests(unittest.TestCase):
     def test_fetch_prefers_manual_track_over_generated(self):
         transcript_list = DummyTranscriptList(
             [
-                DummyTranscript("English", True, [{"text": "generated", "start": 0.0}]),
-                DummyTranscript("English", False, [{"text": "manual", "start": 0.0}]),
+                DummyTranscript("English", True, [{"text": "generated", "start": 0.0}], language_code="en"),
+                DummyTranscript("English", False, [{"text": "manual", "start": 0.0}], language_code="en"),
             ]
         )
         with mock.patch.object(mod, "YouTubeTranscriptApi", return_value=DummyTranscriptApi(transcript_list)):
             payload = mod._fetch_transcript_payload("https://youtu.be/dQw4w9WgXcQ")
         self.assertEqual(payload["caption_type"], "manual")
+        self.assertEqual(payload["source_url"], "https://youtu.be/dQw4w9WgXcQ")
+        self.assertEqual(payload["language_code"], "en")
+        self.assertEqual(payload["segments"][0]["timestamp_label"], "00:00")
         self.assertIn("[00:00] manual", payload["transcript_text"])
 
-    def test_fetch_builds_timestamped_transcript_and_skips_empty_noise(self):
+    def test_fetch_builds_structured_segments_and_skips_empty_noise(self):
         transcript_list = DummyTranscriptList(
             [
                 DummyTranscript(
@@ -76,17 +80,27 @@ class MediaFetchMcpTests(unittest.TestCase):
                         {"text": " Hallo    Welt ", "start": 0.0},
                         {"text": "   ", "start": 1.0},
                         {"text": " -- ", "start": 2.0},
-                        {"text": "Noch ein Satz", "start": 65.0},
+                        {"text": "Noch ein Satz", "start": 65.0, "duration": 2.0},
                     ],
+                    language_code="de",
                 )
             ]
         )
         with mock.patch.object(mod, "YouTubeTranscriptApi", return_value=DummyTranscriptApi(transcript_list)):
             payload = mod.youtube_transcript("https://youtu.be/dQw4w9WgXcQ")
         self.assertEqual(payload["video_id"], "dQw4w9WgXcQ")
+        self.assertEqual(payload["source_url"], "https://youtu.be/dQw4w9WgXcQ")
         self.assertEqual(payload["language"], "German")
+        self.assertEqual(payload["language_code"], "de")
         self.assertEqual(payload["caption_type"], "manual")
         self.assertEqual(payload["transcript_text"], "[00:00] Hallo Welt\n[01:05] Noch ein Satz")
+        self.assertEqual(
+            payload["segments"],
+            [
+                {"text": "Hallo Welt", "start": 0.0, "duration": 0.0, "timestamp_label": "00:00"},
+                {"text": "Noch ein Satz", "start": 65.0, "duration": 2.0, "timestamp_label": "01:05"},
+            ],
+        )
 
     def test_fetch_maps_missing_transcript_to_no_transcript(self):
         class NoTranscriptApi:

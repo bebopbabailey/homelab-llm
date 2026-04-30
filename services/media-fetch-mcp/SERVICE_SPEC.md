@@ -3,8 +3,8 @@
 ## Purpose
 Localhost-only MCP backend on the Mini for retrieval-style media tools. The
 first tool is `youtube.transcript`, which fetches the full caption transcript
-for a supported single-video YouTube URL and returns it as one flat
-timestamped text field plus minimal metadata.
+for a supported single-video YouTube URL and returns both a backward-compatible
+flat timestamped transcript field and structured timestamp-aware segments.
 
 ## Host & Runtime
 - **Host**: Mini
@@ -21,9 +21,16 @@ timestamped text field plus minimal metadata.
   - `url`
 - Output:
   - `video_id`
+  - `source_url`
   - `transcript_text`
   - `language`
+  - `language_code`
   - `caption_type`
+  - `segments[]`
+    - `text`
+    - `start`
+    - `duration`
+    - `timestamp_label`
 
 ## Behavior
 - Accept supported single-video YouTube watch, `youtu.be`, Shorts, and live
@@ -33,7 +40,10 @@ timestamped text field plus minimal metadata.
 - Prefer the first manually created transcript YouTube exposes; otherwise use
   the first generated transcript.
 - Return the full transcript always.
-- Format `transcript_text` as timestamp-prefixed lines.
+- Format `transcript_text` as timestamp-prefixed lines for backward
+  compatibility.
+- `segments[]` is the canonical machine-readable payload for downstream
+  chunking/indexing.
 - Apply light normalization only: collapse whitespace and skip empty/noisy
   segments.
 

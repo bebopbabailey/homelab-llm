@@ -14,6 +14,9 @@ Why this service exists separately:
 - Transcript retrieval is tool behavior, not model behavior.
 - This keeps YouTube/media ingestion separate from LiteLLM task aliases and
   leaves room for future document/media retrieval tools under the same service.
+- The `youtube.transcript` output stays source-faithful and read-only while
+  still giving downstream consumers structured timestamp-aware segments for
+  chunking and indexing.
 
 Current non-goals:
 - summarization

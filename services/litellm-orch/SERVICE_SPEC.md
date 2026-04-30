@@ -141,20 +141,27 @@ implement inference or web-search business logic.
   `POST /v1/chat/completions` remains compatibility-only for Open WebUI and
   other chat-style clients.
 - `task-youtube-summary` uses a LiteLLM-owned pre-call guardrail to normalize
-  the first-turn URL, fetch captions with `youtube-transcript-api`, prefer
-  manual English captions over generated English captions, fall back to YouTube
-  translation only when needed, synchronously upsert a durable transcript
-  document through the memory API, and render the adaptive summary dotprompt
-  through the generic `prompt-pre` path.
+  the first-turn URL, fetch source-faithful structured transcript data from the
+  localhost-only `media-fetch-mcp` service on `127.0.0.1:8012/mcp`,
+  synchronously upsert a durable transcript document through the memory API,
+  and render the adaptive summary dotprompt through the generic `prompt-pre`
+  path. `segments[]` from `media-fetch-mcp` are the canonical chunking/indexing
+  surface; LiteLLM does not reparse timestamped transcript text for that work.
 - `task-youtube-summary` emits readable markdown with a compact metadata line,
-  adaptive sections, and sparse timestamps. Successful Responses payloads are
-  rewritten into stable `output_text` while preserving response `id`,
+  adaptive sections, and sparse timestamps. The first summary line includes the
+  durable document handle (`Document: youtube:<video_id>`). Successful
+  Responses payloads are rewritten into stable `output_text` while preserving
+  response `id`,
   `previous_response_id`, and `usage`.
 - `task-youtube-summary` accepts common single-video YouTube watch, short-link,
   Shorts, and live URLs. Playlist-only, channel, search, and other non-video
   pages are rejected.
 - `task-youtube-summary` fails closed when YouTube does not expose a usable
   caption track. v1 does not add ASR fallback or metadata-only summary mode.
+- `task-youtube-summary` keeps English summary/answer output as the default
+  user contract even when `media-fetch-mcp` returns a non-English transcript;
+  translation remains a summarization concern, not a transcript-service
+  concern.
 - `task-youtube-summary` supports direct follow-up Q&A on the same alias.
   `previous_response_id` is treated as an ergonomic handle only; LiteLLM
   resolves it into a retrieval-owned `document_id` mapping and asks the memory
@@ -162,6 +169,11 @@ implement inference or web-search business logic.
   Oversized transcripts are still summarized internally on `deep`, but their
   follow-ups now ground against the indexed transcript document rather than
   provider-side placeholder lineage.
+- Chat-completions follow-ups must not require a repeated URL. When
+  `previous_response_id` is absent, LiteLLM attempts recovery in this order:
+  explicit `document_id`, prior assistant metadata line, then prior YouTube URL
+  in chat history; otherwise it fails clearly and asks for the URL or document
+  handle.
 - GPT formatting ownership is upstream-first:
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the

@@ -45,6 +45,36 @@ Expected:
 - connect succeeds
 - tool list includes `youtube.transcript`
 
+## Direct transcript smoke
+```bash
+cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
+.venv/bin/python - <<'PY'
+import asyncio, json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+URL = "https://youtu.be/-QFHIoCo-Ko?si=EP5WGz2PLVLPWU9j"
+
+async def main():
+    async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _get_session_id):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("youtube.transcript", {"url": URL})
+            assert not result.isError
+            payload = json.loads(result.content[0].text)
+            print(payload["video_id"], payload["language"], payload["caption_type"])
+            print("segments", len(payload["segments"]))
+            print("prefix", payload["transcript_text"][:120])
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- `segments` is non-zero
+- `transcript_text` is non-empty
+- payload includes `source_url` and `language_code`
+
 ## Open WebUI verify smoke
 ```bash
 python3 - <<'PY'

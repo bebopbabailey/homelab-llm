@@ -16,6 +16,10 @@ def _env_int(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None:
         return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 def _env_secret(name: str, file_name: str) -> str:
@@ -30,10 +34,6 @@ def _env_secret(name: str, file_name: str) -> str:
             return handle.read().strip()
     except OSError:
         return ""
-    try:
-        return int(raw)
-    except ValueError:
-        return default
 
 
 @dataclass(frozen=True)
