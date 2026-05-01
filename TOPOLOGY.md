@@ -14,7 +14,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - **OpenHands (Phase A, managed operator UI)**: `127.0.0.1:4031` (systemd-managed Docker service; tailnet-only access at `https://hands.tailfd1400.ts.net/`)
 - **Samba SMB**: `127.0.0.1,192.168.1.71:139/445` (LAN-only; Finder shares `mini-root` and `seagate`)
 - **Prometheus**: `127.0.0.1:9090` (localhost only)
-- **Grafana**: `127.0.0.1:3001` (localhost only)
+- **Grafana**: `127.0.0.1:3001` (localhost bind; tailnet-only operator access at `https://grafana.tailfd1400.ts.net/`)
 - **OpenVINO LLM**: `0.0.0.0:9000`
 - **SearXNG**: `127.0.0.1:8888` (localhost only)
 - **Ollama**: `0.0.0.0:11434` (do not modify)

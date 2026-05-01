@@ -6,7 +6,7 @@
   OpenCode Web :4096 (LAN + tailnet-reachable if network policy allows, Basic Auth at app layer),
   OpenHands Phase A :4031 (localhost + tailnet via `hands`, systemd-managed Docker service),
   Samba SMB :139/:445 (LAN-only authenticated Finder access to `mini-root` and `seagate`),
-  Prometheus :9090 (localhost-only), Grafana :3001 (localhost-only),
+  Prometheus :9090 (localhost-only), Grafana :3001 (localhost + tailnet via `grafana`),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX inference host using the `mlxctl`-governed team-lane domain
@@ -44,7 +44,7 @@
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | 127.0.0.1 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root | `/etc/systemd/system/openhands.service`, `systemctl show openhands.service -p ExecStart`, `ss -ltnp`, `tailscale serve status --json` |
 | Samba SMB | Mini | 139/445 | `127.0.0.1` + `192.168.1.71` | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth | `/etc/samba/smb.conf`, `systemctl status smbd.service nmbd.service`, `pdbedit -L` |
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
-| Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001 | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server` |
+| Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001, https://grafana.tailfd1400.ts.net/ | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server`, `tailscale serve status --json` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `services/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
 | OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `services/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
@@ -301,9 +301,9 @@ Networking note:
 - LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` with localhost still valid.
 - LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
   `8126` on `192.168.1.72`.
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
+- Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, CCProxy API 4010.
-- Local-only bind with tailnet-only operator access: OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
+- Local-only bind with tailnet-only operator access: Grafana 3001 at `https://grafana.tailfd1400.ts.net/`, OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): Elasticsearch `127.0.0.1:9200`.
 - Mini-to-Studio LAN retrieval path: memory API `192.168.1.72:55440`, reads open
   to Mini and writes gated by bearer token plus pf allowlist.
@@ -311,6 +311,7 @@ Networking note:
   - `https://code.tailfd1400.ts.net/` → code-server (8080)
   - `https://chat.tailfd1400.ts.net/` → Open WebUI (3000)
   - `https://codeagent.tailfd1400.ts.net/` → OpenCode Web (4096)
+  - `https://grafana.tailfd1400.ts.net/` → Grafana (3001)
   - `https://gateway.tailfd1400.ts.net/` → LiteLLM (4000)
   - `https://hands.tailfd1400.ts.net/` → OpenHands (4031)
   - `https://search.tailfd1400.ts.net/` → SearXNG (8888)

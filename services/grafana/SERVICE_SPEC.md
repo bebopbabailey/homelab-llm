@@ -5,7 +5,8 @@ UI for LiteLLM + Prometheus observability dashboards.
 
 ## Host & Runtime
 - **Host**: Mac mini (Ubuntu 24.04)
-- **Bind**: `127.0.0.1:3001` (tailnet HTTPS via Tailscale Serve if needed)
+- **Bind**: `127.0.0.1:3001`
+- **Tailnet operator URL**: `https://grafana.tailfd1400.ts.net/` via `svc:grafana`
 - **Binary**: `grafana-server` (system package)
 
 ## Configuration
@@ -25,4 +26,5 @@ UI for LiteLLM + Prometheus observability dashboards.
 ## Validation
 ```bash
 curl -fsS http://127.0.0.1:3001/api/health
+tailscale serve status --json
 ```

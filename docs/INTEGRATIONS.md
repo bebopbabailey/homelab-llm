@@ -157,7 +157,7 @@ sum(rate(litellm_output_tokens_metric_total[1m]))
 
 ### Prometheus + Grafana (Mini)
 - Prometheus: `http://127.0.0.1:9090` (localhost only).
-- Grafana: `http://127.0.0.1:3001` (localhost only).
+- Grafana: `http://127.0.0.1:3001` (localhost-only bind) with tailnet-only operator access at `https://grafana.tailfd1400.ts.net/`.
 - Grafana datasource is provisioned to Prometheus on startup.
 - Dashboards live in `services/grafana/dashboards/` (deployed copy under `/etc/homelab-llm/grafana/dashboards/`).
 - Prometheus runtime config: `/etc/homelab-llm/prometheus/prometheus.yml` (deployed from repo).

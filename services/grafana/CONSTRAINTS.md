@@ -5,7 +5,7 @@ This service inherits global + layer constraints:
 - Interface layer: `../CONSTRAINTS.md`
 
 ## Hard constraints
-- Keep Grafana local-only on `127.0.0.1:3001` unless explicitly approved.
+- Keep Grafana bound to `127.0.0.1:3001`; remote operator access must proxy through tailnet-only `svc:grafana`.
 - Keep secrets (admin credentials, API keys, datasource tokens) out of git.
 - Prefer repo-managed dashboards/provisioning artifacts; avoid undocumented UI-only drift.
 - Preserve observability role; no cross-service control actions from Grafana changes.
@@ -27,6 +27,7 @@ This service inherits global + layer constraints:
 
 ## Validation pointers
 - `curl -fsS http://127.0.0.1:3001/api/health | jq .`
+- `tailscale serve status --json | jq .`
 - `journalctl -u grafana-server.service -n 200 --no-pager`
 - `systemctl status grafana-server.service --no-pager`
 

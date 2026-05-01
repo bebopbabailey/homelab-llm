@@ -21,6 +21,8 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   LiteLLM `boost` routes to Studio OptiLLM proxy (`:4020`).
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
   operator access at `https://hands.tailfd1400.ts.net/`.
+  Grafana is on `127.0.0.1:3001` locally with tailnet-only operator access at
+  `https://grafana.tailfd1400.ts.net/` via `svc:grafana`.
   OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
   `orchestration-cockpit` is localhost-only and inactive by default; when
   launched it uses LangGraph dev on `127.0.0.1:2024` and Agent Chat UI on
@@ -69,7 +71,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
 | Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
-| Grafana | Mini | 3001 | http://127.0.0.1:3001 | /api/health |
+| Grafana | Mini | 3001 | http://127.0.0.1:3001, https://grafana.tailfd1400.ts.net/ | /api/health |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | Voice Gateway | Orin | 18080 | http://192.168.1.93:18080/v1 | /health, /health/readiness |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
@@ -139,8 +141,10 @@ define the contract for specialized runtime-plane services such as
 - There are no active temporary GPT canary aliases in the current LiteLLM
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
-- Local-only: Prometheus 9090, Grafana 3001, SearXNG 8888, Open Terminal API
+- Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, Media Fetch MCP 8012, CCProxy API 4010.
+  Grafana is on `127.0.0.1:3001` with tailnet-only operator access at
+  `https://grafana.tailfd1400.ts.net/` via `svc:grafana`.
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only
   operator access at `https://hands.tailfd1400.ts.net/` via `svc:hands`.
   Studio local-only: main vector DB 55432, memory API 55440.

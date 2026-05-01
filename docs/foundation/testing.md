@@ -1247,7 +1247,14 @@ curl -fsS http://127.0.0.1:9090/-/healthy
 ## Grafana (Mini)
 ```bash
 curl -fsS http://127.0.0.1:3001/api/health
+tailscale serve status --json
+curl -I -sS https://grafana.tailfd1400.ts.net/
 ```
+
+Expected:
+- local `/api/health` returns healthy JSON
+- `Services["svc:grafana"]` points to `http://127.0.0.1:3001`
+- remote tailnet root returns `302` to `/login`
 
 Check for MLX aliases:
 ```bash
