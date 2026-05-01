@@ -30,6 +30,9 @@ QUERYGEN_PATCH_MARKER = (
 )
 CHATGPT5_PATCH_MARKER = "chatgpt5-text-only-hardening: disable terminal re-entry"
 RESULT_HYGIENE_PATCH_MARKER = (
+    "web-search-result-hygiene: drop low-overlap junk before fetch; keep bounded low-confidence fallback"
+)
+LEGACY_RESULT_HYGIENE_PATCH_MARKER = (
     "web-search-result-hygiene: drop low-overlap junk before fetch"
 )
 
@@ -408,14 +411,14 @@ RESULT_HYGIENE_NEW = """        search_results = await asyncio.gather(*search_ta
             ]
             weak_items = [item for overlap_count, item in candidates if overlap_count > 0]
 
+            low_confidence_items = [item for _, item in candidates[:2]]
+
             if strong_items:
                 result_items = strong_items
-            elif len(high_signal_tokens) >= 4:
-                result_items = []
             elif weak_items:
-                result_items = weak_items
+                result_items = weak_items[:2]
             else:
-                result_items = [item for _, item in candidates]
+                result_items = low_confidence_items
         else:
             result_items = [item for _, item in candidates]
 
@@ -461,8 +464,44 @@ PATCH_SPECS = {
                 (RESULT_HYGIENE_OLD, RESULT_HYGIENE_NEW),
                 (
                     RESULT_HYGIENE_NEW.replace(
-                        "            elif len(high_signal_tokens) >= 4:\n                result_items = []\n",
-                        "",
+                        "            low_confidence_items = [item for _, item in candidates[:2]]\n\n"
+                        "            if strong_items:\n"
+                        "                result_items = strong_items\n"
+                        "            elif weak_items:\n"
+                        "                result_items = weak_items[:2]\n"
+                        "            else:\n"
+                        "                result_items = low_confidence_items\n",
+                        "            if strong_items:\n"
+                        "                result_items = strong_items\n"
+                        "            elif len(high_signal_tokens) >= 4:\n"
+                        "                result_items = []\n"
+                        "            elif weak_items:\n"
+                        "                result_items = weak_items\n"
+                        "            else:\n"
+                        "                result_items = [item for _, item in candidates]\n",
+                    ),
+                    RESULT_HYGIENE_NEW,
+                ),
+                (
+                    RESULT_HYGIENE_NEW.replace(
+                        RESULT_HYGIENE_PATCH_MARKER,
+                        LEGACY_RESULT_HYGIENE_PATCH_MARKER,
+                    ).replace(
+                        "            low_confidence_items = [item for _, item in candidates[:2]]\n\n"
+                        "            if strong_items:\n"
+                        "                result_items = strong_items\n"
+                        "            elif weak_items:\n"
+                        "                result_items = weak_items[:2]\n"
+                        "            else:\n"
+                        "                result_items = low_confidence_items\n",
+                        "            if strong_items:\n"
+                        "                result_items = strong_items\n"
+                        "            elif len(high_signal_tokens) >= 4:\n"
+                        "                result_items = []\n"
+                        "            elif weak_items:\n"
+                        "                result_items = weak_items\n"
+                        "            else:\n"
+                        "                result_items = [item for _, item in candidates]\n",
                     ),
                     RESULT_HYGIENE_NEW,
                 ),

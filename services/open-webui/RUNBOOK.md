@@ -39,6 +39,8 @@ WebUI runtime in place to:
 - normalize generated rewrites so month/year prefixes do not dominate the query
 - add a narrow pre-fetch result hygiene pass that drops obvious zero-overlap
   junk before page loading/embedding
+- keep at most two weak or low-confidence fallback results when the strict
+  overlap filter would otherwise leave the search with nothing usable
 
 The current prompt override also tells query generation to:
 - keep queries topic-first and date-last
@@ -72,7 +74,7 @@ targets = [
 ]
 markers = [
     'querygen-hardening: avoid poisoned queries fallback; normalize generated search queries',
-    'web-search-result-hygiene: drop low-overlap junk before fetch',
+    'web-search-result-hygiene: drop low-overlap junk before fetch; keep bounded low-confidence fallback',
 ]
 for target, marker in zip(targets, markers):
     text = target.read_text(encoding='utf-8')

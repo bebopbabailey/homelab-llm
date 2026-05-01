@@ -146,7 +146,9 @@ Networking note:
   `WEB_SEARCH_DOMAIN_FILTER_LIST=!localhost,!127.0.0.1,!192.168.1.70,!192.168.1.71,!192.168.1.72,!100.69.99.60,!code.tailfd1400.ts.net,!chat.tailfd1400.ts.net,!gateway.tailfd1400.ts.net,!search.tailfd1400.ts.net`.
   The live Open WebUI restart path also hotfixes query generation and pre-fetch
   search-result hygiene inside the installed runtime while keeping the same
-  supported `searxng` + `safe_web` topology.
+  supported `searxng` + `safe_web` topology. When strict overlap filtering
+  strips every candidate for an ambiguous research query, the runtime now falls
+  back to a bounded low-confidence fetch set instead of hard failing.
   The global query-generation prompt policy is currently injected through
   `/etc/systemd/system/open-webui.service.d/25-querygen-prompt-policy.conf`.
   Audio env/drop-ins remain authoritative for the speech path in current

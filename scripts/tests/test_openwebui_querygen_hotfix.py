@@ -30,6 +30,67 @@ class OpenWebuiQuerygenHotfixTests(unittest.TestCase):
         self.assertTrue(changed)
         self.assertIn(hotfix.RESULT_HYGIENE_PATCH_MARKER, patched)
         self.assertEqual(statuses["web_search_result_hygiene"], "patched")
+        self.assertIn("low_confidence_items = [item for _, item in candidates[:2]]", patched)
+        self.assertNotIn("elif len(high_signal_tokens) >= 4:", patched)
+        self.assertNotIn("result_items = []", patched)
+
+    def test_patch_text_upgrades_prior_hard_fail_variant(self):
+        original = hotfix.RESULT_HYGIENE_NEW.replace(
+            "            low_confidence_items = [item for _, item in candidates[:2]]\n\n"
+            "            if strong_items:\n"
+            "                result_items = strong_items\n"
+            "            elif weak_items:\n"
+            "                result_items = weak_items[:2]\n"
+            "            else:\n"
+            "                result_items = low_confidence_items\n",
+            "            if strong_items:\n"
+            "                result_items = strong_items\n"
+            "            elif len(high_signal_tokens) >= 4:\n"
+            "                result_items = []\n"
+            "            elif weak_items:\n"
+            "                result_items = weak_items\n"
+            "            else:\n"
+            "                result_items = [item for _, item in candidates]\n",
+        )
+        patched, changed, statuses = hotfix.patch_text(
+            original, hotfix.PATCH_SPECS["retrieval"]
+        )
+        self.assertTrue(changed)
+        self.assertIn("low_confidence_items = [item for _, item in candidates[:2]]", patched)
+        self.assertNotIn("elif len(high_signal_tokens) >= 4:", patched)
+        self.assertEqual(statuses["web_search_result_hygiene"], "patched")
+
+    def test_patch_text_upgrades_legacy_marker_variant(self):
+        original = hotfix.RESULT_HYGIENE_NEW.replace(
+            hotfix.RESULT_HYGIENE_PATCH_MARKER,
+            hotfix.LEGACY_RESULT_HYGIENE_PATCH_MARKER,
+        ).replace(
+            "            low_confidence_items = [item for _, item in candidates[:2]]\n\n"
+            "            if strong_items:\n"
+            "                result_items = strong_items\n"
+            "            elif weak_items:\n"
+            "                result_items = weak_items[:2]\n"
+            "            else:\n"
+            "                result_items = low_confidence_items\n",
+            "            if strong_items:\n"
+            "                result_items = strong_items\n"
+            "            elif len(high_signal_tokens) >= 4:\n"
+            "                result_items = []\n"
+            "            elif weak_items:\n"
+            "                result_items = weak_items\n"
+            "            else:\n"
+            "                result_items = [item for _, item in candidates]\n",
+        )
+        patched, changed, statuses = hotfix.patch_text(
+            original, hotfix.PATCH_SPECS["retrieval"]
+        )
+        self.assertTrue(changed)
+        self.assertIn(hotfix.RESULT_HYGIENE_PATCH_MARKER, patched)
+        self.assertNotIn(
+            f"# {hotfix.LEGACY_RESULT_HYGIENE_PATCH_MARKER}\n",
+            patched,
+        )
+        self.assertEqual(statuses["web_search_result_hygiene"], "patched")
 
     def test_patch_target_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmpdir:

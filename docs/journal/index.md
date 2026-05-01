@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-01-searxng-reliability-hardening](2026-05-01-searxng-reliability-hardening.md)
 - [2026-04-30-owui-querygen-prompt-policy](2026-04-30-owui-querygen-prompt-policy.md)
 - [2026-04-30-websearch-quality-hardening](2026-04-30-websearch-quality-hardening.md)
 - [2026-04-29-elastic-vector-db-cutover-runtime](2026-04-29-elastic-vector-db-cutover-runtime.md)

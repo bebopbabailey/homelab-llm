@@ -1,9 +1,10 @@
 # NOW
 
 Active
-- Restore Grafana to localhost-only bind, add tailnet-only operator access,
-  and align the repo contracts with the live Mini exposure policy.
+- Harden the Mini-hosted Open WebUI -> SearXNG web-search path so ambiguous
+  research queries degrade gracefully instead of failing closed after
+  result-hygiene filtering.
 
 NEXT UP
 - Return to the pending `services/vector-db` documentation pass once the
-  Grafana access fix is closed out.
+  web-search reliability hardening closes cleanly.

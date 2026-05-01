@@ -18,7 +18,9 @@ Human-facing UI for LLM and voice interactions routed through LiteLLM.
 - Local SearXNG JSON endpoint via documented Open WebUI config
 - Restart-time hotfix script at `scripts/openwebui_querygen_hotfix.py`, which
   hardens query generation and pre-fetch result hygiene inside the installed
-  Open WebUI runtime without changing the supported topology
+  Open WebUI runtime without changing the supported topology; ambiguous
+  research queries now fall back to a bounded low-confidence fetch set instead
+  of hard failing whenever the strict overlap filter returns nothing
 - Local Open Terminal integrations on the Mini:
   - native terminal server at `http://127.0.0.1:8010`
   - read-only MCP tool server at `http://127.0.0.1:8011/mcp`

@@ -1607,7 +1607,7 @@ targets = {
     ),
     'retrieval': (
         Path('/home/christopherbailey/homelab-llm/layer-interface/open-webui/.venv/lib/python3.12/site-packages/open_webui/routers/retrieval.py'),
-        'web-search-result-hygiene: drop low-overlap junk before fetch',
+        'web-search-result-hygiene: drop low-overlap junk before fetch; keep bounded low-confidence fallback',
     ),
 }
 
@@ -1623,6 +1623,9 @@ Pass guidance:
 - The live task config shows a non-empty `QUERY_GENERATION_PROMPT_TEMPLATE`
   matching the `25-querygen-prompt-policy.conf` override.
 - The runtime marker checks return `True` for both patched files.
+- The known month/community regression no longer raises
+  `No results found from web search` when the engine returns at least a bounded
+  low-confidence candidate set.
 - The SearXNG smoke returns at least one result.
 - The Open WebUI stream shows a `sources` event with `type: "web_search"` and returns assistant content.
 - If this host is not running `ENABLE_PERSISTENT_CONFIG=False`, treat any
