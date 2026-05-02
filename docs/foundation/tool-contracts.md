@@ -278,6 +278,151 @@ Format:
 ]
 ```
 
+## media-fetch.web.search
+- status: active
+- transport: mcp (http via `127.0.0.1:8012/mcp`)
+- endpoint: `media-fetch` (MCP server name)
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["query"],
+  "additionalProperties": false,
+  "properties": {
+    "query": { "type": "string", "minLength": 1 },
+    "max_results": { "type": "integer", "minimum": 1, "maximum": 25 }
+  }
+}
+```
+- output_schema:
+```json
+{
+  "type": "object",
+  "required": ["query", "provider", "results"],
+  "additionalProperties": false,
+  "properties": {
+    "query": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "const": "searxng" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "url", "snippet"],
+        "additionalProperties": true
+      }
+    }
+  }
+}
+```
+
+## media-fetch.web.fetch
+- status: active
+- transport: mcp (http via `127.0.0.1:8012/mcp`)
+- endpoint: `media-fetch` (MCP server name)
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["url"],
+  "additionalProperties": false,
+  "properties": {
+    "url": { "type": "string", "format": "uri" },
+    "include_raw_html": { "type": "boolean" }
+  }
+}
+```
+
+## media-fetch.web.session.search
+- status: active
+- transport: mcp (http via `127.0.0.1:8012/mcp`)
+- endpoint: `media-fetch` (MCP server name)
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["conversation_id", "query"],
+  "additionalProperties": false,
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "query": { "type": "string", "minLength": 1 },
+    "profile": { "type": "string", "enum": ["precise", "balanced", "broad"] },
+    "top_k": { "type": "integer", "minimum": 1, "maximum": 20 }
+  }
+}
+```
+- output_schema:
+```json
+{
+  "type": "object",
+  "required": ["conversation_id", "document_id", "query", "hits"],
+  "additionalProperties": false,
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "document_id": { "type": "string", "pattern": "^research:" },
+    "query": { "type": "string", "minLength": 1 },
+    "hits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rank", "chunk_id", "text", "source_url"],
+        "additionalProperties": true
+      }
+    }
+  }
+}
+```
+
+## media-fetch.web.quick
+- status: active
+- transport: mcp (http via `127.0.0.1:8012/mcp`)
+- endpoint: `media-fetch` (MCP server name)
+- input_schema:
+```json
+{
+  "type": "object",
+  "required": ["conversation_id", "query"],
+  "additionalProperties": false,
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "query": { "type": "string", "minLength": 1 },
+    "search_max_results": { "type": "integer", "minimum": 1, "maximum": 25 },
+    "fetch_max_results": { "type": "integer", "minimum": 1, "maximum": 10 }
+  }
+}
+```
+- output_schema:
+```json
+{
+  "type": "object",
+  "required": ["conversation_id", "document_id", "query", "sources", "evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "document_id": { "type": "string", "pattern": "^research:" },
+    "query": { "type": "string", "minLength": 1 },
+    "sources": { "type": "array" },
+    "evidence": { "type": "array" }
+  }
+}
+```
+- output_schema:
+```json
+{
+  "type": "object",
+  "required": ["requested_url", "final_url", "canonical_url", "clean_text", "markdown", "quality_label", "extractor_used"],
+  "additionalProperties": true,
+  "properties": {
+    "requested_url": { "type": "string", "format": "uri" },
+    "final_url": { "type": "string", "format": "uri" },
+    "canonical_url": { "type": "string", "format": "uri" },
+    "clean_text": { "type": "string", "minLength": 1 },
+    "markdown": { "type": "string", "minLength": 1 },
+    "quality_label": { "type": "string", "enum": ["high", "medium", "low"] },
+    "extractor_used": { "type": "string", "minLength": 1 }
+  }
+}
+```
+
 ## health_check
 - status: active on direct Open Terminal MCP backend; LiteLLM alias not yet live
 - transport: mcp (http via `127.0.0.1:8011/mcp`)

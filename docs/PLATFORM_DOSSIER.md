@@ -157,7 +157,7 @@ Networking note:
 - Open Terminal:
   - native human-UX API container remains on `127.0.0.1:8010`
   - canonical Open Terminal MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
-  - transcript/media retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
+  - transcript/media/web retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
   - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
   - first slice mount scope is repo-root only:
     `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
@@ -172,6 +172,9 @@ Networking note:
   - shared LiteLLM exposure is still blocked on current stable runtime
   - any future shared LiteLLM path may expose only an explicitly filtered
     read-only subset, not the full direct backend surface
+  - `media-fetch-mcp` now owns reusable MCP retrieval primitives for
+    transcript fetch, direct SearXNG search, cleaned webpage extraction, and
+    per-conversation `vector-db` web-research sessions
   - OpenHands remains denied for `/v1/mcp/*`
 - CCProxy API: systemd unit `/etc/systemd/system/ccproxy-api.service`,
   localhost-only on `127.0.0.1:4010`, backed by upstream `ccproxy-api`.

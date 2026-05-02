@@ -509,25 +509,33 @@ Example:
   - `/v1/responses` stays denied for the worker key
 
 ## Media Fetch MCP (implemented locally)
-- Current live target path for transcript retrieval is the localhost-only
-  `media-fetch-mcp` backend:
+- Current live target path for transcript and web retrieval is the
+  localhost-only `media-fetch-mcp` backend:
   - backend: `http://127.0.0.1:8012/mcp`
   - transport: MCP Streamable HTTP
 - Intended first client:
   - Open WebUI direct MCP registration on the Mini
 - Current tool surface:
   - `youtube.transcript`
+  - `media-fetch.web.search`
+  - `media-fetch.web.fetch`
+  - `media-fetch.web.session.upsert`
+  - `media-fetch.web.session.search`
+  - `media-fetch.web.session.delete`
+  - `media-fetch.web.quick`
+  - `media-fetch.web.research`
 - `youtube.transcript` accepts one supported single-video YouTube URL and
-  returns:
-  - `video_id`
-  - `transcript_text`
-  - `language`
-  - `caption_type`
-- Behavior:
-  - preserve source caption language
-  - prefer the first manual transcript YouTube exposes, else the first generated transcript
-  - return full transcript text as timestamped lines
-  - no translation, summarization, chunking, or storage in this slice
+  returns timestamped full transcript text plus structured segments.
+- `media-fetch.web.search` calls local SearXNG directly and returns normalized
+  live web results.
+- `media-fetch.web.fetch` turns public webpages into cleaned evidence payloads
+  using `trafilatura` first, `readability-lxml` second, and visible-text
+  fallback last.
+- `media-fetch.web.session.*` persists and retrieves cleaned web evidence
+  through `vector-db` using deterministic per-conversation ids:
+  `research:<conversation_id>`.
+- `media-fetch.web.quick` and `media-fetch.web.research` are orchestration
+  helpers only. They do not perform model inference or answer synthesis.
 
 ## Client base URL recommendation
 - Prefer LAN when local: `http://192.168.1.71:4000/v1`.

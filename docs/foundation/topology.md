@@ -127,8 +127,11 @@ define the contract for specialized runtime-plane services such as
   on `127.0.0.1:8010`. A shared LiteLLM read-only alias is follow-on work and
   is not part of the current live runtime.
 - Media Fetch MCP — HTTP MCP backend on the Mini at `127.0.0.1:8012/mcp`,
-  currently localhost-only. Open WebUI is the intended first client. The first
-  tool is `youtube.transcript`, a read-only full-transcript retrieval helper.
+  currently localhost-only. Open WebUI is the intended first client. It now
+  exposes transcript retrieval plus reusable web-research primitives:
+  direct SearXNG search, cleaned webpage fetch/extraction, per-conversation
+  `vector-db` session tools, and helper orchestration tools that stop short of
+  answer synthesis.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.

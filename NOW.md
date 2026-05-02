@@ -1,10 +1,11 @@
 # NOW
 
 Active
-- Harden the Mini-hosted Open WebUI -> SearXNG web-search path so ambiguous
-  research queries degrade gracefully instead of failing closed after
-  result-hygiene filtering.
+- Extend `services/media-fetch-mcp` into the canonical localhost MCP retrieval
+  boundary for web research by folding in direct SearXNG search, cleaned
+  webpage fetch/extraction, and Elastic-backed per-conversation session tools.
 
 NEXT UP
-- Return to the pending `services/vector-db` documentation pass once the
-  web-search reliability hardening closes cleanly.
+- Validate the new `media-fetch.web.*` tool chain end-to-end from MCP through
+  `vector-db`, then decide how OWUI and future pipelines should consume the
+  new canonical retrieval surface.

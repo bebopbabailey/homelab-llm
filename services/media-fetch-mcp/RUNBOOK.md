@@ -44,6 +44,8 @@ PY
 Expected:
 - connect succeeds
 - tool list includes `youtube.transcript`
+- tool list includes `media-fetch.web.quick`
+- tool list includes `media-fetch.web.session.search`
 
 ## Direct transcript smoke
 ```bash
@@ -75,6 +77,101 @@ Expected:
 - `transcript_text` is non-empty
 - payload includes `source_url` and `language_code`
 
+## Direct web search smoke
+```bash
+cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
+.venv/bin/python - <<'PY'
+import asyncio, json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+async def main():
+    async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _get_session_id):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "media-fetch.web.search",
+                {"query": "Open WebUI SearXNG integration", "max_results": 3},
+            )
+            assert not result.isError
+            payload = json.loads(result.content[0].text)
+            print(payload["provider"], len(payload["results"]))
+            print(payload["results"][0]["url"])
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- provider is `searxng`
+- at least one normalized result is returned
+
+## Direct fetch smoke
+```bash
+cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
+.venv/bin/python - <<'PY'
+import asyncio, json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+URL = "https://docs.openwebui.com/features/web-search/"
+
+async def main():
+    async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _get_session_id):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("media-fetch.web.fetch", {"url": URL})
+            assert not result.isError
+            payload = json.loads(result.content[0].text)
+            print(payload["canonical_url"])
+            print(payload["extractor_used"], payload["quality_label"])
+            print(payload["clean_text"][:120])
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- `clean_text` is non-empty
+- payload includes `canonical_url`, `markdown`, `quality_label`, and
+  `extractor_used`
+
+## Direct research-session smoke
+```bash
+TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
+export MEDIA_FETCH_VECTOR_DB_WRITE_BEARER_TOKEN="$TOKEN"
+
+cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
+.venv/bin/python - <<'PY'
+import asyncio, json
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+async def main():
+    async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _get_session_id):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "media-fetch.web.quick",
+                {"conversation_id": "smoke-web-1", "query": "Open WebUI SearXNG integration"},
+            )
+            assert not result.isError
+            payload = json.loads(result.content[0].text)
+            print(payload["document_id"], len(payload["evidence"]))
+            cleanup = await session.call_tool("media-fetch.web.session.delete", {"conversation_id": "smoke-web-1"})
+            assert not cleanup.isError
+            print(json.loads(cleanup.content[0].text)["deleted_documents"])
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- `document_id` is `research:smoke-web-1`
+- `evidence` is non-empty
+- delete succeeds after the smoke run
+
 ## Open WebUI verify smoke
 ```bash
 python3 - <<'PY'
@@ -91,7 +188,7 @@ payload = {
     "key": "",
     "config": {
         "enable": True,
-        "function_name_filter_list": "youtube.transcript",
+        "function_name_filter_list": "youtube.transcript,media-fetch.web.quick,media-fetch.web.fetch",
         "access_grants": []
     },
     "info": {"id": "media-fetch-mcp", "name": "Media Fetch MCP"}

@@ -1,5 +1,5 @@
 [Unit]
-Description=Media Fetch MCP (localhost-only transcript backend)
+Description=Media Fetch MCP (localhost-only retrieval backend)
 After=network-online.target
 Wants=network-online.target
 
