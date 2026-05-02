@@ -1,5 +1,15 @@
 # Runbook: media-fetch-mcp
 
+Use [README.md](./README.md) for the main human-facing manual:
+- which tool to use
+- direct MCP usage patterns
+- Open WebUI setup
+- reusable pipeline recipes
+- eval file placement
+
+This runbook stays operator-first: install, service state, logs, and live
+smoke checks.
+
 ## Install env
 ```bash
 sudo install -d -m 0755 /etc/homelab-llm
@@ -114,7 +124,7 @@ import asyncio, json
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-URL = "https://docs.openwebui.com/features/web-search/"
+URL = "https://example.com"
 
 async def main():
     async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _get_session_id):
@@ -154,7 +164,7 @@ async def main():
             await session.initialize()
             result = await session.call_tool(
                 "media-fetch.web.quick",
-                {"conversation_id": "smoke-web-1", "query": "Open WebUI SearXNG integration"},
+                {"conversation_id": "smoke-web-1", "query": "IANA example domain"},
             )
             assert not result.isError
             payload = json.loads(result.content[0].text)
