@@ -46,7 +46,8 @@ Status: active v1 cutover. Elasticsearch is now the primary retrieval backend.
 - `docs/vector-db-guide.md` for a practical user/operator walkthrough of the
   retrieval service, API surface, pipeline integration model, and a blunt
   explanation of how it is actually used right now versus what still belongs to
-  later UX phases
+  later UX phases, including copy-paste `curl` and Python examples for direct
+  search/upsert and the current manual-retrieval workflow
 - `docs/openwebui-integration-and-usage.md` for Open WebUI integration options
   and a practical explanation of how this retrieval layer fits into everyday
   use beyond YouTube transcripts

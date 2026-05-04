@@ -119,6 +119,133 @@ normalize content
 
 This is already a valid production shape in this repo.
 
+## Copy-paste examples you can use now
+
+### Search one indexed manual with `curl`
+
+Run this on Studio:
+
+```bash
+curl -fsS http://127.0.0.1:55440/v1/memory/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "battery power",
+    "document_id": "manual:music-manuals:reface-en-om-b0",
+    "profile": "balanced",
+    "top_k": 3,
+    "final_k": 3
+  }' | jq .
+```
+
+This is the fastest direct proof that the Reface manual is indexed and that
+retrieval is returning grounded chunks with page spans.
+
+### Search all indexed manuals with `curl`
+
+```bash
+curl -fsS http://127.0.0.1:55440/v1/memory/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "battery power",
+    "source_type": "manual",
+    "profile": "balanced",
+    "top_k": 3,
+    "final_k": 3
+  }' | jq .
+```
+
+### Upsert one normalized document directly with `curl`
+
+This bypasses `docs-mcp` entirely and shows the raw `vector-db` ingest shape.
+
+```bash
+TOKEN="$(cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token)"
+
+curl -fsS http://127.0.0.1:55440/v1/memory/upsert \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "documents": [
+      {
+        "document_id": "manual:music-manuals:test-doc",
+        "source_type": "manual",
+        "source": "manual-test",
+        "title": "Test Manual",
+        "uri": "file://library:music-manuals/test.pdf",
+        "metadata": {
+          "library_handle": "library:music-manuals",
+          "document_handle": "manual:music-manuals:test-doc"
+        },
+        "chunks": [
+          {
+            "chunk_index": 0,
+            "text": "Use six AA batteries.",
+            "section_title": "",
+            "page_start": 3,
+            "page_end": 3,
+            "char_start": 0,
+            "char_end": 22,
+            "metadata": {
+              "library_handle": "library:music-manuals",
+              "document_handle": "manual:music-manuals:test-doc"
+            }
+          }
+        ]
+      }
+    ]
+  }' | jq .
+```
+
+Delete the same exact document again:
+
+```bash
+TOKEN="$(cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token)"
+
+curl -fsS http://127.0.0.1:55440/v1/memory/delete \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "document_id": "manual:music-manuals:test-doc"
+  }' | jq .
+```
+
+### Search from Python with no MCP layer
+
+```python
+import json
+import urllib.request
+
+payload = {
+    "query": "battery power",
+    "document_id": "manual:music-manuals:reface-en-om-b0",
+    "profile": "balanced",
+    "top_k": 3,
+    "final_k": 3,
+}
+
+req = urllib.request.Request(
+    "http://127.0.0.1:55440/v1/memory/search",
+    data=json.dumps(payload).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+
+with urllib.request.urlopen(req, timeout=60) as resp:
+    body = json.loads(resp.read().decode("utf-8"))
+
+print(json.dumps(body, indent=2))
+```
+
+### What should you use today?
+
+For the current repo state:
+
+- use `docs-mcp` when you want a curated document-library tool boundary
+- use direct `vector-db` calls when you already have normalized chunks or want
+  shell/Python-friendly retrieval without MCP
+- use `task-youtube-summary` when the source is a YouTube video and you want
+  the retrieval path hidden behind a task alias
+
 ## Core Mental Model
 
 Think of `vector-db` as a document memory service with three responsibilities:

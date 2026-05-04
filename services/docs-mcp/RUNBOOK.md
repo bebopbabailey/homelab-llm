@@ -74,6 +74,123 @@ asyncio.run(main())
 PY
 ```
 
+## Copy-paste usage examples
+
+### Use `docs-mcp` from Python on Studio
+
+This is the most practical phase-1 way to use the service today.
+
+Run this on Studio, or through `platform/ops/scripts/studio_run_utility.sh`:
+
+```bash
+cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp
+. .venv/bin/activate
+python - <<'PY'
+import anyio
+from mcp.client.streamable_http import streamablehttp_client
+from mcp import ClientSession
+
+URL = "http://127.0.0.1:8013/mcp"
+
+async def main():
+    async with streamablehttp_client(URL) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            result = await session.call_tool("docs.library.list", {})
+            print("LIBRARIES")
+            for item in result.content:
+                print(item.text)
+
+            result = await session.call_tool(
+                "docs.library.ingest",
+                {
+                    "library_handle": "library:music-manuals",
+                    "relative_path": "reface_en_om_b0.pdf",
+                    "dry_run": True,
+                },
+            )
+            print("\\nDRY RUN")
+            for item in result.content:
+                print(item.text)
+
+            result = await session.call_tool(
+                "docs.library.ingest",
+                {
+                    "library_handle": "library:music-manuals",
+                    "relative_path": "reface_en_om_b0.pdf",
+                    "dry_run": False,
+                },
+            )
+            print("\\nINGEST")
+            for item in result.content:
+                print(item.text)
+
+            result = await session.call_tool(
+                "docs.document.search",
+                {
+                    "document_handle": "manual:music-manuals:reface-en-om-b0",
+                    "query": "battery power",
+                },
+            )
+            print("\\nDOCUMENT SEARCH")
+            for item in result.content:
+                print(item.text)
+
+            result = await session.call_tool(
+                "docs.library.search",
+                {
+                    "library_handle": "library:music-manuals",
+                    "query": "battery power",
+                },
+            )
+            print("\\nLIBRARY SEARCH")
+            for item in result.content:
+                print(item.text)
+
+anyio.run(main())
+PY
+```
+
+### Use `docs-mcp` remotely through the Studio utility wrapper
+
+From Mini/local workspace:
+
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- '
+cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp &&
+. .venv/bin/activate &&
+python - <<'"'"'PY'"'"'
+import anyio
+from mcp.client.streamable_http import streamablehttp_client
+from mcp import ClientSession
+
+async def main():
+    async with streamablehttp_client("http://127.0.0.1:8013/mcp") as (r, w, _):
+        async with ClientSession(r, w) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "docs.document.search",
+                {
+                    "document_handle": "manual:music-manuals:reface-en-om-b0",
+                    "query": "battery power",
+                },
+            )
+            for item in result.content:
+                print(item.text)
+
+anyio.run(main())
+PY'
+```
+
+### Should you use `curl` against MCP?
+
+Not as the normal path.
+
+`docs-mcp` is Streamable HTTP MCP, so the ergonomic client is an MCP client
+library. If you want shell-friendly direct access today, use `curl` against
+`vector-db` instead and use `docs-mcp` only for ingest/search orchestration.
+
 ## Acceptance ingest/search
 ```bash
 cd /home/christopherbailey/homelab-llm/services/docs-mcp
