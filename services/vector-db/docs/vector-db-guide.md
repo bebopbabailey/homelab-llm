@@ -23,6 +23,102 @@ provider conversation state is durable memory.
 The current primary backend is Elasticsearch. `pgvector` remains only as a
 temporary rollback path.
 
+## How It Is Used Right Now
+
+The most important practical point is:
+
+- `vector-db` is live and useful now as a retrieval service
+- the polished everyday UX on top of it is still arriving in phases
+
+So the current reality is:
+
+1. **Specialized pipelines already use it**
+- `task-youtube-summary` uses it for long-video follow-up retrieval
+- `docs-mcp` now uses it for curated document ingest and evidence search over
+  Studio-local manuals
+
+2. **Direct service/API use is available now**
+- operators and local tools can upsert/search documents directly against the
+  memory API
+- this is already enough to build reliable retrieval-backed workflows without
+  waiting for a bigger front-end integration pass
+
+3. **The broad end-user UX is still a later layer**
+- LiteLLM-brokered generic doc chat is a later phase
+- Open WebUI-native ergonomic document workflows are also a later phase
+- `vector-db` is the durable substrate underneath those future surfaces, not
+  the final UX by itself
+
+If you want the blunt version:
+
+- **today**: use `vector-db` through `docs-mcp`, `task-youtube-summary`, or
+  direct API calls
+- **later**: richer “just chat with my whole library” UX gets layered on top
+
+## Concrete Current Examples
+
+### 1. YouTube follow-up retrieval
+
+Current path:
+
+```text
+YouTube URL
+-> media-fetch-mcp gets transcript
+-> litellm-orch indexes long transcript into vector-db
+-> vector-db stores chunks + spans + response-map
+-> follow-up question resolves previous_response_id
+-> vector-db returns grounded transcript chunks
+```
+
+Why `vector-db` matters here:
+- the long video does not live only in provider conversation state
+- retrieval stays durable across turns and restarts
+- hits include transcript spans and chunk text
+
+### 2. `docs-mcp` over music manuals
+
+Current phase-1 path:
+
+```text
+registered library on Studio
+-> docs-mcp extracts/chunks one manual
+-> docs-mcp upserts into vector-db
+-> docs-mcp searches vector-db by document handle
+-> caller gets evidence-only hits with page spans
+```
+
+This is now the cleanest non-YouTube example of how `vector-db` is meant to be
+used:
+
+- files stay on Studio
+- the ingest/search boundary is a small MCP service by responsibility
+- `vector-db` remains the canonical durable store
+- answers are synthesized elsewhere, not in the retrieval layer
+
+Concrete handle examples:
+- library handle: `library:music-manuals`
+- document handle: `manual:music-manuals:reface-en-om-b0`
+
+### 3. Direct API retrieval
+
+You can also use `vector-db` directly with no MCP or LiteLLM layer in between.
+
+That is appropriate when:
+- you are building a small service around one corpus
+- you want explicit control over `document_id`
+- you want evidence retrieval without another orchestration layer
+
+Minimal pattern:
+
+```text
+normalize content
+-> POST /v1/memory/upsert
+-> later POST /v1/memory/search
+-> synthesize answers in your own caller
+```
+
+This is already a valid production shape in this repo.
+
 ## Core Mental Model
 
 Think of `vector-db` as a document memory service with three responsibilities:
@@ -191,6 +287,13 @@ Typical filters:
 - `source_types`
 - metadata filters
 
+For current practice, prefer these patterns:
+- exact document search when you have a stable handle like
+  `manual:music-manuals:reface-en-om-b0`
+- source-type search when the corpus is intentionally narrow
+- metadata filters only when the indexed mapping for that field is part of the
+  active contract for your caller
+
 ### `POST /v1/memory/response-map/upsert`
 
 Use this when another service has returned a public response id and wants to
@@ -257,6 +360,42 @@ The meaning of the profiles is roughly:
 
 For single-document retrieval, the service does not blindly assume HNSW is
 always best.
+
+That matters in current real usage:
+- `docs-mcp` document search benefits from exact single-document routing
+- long-form YouTube follow-ups also benefit when a request resolves to one
+  durable `document_id`
+
+## What It Is Not
+
+`vector-db` is not:
+- a user-facing chat app
+- a generic MCP broker
+- a summarizer
+- a file-upload UI
+- a replacement for source acquisition services
+
+Keep the responsibility split clean:
+- source acquisition: `media-fetch-mcp` or another ingestion boundary
+- curated document ingest/search surface: `docs-mcp`
+- user-facing orchestration: LiteLLM lanes or future UI flows
+- durable retrieval: `vector-db`
+
+## Current UX Boundary
+
+If you are trying to decide “is this the thing I talk to directly in daily
+life?”, the answer is:
+
+- **sometimes yes for operators and service authors**
+- **usually no for end users**
+
+Today the normal consumer surfaces are:
+- `docs-mcp` for curated manuals/doc evidence
+- `task-youtube-summary` for YouTube transcript conversations
+- direct API calls for service-to-service workflows
+
+The broader “chat naturally with my personal libraries in one UI” experience is
+still a later layer to build on top of this retrieval substrate.
 
 It supports:
 - exact brute-force vector scoring for smaller document scopes

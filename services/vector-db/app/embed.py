@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -42,22 +43,42 @@ MODEL_MAP = {
 }
 
 
+def _env_positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 class EmbeddingRegistry:
     """Lazy model loader for embedding spaces."""
 
     def __init__(self) -> None:
         self._loaded: dict[str, SentenceTransformer] = {}
+        self._encode_locks: dict[str, threading.Lock] = {}
+        self._load_lock = threading.Lock()
 
     def _load(self, model_name: str) -> SentenceTransformer:
         cfg = MODEL_MAP.get(model_name)
         if cfg is None:
             raise ValueError(f"unknown embedding model: {model_name}")
         if model_name not in self._loaded:
-            self._loaded[model_name] = SentenceTransformer(
-                cfg.hf_repo,
-                trust_remote_code=cfg.trust_remote_code,
-            )
+            with self._load_lock:
+                if model_name not in self._loaded:
+                    self._loaded[model_name] = SentenceTransformer(
+                        cfg.hf_repo,
+                        trust_remote_code=cfg.trust_remote_code,
+                    )
+                    self._encode_locks[model_name] = threading.Lock()
         return self._loaded[model_name]
+
+    def _encode_lock(self, model_name: str) -> threading.Lock:
+        self._load(model_name)
+        return self._encode_locks[model_name]
 
     def model_config(self, model_name: str) -> EmbedModelConfig:
         cfg = MODEL_MAP.get(model_name)
@@ -78,20 +99,50 @@ class EmbeddingRegistry:
         }
 
     def embed(self, model_name: str, texts: Iterable[str]) -> list[list[float]]:
-        model = self._load(model_name)
-        vectors = model.encode(list(texts), normalize_embeddings=True)
-        arr = np.asarray(vectors, dtype=np.float32)
-        return arr.tolist()
+        return self._encode(
+            model_name,
+            texts,
+            batch_size=_env_positive_int("MEMORY_EMBED_BATCH_SIZE", 32),
+        )
 
     def embed_query(self, model_name: str, texts: Iterable[str]) -> list[list[float]]:
         cfg = self.model_config(model_name)
         prepared = [f"{cfg.query_prefix} {text}".strip() if cfg.query_prefix else str(text) for text in texts]
-        return self.embed(model_name, prepared)
+        return self._encode(
+            model_name,
+            prepared,
+            batch_size=_env_positive_int(
+                "MEMORY_EMBED_QUERY_BATCH_SIZE",
+                _env_positive_int("MEMORY_EMBED_BATCH_SIZE", 32),
+            ),
+        )
 
     def embed_document(self, model_name: str, texts: Iterable[str]) -> list[list[float]]:
         cfg = self.model_config(model_name)
         prepared = [f"{cfg.document_prefix} {text}".strip() if cfg.document_prefix else str(text) for text in texts]
-        return self.embed(model_name, prepared)
+        return self._encode(
+            model_name,
+            prepared,
+            batch_size=_env_positive_int("MEMORY_EMBED_DOCUMENT_BATCH_SIZE", 1),
+        )
+
+    def _encode(self, model_name: str, texts: Iterable[str], *, batch_size: int) -> list[list[float]]:
+        prepared = list(texts)
+        if not prepared:
+            return []
+        model = self._load(model_name)
+        lock = self._encode_lock(model_name)
+        out: list[list[float]] = []
+        batch_size = max(1, batch_size)
+        with lock:
+            for start in range(0, len(prepared), batch_size):
+                batch = prepared[start : start + batch_size]
+                vectors = model.encode(batch, normalize_embeddings=True)
+                arr = np.asarray(vectors, dtype=np.float32)
+                if arr.ndim == 1:
+                    arr = np.expand_dims(arr, axis=0)
+                out.extend(arr.tolist())
+        return out
 
 
 def default_model() -> str:

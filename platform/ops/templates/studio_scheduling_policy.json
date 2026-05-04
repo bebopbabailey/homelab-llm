@@ -86,6 +86,10 @@
     "com.bebop.memory-backup-nightly": {
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.memory-backup-nightly.plist"
+    },
+    "com.bebop.docs-mcp-main": {
+      "lane": "background",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.docs-mcp-main.plist"
     }
   },
   "retired_labels": {

@@ -11,7 +11,7 @@
     <string>uvicorn</string>
     <string>app.main:app</string>
     <string>--host</string>
-    <string>192.168.1.72</string>
+    <string>0.0.0.0</string>
     <string>--port</string>
     <string>55440</string>
     <string>--workers</string>
@@ -41,6 +41,8 @@
     <string>search_query:</string>
     <key>MEMORY_EMBED_NOMIC_DOCUMENT_PREFIX</key>
     <string>search_document:</string>
+    <key>MEMORY_EMBED_DOCUMENT_BATCH_SIZE</key>
+    <string>1</string>
     <key>MEMORY_EMBED_FALLBACK</key>
     <string>studio-mxbai-embed-large-v1</string>
     <key>MEMORY_API_WRITE_BEARER_TOKEN_FILE</key>

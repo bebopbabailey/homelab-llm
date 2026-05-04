@@ -1,11 +1,10 @@
 # NOW
 
 Active
-- Extend `services/media-fetch-mcp` into the canonical localhost MCP retrieval
-  boundary for web research by folding in direct SearXNG search, cleaned
-  webpage fetch/extraction, and Elastic-backed per-conversation session tools.
+- Build `services/docs-mcp` as the Studio-local MCP surface for curated music
+  manual ingest and evidence retrieval over `vector-db`, starting with the
+  Reface manual only.
 
 NEXT UP
-- Validate the new `media-fetch.web.*` tool chain end-to-end from MCP through
-  `vector-db`, then decide how OWUI and future pipelines should consume the
-  new canonical retrieval surface.
+- Close out the `docs-mcp` phase-1 lane now that Studio localhost deploy,
+  Reface ingest, and grounded page-span retrieval are all passing.

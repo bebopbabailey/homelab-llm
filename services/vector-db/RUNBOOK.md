@@ -65,8 +65,8 @@ Expected:
 
 ## Health checks
 ```bash
-curl -fsS http://192.168.1.72:55440/health | jq .
-curl -fsS http://192.168.1.72:55440/v1/memory/stats | jq .
+curl -fsS http://127.0.0.1:55440/health | jq .
+curl -fsS http://127.0.0.1:55440/v1/memory/stats | jq .
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "curl -fsS http://127.0.0.1:9200/_cluster/health?pretty"
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
@@ -91,7 +91,7 @@ Expected stats fields:
 
 ## Retrieval smoke
 ```bash
-curl -fsS http://192.168.1.72:55440/v1/memory/search \
+curl -fsS http://127.0.0.1:55440/v1/memory/search \
   -H 'Content-Type: application/json' \
   -d '{"query":"mlxctl sync-gateway","profile":"balanced","document_id":"ops:mlxctl-guide"}' | jq .
 ```
@@ -100,11 +100,11 @@ curl -fsS http://192.168.1.72:55440/v1/memory/search \
 ```bash
 TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
   'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
-curl -fsS http://192.168.1.72:55440/v1/memory/response-map/upsert \
+curl -fsS http://127.0.0.1:55440/v1/memory/response-map/upsert \
   -H "Authorization: Bearer ${TOKEN}" \
   -H 'Content-Type: application/json' \
   -d '{"response_id":"resp_test","document_id":"youtube:test","source_type":"youtube","summary_mode":"indexed_long"}' | jq .
-curl -fsS http://192.168.1.72:55440/v1/memory/response-map/resolve \
+curl -fsS http://127.0.0.1:55440/v1/memory/response-map/resolve \
   -H 'Content-Type: application/json' \
   -d '{"response_id":"resp_test"}' | jq .
 ```
@@ -117,7 +117,7 @@ Example direct upsert:
 ```bash
 TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
   'cat /Users/thestudio/data/memory-main/secrets/memory-api-write-token')"
-curl -fsS http://192.168.1.72:55440/v1/memory/upsert \
+curl -fsS http://127.0.0.1:55440/v1/memory/upsert \
   -H "Authorization: Bearer ${TOKEN}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -139,13 +139,24 @@ curl -fsS http://192.168.1.72:55440/v1/memory/upsert \
 Write-auth smoke:
 ```bash
 curl -sS -o /tmp/memory-unauth.json -w '%{http_code}\n' \
-  -X POST http://192.168.1.72:55440/v1/memory/upsert \
+  -X POST http://127.0.0.1:55440/v1/memory/upsert \
   -H 'Content-Type: application/json' \
   -d '{"documents":[{"source":"memory://unauth","text":"probe"}]}'
 cat /tmp/memory-unauth.json
 ```
 Expected:
 - `401` without a bearer token
+
+## Embedding batch controls
+- `MEMORY_EMBED_BATCH_SIZE`
+- `MEMORY_EMBED_QUERY_BATCH_SIZE`
+- `MEMORY_EMBED_DOCUMENT_BATCH_SIZE`
+
+Operational note:
+- Studio phase-1 curated document ingest uses
+  `MEMORY_EMBED_DOCUMENT_BATCH_SIZE=1` in the memory API launchd env. This is
+  an internal reliability clamp for the current Nomic document-embedding path;
+  it does not change the public API or index schema.
 
 ## Reindex path
 Use a fresh physical chunk index whenever any of these change:

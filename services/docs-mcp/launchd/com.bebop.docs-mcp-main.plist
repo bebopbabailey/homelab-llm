@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.docs-mcp-main</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/thestudio/optillm-proxy/layer-tools/docs-mcp/.venv/bin/python</string>
+    <string>-m</string>
+    <string>docs_mcp</string>
+    <string>--transport</string>
+    <string>streamable-http</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8013</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DOCS_MCP_VECTOR_DB_BASE</key>
+    <string>http://127.0.0.1:55440</string>
+    <key>DOCS_MCP_VECTOR_DB_WRITE_TOKEN_FILE</key>
+    <string>/Users/thestudio/data/memory-main/secrets/memory-api-write-token</string>
+    <key>DOCS_MCP_LIBRARY_MUSIC_MANUALS_ROOT</key>
+    <string>/Users/thestudio/Documents/music-manuals</string>
+    <key>DOCS_MCP_MAX_FILE_MB</key>
+    <string>50</string>
+    <key>DOCS_MCP_MAX_FILES_PER_INGEST</key>
+    <string>10</string>
+    <key>DOCS_MCP_MAX_CHUNKS_PER_DOCUMENT</key>
+    <string>500</string>
+    <key>DOCS_MCP_CHUNK_TARGET_CHARS</key>
+    <string>300</string>
+    <key>DOCS_MCP_CHUNK_OVERLAP_CHARS</key>
+    <string>40</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>WorkingDirectory</key>
+  <string>/Users/thestudio/optillm-proxy/layer-tools/docs-mcp</string>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/data/docs-mcp/logs/docs-mcp-main.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/data/docs-mcp/logs/docs-mcp-main.err</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>LowPriorityBackgroundIO</key>
+  <true/>
+</dict>
+</plist>

@@ -21,6 +21,9 @@ It owns reusable search/fetch/session primitives, not answer synthesis.
 - `media-fetch.web.quick`
 - `media-fetch.web.research`
 
+Curated local document-library ingest/search is out of scope here and belongs to
+`services/docs-mcp`.
+
 ## `youtube.transcript` contract
 - Input:
   - `url`

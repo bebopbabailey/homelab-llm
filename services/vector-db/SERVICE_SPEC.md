@@ -43,7 +43,8 @@ through the existing memory API contract.
 - Existing public API contract remains `55440`.
 - Elasticsearch is localhost-only on `127.0.0.1:9200`.
 - Kibana is localhost-only on `127.0.0.1:5601`.
-- The Studio memory API binds to `192.168.1.72:55440`.
+- The Studio memory API binds to `0.0.0.0:55440`.
+- Studio-local callers should prefer `http://127.0.0.1:55440`.
 - v1 firewall posture allows Mini `192.168.1.71` only; broader LAN access is
   blocked.
 - Write routes require the bearer token from
@@ -64,6 +65,12 @@ through the existing memory API contract.
   - `search_query:` -> query embedding path
   - `search_document:` -> document embedding path
   - other non-empty prefixes -> deterministic raw-prefix fallback
+- Internal batching controls:
+  - `MEMORY_EMBED_BATCH_SIZE` for raw embeddings
+  - `MEMORY_EMBED_QUERY_BATCH_SIZE` for query embeddings
+  - `MEMORY_EMBED_DOCUMENT_BATCH_SIZE` for document embeddings
+  - Studio phase-1 manuals/doc ingestion uses `MEMORY_EMBED_DOCUMENT_BATCH_SIZE=1`
+    for reliability with the current Nomic runtime
 - Active embedding default:
   - `studio-nomic-embed-text-v1.5`
   - repo default source: `nomic-ai/nomic-embed-text-v1.5`
