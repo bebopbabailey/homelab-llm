@@ -50,6 +50,7 @@
 | OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `services/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
 | Studio main retrieval store | Studio | 9200 | 127.0.0.1 | http://127.0.0.1:9200 | `/`, `/_cluster/health` | `com.bebop.elasticsearch-memory-main`, policy-managed launchd |
 | Studio main memory API | Studio | 55440 | 192.168.1.72 (Mini-only firewall scope) | http://192.168.1.72:55440 | /health | `com.bebop.memory-api-main`, policy-managed launchd, write-token protected routes |
+| Docs MCP | Studio | 8013 | 192.168.1.72 (Mini + Studio self-access only) | http://192.168.1.72:8013/mcp | authenticated MCP handshake | `com.bebop.docs-mcp-main`, policy-managed launchd, bearer-authenticated MCP facade over `vector-db` |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX inference lane (active) | Studio | 8101 | 192.168.1.72 | http://192.168.1.72:8101/v1 | /v1/models | `com.bebop.mlx-lane.8101`, runtime `vllm serve`, `mlxctl status` |
 | llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | 192.168.1.72 | http://192.168.1.72:8126/v1 | /v1/models | `com.bebop.llmster-gpt.8126`, runtime `llmster`, `lms ps --json` |
@@ -158,6 +159,7 @@ Networking note:
   - native human-UX API container remains on `127.0.0.1:8010`
   - canonical Open Terminal MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
   - transcript/media/web retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
+  - curated document-library MCP backend is `docs-mcp` on `http://192.168.1.72:8013/mcp`
   - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
   - first slice mount scope is repo-root only:
     `/home/christopherbailey/homelab-llm:/lab/homelab-llm:ro`
@@ -175,6 +177,8 @@ Networking note:
   - `media-fetch-mcp` now owns reusable MCP retrieval primitives for
     transcript fetch, direct SearXNG search, cleaned webpage extraction, and
     per-conversation `vector-db` web-research sessions
+  - `docs-mcp` is the separate Studio MCP surface for curated local document
+    ingest/search over `vector-db`, with bearer auth and Mini-only pf scope
   - OpenHands remains denied for `/v1/mcp/*`
 - CCProxy API: systemd unit `/etc/systemd/system/ccproxy-api.service`,
   localhost-only on `127.0.0.1:4010`, backed by upstream `ccproxy-api`.
@@ -290,6 +294,8 @@ Networking note:
   - HTTP backend on Mini: Open Terminal MCP at `127.0.0.1:8011/mcp`
     (localhost-only direct backend; shared LiteLLM exposure is not yet accepted
     runtime truth on the current stable build)
+  - HTTP backend on Studio: Docs MCP at `http://192.168.1.72:8013/mcp`
+    (internal LAN-visible MCP facade; bearer auth required; Mini-only pf scope)
 - AFM: Apple Foundation Models OpenAI-compatible API (planned). Will be routed via LiteLLM.
 - Studio main vector store: Postgres+pgvector backend for general/personal memory.
   Runtime now supports internal backend selection (`MEMORY_BACKEND=legacy|haystack`)
@@ -308,6 +314,7 @@ Networking note:
   `8126` on `192.168.1.72`.
 - Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, CCProxy API 4010.
+- LAN-only from Mini plus Studio self-access: Docs MCP `192.168.1.72:8013/mcp`.
 - Local-only bind with tailnet-only operator access: Grafana 3001 at `https://grafana.tailfd1400.ts.net/`, OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): Elasticsearch `127.0.0.1:9200`.
 - Mini-to-Studio LAN retrieval path: memory API `192.168.1.72:55440`, reads open

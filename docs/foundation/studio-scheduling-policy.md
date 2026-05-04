@@ -118,6 +118,7 @@ Approved active/persistent inference labels:
 Approved active/persistent background data-service labels:
 - `com.bebop.elasticsearch-memory-main` for the localhost-only retrieval store
 - `com.bebop.memory-api-main` for the Mini-facing retrieval API
+- `com.bebop.docs-mcp-main` for the Studio LAN MCP document facade
 
 Retired shadow labels:
 - `com.bebop.mlx-shadow.8123`

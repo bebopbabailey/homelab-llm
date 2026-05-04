@@ -10,6 +10,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - **CCProxy API (experimental)**: `127.0.0.1:4010` (`/codex/v1`, localhost-only Codex sidecar behind LiteLLM)
 - **Open Terminal API**: `127.0.0.1:8010` (optional native Open WebUI human UX path)
 - **Open Terminal MCP**: `127.0.0.1:8011` (`/mcp`, localhost-only direct backend; shared LiteLLM alias is future work)
+- **Media Fetch MCP**: `127.0.0.1:8012` (`/mcp`, localhost-only Mini retrieval backend)
 - **OpenCode Web**: `0.0.0.0:4096` (Basic Auth; writable workspace limited to `~/homelab-llm`)
 - **OpenHands (Phase A, managed operator UI)**: `127.0.0.1:4031` (systemd-managed Docker service; tailnet-only access at `https://hands.tailfd1400.ts.net/`)
 - **Samba SMB**: `127.0.0.1,192.168.1.71:139/445` (LAN-only; Finder shares `mini-root` and `seagate`)
@@ -41,6 +42,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
   - Internal retrieval backend mode: `MEMORY_BACKEND=elastic|legacy|haystack`
   - Snapshot repository path is repo-managed under the vector-db runtime tree
   - Nightly ingest/backup jobs (`com.bebop.memory-ingest-nightly`, `com.bebop.memory-backup-nightly`)
+- **Docs MCP**: `192.168.1.72:8013/mcp` (`com.bebop.docs-mcp-main`; bearer auth required; pf-limited to Mini + Studio self-access)
 
 ## Orin (speech appliance)
 - **Voice Gateway**: `192.168.1.93:18080` (LAN-visible OpenAI-compatible speech facade)
@@ -86,6 +88,11 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - Open Terminal MCP currently remains a localhost-only direct backend at
   `127.0.0.1:8011/mcp`; a shared LiteLLM MCP alias is follow-on work and is
   not part of the current live runtime.
+- Media Fetch MCP currently remains a localhost-only Mini backend at
+  `127.0.0.1:8012/mcp`.
+- Docs MCP is the current internal LAN-visible Studio MCP facade at
+  `http://192.168.1.72:8013/mcp`. It remains evidence-only and is the approved
+  inter-service document MCP surface in the current phase.
 - Open WebUI may keep the native Open Terminal API path on `127.0.0.1:8010`
   for human UX; it remains intentionally separate from the MCP backend.
 - MLX team ports (`8100–8119`) are managed via `platform/ops/scripts/mlxctl`.

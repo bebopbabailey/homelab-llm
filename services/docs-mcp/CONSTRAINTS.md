@@ -1,7 +1,7 @@
 # Constraints: docs-mcp
 
 ## Hard constraints
-- This service is Studio-hosted and localhost-only in phase 1.
+- This service is Studio-hosted and LAN-visible only on the explicit Studio LAN IP in this phase.
 - This service is a separate responsibility boundary from `media-fetch-mcp`.
 - `vector-db` is the only durable backing store in phase 1.
 - The tool surface is limited to:
@@ -35,4 +35,6 @@
 ## Operational constraints
 - Launchd label must remain policy-audited in `platform/ops/templates/studio_scheduling_policy.json`.
 - Use `platform/ops/scripts/studio_run_utility.sh` for Studio host operations.
+- Service auth is required for every MCP HTTP request.
+- Remote access is limited to the Mini by the Studio pf anchor in this phase.
 - No LiteLLM brokering, OWUI integration, cold storage/offload, conversation binding, or scheduled sync in this phase.

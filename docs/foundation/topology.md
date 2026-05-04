@@ -67,6 +67,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
 | Media Fetch MCP | Mini | 8012 | http://127.0.0.1:8012/mcp | MCP handshake |
+| Docs MCP | Studio | 8013 | http://192.168.1.72:8013/mcp | authenticated MCP handshake |
 | OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
@@ -132,12 +133,18 @@ define the contract for specialized runtime-plane services such as
   direct SearXNG search, cleaned webpage fetch/extraction, per-conversation
   `vector-db` session tools, and helper orchestration tools that stop short of
   answer synthesis.
+- Docs MCP — HTTP MCP backend on the Studio at `http://192.168.1.72:8013/mcp`,
+  bearer-authenticated and pf-limited to Mini `192.168.1.71` plus Studio
+  self-access. It exposes curated document ingest/search over `vector-db` for
+  registered local libraries and returns evidence only.
 
 ## Exposure and Secrets
 - LAN-exposed: OpenVINO 9000 (maintenance), Voice Gateway 18080, Ollama 11434, Open WebUI 3000, OpenCode Web 4096, Samba SMB 139/445, Home Assistant 8123.
 - LAN-first on Mini: LiteLLM 4000 on `192.168.1.71` (localhost remains valid).
 - LAN-only from trusted local hosts: Studio MLX `8101` and Studio `llmster`
   `8126` via `192.168.1.72`.
+- LAN-only from Mini plus Studio self-access: Docs MCP `8013` via
+  `http://192.168.1.72:8013/mcp`.
 - `8126` is the active shared `fast` + `deep` `llmster` GPT service.
 - `8123-8125` are retired Studio shadow ports and are not part of the current
   control-plane target set.

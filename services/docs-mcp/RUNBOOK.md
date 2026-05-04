@@ -9,6 +9,13 @@ Canonical source tree:
 Current Studio runtime target:
 - `/Users/thestudio/optillm-proxy/layer-tools/docs-mcp`
 
+Canonical LAN endpoint:
+- `http://192.168.1.72:8013/mcp`
+
+Auth and network posture:
+- bearer token required on every MCP request
+- Studio pf anchor allows Mini `192.168.1.71` plus Studio self-access only
+
 ## Utility wrapper
 Use the Studio utility wrapper for transient remote commands:
 `platform/ops/scripts/studio_run_utility.sh`.
@@ -32,7 +39,15 @@ cd /home/christopherbailey/homelab-llm
 ./services/docs-mcp/scripts/deploy_studio.sh --dry-run
 ```
 
-## Start/restart Studio launchd label
+What deploy now does:
+- syncs the service tree to Studio
+- syncs the service venv
+- ensures the docs-mcp bearer token exists
+- stages the launchd plist
+- installs/refreshes the pf anchor
+- restarts `com.bebop.docs-mcp-main`
+
+## Manual launchd restart
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl bootstrap system /Library/LaunchDaemons/com.bebop.docs-mcp-main.plist || true"
@@ -40,15 +55,97 @@ platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl kickstart -k system/com.bebop.docs-mcp-main"
 ```
 
-## Health/smoke
-Streamable HTTP MCP should respond on:
-- `http://127.0.0.1:8013/mcp`
+## Token and firewall bootstrap
+Bearer token file:
+- `/Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token`
 
-Basic listener check:
+Inspect or create it:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- \
+  "cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp && ./scripts/ensure_docs_mcp_bearer_token.sh"
+```
+
+Install/refresh the pf anchor:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp && ./scripts/install_docs_mcp_firewall.sh"
+```
+
+## Health and auth smoke
+Listener check on Studio:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio -- \
   "lsof -nP -iTCP:8013 -sTCP:LISTEN"
-curl -fsS http://127.0.0.1:8013/mcp >/dev/null
+```
+
+Unauthorized request should fail:
+```bash
+curl -sS -o /tmp/docs-mcp-unauth.txt -w '%{http_code}\n' http://192.168.1.72:8013/mcp
+cat /tmp/docs-mcp-unauth.txt
+```
+
+Expected:
+- HTTP status `401`
+
+Studio-local authenticated probe:
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- '
+TOKEN="$(cat /Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token)"
+export DOCS_MCP_TOKEN="$TOKEN"
+python - <<'"'"'PY'"'"'
+import anyio
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+import os
+
+async def main():
+    token = os.environ["DOCS_MCP_TOKEN"]
+    async with streamablehttp_client(
+        "http://192.168.1.72:8013/mcp",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            print(await session.call_tool("docs.library.list", {}))
+
+anyio.run(main)
+PY'
+```
+
+## One-command helper
+If you do not want to paste Python snippets, use:
+
+```bash
+cd /home/christopherbailey/homelab-llm/services/docs-mcp
+uv run python scripts/manual_lookup.py list
+uv run python scripts/manual_lookup.py search-document --query "battery power"
+uv run python scripts/manual_lookup.py search-library --query "battery power"
+```
+
+Status:
+- `manual_lookup.py` is currently a read-only convenience helper.
+- `ingest` is parked as under construction because the helper client lifecycle
+  is still flaky on longer write operations.
+- Use the direct MCP Python examples below for authoritative ingest.
+
+This helper assumes the current phase-1 defaults:
+- MCP URL: `http://192.168.1.72:8013/mcp`
+- library handle: `library:music-manuals`
+- document handle: `manual:music-manuals:reface-en-om-b0`
+- relative path: `reface_en_om_b0.pdf`
+- token file: `/Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token`
+
+Override the endpoint or token if needed:
+```bash
+uv run python scripts/manual_lookup.py \
+  --url http://192.168.1.72:8013/mcp \
+  --token-file /Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token \
+  search-document --query "battery power"
+```
+
+Emit machine-readable output:
+```bash
+uv run python scripts/manual_lookup.py --json search-document --query "battery power"
 ```
 
 ## Direct MCP smoke
@@ -56,11 +153,17 @@ curl -fsS http://127.0.0.1:8013/mcp >/dev/null
 cd /home/christopherbailey/homelab-llm/services/docs-mcp
 uv run python - <<'PY'
 import asyncio
+from pathlib import Path
 from mcp.client.session import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import streamablehttp_client
+
+TOKEN = Path("/Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token").read_text(encoding="utf-8").strip()
 
 async def main():
-    async with streamable_http_client("http://127.0.0.1:8013/mcp") as (read, write, _):
+    async with streamablehttp_client(
+        "http://192.168.1.72:8013/mcp",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+    ) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             print(await session.call_tool("docs.library.list", {}))
@@ -74,177 +177,24 @@ asyncio.run(main())
 PY
 ```
 
-## Copy-paste usage examples
-
-### One-command helper
-
-If you do not want to paste Python snippets, use:
-
-```bash
-cd /home/christopherbailey/homelab-llm/services/docs-mcp
-uv run python scripts/manual_lookup.py list
-uv run python scripts/manual_lookup.py ingest --dry-run
-uv run python scripts/manual_lookup.py ingest
-uv run python scripts/manual_lookup.py search-document --query "battery power"
-uv run python scripts/manual_lookup.py search-library --query "battery power"
-```
-
-This helper assumes the current phase-1 defaults:
-- MCP URL: `http://127.0.0.1:8013/mcp`
-- library handle: `library:music-manuals`
-- document handle: `manual:music-manuals:reface-en-om-b0`
-- relative path: `reface_en_om_b0.pdf`
-
-Override the endpoint if you are not running on Studio:
-
-```bash
-uv run python scripts/manual_lookup.py --url http://127.0.0.1:8013/mcp search-document --query "battery power"
-```
-
-Emit machine-readable output:
-
-```bash
-uv run python scripts/manual_lookup.py --json search-document --query "battery power"
-```
-
-### Use `docs-mcp` from Python on Studio
-
-This is the most practical phase-1 way to use the service today.
-
-Run this on Studio, or through `platform/ops/scripts/studio_run_utility.sh`:
-
-```bash
-cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp
-. .venv/bin/activate
-python - <<'PY'
-import anyio
-from mcp.client.streamable_http import streamablehttp_client
-from mcp import ClientSession
-
-URL = "http://127.0.0.1:8013/mcp"
-
-async def main():
-    async with streamablehttp_client(URL) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-
-            result = await session.call_tool("docs.library.list", {})
-            print("LIBRARIES")
-            for item in result.content:
-                print(item.text)
-
-            result = await session.call_tool(
-                "docs.library.ingest",
-                {
-                    "library_handle": "library:music-manuals",
-                    "relative_path": "reface_en_om_b0.pdf",
-                    "dry_run": True,
-                },
-            )
-            print("\\nDRY RUN")
-            for item in result.content:
-                print(item.text)
-
-            result = await session.call_tool(
-                "docs.library.ingest",
-                {
-                    "library_handle": "library:music-manuals",
-                    "relative_path": "reface_en_om_b0.pdf",
-                    "dry_run": False,
-                },
-            )
-            print("\\nINGEST")
-            for item in result.content:
-                print(item.text)
-
-            result = await session.call_tool(
-                "docs.document.search",
-                {
-                    "document_handle": "manual:music-manuals:reface-en-om-b0",
-                    "query": "battery power",
-                },
-            )
-            print("\\nDOCUMENT SEARCH")
-            for item in result.content:
-                print(item.text)
-
-            result = await session.call_tool(
-                "docs.library.search",
-                {
-                    "library_handle": "library:music-manuals",
-                    "query": "battery power",
-                },
-            )
-            print("\\nLIBRARY SEARCH")
-            for item in result.content:
-                print(item.text)
-
-anyio.run(main())
-PY
-```
-
-### Use `docs-mcp` remotely through the Studio utility wrapper
-
-From Mini/local workspace:
-
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- '
-cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp &&
-. .venv/bin/activate &&
-python scripts/manual_lookup.py search-document --query "battery power"'
-```
-
-Or, if you want the raw MCP client example:
-
-```bash
-platform/ops/scripts/studio_run_utility.sh --host studio -- '
-cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp &&
-. .venv/bin/activate &&
-python - <<'"'"'PY'"'"'
-import anyio
-from mcp.client.streamable_http import streamablehttp_client
-from mcp import ClientSession
-
-async def main():
-    async with streamablehttp_client("http://127.0.0.1:8013/mcp") as (r, w, _):
-        async with ClientSession(r, w) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "docs.document.search",
-                {
-                    "document_handle": "manual:music-manuals:reface-en-om-b0",
-                    "query": "battery power",
-                },
-            )
-            for item in result.content:
-                print(item.text)
-
-anyio.run(main())
-PY'
-```
-
-### Should you use `curl` against MCP?
-
-Not as the normal path.
-
-`docs-mcp` is Streamable HTTP MCP, so the ergonomic client is an MCP client
-library. If you want shell-friendly direct access today, use the helper above
-or `curl` against `vector-db` instead and use `docs-mcp` only for
-ingest/search orchestration.
-
 ## Acceptance ingest/search
 ```bash
 cd /home/christopherbailey/homelab-llm/services/docs-mcp
 uv run python - <<'PY'
 import asyncio
+from pathlib import Path
 from mcp.client.session import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from mcp.client.streamable_http import streamablehttp_client
 
 QUERY = "battery"
 DOC = "manual:music-manuals:reface-en-om-b0"
+TOKEN = Path("/Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token").read_text(encoding="utf-8").strip()
 
 async def main():
-    async with streamable_http_client("http://127.0.0.1:8013/mcp") as (read, write, _):
+    async with streamablehttp_client(
+        "http://192.168.1.72:8013/mcp",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+    ) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             print(await session.call_tool("docs.library.ingest", {
@@ -273,17 +223,21 @@ Expected:
 - `DOCS_MCP_VECTOR_DB_BASE` should point to the active Studio-local `vector-db`
   API, normally `http://127.0.0.1:55440`.
 - `DOCS_MCP_VECTOR_DB_WRITE_TOKEN_FILE` should point to the existing memory API write token file.
+- `DOCS_MCP_BEARER_TOKEN_FILE` should point to the docs-mcp service token file.
 - The service stores logical `file://library:...` URIs, not absolute paths.
 - Phase-1 defaults intentionally use smaller chunks (`300` chars with `40`
   overlap) to stay below the currently known Nomic embedding failure envelope
   in `vector-db`.
 
 ## Rollback
+Restore localhost-only service bind and remove the LAN pf rule:
 ```bash
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
   "launchctl bootout system/com.bebop.docs-mcp-main || true"
 platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
-  "rm -f /Library/LaunchDaemons/com.bebop.docs-mcp-main.plist"
+  "rm -f /etc/pf.anchors/com.bebop.docs-mcp-main"
+platform/ops/scripts/studio_run_utility.sh --host studio --sudo -- \
+  "pfctl -a com.bebop.docs-mcp-main -F all || true"
 ```
 
 If you need to remove the phase-1 acceptance document from `vector-db`, delete only:

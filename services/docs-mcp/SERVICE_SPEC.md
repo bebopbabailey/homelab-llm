@@ -6,11 +6,18 @@ Provide a stable MCP surface for ingesting and searching curated local document 
 ## Runtime
 - Host: Studio (macOS)
 - Transport: MCP Streamable HTTP
-- Bind: `127.0.0.1:8013`
+- Bind: `192.168.1.72:8013`
 - Management: launchd (`com.bebop.docs-mcp-main`)
 - Canonical source: `homelab-llm/services/docs-mcp`
 - Current deployed target path:
   `/Users/thestudio/optillm-proxy/layer-tools/docs-mcp`
+
+## Exposure
+- Audience: internal service/tool callers only
+- Canonical MCP endpoint: `http://192.168.1.72:8013/mcp`
+- HTTP auth: required bearer token on every request
+- Network policy: Studio pf anchor allows Mini `192.168.1.71` plus Studio self-access only
+- `vector-db` remains Studio-local behind this facade
 
 ## Launchd identity contract
 - Domain: `system`
@@ -29,8 +36,12 @@ Provide a stable MCP surface for ingesting and searching curated local document 
 - Repo helper script:
   - `services/docs-mcp/scripts/manual_lookup.py`
 - Purpose:
-  - one-command phase-1 wrapper around the four MCP tools for the current
-    music-manuals workflow
+  - one-command read-only wrapper around the current lookup/search MCP tools
+    for the music-manuals workflow
+- Status:
+  - `list`, `search-document`, and `search-library` are supported
+  - `ingest` is explicitly parked as under construction; use a real MCP client
+    for authoritative ingest
 
 ## Registered libraries (phase 1)
 - `library:music-manuals`
@@ -42,6 +53,8 @@ Provide a stable MCP surface for ingesting and searching curated local document 
 - `DOCS_MCP_VECTOR_DB_BASE`
 - `DOCS_MCP_VECTOR_DB_WRITE_TOKEN`
 - `DOCS_MCP_VECTOR_DB_WRITE_TOKEN_FILE`
+- `DOCS_MCP_BEARER_TOKEN`
+- `DOCS_MCP_BEARER_TOKEN_FILE`
 - `DOCS_MCP_LIBRARY_MUSIC_MANUALS_ROOT`
 - `DOCS_MCP_MAX_FILE_MB`
 - `DOCS_MCP_MAX_FILES_PER_INGEST`
@@ -52,6 +65,7 @@ Provide a stable MCP surface for ingesting and searching curated local document 
 Preferred Studio runtime values:
 - `DOCS_MCP_VECTOR_DB_BASE=http://127.0.0.1:55440`
 - `DOCS_MCP_VECTOR_DB_WRITE_TOKEN_FILE=/Users/thestudio/data/memory-main/secrets/memory-api-write-token`
+- `DOCS_MCP_BEARER_TOKEN_FILE=/Users/thestudio/data/docs-mcp/secrets/docs-mcp-bearer-token`
 - `DOCS_MCP_LIBRARY_MUSIC_MANUALS_ROOT=/Users/thestudio/Documents/music-manuals`
 - `DOCS_MCP_CHUNK_TARGET_CHARS=300`
 - `DOCS_MCP_CHUNK_OVERLAP_CHARS=40`

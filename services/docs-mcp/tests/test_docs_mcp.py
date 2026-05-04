@@ -5,6 +5,10 @@ import unittest
 from pathlib import Path
 
 import docs_mcp as mod
+from starlette.applications import Starlette
+from starlette.routing import Route
+from starlette.responses import JSONResponse
+from starlette.testclient import TestClient
 
 
 class _FakeVectorDB:
@@ -94,6 +98,7 @@ class DocsMcpTests(unittest.TestCase):
         cfg = mod.ServiceConfig(
             vector_db_base="http://vector-db.test",
             vector_db_write_token="secret",
+            bearer_token="docs-secret",
             max_file_mb=10,
             max_files_per_ingest=4,
             max_chunks_per_document=20,
@@ -182,6 +187,39 @@ class DocsMcpTests(unittest.TestCase):
         self.assertEqual(payload["library_handle"], "library:music-manuals")
         self.assertEqual(self.fake_vector_db.search_calls[0]["document_id"], "manual:music-manuals:reface-en-om-b0")
         self.assertNotIn("source_type", self.fake_vector_db.search_calls[0])
+
+    def test_bearer_auth_middleware_rejects_missing_token(self) -> None:
+        async def _ok(_request):  # type: ignore[no-untyped-def]
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/mcp", _ok)])
+        app.add_middleware(mod.BearerAuthMiddleware, bearer_token="docs-secret")
+        with TestClient(app) as client:
+            response = client.get("/mcp")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"], "unauthorized")
+
+    def test_bearer_auth_middleware_rejects_wrong_token(self) -> None:
+        async def _ok(_request):  # type: ignore[no-untyped-def]
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/mcp", _ok)])
+        app.add_middleware(mod.BearerAuthMiddleware, bearer_token="docs-secret")
+        with TestClient(app) as client:
+            response = client.get("/mcp", headers={"Authorization": "Bearer wrong"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "unauthorized")
+
+    def test_bearer_auth_middleware_accepts_valid_token(self) -> None:
+        async def _ok(_request):  # type: ignore[no-untyped-def]
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/mcp", _ok)])
+        app.add_middleware(mod.BearerAuthMiddleware, bearer_token="docs-secret")
+        with TestClient(app) as client:
+            response = client.get("/mcp", headers={"Authorization": "Bearer docs-secret"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
 
 
 if __name__ == "__main__":

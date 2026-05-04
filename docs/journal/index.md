@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-04-docs-mcp-lan-publish](2026-05-04-docs-mcp-lan-publish.md)
 - [2026-05-01-searxng-reliability-hardening](2026-05-01-searxng-reliability-hardening.md)
 - [2026-05-03-docs-mcp-phase1](2026-05-03-docs-mcp-phase1.md)
 - [2026-04-30-owui-querygen-prompt-policy](2026-04-30-owui-querygen-prompt-policy.md)

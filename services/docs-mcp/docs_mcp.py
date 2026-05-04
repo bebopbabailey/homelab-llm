@@ -11,12 +11,15 @@ import re
 import uuid
 from dataclasses import dataclass
 from html import unescape
+from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 from pypdf import PdfReader
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
 
 MCP_SERVER_NAME = "docs-mcp"
 DEFAULT_VECTOR_DB_BASE = "http://127.0.0.1:55440"
@@ -63,6 +66,7 @@ class LibrarySpec:
 class ServiceConfig:
     vector_db_base: str
     vector_db_write_token: str
+    bearer_token: str
     max_file_mb: int
     max_files_per_ingest: int
     max_chunks_per_document: int
@@ -116,6 +120,13 @@ def _env_secret(name: str, file_name: str) -> str:
         return ""
 
 
+def _normalize_token(raw: str) -> str:
+    token = (raw or "").strip()
+    if token.lower().startswith("bearer "):
+        token = token.split(" ", 1)[1].strip()
+    return token
+
+
 def _music_manuals_root() -> Path:
     raw = os.getenv("DOCS_MCP_LIBRARY_MUSIC_MANUALS_ROOT", "/Users/thestudio/Documents/music-manuals").strip()
     return Path(raw).expanduser()
@@ -135,6 +146,7 @@ def _build_config() -> ServiceConfig:
     return ServiceConfig(
         vector_db_base=os.getenv("DOCS_MCP_VECTOR_DB_BASE", DEFAULT_VECTOR_DB_BASE).rstrip("/"),
         vector_db_write_token=_env_secret("DOCS_MCP_VECTOR_DB_WRITE_TOKEN", "DOCS_MCP_VECTOR_DB_WRITE_TOKEN_FILE"),
+        bearer_token=_normalize_token(_env_secret("DOCS_MCP_BEARER_TOKEN", "DOCS_MCP_BEARER_TOKEN_FILE")),
         max_file_mb=_env_int("DOCS_MCP_MAX_FILE_MB", DEFAULT_MAX_FILE_MB),
         max_files_per_ingest=_env_int("DOCS_MCP_MAX_FILES_PER_INGEST", DEFAULT_MAX_FILES_PER_INGEST),
         max_chunks_per_document=_env_int("DOCS_MCP_MAX_CHUNKS_PER_DOCUMENT", DEFAULT_MAX_CHUNKS_PER_DOCUMENT),
@@ -611,7 +623,7 @@ class DocsService:
             relative_path=None,
         )
         hits: list[dict[str, Any]] = []
-        for item in ingest_files:
+        for item in ingest_files[: self.cfg.max_files_per_ingest]:
             response = self.vector_db.search(
                 query=query,
                 document_id=item.document_handle,
@@ -717,6 +729,59 @@ def _normalize_hit(hit: dict[str, Any]) -> dict[str, Any]:
 SERVICE = DocsService(CFG, VectorDBClient(CFG.vector_db_base, CFG.vector_db_write_token))
 
 
+class BearerAuthMiddleware:
+    def __init__(self, app: Starlette, *, bearer_token: str) -> None:
+        self.app = app
+        self._bearer_token = _normalize_token(bearer_token)
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if not self._bearer_token:
+            response = JSONResponse(
+                {
+                    "error": "config_error",
+                    "message": "docs-mcp bearer token is not configured",
+                },
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            await response(scope, receive, send)
+            return
+
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        authorization = headers.get("authorization", "").strip()
+        if not authorization.startswith("Bearer "):
+            response = JSONResponse(
+                {
+                    "error": "unauthorized",
+                    "message": "missing bearer token",
+                },
+                status_code=HTTPStatus.UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            await response(scope, receive, send)
+            return
+
+        actual = _normalize_token(authorization)
+        if actual != self._bearer_token:
+            response = JSONResponse(
+                {
+                    "error": "unauthorized",
+                    "message": "invalid bearer token",
+                },
+                status_code=HTTPStatus.FORBIDDEN,
+            )
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+
 @mcp.tool(name="docs.library.list")
 def docs_library_list() -> dict[str, Any]:
     """List registered curated document libraries."""
@@ -774,8 +839,28 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
     if args.transport == "streamable-http":
+        import uvicorn
+
         mcp.settings.host = args.host
         mcp.settings.port = args.port
+        host_pattern = f"{args.host}:*"
+        origin_pattern = f"http://{args.host}:*"
+        security = mcp.settings.transport_security
+        if host_pattern not in security.allowed_hosts:
+            security.allowed_hosts.append(host_pattern)
+        if origin_pattern not in security.allowed_origins:
+            security.allowed_origins.append(origin_pattern)
+        app = mcp.streamable_http_app()
+        app.add_middleware(BearerAuthMiddleware, bearer_token=CFG.bearer_token)
+        config = uvicorn.Config(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level=mcp.settings.log_level.lower(),
+        )
+        server = uvicorn.Server(config)
+        server.run()
+        return
     mcp.run(args.transport)
 
 

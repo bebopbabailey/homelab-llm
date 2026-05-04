@@ -15,7 +15,8 @@ usage() {
 Usage: $0 [--host <studio-host>] [--dry-run]
 
 Syncs the monorepo docs-mcp subtree into the Studio runtime path.
-No launchd mutation is performed.
+Stages launchd assets, installs the firewall anchor, and restarts docs-mcp
+when not running in dry-run mode.
 USAGE
 }
 
@@ -50,6 +51,10 @@ run_remote() {
   "$WRAPPER" --host "$STUDIO_HOST" -- "$1"
 }
 
+run_remote_sudo() {
+  "$WRAPPER" --host "$STUDIO_HOST" --sudo -- "$1"
+}
+
 log "Preflight: ensuring target tree exists"
 run_remote "mkdir -p '$SERVICE_DIR'"
 
@@ -78,4 +83,19 @@ run_remote "cd '$SERVICE_DIR' && uv venv .venv && uv sync --no-dev"
 log "Running Studio install/bootstrap helper"
 run_remote "cd '$SERVICE_DIR' && ./scripts/studio_install.sh"
 
-log "Deploy script complete (no launchctl mutation performed)"
+log "Staging launchd plist on Studio"
+run_remote_sudo "cd '$SERVICE_DIR' && ./scripts/stage_launchd_plists.sh"
+
+log "Installing docs-mcp firewall anchor on Studio"
+run_remote_sudo "cd '$SERVICE_DIR' && ./scripts/install_docs_mcp_firewall.sh"
+
+log "Restarting docs-mcp launchd label on Studio"
+run_remote_sudo "if launchctl print system/com.bebop.docs-mcp-main >/dev/null 2>&1; then \
+  launchctl kickstart -k system/com.bebop.docs-mcp-main; \
+else \
+  launchctl enable system/com.bebop.docs-mcp-main; \
+  launchctl bootstrap system /Library/LaunchDaemons/com.bebop.docs-mcp-main.plist; \
+  launchctl kickstart -k system/com.bebop.docs-mcp-main; \
+fi"
+
+log "Deploy script complete"

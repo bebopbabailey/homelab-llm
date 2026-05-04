@@ -1,7 +1,7 @@
 # Architecture: docs-mcp
 
 ## High-level flow
-1. A localhost MCP client calls one of the `docs.*` tools on Studio.
+1. An authenticated MCP client on the Mini or Studio calls one of the `docs.*` tools on Studio.
 2. `docs-mcp` resolves the request against one registered library only.
 3. For ingest:
    - it validates selectors and caps
@@ -17,6 +17,7 @@
 
 ## Boundaries
 - `docs-mcp` owns:
+  - bearer-authenticated MCP HTTP facade on Studio
   - curated library registration
   - filesystem selection and path safety
   - extraction/chunking
@@ -34,6 +35,7 @@
 - One acceptance fixture in phase 1: `reface_en_om_b0.pdf`
 - Reingest deletes by exact `document_id` only.
 - Source URIs use logical library handles, not absolute paths.
+- One published LAN listener in phase 1: `192.168.1.72:8013/mcp`, Mini-only pf scope.
 
 ## Out of scope
 - Answer synthesis

@@ -537,6 +537,30 @@ Example:
 - `media-fetch.web.quick` and `media-fetch.web.research` are orchestration
   helpers only. They do not perform model inference or answer synthesis.
 
+## Docs MCP (implemented locally)
+- Current live target path for curated document ingest/search is the
+  bearer-authenticated `docs-mcp` backend on the Studio:
+  - backend: `http://192.168.1.72:8013/mcp`
+  - transport: MCP Streamable HTTP
+  - network scope: Mini `192.168.1.71` plus Studio self-access only
+- Current tool surface:
+  - `docs.library.list`
+  - `docs.library.ingest`
+  - `docs.library.search`
+  - `docs.document.search`
+- Purpose:
+  - publish one narrow inter-service MCP facade for registered local document
+    libraries backed by `vector-db`
+- Current library scope:
+  - `library:music-manuals`
+- Current acceptance fixture:
+  - `manual:music-manuals:reface-en-om-b0`
+- Behavior:
+  - no answer synthesis
+  - no model calls
+  - evidence only
+  - `vector-db` remains the only durable backing store
+
 ## Client base URL recommendation
 - Prefer LAN when local: `http://192.168.1.71:4000/v1`.
 - Local host-only calls on the Mini can still use `http://127.0.0.1:4000/v1`.
