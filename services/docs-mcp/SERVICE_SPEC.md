@@ -25,6 +25,13 @@ Provide a stable MCP surface for ingesting and searching curated local document 
 - `docs.library.search`
 - `docs.document.search`
 
+## Local helper
+- Repo helper script:
+  - `services/docs-mcp/scripts/manual_lookup.py`
+- Purpose:
+  - one-command phase-1 wrapper around the four MCP tools for the current
+    music-manuals workflow
+
 ## Registered libraries (phase 1)
 - `library:music-manuals`
   - `library_id`: `music-manuals`

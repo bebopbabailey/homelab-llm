@@ -76,6 +76,37 @@ PY
 
 ## Copy-paste usage examples
 
+### One-command helper
+
+If you do not want to paste Python snippets, use:
+
+```bash
+cd /home/christopherbailey/homelab-llm/services/docs-mcp
+uv run python scripts/manual_lookup.py list
+uv run python scripts/manual_lookup.py ingest --dry-run
+uv run python scripts/manual_lookup.py ingest
+uv run python scripts/manual_lookup.py search-document --query "battery power"
+uv run python scripts/manual_lookup.py search-library --query "battery power"
+```
+
+This helper assumes the current phase-1 defaults:
+- MCP URL: `http://127.0.0.1:8013/mcp`
+- library handle: `library:music-manuals`
+- document handle: `manual:music-manuals:reface-en-om-b0`
+- relative path: `reface_en_om_b0.pdf`
+
+Override the endpoint if you are not running on Studio:
+
+```bash
+uv run python scripts/manual_lookup.py --url http://127.0.0.1:8013/mcp search-document --query "battery power"
+```
+
+Emit machine-readable output:
+
+```bash
+uv run python scripts/manual_lookup.py --json search-document --query "battery power"
+```
+
 ### Use `docs-mcp` from Python on Studio
 
 This is the most practical phase-1 way to use the service today.
@@ -160,6 +191,15 @@ From Mini/local workspace:
 platform/ops/scripts/studio_run_utility.sh --host studio -- '
 cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp &&
 . .venv/bin/activate &&
+python scripts/manual_lookup.py search-document --query "battery power"'
+```
+
+Or, if you want the raw MCP client example:
+
+```bash
+platform/ops/scripts/studio_run_utility.sh --host studio -- '
+cd /Users/thestudio/optillm-proxy/layer-tools/docs-mcp &&
+. .venv/bin/activate &&
 python - <<'"'"'PY'"'"'
 import anyio
 from mcp.client.streamable_http import streamablehttp_client
@@ -188,8 +228,9 @@ PY'
 Not as the normal path.
 
 `docs-mcp` is Streamable HTTP MCP, so the ergonomic client is an MCP client
-library. If you want shell-friendly direct access today, use `curl` against
-`vector-db` instead and use `docs-mcp` only for ingest/search orchestration.
+library. If you want shell-friendly direct access today, use the helper above
+or `curl` against `vector-db` instead and use `docs-mcp` only for
+ingest/search orchestration.
 
 ## Acceptance ingest/search
 ```bash
