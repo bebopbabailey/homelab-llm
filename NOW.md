@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Build the V2 Mini baseline inventory in `docs/v2/inventory/MINI_BASELINE.md`
-  so the rebuild starts from live Mini host evidence instead of stale V1
-  assumptions.
+- Build `services/docs-mcp` as the Studio-local MCP surface for curated music
+  manual ingest and evidence retrieval over `vector-db`, starting with the
+  Reface manual only.
 
 NEXT UP
-- Use the Mini inventory to decide which Mini surfaces are preserve, retire,
-  or human-review candidates before any V2 rebuild wiring work starts.
+- Close out the `docs-mcp` phase-1 lane now that Studio localhost deploy,
+  Reface ingest, and grounded page-span retrieval are all passing.
