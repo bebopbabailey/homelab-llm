@@ -2,36 +2,38 @@
 
 Not current runtime truth. These are V1 traps, dead ends, or failure patterns that V2 should avoid unless new evidence clearly overturns them.
 
-## Avoid
+## Permanent Rules
 
-- Split boot/runtime authority. Evidence: `docs/journal/2026-02-11-mlx-runtime-single-contract.md` attributes drift on `8101` to “split authority.”
+- Do not split boot/runtime authority. Evidence: `docs/journal/2026-02-11-mlx-runtime-single-contract.md`
+- Do not leave shadow or rollout infrastructure half-retired. Evidence: `docs/journal/2026-03-19-shadow-ports-retired-and-docs-hardened.md`
+- Do not treat tailnet transport as the core runtime contract when a stable LAN path exists. Evidence: `docs/journal/2026-03-16-lan-first-studio-gateway-contract-reset.md`
+- Do not assume direct backend success implies gateway success. Evidence: `docs/journal/2026-04-21-omlx-litellm-shadow-alias-result.md`
+- Do not revive custom web-search glue by default. Evidence: `docs/journal/2026-03-07-websearch-supported-path-reset.md`
+- Do not confuse backend bring-up with retrieval-quality acceptance. Evidence: `docs/journal/2026-03-05-vector-db-quality-gate-qg1-closeout.md`, `docs/journal/2026-04-29-elastic-vector-db-cutover-runtime.md`
+- Do not treat raw mirrors as automatic promotion oracles. Evidence: `docs/journal/2026-03-18-gpt-llmster-fast-observation-and-deep-usable-success-contract.md`, `docs/INTEGRATIONS.md`
+- Do not promote experimental systems to defaults before stable acceptance. Evidence: `docs/journal/2026-02-19-optillm-mlx-viability-testing-log.md`, `docs/journal/2026-04-15-qwen3-coder-next-failure-closeout.md`, `docs/journal/2026-04-21-omlx-litellm-shadow-alias-result.md`
+- Do not make LiteLLM the permanent owner of provider formatting when the backend should own it. Evidence: `docs/journal/2026-04-22-gptoss-harmony-upstream-fix.md`
+- Do not let repo root compete with canon. Evidence: `docs/journal/2026-04-02-root-allowlist-and-root-artifact-cleanup.md`
 
-- Leaving rollout lanes half-retired. Evidence: `docs/journal/2026-03-19-shadow-ports-retired-and-docs-hardened.md` found `8123` still running after it had already fallen out of the active alias surface.
+## Re-Test Only If Upstream or Runtime Conditions Materially Change
 
-- Treating tailnet transport as the core service contract when a stable LAN path exists. Evidence: `docs/journal/2026-03-16-lan-first-studio-gateway-contract-reset.md` explicitly supersedes the earlier tailnet-only contract from `2026-03-10`.
+- Qwen/vLLM constrained-tool behavior. Evidence: `docs/journal/2026-03-18-main-shadow-8123-final-no-forced-backend-retry-no-go.md`, `docs/journal/2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md`
+- LiteLLM-owned upstream MCP route and session support. Evidence: `docs/journal/2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md`
+- Public oMLX aliasing through LiteLLM. Evidence: `docs/journal/2026-04-21-omlx-litellm-shadow-alias-result.md`
+- The specific GPT MLX shadow-service isolation method rejected in April 2026. Evidence: `docs/journal/2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md`
+- Narrow gateway cleanup shims that existed only to patch V1 backend defects. Evidence: `docs/journal/2026-03-18-qwen-main-acceptance-codified-with-posthook.md`, `docs/journal/2026-04-22-gptoss-harmony-upstream-fix.md`
 
-- Promoting Qwen/vLLM constrained-tool behavior without hard proof. Evidence: `docs/journal/2026-03-18-main-shadow-8123-final-no-forced-backend-retry-no-go.md` ended `NO-GO`; `docs/journal/2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md` later retired `main`.
+## V1 Vocabulary Not Worth Carrying Forward
 
-- Assuming direct backend success means gateway success. Evidence: `docs/journal/2026-04-21-omlx-litellm-shadow-alias-result.md` shows direct oMLX was fine while the LiteLLM alias degraded and failed.
+- `main`
+- `main-shadow`
+- Shadow-port numbers such as `8123-8125`
+- `boost-*`
+- `shared-8126` as a product-identity term
+- Temporary rollout labels that describe cutover posture rather than durable behavior
 
-- Reviving custom web-search glue too early. Evidence: `docs/journal/2026-03-07-websearch-supported-path-reset.md` says the stack was intentionally deleted instead of preserved; later hardening stayed on the native path.
-
-- Confusing backend bring-up with retrieval-quality acceptance. Evidence: `docs/journal/2026-03-05-vector-db-quality-gate-qg1-closeout.md` had “no gate-passing candidate” despite a working store; `docs/journal/2026-04-29-elastic-vector-db-cutover-runtime.md` solved runtime substrate, not all evaluation questions.
-
-- Assuming upstream MCP route support is production-ready because registration/listing works. Evidence: `docs/journal/2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md` proved the control-plane objects worked but the real MCP route still timed out or 500’d.
-
-- Letting repo root become a dump of plans, review packs, and dated artifacts. Evidence: `docs/journal/2026-04-02-root-allowlist-and-root-artifact-cleanup.md`.
-
-- Treating experimental systems as defaults before stable acceptance. Evidence: `docs/journal/2026-02-19-optillm-mlx-viability-testing-log.md` says the conservative status remained “not yet proven viable for promotion”; `docs/journal/2026-04-15-qwen3-coder-next-failure-closeout.md` explicitly abandoned that project; `docs/journal/2026-04-21-omlx-litellm-shadow-alias-result.md` says “do not add an oMLX LiteLLM shadow alias yet.”
-
-## Strong No-Go Decisions
-
-- No public `main-shadow` promotion on V1’s `vllm-metal` path. Evidence: `docs/journal/2026-03-18-main-shadow-8123-final-no-forced-backend-retry-no-go.md`.
-
-- No shared LiteLLM-owned OpenTerminal MCP lane on the evaluated upstream baseline. Evidence: `docs/journal/2026-04-08-litellm-upstream-mcp-toolset-eval-no-go.md`.
-
-- No GPT MLX shadow service via the attempted LM Studio isolation method. Evidence: `docs/journal/2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md` says the second server changed the incumbent global server instead of isolating it.
+Evidence: `docs/INTEGRATIONS.md`, `docs/journal/2026-03-19-shadow-ports-retired-and-docs-hardened.md`, `docs/journal/2026-04-19-qwen-retirement-and-gpt-mlx-shadow-probe.md`, `docs/journal/2026-03-03-optillm-coding-profiles-vllm-metal.md`
 
 ## Needs Human/ChatGPT Review
-- Whether any V1 “do not repeat” item should be downgraded from a no-go to a re-test candidate because upstreams have moved since the journal entry.
-- Whether V2 should retire some V1 terms entirely (`main`, shadow-port language, certain boost lanes) to reduce accidental carryover.
+
+- Whether any current re-test candidate should be downgraded to permanent no-go because the surrounding architecture has moved too far for retest to be worthwhile.
