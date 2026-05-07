@@ -75,6 +75,24 @@ Current runtime truth remains the active platform, topology, integration, and pe
 
 - [docs/v2/REBUILD_CUTOVER_MAP.md](REBUILD_CUTOVER_MAP.md)
 
+### Planning prep
+
+- [docs/v2/PLANNING_READINESS_CHECKLIST.md](PLANNING_READINESS_CHECKLIST.md)
+
+### Project prep
+
+- [docs/v2/project/CHATGPT_PROJECT_SEED.md](project/CHATGPT_PROJECT_SEED.md)
+- [docs/v2/project/PROJECT_INSTRUCTIONS.md](project/PROJECT_INSTRUCTIONS.md)
+- [docs/v2/project/PROJECT_SOURCE_GUIDE.md](project/PROJECT_SOURCE_GUIDE.md)
+- [docs/v2/project/SESSION_TYPES.md](project/SESSION_TYPES.md)
+
+### Agent prep
+
+- [docs/v2/agent/CODEX_PLANNING_BRIEF.md](agent/CODEX_PLANNING_BRIEF.md)
+- [docs/v2/agent/CODEX_PROMPT_TEMPLATE.md](agent/CODEX_PROMPT_TEMPLATE.md)
+- [docs/v2/agent/CODEX_DEBRIEF_TEMPLATE.md](agent/CODEX_DEBRIEF_TEMPLATE.md)
+- [docs/v2/agent/EVIDENCE_USE_POLICY.md](agent/EVIDENCE_USE_POLICY.md)
+
 ## Working Rules For Future Sessions
 
 - Treat baseline inventories as evidence snapshots, not self-updating truth.
