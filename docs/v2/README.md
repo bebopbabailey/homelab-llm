@@ -11,8 +11,8 @@ Current runtime truth remains the active platform, topology, integration, and pe
 
 ## Current V2 Phase
 
-- Phase: planning synthesis and inventory reconciliation.
-- Goal: define the V2 command center, preserve the proven public contract, and separate preserve-now evidence from rebuild-clean candidates.
+- Phase: planning synthesis, inventory reconciliation, and seed-canon definition.
+- Goal: define the V2 command center, preserve the proven public contract, separate preserve-now evidence from rebuild-clean candidates, and lock the first clean-repo documentation constitution.
 - Inputs are currently strongest for Mini and Studio. Orin and HP remain pending inventory.
 - V2 doctrine is set at the contract level first: one public gateway, private specialized runtimes until eval-proven, registry-derived routing, LAN-first service traffic, and retrieval discipline before backend finality.
 
@@ -85,6 +85,9 @@ Current runtime truth remains the active platform, topology, integration, and pe
 - [docs/v2/project/PROJECT_INSTRUCTIONS.md](project/PROJECT_INSTRUCTIONS.md)
 - [docs/v2/project/PROJECT_SOURCE_GUIDE.md](project/PROJECT_SOURCE_GUIDE.md)
 - [docs/v2/project/SESSION_TYPES.md](project/SESSION_TYPES.md)
+- [docs/v2/project/SEED_CANON_V2.md](project/SEED_CANON_V2.md)
+- [docs/v2/project/DOCS_CONTRACT_V2_SEED.md](project/DOCS_CONTRACT_V2_SEED.md)
+- [docs/v2/project/BMAD_V2_ADOPTION.md](project/BMAD_V2_ADOPTION.md)
 
 ### Agent prep
 

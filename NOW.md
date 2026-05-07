@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Build `services/docs-mcp` as the Studio-local MCP surface for curated music
-  manual ingest and evidence retrieval over `vector-db`, starting with the
-  Reface manual only.
+- Define the V2 seed canon and `DOCS_CONTRACT` so the next clean repo can start
+  from stable doctrine, staged component promotion rules, and BMAD-aligned
+  planning handoff instead of replaying V1 journals.
 
 NEXT UP
-- Close out the `docs-mcp` phase-1 lane now that Studio localhost deploy,
-  Reface ingest, and grounded page-span retrieval are all passing.
+- Use the seed canon to choose the first V2 implementation slice and its
+  acceptance contract.
