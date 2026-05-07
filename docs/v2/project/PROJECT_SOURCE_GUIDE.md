@@ -31,8 +31,9 @@ Use these when classifying `conditional candidate`, `historical reference`, or `
 - [docs/v2/inventory/HOST_INVENTORY_SUMMARY.md](../inventory/HOST_INVENTORY_SUMMARY.md)
 - [docs/v2/inventory/MINI_BASELINE.md](../inventory/MINI_BASELINE.md)
 - [docs/v2/inventory/STUDIO_BASELINE.md](../inventory/STUDIO_BASELINE.md)
-- [docs/v2/inventory/ORIN_BASELINE_PENDING.md](../inventory/ORIN_BASELINE_PENDING.md)
-- [docs/v2/inventory/HP_BASELINE_PENDING.md](../inventory/HP_BASELINE_PENDING.md)
+- [docs/v2/inventory/ORIN_BASELINE.md](../inventory/ORIN_BASELINE.md)
+- [docs/v2/inventory/HP_BASELINE.md](../inventory/HP_BASELINE.md)
+- [docs/v2/inventory/HAOS_BASELINE.md](../inventory/HAOS_BASELINE.md)
 
 Use these when classifying `unknown` or pending evidence.
 

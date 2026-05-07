@@ -13,7 +13,7 @@ Current runtime truth remains the active platform, topology, integration, and pe
 
 - Phase: planning synthesis, inventory reconciliation, and seed-canon definition.
 - Goal: define the V2 command center, preserve the proven public contract, separate preserve-now evidence from rebuild-clean candidates, and lock the first clean-repo documentation constitution.
-- Inputs are currently strongest for Mini and Studio. Orin and HP remain pending inventory.
+- Inputs are now grounded across Mini, Studio, Orin, HP, and the HAOS VM, with stronger detail still concentrated on Mini and Studio.
 - V2 doctrine is set at the contract level first: one public gateway, private specialized runtimes until eval-proven, registry-derived routing, LAN-first service traffic, and retrieval discipline before backend finality.
 
 ## Recommended Reading Order
@@ -66,10 +66,12 @@ Current runtime truth remains the active platform, topology, integration, and pe
 ### Host inventory
 
 - [docs/v2/inventory/HOST_INVENTORY_SUMMARY.md](inventory/HOST_INVENTORY_SUMMARY.md)
+- [docs/v2/inventory/NODE_QUICK_REFERENCE.md](inventory/NODE_QUICK_REFERENCE.md)
 - [docs/v2/inventory/MINI_BASELINE.md](inventory/MINI_BASELINE.md)
 - [docs/v2/inventory/STUDIO_BASELINE.md](inventory/STUDIO_BASELINE.md)
-- [docs/v2/inventory/ORIN_BASELINE_PENDING.md](inventory/ORIN_BASELINE_PENDING.md)
-- [docs/v2/inventory/HP_BASELINE_PENDING.md](inventory/HP_BASELINE_PENDING.md)
+- [docs/v2/inventory/ORIN_BASELINE.md](inventory/ORIN_BASELINE.md)
+- [docs/v2/inventory/HP_BASELINE.md](inventory/HP_BASELINE.md)
+- [docs/v2/inventory/HAOS_BASELINE.md](inventory/HAOS_BASELINE.md)
 
 ### Rebuild planning
 

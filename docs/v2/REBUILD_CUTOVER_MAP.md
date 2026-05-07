@@ -223,11 +223,11 @@ Primary evidence:
 ### Orin and HP host integration work
 
 - Host: `Orin`, `HP`
-- Current evidence/source: pending inventory docs [inventory/ORIN_BASELINE_PENDING.md](inventory/ORIN_BASELINE_PENDING.md) and [inventory/HP_BASELINE_PENDING.md](inventory/HP_BASELINE_PENDING.md)
+- Current evidence/source: current host baselines [inventory/ORIN_BASELINE.md](inventory/ORIN_BASELINE.md), [inventory/HP_BASELINE.md](inventory/HP_BASELINE.md), and [inventory/HAOS_BASELINE.md](inventory/HAOS_BASELINE.md)
 - Proposed V2 action: do not touch yet
-- Reason: no baseline evidence exists in this planning slice
+- Reason: baseline evidence now exists, but no approved integration or rebuild slice follows from it yet
 - Risk: medium
-- Verification needed before action: complete host inventories first
+- Verification needed before action: define an explicit host-specific planning slice before touching Orin, HP, or HAOS runtime surfaces
 
 ## Phase-one rebuild candidates
 
