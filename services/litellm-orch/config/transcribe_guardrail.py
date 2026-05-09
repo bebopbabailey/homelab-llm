@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
+import httpx
 from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
 
 
 TASK_TRANSCRIBE_MODELS = {"task-transcribe", "task-transcribe-vivid"}
+TASK_TRANSCRIBE_AUDIO_STT_MODEL = "voice-stt"
 RESPONSES_MIN_OUTPUT_TOKENS = {
+    "task-transcribe": 384,
+    "task-transcribe-vivid": 256,
+}
+PROVIDER_MAX_OUTPUT_TOKENS = {
     "task-transcribe": 384,
     "task-transcribe-vivid": 256,
 }
@@ -28,11 +37,27 @@ except ModuleNotFoundError:
     strip_punct_outside_words = _UTILS_MODULE.strip_punct_outside_words
     strip_wrappers = _UTILS_MODULE.strip_wrappers
 
+try:
+    from config.prompt_guardrail import _render_prompt_messages
+except ModuleNotFoundError:
+    _PROMPT_PATH = Path(__file__).with_name("prompt_guardrail.py")
+    _PROMPT_SPEC = importlib.util.spec_from_file_location("prompt_guardrail", _PROMPT_PATH)
+    if _PROMPT_SPEC is None or _PROMPT_SPEC.loader is None:
+        raise ImportError(f"Unable to load prompt_guardrail from {_PROMPT_PATH}")
+    _PROMPT_MODULE = importlib.util.module_from_spec(_PROMPT_SPEC)
+    _PROMPT_SPEC.loader.exec_module(_PROMPT_MODULE)
+    _render_prompt_messages = _PROMPT_MODULE._render_prompt_messages
+
 
 PROMPT_ID_BY_MODEL = {
     "task-transcribe": "task-transcribe",
     "task-transcribe-vivid": "task-transcribe-vivid",
 }
+
+
+def _strip_provider_prefix(model: str) -> str:
+    return model.rsplit("/", 1)[-1] if "/" in model else model
+
 
 def _extract_user_text(messages: Any) -> str:
     if not isinstance(messages, list):
@@ -131,6 +156,22 @@ def _extract_responses_output_text(response: Any) -> str | None:
     return None
 
 
+def _extract_transcription_text(response: Any) -> str:
+    if isinstance(response, str):
+        return response.strip()
+    if hasattr(response, "text"):
+        text = getattr(response, "text")
+        if isinstance(text, str):
+            return text.strip()
+    body = _response_to_dict(response)
+    if not body:
+        return ""
+    text = body.get("text")
+    if isinstance(text, str):
+        return text.strip()
+    return ""
+
+
 def _set_chat_content(response: Any, content: str) -> Any:
     if hasattr(response, "model_dump"):
         response = response.model_dump()
@@ -166,6 +207,96 @@ def _set_responses_output_text(response: Any, content: str) -> Any:
     body.pop("reasoning", None)
     return body
 
+
+def _minimal_audio_response_payload(response_id: str, output_text: str) -> dict[str, str]:
+    return {"id": response_id, "output_text": output_text}
+
+
+def _set_audio_output_text(response: Any, response_id: str, output_text: str) -> Any:
+    payload = _minimal_audio_response_payload(response_id, output_text)
+    if isinstance(response, dict):
+        response.clear()
+        response.update(payload)
+        return response
+    if hasattr(response, "model_dump"):
+        response.model_dump = lambda *args, **kwargs: dict(payload)
+    if hasattr(response, "json"):
+        response.json = lambda *args, **kwargs: dict(payload)
+    if hasattr(response, "model_dump_json"):
+        response.model_dump_json = lambda *args, **kwargs: json.dumps(payload)
+    for key, value in payload.items():
+        try:
+            setattr(response, key, value)
+        except Exception:
+            pass
+    for key in ("text", "usage"):
+        try:
+            setattr(response, key, None)
+        except Exception:
+            pass
+    return response
+
+
+def _provider_config_for_alias(alias: str, data: dict[str, Any]) -> tuple[str, str, str | None]:
+    if alias == "task-transcribe-vivid":
+        api_base = os.getenv("LLMSTER_DEEP_API_BASE", "")
+        provider_model = os.getenv("LLMSTER_DEEP_MODEL", "")
+    else:
+        api_base = os.getenv("LLMSTER_FAST_API_BASE", "")
+        provider_model = os.getenv("LLMSTER_FAST_MODEL", "")
+    if not api_base:
+        api_base = str(data.get("_transcribe_audio_provider_api_base") or "")
+    if not provider_model:
+        provider_model = str(data.get("_transcribe_audio_provider_model") or "")
+    api_key = os.getenv("LLMSTER_API_KEY") or None
+    return api_base, provider_model, api_key
+
+
+async def _post_responses(api_base: str, api_key: str | None, payload: dict[str, Any]) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if api_key and api_key != "dummy":
+        headers["Authorization"] = f"Bearer {api_key}"
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{api_base.rstrip('/')}/responses",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, Any]) -> tuple[str, str]:
+    api_base, provider_model, api_key = _provider_config_for_alias(alias, data)
+    if not api_base:
+        raise RuntimeError(f"{alias} audio cleanup requires provider api_base")
+    if not provider_model:
+        raise RuntimeError(f"{alias} audio cleanup requires provider model")
+
+    transcript = _preprocess_transcript(transcript) if transcript else ""
+    prompt_variables = {"user_message": transcript}
+    if alias == "task-transcribe-vivid":
+        prompt_variables.update({"audience": "", "tone": ""})
+    messages = _render_prompt_messages(PROMPT_ID_BY_MODEL[alias], prompt_variables)
+    body = await _post_responses(
+        api_base,
+        api_key,
+        {
+            "model": _strip_provider_prefix(provider_model),
+            "input": messages,
+            "reasoning": {"effort": "low"},
+            "temperature": 0.0,
+            "stream": False,
+            "max_output_tokens": PROVIDER_MAX_OUTPUT_TOKENS[alias],
+        },
+    )
+    content = _extract_responses_output_text(body)
+    if not content:
+        raise RuntimeError(f"{alias} audio cleanup returned empty output")
+    response_id = str(body.get("id") or f"resp_{uuid4().hex}")
+    return response_id, _strip_wrappers(content)
+
+
 _strip_wrappers = strip_wrappers
 _preprocess_transcript = strip_punct_outside_words
 
@@ -189,6 +320,13 @@ class TranscribeGuardrail(CustomGuardrail):
     ) -> dict:
         model = data.get("model")
         if model not in TASK_TRANSCRIBE_MODELS:
+            return data
+
+        if call_type in {"transcription", "atranscription"}:
+            data["_transcribe_audio_cleanup_alias"] = model
+            data["_transcribe_audio_original_model"] = model
+            data["model"] = TASK_TRANSCRIBE_AUDIO_STT_MODEL
+            logger.info("transcribe audio pre_call alias=%s stt_model=%s", model, data["model"])
             return data
 
         if call_type in {"responses", "aresponses"}:
@@ -265,3 +403,46 @@ class TranscribeGuardrail(CustomGuardrail):
             len(cleaned),
         )
         return _set_chat_content(response, cleaned)
+
+    async def async_post_call_response_headers_hook(
+        self,
+        data: dict,
+        user_api_key_dict: Any,
+        response: Any,
+        request_headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> dict[str, str] | None:
+        event_hook = (
+            self.event_hook.value
+            if isinstance(self.event_hook, GuardrailEventHooks)
+            else self.event_hook
+        )
+        if event_hook != GuardrailEventHooks.post_call.value:
+            return None
+
+        alias = data.get("_transcribe_audio_cleanup_alias")
+        if alias not in TASK_TRANSCRIBE_MODELS:
+            return None
+
+        raw_transcript = _extract_transcription_text(response)
+        response_id = f"resp_{uuid4().hex}"
+        if not raw_transcript:
+            logger.error("transcribe audio post_call alias=%s empty_stt_transcript=true", alias)
+            _set_audio_output_text(response, response_id, "")
+            return None
+
+        try:
+            response_id, cleaned = await _clean_audio_transcript(alias, raw_transcript, data)
+        except Exception:
+            logger.exception("transcribe audio cleanup failed alias=%s", alias)
+            _set_audio_output_text(response, response_id, "")
+            return None
+
+        logger.info(
+            "transcribe audio post_call alias=%s raw_len=%s cleaned_len=%s",
+            alias,
+            len(raw_transcript),
+            len(cleaned),
+        )
+        _set_audio_output_text(response, response_id, cleaned)
+        return None

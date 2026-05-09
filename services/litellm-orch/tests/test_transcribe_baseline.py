@@ -3,6 +3,9 @@ import unittest
 import importlib.util
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+from litellm.types.utils import TranscriptionResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -100,6 +103,44 @@ class TestTranscribeBaseline(unittest.TestCase):
         )
         self.assertEqual(result["prompt_variables"]["audience"], "internal notes")
         self.assertEqual(result["prompt_variables"]["tone"], "lightly polished")
+
+    def test_pre_call_audio_task_transcribe_routes_to_voice_stt(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "file": object(),
+                    "language": "en",
+                },
+                "transcription",
+            )
+        )
+
+        self.assertEqual(result["model"], "voice-stt")
+        self.assertEqual(result["_transcribe_audio_cleanup_alias"], "task-transcribe")
+        self.assertEqual(result["_transcribe_audio_original_model"], "task-transcribe")
+        self.assertEqual(result["language"], "en")
+        self.assertNotIn("prompt_id", result)
+
+    def test_pre_call_audio_task_transcribe_vivid_routes_to_voice_stt(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe-vivid",
+                    "file": object(),
+                },
+                "transcription",
+            )
+        )
+
+        self.assertEqual(result["model"], "voice-stt")
+        self.assertEqual(result["_transcribe_audio_cleanup_alias"], "task-transcribe-vivid")
 
     def test_prompt_guardrail_renders_transcribe_template_without_model_override(self):
         pre_guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
@@ -227,6 +268,68 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(result["output"][0]["content"][0]["text"], "Hello there.")
         self.assertEqual(result["output_text"], "Hello there.")
         self.assertNotIn("reasoning", result)
+
+    def test_audio_post_call_cleans_transcript_and_rewrites_minimal_payload(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = TranscriptionResponse(text="um i think this works maybe yes")
+        cleanup_body = {
+            "id": "resp_clean",
+            "object": "response",
+            "output_text": "**Cleaned Transcript**: I think this works, maybe yes.",
+            "output": [],
+        }
+
+        with patch.dict(
+            transcribe_guardrail.os.environ,
+            {
+                "LLMSTER_FAST_API_BASE": "http://provider.test/v1",
+                "LLMSTER_FAST_MODEL": "openai/provider-fast",
+            },
+        ), patch.object(transcribe_guardrail, "_post_responses", AsyncMock(return_value=cleanup_body)) as post:
+            result = asyncio.run(
+                guardrail.async_post_call_response_headers_hook(
+                    {
+                        "model": "voice-stt",
+                        "_transcribe_audio_cleanup_alias": "task-transcribe",
+                    },
+                    None,
+                    response,
+                )
+            )
+
+        self.assertIsNone(result)
+        self.assertEqual(response.model_dump(), {"id": "resp_clean", "output_text": "I think this works, maybe yes."})
+        payload = post.await_args.args[2]
+        self.assertEqual(post.await_args.args[0], "http://provider.test/v1")
+        self.assertEqual(payload["model"], "provider-fast")
+        self.assertEqual(payload["input"][-1]["content"], "Transcript:\num i think this works maybe yes")
+        self.assertEqual(payload["max_output_tokens"], 384)
+
+    def test_audio_post_call_failure_does_not_return_raw_transcript(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = TranscriptionResponse(text="raw sensitive transcript")
+
+        with patch.object(
+            transcribe_guardrail,
+            "_clean_audio_transcript",
+            AsyncMock(side_effect=RuntimeError("boom")),
+        ), patch.object(transcribe_guardrail.logger, "exception") as log_exception:
+            result = asyncio.run(
+                guardrail.async_post_call_response_headers_hook(
+                    {
+                        "model": "voice-stt",
+                        "_transcribe_audio_cleanup_alias": "task-transcribe",
+                    },
+                    None,
+                    response,
+                )
+            )
+
+        self.assertIsNone(result)
+        log_exception.assert_called_once()
+        self.assertRegex(response.model_dump()["id"], r"^resp_[0-9a-f]+$")
+        self.assertEqual(response.model_dump()["output_text"], "")
+        self.assertNotIn("raw sensitive transcript", str(response.model_dump()))
 
     def test_golden_output_matches_expectations(self):
         raw = (REPO_ROOT / "services/litellm-orch/tests/fixtures_transcribe_raw.txt").read_text().strip()

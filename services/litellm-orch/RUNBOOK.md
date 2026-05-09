@@ -235,6 +235,20 @@ Expected:
 - `config/env.local` must include `MEMORY_API_BEARER_TOKEN=<studio token>` for
   the write-side transcript upserts used by `task-youtube-summary`
 
+Task-transcribe audio-upload smoke:
+```bash
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+
+curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -F model=task-transcribe \
+  -F file=@/path/to/audio.wav | jq .
+```
+Expected:
+- request routes audio through `voice-stt`
+- response body contains only `id` and `output_text`
+- `output_text` is the cleaned transcript, not the raw STT payload
+
 Task-alias follow-up/state smoke:
 ```bash
 python3 - <<'PY'

@@ -111,10 +111,13 @@ implement inference or web-search business logic.
   transcribe `prompt_id`, and constrains the Responses token budget enough for
   the `fast` lane to emit final text; its post-call path strips wrappers/labels
   and rewrites task outputs into clean transcript-only payloads.
-- `task-transcribe` and `task-transcribe-vivid` are text cleanup aliases only.
-  Their canonical contract is `POST /v1/responses` with native Responses `input`,
-  not `POST /v1/audio/transcriptions`,
-  and must not be reused for Open WebUI speech wiring.
+- `task-transcribe` and `task-transcribe-vivid` are transcript cleanup aliases.
+  Their canonical text contract is `POST /v1/responses` with native Responses
+  `input`. They also accept `POST /v1/audio/transcriptions` for direct file
+  upload callers: LiteLLM routes the audio through `voice-stt`, cleans the raw
+  transcript through the same dotprompt-backed task alias, and returns a minimal
+  payload with `id` and `output_text`. Open WebUI speech wiring should still use
+  the raw `voice-stt` alias.
 - The transcribe dotprompt files are rendered through the generic
   `prompt-pre` template path. They do not select a backend model; router alias
   selection stays authoritative.

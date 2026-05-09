@@ -42,6 +42,10 @@ only; it does not implement inference.
 - Their prompts are rendered through the generic `prompt-pre` dotprompt path;
   the transcribe guardrail only normalizes transcript input and strips wrapper
   fields from the final response payload.
+- Direct file-upload callers may also use `POST /v1/audio/transcriptions` with
+  `model=task-transcribe` or `model=task-transcribe-vivid`; LiteLLM first routes
+  audio to `voice-stt`, then cleans the raw transcript and returns `id` plus
+  `output_text`.
 - `task-youtube-summary` is also an additional task alias, not part of the
   public human chat-lane trio. Its guardrail resolves one supported YouTube
   video URL on the first turn, fetches structured transcript data from the
