@@ -8,6 +8,13 @@ if [[ -f "config/env.local" ]]; then
   set +a
 fi
 
+if [[ -f "/etc/homelab-llm/litellm-voice.env" ]]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "/etc/homelab-llm/litellm-voice.env"
+  set +a
+fi
+
 export LITELLM_LOG="${LITELLM_LOG:-INFO}"
 export PORT="${PORT:-4000}"
 export CHATGPT5_ADAPTER_HOST="${CHATGPT5_ADAPTER_HOST:-127.0.0.1}"

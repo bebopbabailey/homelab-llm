@@ -38,3 +38,6 @@ localhost-only and keep LiteLLM as the client-facing gateway.
 - `GET http://192.168.1.93:18080/health/stt` reports ready.
 - Direct Orin `/v1/audio/transcriptions` smoke returned non-empty transcript
   JSON from `/tmp/stt-smoke.wav`.
+- LiteLLM launcher now sources `/etc/homelab-llm/litellm-voice.env` after the
+  repo-local `config/env.local` so the correct Orin voice key wins over stale
+  local placeholders.
