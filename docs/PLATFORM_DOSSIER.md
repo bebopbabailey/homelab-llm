@@ -25,8 +25,8 @@
   memory API `:55440`, nightly ingest/backup jobs.
 - Jetson Orin AGX: canonical speech appliance host.
   `voice-gateway` is the approved LAN-visible speech facade and fronts localhost-only
-  Speaches for STT/TTS. Current host identity and runtime status are canonical in
-  `docs/foundation/orin-agx.md`.
+  native STT plus Speaches for speech backends. Current host identity and
+  runtime status are canonical in `docs/foundation/orin-agx.md`.
 - HP DietPi: Home Assistant :8123
 ## Topology (planned)
 - Mac Studio: AFM (Apple Foundation Models) OpenAI-compatible API (target: :9999), routed via LiteLLM.
@@ -134,7 +134,7 @@ Networking note:
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
   Working dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
-  Canonical speech path uses env-driven `AUDIO_STT_*` / `AUDIO_TTS_*` values pointed at LiteLLM speech aliases only.
+  Canonical STT path uses env-driven `AUDIO_STT_*` values pointed at LiteLLM STT aliases only.
   Current web-search contract is the documented native path:
   `WEB_SEARCH_ENGINE=searxng`,
   `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`,
@@ -222,18 +222,20 @@ Networking note:
   int4 on GPU is unstable (kernel compile failure); CPU-only int4 is possible but lower fidelity.
   Current env: `OV_DEVICE=GPU`, `OV_MODEL_PATH` fallback is fp32 (historical; registry is used for OpenVINO).
   Next evaluation: `OV_DEVICE=AUTO` and `OV_DEVICE=MULTI:GPU,CPU` for multi-request throughput.
-- Voice Gateway: repo-owned speech facade on the Orin. LiteLLM routes `voice-stt-canary`,
-  `voice-tts-canary`, `voice-stt`, and `voice-tts` directly to the Orin LAN `/v1`
-  facade. `voice-gateway` maps external voice aliases (`default`, `alloy`) to the
-  configured Kokoro backend voice and forwards STT/TTS to localhost-only Speaches.
+- Voice Gateway: repo-owned speech facade on the Orin. LiteLLM routes
+  `voice-stt-canary` and `voice-stt` directly to the Orin LAN `/v1` facade for
+  raw STT. `voice-gateway` forwards transcription to the localhost-only native
+  faster-whisper wrapper, currently `small.en`. The TTS facade remains
+  service-owned and maps external voice aliases (`default`, `alloy`) to the
+  configured Kokoro backend voice behind localhost-only Speaches.
   Operator control plane is CLI-first (`voicectl`) with dashboard support at `/ops`.
   Canonical TTS candidate set is repo-curated in
   `services/voice-gateway/registry/tts_models.jsonl`; live Speaches registry is discovery-only.
   Live deployment evidence is tracked in `docs/foundation/orin-agx.md` and
   includes deploy provenance surfaced from `/ops/api/state` when
   `.deploy-manifest.json` is present in the deploy checkout.
-  Speaches appliance policy preloads the chosen canary STT and Kokoro TTS models and
-  keeps `STT_MODEL_TTL` / `TTS_MODEL_TTL` at `-1` or another intentionally long value.
+  The native STT wrapper is allowed to report ready independently of
+  TTS/Speaches via `/health/stt`.
 - OptiLLM proxy (Studio): managed by launchd.
   Evidence: `/Library/LaunchDaemons/com.bebop.optillm-proxy.plist`.
   Runtime args include: `--host 192.168.1.72 --port 4020 --model main --base-url http://192.168.1.71:4000/v1`.

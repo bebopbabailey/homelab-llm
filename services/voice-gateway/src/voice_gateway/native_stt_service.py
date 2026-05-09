@@ -9,12 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import ctranslate2
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from faster_whisper import WhisperModel
-from faster_whisper.audio import decode_audio
 
 from voice_gateway.logging import emit_log
 
@@ -33,7 +30,7 @@ def _env_int(name: str, default: int) -> int:
 class NativeRuntimeConfig:
     host: str = _env_str("NATIVE_STT_HOST", "127.0.0.1")
     port: int = _env_int("NATIVE_STT_PORT", 18081)
-    model: str = _env_str("NATIVE_STT_MODEL", "Systran/faster-distil-whisper-large-v3")
+    model: str = _env_str("NATIVE_STT_MODEL", "small.en")
     device: str = _env_str("NATIVE_STT_DEVICE", "cuda")
     compute_type: str = _env_str("NATIVE_STT_COMPUTE_TYPE", "float16")
     expected_ct2_version: str = _env_str("NATIVE_STT_CT2_VERSION", "4.7.1")
@@ -53,7 +50,7 @@ class NativeSttRuntime:
         self._ready_since_unix: float | None = None
         self._load_count = 0
         self._request_count = 0
-        self._model: WhisperModel | None = None
+        self._model: Any | None = None
         self._proof: dict[str, Any] = {}
 
     @staticmethod
@@ -67,7 +64,9 @@ class NativeSttRuntime:
                 return
             started = time.perf_counter()
             try:
+                import ctranslate2
                 import faster_whisper
+                from faster_whisper import WhisperModel
 
                 fw_version = str(getattr(faster_whisper, "__version__", "unknown"))
                 ct2_version = str(ctranslate2.__version__)
@@ -151,6 +150,8 @@ class NativeSttRuntime:
             raise RuntimeError("native stt runtime is not ready")
         if not file_bytes:
             raise ValueError("empty audio payload")
+        from faster_whisper.audio import decode_audio
+
         audio = decode_audio(io.BytesIO(file_bytes), sampling_rate=16000)
         segments, info = self._model.transcribe(
             audio,

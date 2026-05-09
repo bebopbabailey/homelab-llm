@@ -5,7 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from voice_gateway.api import create_app
-from voice_gateway.backend import BackendHealth, BackendSpeechResult, BackendTranscriptionResult
+from voice_gateway.backend import BackendHealth, BackendRequestError, BackendSpeechResult, BackendTranscriptionResult
 from voice_gateway.settings import Settings
 
 
@@ -41,7 +41,7 @@ class FakeTtsBackend:
             content=payload,
             media_type="application/json",
             output_bytes=len(payload),
-            backend_model="Systran/faster-distil-whisper-large-v3",
+            backend_model="small.en",
             upstream_ms=7.0,
         )
 
@@ -92,6 +92,11 @@ class FakeTtsBackend:
         )
 
 
+class BrokenTtsBackend(FakeTtsBackend):
+    def health(self) -> BackendHealth:
+        raise BackendRequestError(status_code=503, code="tts_down", message="tts backend down")
+
+
 class FakeNativeSttBackend:
     def __init__(self) -> None:
         self.last_call: dict[str, object] | None = None
@@ -131,7 +136,7 @@ class FakeNativeSttBackend:
             content=content,
             media_type=media_type,
             output_bytes=len(content),
-            backend_model="Systran/faster-distil-whisper-large-v3",
+            backend_model="small.en",
             upstream_ms=6.0,
         )
 
@@ -241,6 +246,27 @@ def test_native_stt_rejects_unsupported_transcription_format(tmp_path) -> None:
     )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "unsupported_response_format"
+
+
+def test_stt_health_does_not_require_tts_readiness(tmp_path) -> None:
+    native_stt = FakeNativeSttBackend()
+    settings = Settings(
+        voice_config_path=tmp_path / "voices.json",
+        stt_backend_api_base="http://127.0.0.1:18081",
+    )
+    client = TestClient(
+        create_app(
+            settings=settings,
+            tts_backend=BrokenTtsBackend(),
+            stt_backend=native_stt,
+        )
+    )
+
+    response = client.get("/health/stt")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    assert response.json()["backend_stt_model"] == "small.en"
 
 
 def test_v1_routes_require_bearer_when_configured(tmp_path) -> None:

@@ -6,9 +6,9 @@ the only client-facing gateway. `voice-gateway` owns that boundary.
 
 ## Canonical topology
 - Open WebUI talks to LiteLLM on the Mini.
-- LiteLLM routes speech aliases directly to the Orin `voice-gateway` LAN `/v1` endpoint.
-- `voice-gateway` calls localhost-only Speaches on the Orin for STT/TTS.
-- Speaches preloads the chosen canary STT and Kokoro TTS models and keeps them warm.
+- LiteLLM routes STT aliases directly to the Orin `voice-gateway` LAN `/v1` endpoint.
+- `voice-gateway` calls the localhost-only native STT wrapper for transcription.
+- `voice-gateway` keeps localhost-only Speaches available for TTS.
 
 Current deployment baseline:
 - active Orin checkout: `/home/christopherbailey/voice-gateway-canary`
@@ -27,8 +27,10 @@ Current deployment baseline:
   - manual promotion-plan generation for root-owned config changes
   - deploy provenance visibility through optional manifest file
   - future diarization orchestration
+- Native STT wrapper
+  - faster-whisper STT with `small.en`
+  - localhost-only backend implementation
 - Speaches
-  - faster-whisper STT
   - Kokoro TTS
   - warm-model appliance behavior
   - localhost-only backend implementation
@@ -36,7 +38,7 @@ Current deployment baseline:
 ## Boundary rules
 - LiteLLM remains the only client-facing gateway.
 - Open WebUI never calls the Orin directly.
-- Speaches is an internal implementation detail behind `voice-gateway`.
+- Native STT and Speaches are internal implementation details behind `voice-gateway`.
 - Diarization must not enter the default Open WebUI voice-turn critical path.
 - `/ops` does not bypass `voice-gateway` public speech contract and does not auto-write
   root-owned runtime files under `/etc`.

@@ -71,10 +71,8 @@ implement inference or web-search business logic.
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `task-youtube-summary` -> Studio `llmster` deep lane `8126`
   (`llmster-gpt-oss-120b-mxfp4-gguf`) with the YouTube transcript-summary prompt
-- `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`)
-- `voice-tts-canary` -> Orin `voice-gateway` facade (`tts-1`)
-- `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`)
-- `voice-tts` -> Orin `voice-gateway` facade (`tts-1`)
+- `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
+- `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
 
 ## Current runtime notes
 - Pushcut MCP integration is not active in the main LiteLLM runtime.

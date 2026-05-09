@@ -1360,28 +1360,27 @@ ssh orin 'sudo docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\
 ```
 
 ## Voice Gateway Speech Appliance (Orin)
-The canonical speech loop is now:
+The canonical STT loop is now:
 
-`Open WebUI -> LiteLLM -> voice-gateway -> Speaches`
+`Open WebUI/client -> LiteLLM -> voice-gateway -> native STT wrapper`
 
 Use direct Mini -> Orin LAN routing through `voice-gateway`. Do not add a Mini
-port-forward layer. Speaches stays localhost-only behind `voice-gateway`.
+port-forward layer. The native STT wrapper stays localhost-only behind
+`voice-gateway`.
 
-Required Speaches appliance policy:
+Required native STT policy:
 ```dotenv
-PRELOAD_MODELS=["Systran/faster-distil-whisper-large-v3","speaches-ai/Kokoro-82M-v1.0-ONNX"]
-STT_MODEL_TTL=-1
-TTS_MODEL_TTL=-1
+NATIVE_STT_MODEL=small.en
+VOICE_STT_BACKEND_API_BASE=http://127.0.0.1:18081
 ```
 
-Direct Orin speech facade checks:
+Direct Orin STT facade checks:
 ```bash
 curl -fsS http://192.168.1.93:18080/health
 curl -fsS http://192.168.1.93:18080/health/readiness | jq .
+curl -fsS http://192.168.1.93:18080/health/stt | jq .
 curl -fsS http://192.168.1.93:18080/v1/models -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
-curl -fsS http://192.168.1.93:18080/v1/speakers -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
-curl -fsS http://192.168.1.93:18080/v1/audio/speech   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -H "Content-Type: application/json"   -d '{"model":"tts-1","input":"Homelab speech canary.","voice":"alloy","response_format":"wav","speed":1.0}'   --output /tmp/voice-gateway-canary.wav
-curl -fsS http://192.168.1.93:18080/v1/audio/transcriptions   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -F 'file=@/tmp/voice-gateway-canary.wav'   -F 'model=whisper-1'
+curl -fsS http://192.168.1.93:18080/v1/audio/transcriptions   -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}"   -F 'file=@/tmp/stt-smoke.wav'   -F 'model=whisper-1'
 ```
 
 Voice alias acceptance checks:
@@ -1407,31 +1406,24 @@ PYTHONPATH=/home/christopherbailey/voice-gateway-canary/src \
   python3 -m voice_gateway.ops_cli --base-url http://192.168.1.93:18080 --api-key "${VOICE_GATEWAY_API_KEY}" status
 ```
 
-## LiteLLM speech canary (Mini)
+## LiteLLM STT canary (Mini)
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
-curl -fsS http://127.0.0.1:4000/v1/audio/speech   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -H "Content-Type: application/json"   -d '{"model":"voice-tts-canary","input":"LiteLLM speech canary.","voice":"alloy","response_format":"wav","speed":1.0}'   --output /tmp/litellm-voice-canary.wav
-
-curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -F 'file=@/tmp/litellm-voice-canary.wav'   -F 'model=voice-stt-canary'
+curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"   -F 'file=@/tmp/stt-smoke.wav'   -F 'model=voice-stt-canary'
 ```
 
-## Open WebUI voice canary
+## Open WebUI STT canary
 Target values:
 ```bash
 AUDIO_STT_ENGINE=openai
 AUDIO_STT_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1
 AUDIO_STT_MODEL=voice-stt-canary
-AUDIO_TTS_ENGINE=openai
-AUDIO_TTS_OPENAI_API_BASE_URL=http://127.0.0.1:4000/v1
-AUDIO_TTS_MODEL=voice-tts-canary
-AUDIO_TTS_VOICE=alloy
 ```
 
 Post-restart verification is required:
 ```bash
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_STT_'
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_TTS_'
 curl -fsS http://127.0.0.1:3000/health | jq .
 ```
 

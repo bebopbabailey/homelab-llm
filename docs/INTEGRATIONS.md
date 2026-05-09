@@ -189,11 +189,11 @@ if a param is rejected by the backend.
 - Open WebUI continues to talk only to LiteLLM; no upstream provider rewrite is
   required for ChatGPT-backed aliases.
 - Health: `/health` on port 3000.
-- Canonical voice path uses dedicated Open WebUI `AUDIO_STT_*` and `AUDIO_TTS_*`
-  settings pointed at LiteLLM, not direct Orin URLs.
-- LiteLLM speech aliases:
-  - canary: `voice-stt-canary`, `voice-tts-canary`
-  - stable: `voice-stt`, `voice-tts`
+- Canonical STT path uses dedicated Open WebUI `AUDIO_STT_*` settings pointed
+  at LiteLLM, not direct Orin URLs.
+- LiteLLM STT aliases:
+  - canary: `voice-stt-canary`
+  - stable: `voice-stt`
 - LiteLLM transcript-cleanup aliases:
   - standard: `task-transcribe` on the `fast` lane
   - vivid: `task-transcribe-vivid` on the `deep` lane
@@ -236,8 +236,9 @@ if a param is rejected by the backend.
   against LiteLLM, which avoids the previous empty-output failure on the raw
   ChatGPT backend path.
 - The current validated upstream model id for the alias is `gpt-5.3-codex`.
-- LiteLLM routes the speech aliases directly to the Orin `voice-gateway` LAN `/v1`
-  facade. `voice-gateway` then forwards to localhost-only Speaches.
+- LiteLLM routes the STT aliases directly to the Orin `voice-gateway` LAN `/v1`
+  facade. `voice-gateway` then forwards transcription to the localhost-only
+  native faster-whisper wrapper, currently `small.en`.
 - Web search (active path): `WEB_SEARCH_ENGINE=searxng` with `SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json`.
 - Result and loader policy is explicit in documented Open WebUI env vars:
   `WEB_SEARCH_RESULT_COUNT=3`, `WEB_SEARCH_CONCURRENT_REQUESTS=1`,

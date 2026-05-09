@@ -278,6 +278,48 @@ def create_app(
                 message=str(exc),
             )
 
+    @app.get("/health/stt")
+    def stt_health() -> JSONResponse:
+        request_id = str(uuid4())
+        total_start = time.perf_counter()
+        try:
+            stt_backend_health = active_stt_backend.health()
+            payload = {
+                "status": "ready",
+                "stt_backend_status": stt_backend_health.status,
+                "stt_backend_api_base": active_settings.stt_backend_api_base or active_settings.backend_api_base,
+                "public_stt_model": active_settings.public_stt_model,
+                "backend_stt_model": active_settings.backend_stt_model,
+            }
+            emit_log(
+                event="stt_readiness",
+                log_path=active_settings.log_path,
+                request_id=request_id,
+                route="/health/stt",
+                source="http",
+                stt_backend_status=stt_backend_health.status,
+                stt_backend_api_base=active_settings.stt_backend_api_base or active_settings.backend_api_base,
+                stt_backend_upstream_ms=stt_backend_health.upstream_ms,
+                total_ms=round((time.perf_counter() - total_start) * 1000, 3),
+                status="ready",
+                error_code=None,
+                exception_class=None,
+            )
+            return JSONResponse(payload)
+        except BackendRequestError as exc:
+            emit_log(
+                event="stt_readiness",
+                log_path=active_settings.log_path,
+                request_id=request_id,
+                route="/health/stt",
+                source="http",
+                total_ms=round((time.perf_counter() - total_start) * 1000, 3),
+                status="blocked",
+                error_code=exc.code,
+                exception_class=exc.__class__.__name__,
+            )
+            return _error_response(status_code=exc.status_code, code=exc.code, message=exc.message)
+
     @app.get("/ops", response_class=HTMLResponse)
     def ops_page() -> HTMLResponse:
         return HTMLResponse(content=OPS_HTML)

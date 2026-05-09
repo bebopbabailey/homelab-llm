@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Define the V2 seed canon and `DOCS_CONTRACT` so the next clean repo can start
-  from stable doctrine, staged component promotion rules, and BMAD-aligned
-  planning handoff instead of replaying V1 journals.
+- Implement lightweight Orin STT by using the existing native faster-whisper
+  wrapper with `small.en`, adding STT-only health, and wiring LiteLLM STT
+  aliases.
 
 NEXT UP
-- Use the seed canon to choose the first V2 implementation slice and its
-  acceptance contract.
+- Validate the STT path from Orin native wrapper through LiteLLM audio
+  transcription.

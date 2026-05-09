@@ -23,7 +23,7 @@ only; it does not implement inference.
 - `task-transcribe` is a text-cleanup alias on `fast`
 - `task-transcribe-vivid` is a text-cleanup alias on `deep`
 - `task-youtube-summary` is a YouTube transcript-summary alias on `deep`
-- Voice Gateway on the Orin for speech aliases
+- Voice Gateway on the Orin for STT aliases
 - SearXNG on the Mini for generic search tooling
 
 ## OpenCode Note

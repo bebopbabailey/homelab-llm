@@ -44,7 +44,7 @@ class Settings:
     backend_stt_model: str = field(
         default_factory=lambda: os.environ.get(
             "VOICE_BACKEND_STT_MODEL",
-            "Systran/faster-distil-whisper-large-v3",
+            "small.en",
         )
     )
     backend_tts_model: str = field(

@@ -410,25 +410,19 @@ Expected:
 - no raw `<|channel|>` / `to=functions.` protocol text is left in the final
   assistant content for these lanes
 
-## Speech canary checks
+## STT canary checks
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
-curl -fsS http://127.0.0.1:4000/v1/audio/speech \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"voice-tts-canary","input":"LiteLLM speech canary.","voice":"alloy","response_format":"wav","speed":1.0}' \
-  --output /tmp/litellm-voice-canary.wav
-
 curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -F 'file=@/tmp/litellm-voice-canary.wav' \
+  -F 'file=@/tmp/stt-smoke.wav' \
   -F 'model=voice-stt-canary'
 ```
 
 Expected:
-- both calls succeed through LiteLLM
-- LiteLLM logs show `voice-tts-canary` and `voice-stt-canary`
+- the transcription call succeeds through LiteLLM
+- LiteLLM logs show `voice-stt-canary`
 - the Orin `voice-gateway` LAN `api_base` is used directly
 - `task-transcribe*` remains untouched
 

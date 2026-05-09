@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from voice_gateway.native_stt_service import create_app
+from voice_gateway.native_stt_service import NativeRuntimeConfig, create_app
 
 
 class FakeRuntime:
@@ -37,13 +37,17 @@ class FakeRuntime:
 
 def test_health_and_readiness() -> None:
     runtime = FakeRuntime()
-    client = TestClient(create_app(runtime))
-    health = client.get("/health")
-    readiness = client.get("/health/readiness")
+    with TestClient(create_app(runtime)) as client:
+        health = client.get("/health")
+        readiness = client.get("/health/readiness")
     assert health.status_code == 200
     assert readiness.status_code == 200
     assert runtime.loaded is True
     assert readiness.json()["model_loaded_once"] is True
+
+
+def test_default_model_is_small_en() -> None:
+    assert NativeRuntimeConfig().model == "small.en"
 
 
 def test_transcribe_endpoint_accepts_raw_audio() -> None:

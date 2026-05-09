@@ -87,6 +87,22 @@ model_list:
     max_output_tokens: 4096
     supports_function_calling: false
     supports_system_messages: true
+# 3) STT aliases below
+- model_name: voice-stt-canary
+  litellm_params:
+    model: openai/whisper-1
+    api_base: os.environ/VOICE_GATEWAY_API_BASE
+    api_key: os.environ/VOICE_GATEWAY_API_KEY
+  model_info:
+    mode: audio_transcription
+
+- model_name: voice-stt
+  litellm_params:
+    model: openai/whisper-1
+    api_base: os.environ/VOICE_GATEWAY_API_BASE
+    api_key: os.environ/VOICE_GATEWAY_API_KEY
+  model_info:
+    mode: audio_transcription
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:

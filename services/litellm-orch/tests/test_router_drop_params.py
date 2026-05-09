@@ -51,6 +51,21 @@ class TestRouterDropParams(unittest.TestCase):
             "os.environ/LLMSTER_DEEP_API_BASE",
         )
 
+    def test_voice_stt_aliases_use_orin_voice_gateway(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        aliases = {
+            item.get("model_name"): item
+            for item in config.get("model_list", [])
+            if isinstance(item, dict)
+        }
+        for alias in ("voice-stt-canary", "voice-stt"):
+            self.assertIn(alias, aliases)
+            params = aliases[alias].get("litellm_params", {})
+            self.assertEqual(params.get("model"), "openai/whisper-1")
+            self.assertEqual(params.get("api_base"), "os.environ/VOICE_GATEWAY_API_BASE")
+            self.assertEqual(params.get("api_key"), "os.environ/VOICE_GATEWAY_API_KEY")
+            self.assertEqual(aliases[alias].get("model_info", {}).get("mode"), "audio_transcription")
+
     def test_operator_only_chatgpt_alias_exists(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         model_names = {
@@ -108,7 +123,7 @@ class TestRouterDropParams(unittest.TestCase):
         for params in names.values():
             self.assertEqual(
                 params.get("target_models"),
-                "deep,fast,task-transcribe,task-transcribe-vivid,task-json",
+                "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary",
             )
             self.assertEqual(params.get("responses_only"), False)
 

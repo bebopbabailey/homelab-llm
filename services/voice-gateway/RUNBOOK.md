@@ -9,11 +9,12 @@ Operate the canonical Orin speech appliance facade used by LiteLLM.
 - LiteLLM on the Mini talks directly to `voice-gateway` over the Orin LAN address.
 
 ## Required backend policy
-Configure Speaches with warm resident models:
+Configure native STT with the lightweight resident model and keep Speaches for
+TTS only:
 
 ```dotenv
-PRELOAD_MODELS=["Systran/faster-distil-whisper-large-v3","speaches-ai/Kokoro-82M-v1.0-ONNX"]
-STT_MODEL_TTL=-1
+NATIVE_STT_MODEL=small.en
+PRELOAD_MODELS=["speaches-ai/Kokoro-82M-v1.0-ONNX"]
 TTS_MODEL_TTL=-1
 ```
 
@@ -97,7 +98,7 @@ the proven host-native runtime pinned:
 
 - `ctranslate2==4.7.1` (source-built CUDA-capable lane)
 - `faster-whisper==1.1.1`
-- model `Systran/faster-distil-whisper-large-v3`
+- model `small.en`
 - `device=cuda`, `compute_type=float16`
 - `LD_LIBRARY_PATH` includes `/home/christopherbailey/stt-native-lab/ct2-prefix/lib`
 
@@ -106,7 +107,7 @@ Required env file (`/etc/voice-gateway/native-stt.env`):
 ```dotenv
 NATIVE_STT_HOST=127.0.0.1
 NATIVE_STT_PORT=18081
-NATIVE_STT_MODEL=Systran/faster-distil-whisper-large-v3
+NATIVE_STT_MODEL=small.en
 NATIVE_STT_DEVICE=cuda
 NATIVE_STT_COMPUTE_TYPE=float16
 NATIVE_STT_CT2_VERSION=4.7.1
@@ -115,8 +116,9 @@ NATIVE_STT_CTRANSLATE2_SOURCE_REF=226c95d94e660c48b11c62e108886b7ef76d589d
 NATIVE_STT_CT2_PREFIX=/home/christopherbailey/stt-native-lab/ct2-prefix
 PYTHONPATH=/home/christopherbailey/homelab-llm/services/voice-gateway/src
 LD_LIBRARY_PATH=/home/christopherbailey/stt-native-lab/ct2-prefix/lib
-HF_HOME=/srv/ssd/cache/huggingface
+HF_HOME=/home/christopherbailey/.cache/huggingface-small-stt
 HF_HUB_DISABLE_TELEMETRY=1
+HF_HUB_DISABLE_IMPLICIT_TOKEN=1
 PYTHONNOUSERSITE=1
 ```
 
@@ -143,6 +145,7 @@ WantedBy=multi-user.target
 ```bash
 curl -fsS http://127.0.0.1:18081/health | jq .
 curl -fsS http://127.0.0.1:18081/health/readiness | jq .
+curl -fsS http://192.168.1.93:18080/health/stt | jq .
 
 # 5 consecutive short-fixture transcriptions
 for i in 1 2 3 4 5; do
@@ -160,6 +163,8 @@ curl -fsS http://127.0.0.1:18081/transcribe \
 
 Gate 1 pass criteria:
 - readiness proves pinned versions/model/device/compute and `cuda_device_count >= 1`
+- `/health/stt` succeeds through `voice-gateway` even if the TTS/Speaches side
+  blocks whole-gateway `/health/readiness`
 - all 6 transcription requests succeed
 - readiness or startup logs prove one model load reused across all requests (`load_count=1`)
 
@@ -183,6 +188,7 @@ Request/response translation in Gate 2:
 ```bash
 curl -fsS http://192.168.1.93:18080/health
 curl -fsS http://192.168.1.93:18080/health/readiness | jq .
+curl -fsS http://192.168.1.93:18080/health/stt | jq .
 curl -fsS http://192.168.1.93:18080/v1/models -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
 curl -fsS http://192.168.1.93:18080/v1/speakers -H "Authorization: Bearer ${VOICE_GATEWAY_API_KEY}" | jq .
 curl -fsS http://192.168.1.93:18080/v1/audio/speech \
@@ -203,17 +209,11 @@ curl -fsS http://192.168.1.93:18080/v1/audio/speech \
   --output /tmp/voice-gateway-tts-regression.wav
 ```
 
-## LiteLLM canary smoke
+## LiteLLM STT canary smoke
 ```bash
-curl -fsS http://127.0.0.1:4000/v1/audio/speech \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"voice-tts-canary","input":"Homelab speech canary.","voice":"alloy","response_format":"wav","speed":1.0}' \
-  --output /tmp/litellm-voice-canary.wav
-
 curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -F 'file=@/tmp/litellm-voice-canary.wav' \
+  -F 'file=@/tmp/stt-smoke.wav' \
   -F 'model=voice-stt-canary'
 ```
 
@@ -225,16 +225,16 @@ curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   - optional: deterministic fallback plus warning log
 
 ## Open WebUI post-restart verification
-After any Open WebUI restart tied to the speech rollout:
+After any Open WebUI restart tied to the STT rollout:
 - verify `ENABLE_PERSISTENT_CONFIG=False`
-- verify effective `AUDIO_STT_*` and `AUDIO_TTS_*` envs from systemd
+- verify effective `AUDIO_STT_*` envs from systemd
 - verify the Admin UI audio page reflects the same values after restart
-- verify one real voice turn lands on LiteLLM `voice-*-canary` aliases
+- verify one real transcription request lands on LiteLLM `voice-stt-canary`
 
 Suggested commands:
 ```bash
 systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?ENABLE_PERSISTENT_CONFIG=False$'
-systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_(STT|TTS)_'
+systemctl show -p Environment open-webui.service --no-pager | tr ' ' '\n' | rg '^"?AUDIO_STT_'
 curl -fsS http://127.0.0.1:3000/health | jq .
 ```
 
