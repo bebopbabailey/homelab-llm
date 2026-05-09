@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+systemd_voice_gateway_api_base="${VOICE_GATEWAY_API_BASE:-}"
+systemd_voice_gateway_api_key="${VOICE_GATEWAY_API_KEY:-}"
+
 if [[ -f "config/env.local" ]]; then
   # shellcheck disable=SC1091
   set -a
@@ -8,11 +11,12 @@ if [[ -f "config/env.local" ]]; then
   set +a
 fi
 
-if [[ -f "/etc/homelab-llm/litellm-voice.env" ]]; then
-  # shellcheck disable=SC1091
-  set -a
-  source "/etc/homelab-llm/litellm-voice.env"
-  set +a
+if [[ -n "${systemd_voice_gateway_api_base}" ]]; then
+  export VOICE_GATEWAY_API_BASE="${systemd_voice_gateway_api_base}"
+fi
+
+if [[ -n "${systemd_voice_gateway_api_key}" ]]; then
+  export VOICE_GATEWAY_API_KEY="${systemd_voice_gateway_api_key}"
 fi
 
 export LITELLM_LOG="${LITELLM_LOG:-INFO}"
