@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Produce a downloadable artifact fit survey for Gemma 4 and Qwen3.6 across
-  Studio MLX, Orin CUDA/Linux, Mini OpenVINO/CPU, iOS MLX Swift, HP-class
-  Linux, and Raspberry Pi 2GB targets.
+- Produce a greenfield Gemma 4 and Qwen3.6 landscape survey covering model
+  capabilities, ecosystem ports, hardware affinity, community usage, and
+  customization paths.
 
 NEXT UP
-- Use the survey to choose the first no-download candidate list before any
-  model-cache or runtime work.
+- Use the survey to decide which model/runtime/hardware combinations deserve
+  actual smoke tests.

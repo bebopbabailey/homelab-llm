@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-10-gemma4-qwen36-landscape-survey](2026-05-10-gemma4-qwen36-landscape-survey.md)
 - [2026-05-10-gemma4-qwen36-artifact-fit](2026-05-10-gemma4-qwen36-artifact-fit.md)
 - [2026-05-09-orin-small-stt](2026-05-09-orin-small-stt.md)
 - [2026-05-04-docs-mcp-lan-publish](2026-05-04-docs-mcp-lan-publish.md)
