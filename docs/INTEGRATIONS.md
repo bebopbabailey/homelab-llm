@@ -205,9 +205,11 @@ if a param is rejected by the backend.
   upload callers may also send `model=task-transcribe` or
   `model=task-transcribe-vivid` to `POST /v1/audio/transcriptions`; LiteLLM
   routes audio through `voice-stt`, cleans the raw transcript with the same
-  dotprompt-backed alias, and returns `id` plus `output_text`. LiteLLM renders
-  the local transcribe dotprompts through its generic prompt-template path and
-  uses only a narrow transcript pre/post sanitizer around them.
+  dotprompt-backed alias, and returns `id` plus `output_text`. Vivid audio
+  uploads accept multipart `prompt_variables` as a JSON string for `audience`
+  and `tone`. LiteLLM renders the local transcribe dotprompts through its
+  generic prompt-template path and uses only a narrow transcript pre/post
+  sanitizer around them.
 - `task-transcribe-vivid` is the supported follow-up lane for conversational
   transcript manipulation. Reuse the prior Responses `id` as
   `previous_response_id` and optionally observe

@@ -59,6 +59,20 @@ def _strip_provider_prefix(model: str) -> str:
     return model.rsplit("/", 1)[-1] if "/" in model else model
 
 
+def _coerce_prompt_variables(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            logger.warning("transcribe audio ignored malformed prompt_variables")
+            return {}
+        if isinstance(parsed, dict):
+            return dict(parsed)
+    return {}
+
+
 def _extract_user_text(messages: Any) -> str:
     if not isinstance(messages, list):
         return ""
@@ -274,9 +288,11 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
         raise RuntimeError(f"{alias} audio cleanup requires provider model")
 
     transcript = _preprocess_transcript(transcript) if transcript else ""
-    prompt_variables = {"user_message": transcript}
+    prompt_variables = _coerce_prompt_variables(data.get("_transcribe_audio_prompt_variables"))
+    prompt_variables["user_message"] = transcript
     if alias == "task-transcribe-vivid":
-        prompt_variables.update({"audience": "", "tone": ""})
+        prompt_variables.setdefault("audience", "")
+        prompt_variables.setdefault("tone", "")
     messages = _render_prompt_messages(PROMPT_ID_BY_MODEL[alias], prompt_variables)
     body = await _post_responses(
         api_base,
@@ -291,10 +307,23 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
         },
     )
     content = _extract_responses_output_text(body)
-    if not content:
-        raise RuntimeError(f"{alias} audio cleanup returned empty output")
     response_id = str(body.get("id") or f"resp_{uuid4().hex}")
-    return response_id, _strip_wrappers(content)
+    if not content:
+        logger.warning(
+            "transcribe audio cleanup empty alias=%s fallback=preprocessed_transcript transcript_len=%s",
+            alias,
+            len(transcript),
+        )
+        return response_id, transcript
+    cleaned = _strip_wrappers(content)
+    if not cleaned:
+        logger.warning(
+            "transcribe audio cleanup stripped_empty alias=%s fallback=preprocessed_transcript transcript_len=%s",
+            alias,
+            len(transcript),
+        )
+        return response_id, transcript
+    return response_id, cleaned
 
 
 _strip_wrappers = strip_wrappers
@@ -325,6 +354,9 @@ class TranscribeGuardrail(CustomGuardrail):
         if call_type in {"transcription", "atranscription"}:
             data["_transcribe_audio_cleanup_alias"] = model
             data["_transcribe_audio_original_model"] = model
+            data["_transcribe_audio_prompt_variables"] = _coerce_prompt_variables(
+                data.pop("prompt_variables", None)
+            )
             data["model"] = TASK_TRANSCRIBE_AUDIO_STT_MODEL
             logger.info("transcribe audio pre_call alias=%s stt_model=%s", model, data["model"])
             return data

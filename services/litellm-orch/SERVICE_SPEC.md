@@ -117,7 +117,9 @@ implement inference or web-search business logic.
   upload callers: LiteLLM routes the audio through `voice-stt`, cleans the raw
   transcript through the same dotprompt-backed task alias, and returns a minimal
   payload with `id` and `output_text`. Open WebUI speech wiring should still use
-  the raw `voice-stt` alias.
+  the raw `voice-stt` alias. For audio uploads, `task-transcribe-vivid` accepts
+  a multipart `prompt_variables` JSON string and passes `audience` / `tone`
+  through to the cleanup dotprompt.
 - The transcribe dotprompt files are rendered through the generic
   `prompt-pre` template path. They do not select a backend model; router alias
   selection stays authoritative.

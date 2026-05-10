@@ -243,11 +243,19 @@ curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -F model=task-transcribe \
   -F file=@/path/to/audio.wav | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -F model=task-transcribe-vivid \
+  -F file=@/path/to/audio.wav \
+  -F 'prompt_variables={"audience":"internal notes","tone":"lightly polished"}' | jq .
 ```
 Expected:
 - request routes audio through `voice-stt`
 - response body contains only `id` and `output_text`
 - `output_text` is the cleaned transcript, not the raw STT payload
+- `task-transcribe-vivid` passes optional `prompt_variables.audience` and
+  `prompt_variables.tone` through to the cleanup dotprompt
 
 Task-alias follow-up/state smoke:
 ```bash
