@@ -1,11 +1,11 @@
 # NOW
 
 Active
-- Research Gemma 4 and Qwen3.6 downloadable model artifacts, quantizations,
-  formats, and hardware fit across Studio MLX, Orin CUDA/Linux, Intel Mini,
-  HP-class Linux, iOS, and Raspberry Pi-class edge devices.
+- Update the Gemma 4 / Qwen3.6 artifact-fit research note with a broader Orin
+  coding-worker recommendation that considers Devstral Small 2, Qwen3-Coder
+  30B-A3B, and Qwen3-Coder-Next.
 
 NEXT UP
-- Decide whether to stage any recommended artifact for download or runtime
-  testing; no model registry or runtime changes are in scope for the research
-  note.
+- Decide whether to run a separate Orin smoke-test plan for a single coding
+  worker artifact; no model registry or runtime changes are in scope for this
+  note update.

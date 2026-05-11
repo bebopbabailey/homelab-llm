@@ -28,6 +28,11 @@ Repo hardware context:
 Public artifact sources checked on 2026-05-11:
 - Official Qwen cards: `Qwen/Qwen3.6-35B-A3B`, `Qwen/Qwen3.6-27B`.
 - Gemma 4 launch/runtime notes, including MLX and Jetson Orin Nano examples.
+- Orin coding-worker follow-up sources:
+  `mistralai/Devstral-Small-2-24B-Instruct-2512`,
+  `unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF`,
+  `Qwen/Qwen3-Coder-Next`, `unsloth/Qwen3-Coder-Next-GGUF`,
+  and Qwen3-Coder 30B-A3B GGUF reports.
 - MLX artifacts: Qwen3.6 35B-A3B DWQ 4-bit, Qwen3.6 27B 4-bit/OptiQ,
   Gemma 4 E2B/E4B/26B/31B 4-bit and OptiQ variants.
 - GGUF artifacts: Qwen3.6 27B GGUF, Gemma 4 26B-A4B GGUF, and searched
@@ -52,6 +57,10 @@ split is:
 - Raspberry Pi 2 GB: Gemma 4 E2B is still too large at normal quants. Treat
   this as sub-1B or extreme Q2 experiment territory, not a Gemma 4/Qwen3.6
   target.
+- Orin near-term coding worker: do not pigeonhole this into Gemma/Qwen3.6.
+  The best pound-for-pound starting point is probably Devstral Small 2 24B GGUF,
+  with Qwen3-Coder 30B-A3B as the Qwen runner-up and Qwen3-Coder-Next as a
+  higher-ceiling second-phase experiment.
 
 ### Qwen3.6 shapes
 `Qwen/Qwen3.6-35B-A3B` is a 35B total / 3B activated MoE with a vision encoder,
@@ -122,13 +131,60 @@ For tiny edge:
   unless you are intentionally testing an extreme Q2 text-only artifact with
   tiny context and very low expectations.
 
+### Orin coding-worker candidates
+The best near-term Orin coding worker should be selected for useful project
+context, stable tool/agent behavior, and enough memory left for KV cache on the
+61 GB unified-memory Jetson AGX Orin. That points away from chasing the biggest
+possible model first.
+
+Best first candidate:
+- `unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF` or
+  `bartowski/mistralai_Devstral-Small-2-24B-Instruct-2512-GGUF`.
+- Start with Q5-class GGUF (`Q5_K_M`, `Q5_K_L`, or a dynamic Q5) if latency is
+  acceptable; fall back to `Q4_K_M` / `UD-Q4_K_XL` if context headroom matters
+  more.
+- Target 32K context first, then try 64K after latency and memory pressure are
+  measured.
+- Why: Devstral Small 2 is explicitly positioned as a software-engineering
+  agent model for codebase exploration, multi-file editing, and tool use. At
+  24B dense it is large enough to be useful but small enough to leave a sane KV
+  budget on Orin.
+
+Best Qwen-side near-term candidate:
+- `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`.
+- Start around Q5-class GGUF if possible, or Q4 if the context budget is too
+  tight.
+- Use a recent llama.cpp build because earlier Qwen3-Coder GGUF behavior had
+  loop/tool-call fixes after release.
+- Why: it keeps the Qwen coding/tool-call lineage but is materially easier to
+  fit than Qwen3-Coder-Next.
+
+High-ceiling experiment, not first dependable worker:
+- `unsloth/Qwen3-Coder-Next-GGUF`.
+- Start with `UD-Q3_K_XL` or `UD-Q4_K_M`; expect 16K-32K context before trying
+  larger windows.
+- Why: Qwen3-Coder-Next is a compelling 80B total / 3B active coding MoE, but
+  the artifact and runtime overhead leave less room on a 61 GB Orin for KV
+  cache, CUDA memory, and agent loops. Unsloth's own card recommends more than
+  45 GB unified memory/RAM+VRAM for 4-bit and more than 30 GB for 2-bit XL, so
+  it fits only with narrower safety margin.
+
+Runtime posture:
+- Prove model quality with GGUF/llama.cpp first.
+- Treat vLLM on Orin as a second-phase experiment. Jetson vLLM wheels exist,
+  and vLLM has explicit Qwen3-Next support, but combining Jetson ARM/CUDA,
+  hybrid MoE, tool parsing, and exotic quants is still more fragile than a
+  GGUF smoke test.
+- If the GGUF path is useful but too slow, then evaluate a vLLM/NVFP4 path
+  such as `RedHatAI/Qwen3-Coder-Next-NVFP4`.
+
 ## Artifact fit matrix
 
 | Hardware | Best fit | Maybe | Avoid |
 | --- | --- | --- | --- |
 | Studio M3 Ultra 256 GB | Qwen3.6 27B MLX 4-bit/OptiQ; Qwen3.6 35B-A3B MLX 4-bit; Gemma 4 E4B/26B/31B MLX | GGUF Q5/Q6/Q8 for llama.cpp/LM Studio comparison | Treating any new artifact as public lane without `mlxctl` onboarding |
 | iOS / Apple mobile | Gemma 4 E2B/E4B MLX-class artifacts after MLX Swift validation | Very small Qwen-family models, not Qwen3.6 27B/35B | 16 GB+ Qwen3.6/Gemma 31B artifacts |
-| Orin AGX Linux/CUDA | Gemma 4 E2B/E4B GGUF; Qwen3.6 27B GGUF low/mid quants as a stress test | Qwen3.6 35B-A3B GGUF Q3/Q4 only if runtime role changes | MLX artifacts; large models while preserving speech appliance role |
+| Orin AGX Linux/CUDA | Devstral Small 2 24B GGUF for coding work; Gemma 4 E2B/E4B GGUF for edge/multimodal trials | Qwen3-Coder 30B-A3B GGUF; Qwen3.6 27B/35B-A3B GGUF low/mid quants as stress tests | MLX artifacts; Qwen3-Coder-Next as the first dependable worker |
 | Intel Mini 62 GiB | Small GGUF; OpenVINO conversion candidates; Gemma 4 E2B/E4B CPU trials | Qwen3.6 27B Q2/Q3 GGUF as slow/offline experiment | 27B/35B as an interactive backend expectation |
 | HP 6.7 GiB | Sub-3B GGUF; Gemma E2B very low quant only if nothing else is running | Q3-ish E2B experiments | Qwen3.6 27B/35B; Gemma 26B/31B |
 | Raspberry Pi 2 GB | Sub-1B, Q2/IQ2 legacy/small models outside this Gemma/Qwen target | Gemma 4 E2B Q2 only as a stunt with tiny context | Normal Gemma 4 E2B Q4; all Qwen3.6 |
@@ -154,6 +210,19 @@ For tiny edge:
 6. `bartowski/Qwen_Qwen3.6-27B-GGUF` low/mid quant
    - Best non-MLX Qwen3.6 path for Linux/CUDA/CPU experiments.
    - Not a small-device artifact.
+7. `unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF`
+   - Best near-term Orin coding-worker candidate if the goal is dependable
+     project work, not maximum benchmark ambition.
+   - Start at Q5-class for quality, then adjust down to Q4 if context or
+     latency requires it.
+8. `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF`
+   - Best Qwen-family Orin worker candidate before trying Qwen3-Coder-Next.
+   - More coding/tool-call specific than generic Qwen3.6, with lower fit risk
+     than the 80B Coder-Next artifact.
+9. `unsloth/Qwen3-Coder-Next-GGUF`
+   - High-ceiling Orin experiment, not the first dependable worker.
+   - Try only after deciding the larger memory footprint and narrower context
+     budget are worth it.
 
 ## Observations / risks
 - MLX is the right format for Studio and any iOS/macOS app work. GGUF is the
@@ -171,6 +240,11 @@ For tiny edge:
 - Fine-tunes and uncensored variants exist for both families, but they should
   not be first downloads. Start with base/instruct or optimization-focused
   quants, then evaluate fine-tunes only for a specific behavior gap.
+- For Orin coding work, "largest model that fits" is the wrong first metric.
+  The better first metric is "best model that can keep 32K useful project
+  context, run stable tool/agent loops, and leave memory headroom for the
+  runtime." By that standard, Devstral Small 2 24B looks stronger than
+  Qwen3-Coder-Next for near-term dependable use.
 
 ## Next steps
 1. If the next action is Apple Silicon evaluation, download
@@ -178,10 +252,14 @@ For tiny edge:
    `mlx-community/gemma-4-e4b-it-OptiQ-4bit` into the Studio model store first.
 2. If the next action is Orin/Linux edge evaluation, start with Gemma 4 E2B
    GGUF Q4_K_M, then Q3_K_M if memory pressure appears.
-3. If the next action is Raspberry Pi 2 GB play, do not start with Gemma 4 or
+3. If the next action is Orin coding-worker evaluation, start with Devstral
+   Small 2 24B GGUF at Q5-class and 32K context. Compare Qwen3-Coder
+   30B-A3B GGUF next, then treat Qwen3-Coder-Next as a second-phase high-ceiling
+   experiment.
+4. If the next action is Raspberry Pi 2 GB play, do not start with Gemma 4 or
    Qwen3.6. Pick a sub-1B GGUF model instead, or explicitly label Gemma 4 E2B
    Q2 as a stunt.
-4. Keep any actual runtime exposure, registry row, or alias work as a separate
+5. Keep any actual runtime exposure, registry row, or alias work as a separate
    approved task.
 
 ## Sources
@@ -213,3 +291,15 @@ For tiny edge:
   https://huggingface.co/mlx-community/gemma-4-31b-4bit
 - PLE-safe Gemma 4 31B MLX note:
   https://huggingface.co/FakeRockert543/gemma-4-31b-it-MLX-4bit
+- Devstral Small 2 model card:
+  https://docs.mistral.ai/models/model-cards/devstral-small-2-25-12
+- Devstral Small 2 GGUF:
+  https://huggingface.co/unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF
+- Qwen3-Coder-Next model card:
+  https://huggingface.co/Qwen/Qwen3-Coder-Next
+- Qwen3-Coder-Next GGUF:
+  https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF
+- Qwen3-Coder-Next technical report:
+  https://arxiv.org/abs/2603.00729
+- vLLM Qwen3-Next support note:
+  https://vllm.ai/blog/qwen3-next
