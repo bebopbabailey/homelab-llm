@@ -204,12 +204,12 @@ source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.loca
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":384}' | jq .
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":4096}' | jq .
 
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"max_output_tokens":256}' | jq .
+  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"max_output_tokens":8192}' | jq .
 
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -249,11 +249,17 @@ curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   -F model=task-transcribe-vivid \
   -F file=@/path/to/audio.wav \
   -F 'prompt_variables={"audience":"internal notes","tone":"lightly polished"}' | jq .
+
+curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
+  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -F model=task-json \
+  -F file=@/path/to/audio.wav | jq .
 ```
 Expected:
 - request routes audio through `voice-stt`
 - response body contains only `id` and `output_text`
-- `output_text` is the cleaned transcript, not the raw STT payload
+- `task-transcribe*` `output_text` is the cleaned transcript, not the raw STT payload
+- `task-json` `output_text` is minified canonical JSON
 - `task-transcribe-vivid` passes optional `prompt_variables.audience` and
   `prompt_variables.tone` through to the cleanup dotprompt
 
@@ -274,7 +280,7 @@ initial = {
     "model": "task-transcribe-vivid",
     "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
-    "max_output_tokens": 256,
+    "max_output_tokens": 8192,
 }
 req = urllib.request.Request(url, data=json.dumps(initial).encode(), headers=headers, method="POST")
 with urllib.request.urlopen(req, timeout=90) as resp:
@@ -285,7 +291,7 @@ followup = {
     "previous_response_id": first["id"],
     "input": [{"role": "user", "content": "Make that a little more formal."}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
-    "max_output_tokens": 192,
+    "max_output_tokens": 4096,
 }
 req = urllib.request.Request(url, data=json.dumps(followup).encode(), headers=headers, method="POST")
 with urllib.request.urlopen(req, timeout=90) as resp:

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 import httpx
 from litellm.integrations.custom_guardrail import CustomGuardrail
@@ -14,6 +16,7 @@ from litellm.types.guardrails import GuardrailEventHooks
 
 
 TASK_JSON_ALIAS = "task-json"
+TASK_JSON_AUDIO_STT_MODEL = "voice-stt"
 PROVIDER_MODEL = "openai/llmster-gpt-oss-20b-mxfp4-gguf"
 PROMPT_ID = "task-json"
 RESPONSES_MAX_OUTPUT_TOKENS = 512
@@ -155,6 +158,20 @@ def _extract_input_text(input_value: Any) -> str:
         if text.strip():
             parts.append(text.strip())
     return "\n\n".join(parts).strip()
+
+
+def _extract_transcription_text(response: Any) -> str:
+    if isinstance(response, str):
+        return response.strip()
+    if hasattr(response, "text"):
+        text = getattr(response, "text")
+        if isinstance(text, str):
+            return text.strip()
+    body = _response_to_dict(response)
+    if not body:
+        return ""
+    text = body.get("text")
+    return text.strip() if isinstance(text, str) else ""
 
 
 def _extract_transcript(messages: Any) -> str:
@@ -364,6 +381,35 @@ def _set_responses_content(response: Any, content: str) -> Any:
     return body
 
 
+def _minimal_audio_response_payload(response_id: str, output_text: str) -> dict[str, str]:
+    return {"id": response_id, "output_text": output_text}
+
+
+def _set_audio_output_text(response: Any, response_id: str, output_text: str) -> Any:
+    payload = _minimal_audio_response_payload(response_id, output_text)
+    if isinstance(response, dict):
+        response.clear()
+        response.update(payload)
+        return response
+    if hasattr(response, "model_dump"):
+        response.model_dump = lambda *args, **kwargs: dict(payload)
+    if hasattr(response, "json"):
+        response.json = lambda *args, **kwargs: dict(payload)
+    if hasattr(response, "model_dump_json"):
+        response.model_dump_json = lambda *args, **kwargs: json.dumps(payload)
+    for key, value in payload.items():
+        try:
+            setattr(response, key, value)
+        except Exception:
+            pass
+    for key in ("text", "usage"):
+        try:
+            setattr(response, key, None)
+        except Exception:
+            pass
+    return response
+
+
 def _is_task_json_request(data: dict[str, Any]) -> bool:
     if data.get("model") == TASK_JSON_ALIAS:
         return True
@@ -374,6 +420,17 @@ def _is_task_json_request(data: dict[str, Any]) -> bool:
     return isinstance(schema, dict) and schema.get("name") == "task_json_payload"
 
 
+def _provider_config(data: dict[str, Any]) -> tuple[str, str, str | None]:
+    api_base = os.getenv("LLMSTER_FAST_API_BASE", "")
+    provider_model = os.getenv("LLMSTER_FAST_MODEL", "")
+    if not api_base:
+        api_base = str(data.get("_task_json_audio_provider_api_base") or data.get("api_base") or "")
+    if not provider_model:
+        provider_model = str(data.get("_task_json_audio_provider_model") or PROVIDER_MODEL)
+    api_key = os.getenv("LLMSTER_API_KEY") or None
+    return api_base, provider_model, api_key
+
+
 async def _post_json(url: str, headers: dict[str, str], payload: dict[str, Any]) -> Optional[dict[str, Any]]:
     async with httpx.AsyncClient(timeout=120) as client:
         response = await client.post(url, headers=headers, json=payload)
@@ -381,6 +438,33 @@ async def _post_json(url: str, headers: dict[str, str], payload: dict[str, Any])
         if response.headers.get("content-type", "").startswith("application/json"):
             return response.json()
     return None
+
+
+async def _extract_audio_json(transcript: str, data: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    api_base, provider_model, api_key = _provider_config(data)
+    if not api_base:
+        raise RuntimeError("task-json audio extraction requires provider api_base")
+    if not provider_model:
+        raise RuntimeError("task-json audio extraction requires provider model")
+
+    headers = {"Content-Type": "application/json"}
+    if api_key and api_key != "dummy":
+        headers["Authorization"] = f"Bearer {api_key}"
+    payload = {
+        "model": provider_model.removeprefix("openai/"),
+        "input": _render_prompt_messages({"user_message": transcript}),
+        "temperature": 0.0,
+        "max_output_tokens": RESPONSES_MAX_OUTPUT_TOKENS,
+        "reasoning": {"effort": "low"},
+        "text": {"format": TASK_JSON_RESPONSES_FORMAT},
+    }
+    response = await _post_json(f"{api_base.rstrip('/')}/responses", headers, payload)
+    content = _extract_responses_content(response)
+    normalized = _parse_and_normalize_content(content) if isinstance(content, str) else None
+    if normalized is None:
+        normalized = _canonical_payload({"guardrail_status": "repair_failed"})
+    response_id = str((response or {}).get("id") or f"resp_{uuid4().hex}")
+    return response_id, normalized
 
 
 async def _repair_once(data: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -453,6 +537,12 @@ class TaskJsonGuardrail(CustomGuardrail):
             return data
 
         data["_task_json_call_type"] = call_type
+        if call_type in {"transcription", "atranscription"}:
+            data["_task_json_audio_cleanup_alias"] = TASK_JSON_ALIAS
+            data["model"] = TASK_JSON_AUDIO_STT_MODEL
+            logger.info("task-json audio pre_call stt_model=%s", data["model"])
+            return data
+
         if call_type in {"responses", "aresponses"}:
             transcript = _extract_input_text(data.get("input"))
             data["input"] = _render_prompt_messages({"user_message": transcript})
@@ -518,3 +608,51 @@ class TaskJsonGuardrail(CustomGuardrail):
         if body and body.get("object") == "response":
             return _set_responses_content(body, minified)
         return _set_chat_content(response, minified)
+
+    async def async_post_call_response_headers_hook(
+        self,
+        data: dict,
+        user_api_key_dict: Any,
+        response: Any,
+        request_headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> dict[str, str] | None:
+        event_hook = (
+            self.event_hook.value
+            if isinstance(self.event_hook, GuardrailEventHooks)
+            else self.event_hook
+        )
+        if event_hook != GuardrailEventHooks.post_call.value:
+            return None
+        if data.get("_task_json_audio_cleanup_alias") != TASK_JSON_ALIAS:
+            return None
+
+        response_id = f"resp_{uuid4().hex}"
+        transcript = _extract_transcription_text(response)
+        if not transcript:
+            logger.error("task-json audio post_call empty_stt_transcript=true")
+            minified = json.dumps(
+                _canonical_payload({"guardrail_status": "empty_stt_transcript"}),
+                separators=(",", ":"),
+                ensure_ascii=True,
+            )
+            _set_audio_output_text(response, response_id, minified)
+            return None
+
+        try:
+            response_id, normalized = await _extract_audio_json(transcript, data)
+        except Exception:
+            logger.exception("task-json audio extraction failed")
+            normalized = _canonical_payload({"guardrail_status": "repair_failed"})
+
+        minified = json.dumps(normalized, separators=(",", ":"), ensure_ascii=True)
+        logger.info(
+            "task-json audio post_call transcript_len=%s todo=%s grocery=%s purchase=%s other_items=%s",
+            len(transcript),
+            len(normalized["todo"]),
+            len(normalized["grocery"]),
+            len(normalized["purchase"]),
+            len(normalized["other"]["items"]),
+        )
+        _set_audio_output_text(response, response_id, minified)
+        return None

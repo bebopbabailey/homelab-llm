@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from litellm.types.utils import TranscriptionResponse
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -100,6 +102,26 @@ class TestTaskJsonGuardrail(unittest.TestCase):
         self.assertEqual(result["text"]["format"]["name"], "task_json_payload")
         self.assertIn("Transcript:\ncall mom tomorrow, buy milk, pick up paper towels", result["input"][-1]["content"])
 
+    def test_pre_call_audio_task_json_routes_to_voice_stt(self):
+        guardrail = task_json_guardrail.TaskJsonGuardrail("task-json-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-json",
+                    "file": object(),
+                    "language": "en",
+                },
+                "transcription",
+            )
+        )
+
+        self.assertEqual(result["model"], "voice-stt")
+        self.assertEqual(result["_task_json_audio_cleanup_alias"], "task-json")
+        self.assertEqual(result["language"], "en")
+        self.assertNotIn("prompt_id", result)
+
     def test_post_call_normalizes_payload_and_salvages_unknown_keys(self):
         guardrail = task_json_guardrail.TaskJsonGuardrail("task-json-post", "post_call", True)
         response = {
@@ -190,3 +212,75 @@ class TestTaskJsonGuardrail(unittest.TestCase):
         self.assertEqual(result["output"][0]["type"], "message")
         self.assertEqual(result["output_text"], '{"todo":["Call Mom"],"grocery":[],"purchase":[],"other":{"items":[],"attributes":{}}}')
         self.assertNotIn("reasoning", result)
+
+    def test_audio_post_call_extracts_json_and_rewrites_minimal_payload(self):
+        guardrail = task_json_guardrail.TaskJsonGuardrail("task-json-post", "post_call", True)
+        response = TranscriptionResponse(text="call mom tomorrow buy milk pick up paper towels")
+        extraction_body = {
+            "id": "resp_json_audio",
+            "object": "response",
+            "output_text": json.dumps(
+                {
+                    "todo": ["Call Mom tomorrow"],
+                    "grocery": ["milk"],
+                    "purchase": ["paper towels"],
+                    "other": {"items": [], "attributes": {}},
+                }
+            ),
+            "output": [],
+        }
+
+        with patch.dict(
+            task_json_guardrail.os.environ,
+            {
+                "LLMSTER_FAST_API_BASE": "http://provider.test/v1",
+                "LLMSTER_FAST_MODEL": "openai/provider-fast",
+            },
+        ), patch.object(task_json_guardrail, "_post_json", AsyncMock(return_value=extraction_body)) as post:
+            result = asyncio.run(
+                guardrail.async_post_call_response_headers_hook(
+                    {
+                        "model": "voice-stt",
+                        "_task_json_audio_cleanup_alias": "task-json",
+                    },
+                    None,
+                    response,
+                )
+            )
+
+        self.assertIsNone(result)
+        payload = json.loads(response.model_dump()["output_text"])
+        self.assertEqual(response.model_dump()["id"], "resp_json_audio")
+        self.assertEqual(payload["todo"], ["Call Mom tomorrow"])
+        self.assertEqual(payload["grocery"], ["milk"])
+        self.assertEqual(payload["purchase"], ["paper towels"])
+        provider_payload = post.await_args.args[2]
+        self.assertEqual(post.await_args.args[0], "http://provider.test/v1/responses")
+        self.assertEqual(provider_payload["model"], "provider-fast")
+        self.assertEqual(provider_payload["text"]["format"]["name"], "task_json_payload")
+        self.assertIn(
+            "Transcript:\ncall mom tomorrow buy milk pick up paper towels",
+            provider_payload["input"][-1]["content"],
+        )
+
+    def test_audio_post_call_empty_stt_returns_canonical_failure_payload(self):
+        guardrail = task_json_guardrail.TaskJsonGuardrail("task-json-post", "post_call", True)
+        response = TranscriptionResponse(text="")
+
+        result = asyncio.run(
+            guardrail.async_post_call_response_headers_hook(
+                {
+                    "model": "voice-stt",
+                    "_task_json_audio_cleanup_alias": "task-json",
+                },
+                None,
+                response,
+            )
+        )
+
+        self.assertIsNone(result)
+        payload = json.loads(response.model_dump()["output_text"])
+        self.assertEqual(payload["todo"], [])
+        self.assertEqual(payload["grocery"], [])
+        self.assertEqual(payload["purchase"], [])
+        self.assertEqual(payload["other"]["attributes"]["guardrail_status"], "empty_stt_transcript")

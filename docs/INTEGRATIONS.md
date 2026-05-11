@@ -217,9 +217,12 @@ if a param is rejected by the backend.
 - LiteLLM transcript-to-JSON utility alias:
   - `task-json`
 - `task-json` is also a `POST /v1/responses` utility contract first.
-  `POST /v1/chat/completions` remains temporary compatibility only.
-  It returns canonical JSON extraction output and is not part of the Open WebUI
-  `AUDIO_STT_*` speech path.
+  `POST /v1/chat/completions` remains temporary compatibility only. Direct
+  audio upload callers may also send `model=task-json` to
+  `POST /v1/audio/transcriptions`; LiteLLM routes audio through `voice-stt`,
+  extracts fixed-schema JSON from the transcript, and returns `id` plus minified
+  JSON in `output_text`. It is not part of the Open WebUI `AUDIO_STT_*` speech
+  path.
 - LiteLLM YouTube transcript-summary alias:
   - `task-youtube-summary`
 - `task-youtube-summary` is a `POST /v1/responses` utility contract first.

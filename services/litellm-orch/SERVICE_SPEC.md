@@ -132,6 +132,10 @@ implement inference or web-search business logic.
   public `id` string that the caller originally stored.
 - `task-json` is a transcript-to-JSON utility alias only.
   Its canonical contract is `POST /v1/responses` with native Responses `input`.
+  It also accepts `POST /v1/audio/transcriptions` for direct file upload
+  callers: LiteLLM routes audio through `voice-stt`, runs the raw transcript
+  through the same fixed-schema JSON extraction path, and returns a minimal
+  payload with `id` and minified JSON in `output_text`.
   It removes tool-calling fields and returns minified JSON with exact top-level keys
   `todo`, `grocery`, `purchase`, and `other`.
 - `task-json` uses LiteLLM-owned pre-call and post-call guardrails to inject a

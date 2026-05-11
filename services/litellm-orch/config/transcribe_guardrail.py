@@ -15,13 +15,9 @@ from litellm.types.guardrails import GuardrailEventHooks
 
 TASK_TRANSCRIBE_MODELS = {"task-transcribe", "task-transcribe-vivid"}
 TASK_TRANSCRIBE_AUDIO_STT_MODEL = "voice-stt"
-RESPONSES_MIN_OUTPUT_TOKENS = {
-    "task-transcribe": 384,
-    "task-transcribe-vivid": 256,
-}
-PROVIDER_MAX_OUTPUT_TOKENS = {
-    "task-transcribe": 384,
-    "task-transcribe-vivid": 256,
+DEFAULT_OUTPUT_TOKENS = {
+    "task-transcribe": 4096,
+    "task-transcribe-vivid": 8192,
 }
 logger = logging.getLogger("transcribe_guardrail")
 
@@ -71,6 +67,21 @@ def _coerce_prompt_variables(value: Any) -> dict[str, Any]:
         if isinstance(parsed, dict):
             return dict(parsed)
     return {}
+
+
+def _coerce_positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = int(value)
+        except ValueError:
+            return None
+        if parsed > 0:
+            return parsed
+    return None
 
 
 def _extract_user_text(messages: Any) -> str:
@@ -294,6 +305,10 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
         prompt_variables.setdefault("audience", "")
         prompt_variables.setdefault("tone", "")
     messages = _render_prompt_messages(PROMPT_ID_BY_MODEL[alias], prompt_variables)
+    max_output_tokens = (
+        _coerce_positive_int(data.get("_transcribe_audio_max_output_tokens"))
+        or DEFAULT_OUTPUT_TOKENS[alias]
+    )
     body = await _post_responses(
         api_base,
         api_key,
@@ -303,7 +318,7 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
             "reasoning": {"effort": "low"},
             "temperature": 0.0,
             "stream": False,
-            "max_output_tokens": PROVIDER_MAX_OUTPUT_TOKENS[alias],
+            "max_output_tokens": max_output_tokens,
         },
     )
     content = _extract_responses_output_text(body)
@@ -357,22 +372,22 @@ class TranscribeGuardrail(CustomGuardrail):
             data["_transcribe_audio_prompt_variables"] = _coerce_prompt_variables(
                 data.pop("prompt_variables", None)
             )
+            requested_output_tokens = _coerce_positive_int(data.pop("max_output_tokens", None))
+            if requested_output_tokens is None:
+                requested_output_tokens = DEFAULT_OUTPUT_TOKENS[model]
+            data["_transcribe_audio_max_output_tokens"] = requested_output_tokens
             data["model"] = TASK_TRANSCRIBE_AUDIO_STT_MODEL
             logger.info("transcribe audio pre_call alias=%s stt_model=%s", model, data["model"])
             return data
 
         if call_type in {"responses", "aresponses"}:
             transcript = _extract_responses_input_text(data.get("input"))
-            current_budget = data.get("max_output_tokens")
-            minimum = RESPONSES_MIN_OUTPUT_TOKENS[model]
-            if not isinstance(current_budget, int) or current_budget < minimum:
-                data["max_output_tokens"] = minimum
+            if _coerce_positive_int(data.get("max_output_tokens")) is None:
+                data["max_output_tokens"] = DEFAULT_OUTPUT_TOKENS[model]
         else:
             transcript = _extract_user_text(data.get("messages") or [])
-            current_budget = data.get("max_tokens")
-            minimum = RESPONSES_MIN_OUTPUT_TOKENS[model]
-            if not isinstance(current_budget, int) or current_budget < minimum:
-                data["max_tokens"] = minimum
+            if _coerce_positive_int(data.get("max_tokens")) is None:
+                data["max_tokens"] = DEFAULT_OUTPUT_TOKENS[model]
         transcript = _preprocess_transcript(transcript) if transcript else ""
 
         prompt_variables = dict(data.get("prompt_variables") or {})
