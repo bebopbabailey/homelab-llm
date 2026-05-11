@@ -1,10 +1,11 @@
 # NOW
 
 Active
-- Produce a greenfield Gemma 4 and Qwen3.6 landscape survey covering model
-  capabilities, ecosystem ports, hardware affinity, community usage, and
-  customization paths.
+- Research Gemma 4 and Qwen3.6 downloadable model artifacts, quantizations,
+  formats, and hardware fit across Studio MLX, Orin CUDA/Linux, Intel Mini,
+  HP-class Linux, iOS, and Raspberry Pi-class edge devices.
 
 NEXT UP
-- Use the survey to decide which model/runtime/hardware combinations deserve
-  actual smoke tests.
+- Decide whether to stage any recommended artifact for download or runtime
+  testing; no model registry or runtime changes are in scope for the research
+  note.
