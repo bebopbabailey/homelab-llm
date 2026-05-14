@@ -1843,7 +1843,7 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":256}' | jq -r '.output[0].content[0].text'
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":256}' | jq -r '.output[0].content[0].text'
 
 python3 - <<'PY'
 import json, urllib.request
@@ -1857,7 +1857,7 @@ for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/conf
 url = "http://127.0.0.1:4000/v1/responses"
 headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 first = {
-    "model": "task-transcribe-vivid",
+    "model": "task-transcribe",
     "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
     "max_output_tokens": 256,
@@ -1867,7 +1867,7 @@ with urllib.request.urlopen(req, timeout=90) as resp:
     first_body = json.loads(resp.read().decode())
 
 second = {
-    "model": "task-transcribe-vivid",
+    "model": "task-transcribe",
     "previous_response_id": first_body["id"],
     "input": [{"role": "user", "content": "Make that a little more formal."}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
@@ -1889,7 +1889,7 @@ PY
 SMOKE_KEY_JSON="$(curl -fsS http://127.0.0.1:4000/key/generate \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"key_alias":"task-transcribe-smoke","key_type":"llm_api","duration":"1h","models":["task-transcribe","task-transcribe-vivid"],"allowed_routes":["/v1/models","/v1/responses","/v1/chat/completions"]}')"
+  -d '{"key_alias":"task-transcribe-smoke","key_type":"llm_api","duration":"1h","models":["task-transcribe"],"allowed_routes":["/v1/models","/v1/responses","/v1/chat/completions"]}')"
 SMOKE_KEY="$(printf '%s' "$SMOKE_KEY_JSON" | jq -r '.key')"
 
 curl -fsS http://127.0.0.1:4000/v1/models \
@@ -1905,11 +1905,13 @@ Pass guidance:
 - `/health/readiness` does not report `db: "Not connected"`.
 - `/key/generate` succeeds for a short-lived non-master smoke key.
 - the smoke key can call `/v1/models` and `POST /v1/responses` for the
-  allowed transcript aliases.
-- `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
-- both aliases succeed through `POST /v1/responses`
+  allowed transcript alias.
+- `/v1/models` includes `task-transcribe` and does not include
+  `task-transcribe-vivid`.
+- standard and vivid `task-transcribe` requests succeed through
+  `POST /v1/responses`
 - outputs are plain cleaned transcript text with no wrapper heading, label, or commentary
-- `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
+- `task-transcribe` accepts optional `audience` and `tone` prompt variables
 - vivid follow-up accepts the prior public response `id` as
   `previous_response_id`
 - the echoed `previous_response_id` does not need to equal that public `id`

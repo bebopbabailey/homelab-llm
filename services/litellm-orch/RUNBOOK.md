@@ -130,7 +130,7 @@ uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scri
 ```
 
 Current GPT public-lane posture:
-- Responses-first for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`, `task-json`, and `task-youtube-summary`
+- Responses-first for `fast`, `deep`, `task-transcribe`, `task-json`, and `task-youtube-summary`
 - `/v1/chat/completions` remains temporary compatibility only for those public GPT-OSS aliases
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
@@ -189,7 +189,8 @@ rg -n "websearch-schema|websearch_schema_guardrail|web_answer|fast-research" \
 
 Expected:
 - `/v1/models` includes `deep`, `fast`, and `code-reasoning`.
-- `/v1/models` includes `task-transcribe` and `task-transcribe-vivid`.
+- `/v1/models` includes `task-transcribe`.
+- `/v1/models` does not include `task-transcribe-vivid`.
 - `/v1/models` includes `task-json`.
 - `/v1/models` includes `task-youtube-summary`.
 - `fast-research` is absent.
@@ -209,7 +210,7 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe-vivid","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"max_output_tokens":8192}' | jq .
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":8192}' | jq .
 
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -223,7 +224,8 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
 ```
 Expected:
 - `task-transcribe` returns cleaned transcript text in the final Responses `message`
-- `task-transcribe-vivid` returns cleaned vivid transcript text in the final Responses `message`
+- `task-transcribe` with `prompt_variables.audience` / `prompt_variables.tone`
+  returns cleaned vivid transcript text in the final Responses `message`
 - `task-json` returns minified canonical JSON in the final Responses `message`
 - `task-youtube-summary` returns markdown with a compact metadata line plus a comprehensive summary in the final Responses `message`
 - `task-youtube-summary` depends on the localhost-only `media-fetch-mcp`
@@ -246,7 +248,7 @@ curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
 
 curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -F model=task-transcribe-vivid \
+  -F model=task-transcribe \
   -F file=@/path/to/audio.wav \
   -F 'prompt_variables={"audience":"internal notes","tone":"lightly polished"}' | jq .
 
@@ -258,9 +260,9 @@ curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
 Expected:
 - request routes audio through `voice-stt`
 - response body contains only `id` and `output_text`
-- `task-transcribe*` `output_text` is the cleaned transcript, not the raw STT payload
+- `task-transcribe` `output_text` is the cleaned transcript, not the raw STT payload
 - `task-json` `output_text` is minified canonical JSON
-- `task-transcribe-vivid` passes optional `prompt_variables.audience` and
+- `task-transcribe` passes optional `prompt_variables.audience` and
   `prompt_variables.tone` through to the cleanup dotprompt
 
 Task-alias follow-up/state smoke:
@@ -277,7 +279,7 @@ for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/conf
 url = "http://127.0.0.1:4000/v1/responses"
 headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 initial = {
-    "model": "task-transcribe-vivid",
+    "model": "task-transcribe",
     "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
     "max_output_tokens": 8192,
@@ -287,7 +289,7 @@ with urllib.request.urlopen(req, timeout=90) as resp:
     first = json.loads(resp.read().decode())
 
 followup = {
-    "model": "task-transcribe-vivid",
+    "model": "task-transcribe",
     "previous_response_id": first["id"],
     "input": [{"role": "user", "content": "Make that a little more formal."}],
     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
@@ -317,7 +319,7 @@ Expected:
 - the echoed `previous_response_id` may be an internal/raw form and should not
   be compared byte-for-byte against the public `id`
 - both responses expose `usage.input_tokens_details.cached_tokens`
-- `task-transcribe-vivid` keeps stable `output_text` for Shortcut-style clients
+- vivid `task-transcribe` keeps stable `output_text` for Shortcut-style clients
 
 YouTube-summary follow-up/state smoke:
 ```bash
@@ -452,7 +454,7 @@ Expected:
 - the transcription call succeeds through LiteLLM
 - LiteLLM logs show `voice-stt-canary`
 - the Orin `voice-gateway` LAN `api_base` is used directly
-- `task-transcribe*` remains untouched
+- `task-transcribe` remains untouched
 
 ## Transcript alias checks
 ```bash
@@ -466,15 +468,16 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe-vivid","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
+  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
 ```
 
 Expected:
-- both aliases succeed through `POST /v1/chat/completions`
+- standard and vivid `task-transcribe` requests succeed through `POST /v1/chat/completions`
 - outputs are plain cleaned transcript text with no wrapper label or commentary
 - outputs do not expose `reasoning`, `reasoning_content`, or `provider_specific_fields`
-- `task-transcribe` routes through the `fast` lane and `task-transcribe-vivid` routes through the `deep` lane
-- `task-transcribe-vivid` accepts optional `audience` and `tone` prompt variables
+- standard and vivid text requests use the public `task-transcribe` lane;
+  vivid selects the vivid dotprompt and larger default output budget
+- `task-transcribe` accepts optional `audience` and `tone` prompt variables
 
 ## Task JSON alias check
 ```bash

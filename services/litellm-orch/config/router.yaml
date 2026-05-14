@@ -52,18 +52,6 @@ model_list:
     supports_function_calling: false
     supports_system_messages: true
 
-- model_name: task-transcribe-vivid
-  litellm_params:
-    model: os.environ/LLMSTER_DEEP_MODEL
-    api_base: os.environ/LLMSTER_DEEP_API_BASE
-    api_key: dummy
-    max_tokens: 4096
-  model_info:
-    mode: chat
-    max_output_tokens: 4096
-    supports_function_calling: false
-    supports_system_messages: true
-
 - model_name: task-json
   litellm_params:
     model: os.environ/LLMSTER_FAST_MODEL
@@ -149,7 +137,7 @@ guardrails:
       guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
+      target_models: "deep,fast,task-transcribe,task-json,task-youtube-summary"
       responses_only: false
   - guardrail_name: "llmster-toolcall-pre"
     litellm_params:
@@ -162,7 +150,7 @@ guardrails:
       guardrail: "gpt_request_defaults.GPTRequestDefaults"
       mode: "pre_call"
       default_on: true
-      target_models: "deep,fast,code-reasoning,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
+      target_models: "deep,fast,code-reasoning,task-transcribe,task-json,task-youtube-summary"
   - guardrail_name: "youtube-summary-post"
     litellm_params:
       guardrail: "youtube_summary_guardrail.YouTubeSummaryGuardrail"
@@ -179,7 +167,7 @@ guardrails:
       guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
       mode: "post_call"
       default_on: true
-      target_models: "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary"
+      target_models: "deep,fast,task-transcribe,task-json,task-youtube-summary"
       responses_only: false
   - guardrail_name: "transcribe-post"
     litellm_params:

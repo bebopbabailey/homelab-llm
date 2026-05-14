@@ -11,7 +11,7 @@ _HARMONY_REQUIRED_CHANNELS = {"analysis", "final"}
 _DEFAULT_TARGET_MODELS = {"deep", "fast", "boost", "boost-deep"}
 
 # Keep task-transcribe behavior fully controlled by transcribe guardrail.
-_EXCLUDED_MODELS = {"task-transcribe", "task-transcribe-vivid"}
+_EXCLUDED_MODELS = {"task-transcribe"}
 
 
 def _parse_bool(value: Any, default: bool) -> bool:

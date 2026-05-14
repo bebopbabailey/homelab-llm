@@ -80,14 +80,14 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(result["max_output_tokens"], 128)
         self.assertEqual(result["prompt_variables"]["user_message"], "um i i think this should probably work maybe yes")
 
-    def test_pre_call_task_transcribe_vivid_accepts_optional_prompt_variables(self):
+    def test_pre_call_task_transcribe_prompt_variables_select_vivid_mode(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
         result = asyncio.run(
             guardrail.async_pre_call_hook(
                 None,
                 None,
                 {
-                    "model": "task-transcribe-vivid",
+                    "model": "task-transcribe",
                     "messages": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
                     "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
                 },
@@ -95,9 +95,12 @@ class TestTranscribeBaseline(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result["model"], "task-transcribe-vivid")
+        self.assertEqual(result["model"], "task-transcribe")
+        self.assertEqual(result["_transcribe_text_cleanup_alias"], "task-transcribe")
+        self.assertEqual(result["_transcribe_mode"], "vivid")
         self.assertEqual(result["prompt_id"], "task-transcribe-vivid")
         self.assertFalse(result["stream"])
+        self.assertEqual(result["max_tokens"], 8192)
         self.assertEqual(
             result["prompt_variables"]["user_message"],
             "uh okay this is kind of sudden but it matters a lot actually",
@@ -112,14 +115,16 @@ class TestTranscribeBaseline(unittest.TestCase):
                 None,
                 None,
                 {
-                    "model": "task-transcribe-vivid",
+                    "model": "task-transcribe",
                     "input": [{"role": "user", "content": "uh okay this matters"}],
-                    "prompt_variables": {},
+                    "prompt_variables": {"audience": "internal notes"},
                 },
                 "responses",
             )
         )
 
+        self.assertEqual(result["model"], "task-transcribe")
+        self.assertEqual(result["prompt_id"], "task-transcribe-vivid")
         self.assertEqual(result["max_output_tokens"], 8192)
 
     def test_pre_call_audio_task_transcribe_routes_to_voice_stt(self):
@@ -151,15 +156,17 @@ class TestTranscribeBaseline(unittest.TestCase):
                 None,
                 None,
                 {
-                    "model": "task-transcribe-vivid",
+                    "model": "task-transcribe",
                     "file": object(),
+                    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
                 },
                 "transcription",
             )
         )
 
         self.assertEqual(result["model"], "voice-stt")
-        self.assertEqual(result["_transcribe_audio_cleanup_alias"], "task-transcribe-vivid")
+        self.assertEqual(result["_transcribe_audio_cleanup_alias"], "task-transcribe")
+        self.assertEqual(result["_transcribe_mode"], "vivid")
         self.assertEqual(result["_transcribe_audio_max_output_tokens"], 8192)
 
     def test_pre_call_audio_task_transcribe_preserves_output_token_override(self):
@@ -188,7 +195,7 @@ class TestTranscribeBaseline(unittest.TestCase):
                 None,
                 None,
                 {
-                    "model": "task-transcribe-vivid",
+                    "model": "task-transcribe",
                     "file": object(),
                     "prompt_variables": json.dumps(
                         {"audience": "internal notes", "tone": "lightly polished"}
@@ -204,6 +211,7 @@ class TestTranscribeBaseline(unittest.TestCase):
             result["_transcribe_audio_prompt_variables"],
             {"audience": "internal notes", "tone": "lightly polished"},
         )
+        self.assertEqual(result["_transcribe_mode"], "vivid")
 
     def test_prompt_guardrail_renders_transcribe_template_without_model_override(self):
         pre_guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
@@ -246,6 +254,31 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(rendered["model"], "task-transcribe")
         self.assertNotIn("messages", rendered)
         self.assertEqual(rendered["input"][-1]["content"], "Transcript:\num i i think this should probably work maybe yes")
+
+    def test_prompt_guardrail_renders_vivid_template_when_prompt_variables_present(self):
+        pre_guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        prompt_pre = prompt_guardrail.PromptGuardrail("prompt-pre", "pre_call", True)
+        request = asyncio.run(
+            pre_guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "input": [{"role": "user", "content": "uh okay this matters"}],
+                    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
+                },
+                "responses",
+            )
+        )
+        rendered = asyncio.run(prompt_pre.async_pre_call_hook(None, None, request, "responses"))
+        rendered_text = "\n".join(message["content"] for message in rendered["input"])
+        self.assertEqual(rendered["model"], "task-transcribe")
+        self.assertNotIn("prompt_id", rendered)
+        self.assertNotIn("prompt_variables", rendered)
+        self.assertIn("Vivid mode rule", rendered_text)
+        self.assertIn("Audience: internal notes", rendered_text)
+        self.assertIn("Tone preference: lightly polished", rendered_text)
+        self.assertIn("Transcript:\nuh okay this matters", rendered_text)
 
     def test_preprocess_preserves_internal_apostrophes_and_hyphens(self):
         raw = "it's a well-known thing — right? wow!"
@@ -332,6 +365,22 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(result["output_text"], "Hello there.")
         self.assertNotIn("reasoning", result)
 
+    def test_post_call_rewrites_vivid_responses_with_internal_alias(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
+        response = {
+            "object": "response",
+            "output_text": "**Cleaned Transcript**: Hello there.",
+            "output": [],
+        }
+        result = asyncio.run(
+            guardrail.async_post_call_success_hook(
+                {"model": "task-transcribe", "_transcribe_text_cleanup_alias": "task-transcribe"},
+                None,
+                response,
+            )
+        )
+        self.assertEqual(result["output_text"], "Hello there.")
+
     def test_audio_post_call_cleans_transcript_and_rewrites_minimal_payload(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-post", "post_call", True)
         response = TranscriptionResponse(text="um i think this works maybe yes")
@@ -389,7 +438,8 @@ class TestTranscribeBaseline(unittest.TestCase):
                 guardrail.async_post_call_response_headers_hook(
                     {
                         "model": "voice-stt",
-                        "_transcribe_audio_cleanup_alias": "task-transcribe-vivid",
+                        "_transcribe_audio_cleanup_alias": "task-transcribe",
+                        "_transcribe_mode": "vivid",
                         "_transcribe_audio_prompt_variables": {
                             "audience": "internal notes",
                             "tone": "lightly polished",

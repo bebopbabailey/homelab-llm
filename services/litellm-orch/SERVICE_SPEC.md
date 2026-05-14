@@ -65,8 +65,9 @@ implement inference or web-search business logic.
   Mini-local `qwen-agent-proxy` sidecar (`qwen-agent-coder-next-shadow`)
 - `task-transcribe` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the standard transcript-cleanup prompt
-- `task-transcribe-vivid` -> Studio `llmster` deep lane `8126`
-  (`llmster-gpt-oss-120b-mxfp4-gguf`) with the vivid transcript-cleanup prompt
+- `task-transcribe` also selects vivid transcript cleanup when callers provide
+  `prompt_variables.audience` and/or `prompt_variables.tone`; vivid cleanup
+  uses the vivid transcript dotprompt and a larger default output budget
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `task-youtube-summary` -> Studio `llmster` deep lane `8126`
@@ -92,8 +93,8 @@ implement inference or web-search business logic.
 - The current validated upstream model for that alias is `gpt-5.3-codex`.
 - Public GPT-OSS lanes are Responses-first on the LiteLLM path.
 - `POST /v1/chat/completions` remains temporarily available as a compatibility
-  path for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
-  `task-json`, and `task-youtube-summary`.
+  path for `fast`, `deep`, `task-transcribe`, `task-json`, and
+  `task-youtube-summary`.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -106,30 +107,33 @@ implement inference or web-search business logic.
 - Log destination: stdout/journald for now; switch to file output when ingestion pipeline is ready.
 
 ## Guardrails
-- `transcribe-guardrail` is enabled for `task-transcribe` and `task-transcribe-vivid`.
+- `transcribe-guardrail` is enabled for `task-transcribe`.
   Its pre-call path only normalizes transcript punctuation, sets the
-  transcribe `prompt_id`, and constrains the Responses token budget enough for
-  the `fast` lane to emit final text; its post-call path strips wrappers/labels
-  and rewrites task outputs into clean transcript-only payloads.
-- `task-transcribe` and `task-transcribe-vivid` are transcript cleanup aliases.
-  Their canonical text contract is `POST /v1/responses` with native Responses
-  `input`. They also accept `POST /v1/audio/transcriptions` for direct file
-  upload callers: LiteLLM routes the audio through `voice-stt`, cleans the raw
-  transcript through the same dotprompt-backed task alias, and returns a minimal
-  payload with `id` and `output_text`. Open WebUI speech wiring should still use
-  the raw `voice-stt` alias. For audio uploads, `task-transcribe-vivid` accepts
-  a multipart `prompt_variables` JSON string and passes `audience` / `tone`
-  through to the cleanup dotprompt.
+  transcribe `prompt_id`, selects standard or vivid cleanup from
+  `prompt_variables`, and constrains the token budget enough for the selected
+  lane to emit final text; its post-call path strips wrappers/labels and
+  rewrites task outputs into clean transcript-only payloads.
+- `task-transcribe` is the transcript cleanup alias. Its canonical text
+  contract is `POST /v1/responses` with native Responses `input`. It also
+  accepts `POST /v1/audio/transcriptions` for direct file upload callers:
+  LiteLLM routes the audio through `voice-stt`, cleans the raw transcript
+  through the same dotprompt-backed task alias, and returns a minimal payload
+  with `id` and `output_text`. Open WebUI speech wiring should still use the
+  raw `voice-stt` alias. For audio uploads, callers send multipart
+  `prompt_variables` as a JSON string when they want vivid `audience` / `tone`
+  behavior.
 - The transcribe dotprompt files are rendered through the generic
-  `prompt-pre` template path. They do not select a backend model; router alias
-  selection stays authoritative.
-- `task-transcribe-vivid` accepts optional `prompt_variables.audience` and
-  `prompt_variables.tone` for subtle punctuation/paragraph shaping only.
-  It is also the supported multi-turn transcript-manipulation lane:
-  callers may reuse the returned response `id` as `previous_response_id` on
-  later `/v1/responses` calls. The echoed `previous_response_id` in gateway
-  responses is not a stable public identity surface and may differ from the
-  public `id` string that the caller originally stored.
+  `prompt-pre` template path. Standard cleanup uses the standard dotprompt;
+  vivid cleanup uses the vivid dotprompt while preserving the public
+  `task-transcribe` contract.
+- `task-transcribe` accepts optional `prompt_variables.audience` and
+  `prompt_variables.tone` for subtle punctuation/paragraph shaping only. When
+  either key is present, the vivid dotprompt is selected. It is also the
+  supported multi-turn transcript-manipulation lane: callers may reuse the
+  returned response `id` as `previous_response_id` on later `/v1/responses`
+  calls. The echoed `previous_response_id` in gateway responses is not a stable
+  public identity surface and may differ from the public `id` string that the
+  caller originally stored.
 - `task-json` is a transcript-to-JSON utility alias only.
   Its canonical contract is `POST /v1/responses` with native Responses `input`.
   It also accepts `POST /v1/audio/transcriptions` for direct file upload
@@ -193,8 +197,8 @@ implement inference or web-search business logic.
     instead of leaving Open WebUI in a half-finished tool turn.
 - LiteLLM retains one narrow GPT request-default shim only:
   - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`,
-    `code-reasoning`, `task-transcribe`, `task-transcribe-vivid`, `task-json`,
-    and `task-youtube-summary`
+    `code-reasoning`, `task-transcribe`, `task-json`, and
+    `task-youtube-summary`
   - behavior:
     - inject `reasoning_effort=low` only when omitted on Chat Completions
     - inject `reasoning: {"effort":"low"}` only when omitted on Responses
@@ -213,8 +217,8 @@ implement inference or web-search business logic.
     error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
 - Current supported public GPT-OSS contract is Responses-first:
-  - `deep`, `fast`, `task-transcribe`, `task-transcribe-vivid`, `task-json`,
-    and `task-youtube-summary` all accept `POST /v1/responses`
+  - `deep`, `fast`, `task-transcribe`, `task-json`, and
+    `task-youtube-summary` all accept `POST /v1/responses`
   - `POST /v1/chat/completions` remains compatibility-only during the current migration window
   - raw upstream `fast` / `deep` callers should treat the Responses `output`
     message surface as canonical text; `output_text` is advisory-only on direct

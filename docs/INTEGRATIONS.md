@@ -52,14 +52,13 @@
   not public gateway aliasing.
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects omitted reasoning
-  defaults for `fast`, `deep`, `task-transcribe`, `task-transcribe-vivid`,
-  `task-json`, `task-youtube-summary`, and `code-reasoning` because the direct
+  defaults for `fast`, `deep`, `task-transcribe`, `task-json`,
+  `task-youtube-summary`, and `code-reasoning` because the direct
   shared `8126` GPT-OSS endpoints still degrade on some omitted-effort probes.
 - Public GPT-OSS lanes are now Responses-first:
   - `fast`
   - `deep`
   - `task-transcribe`
-  - `task-transcribe-vivid`
   - `task-json`
   - `task-youtube-summary`
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
@@ -69,7 +68,7 @@
   not the upstream truth-path requirement for `fast` / `deep`.
 - LiteLLM keeps the task aliases more ergonomic by preserving `id`,
   `previous_response_id`, and `usage`, while also returning stable
-  `output_text` on `task-transcribe*`, `task-json`, and
+  `output_text` on `task-transcribe`, `task-json`, and
   `task-youtube-summary`. Callers may reuse the public response `id` on the
   next request, but should not depend on the echoed `previous_response_id`
   string matching that public `id` verbatim.
@@ -194,23 +193,23 @@ if a param is rejected by the backend.
 - LiteLLM STT aliases:
   - canary: `voice-stt-canary`
   - stable: `voice-stt`
-- LiteLLM transcript-cleanup aliases:
-  - standard: `task-transcribe` on the `fast` lane
-  - vivid: `task-transcribe-vivid` on the `deep` lane
+- LiteLLM transcript-cleanup alias:
+  - `task-transcribe`; vivid cleanup is selected with
+    `prompt_variables.audience` / `prompt_variables.tone`
 - LiteLLM experimental Codex-backed alias:
   - `chatgpt-5`
-- `task-transcribe*` is a `POST /v1/responses` text-cleanup contract first.
+- `task-transcribe` is a `POST /v1/responses` text-cleanup contract first.
   `POST /v1/chat/completions` remains temporary compatibility only.
   It is not part of the Open WebUI `AUDIO_STT_*` speech path. Direct file
-  upload callers may also send `model=task-transcribe` or
-  `model=task-transcribe-vivid` to `POST /v1/audio/transcriptions`; LiteLLM
-  routes audio through `voice-stt`, cleans the raw transcript with the same
-  dotprompt-backed alias, and returns `id` plus `output_text`. Vivid audio
-  uploads accept multipart `prompt_variables` as a JSON string for `audience`
-  and `tone`. LiteLLM renders the local transcribe dotprompts through its
-  generic prompt-template path and uses only a narrow transcript pre/post
-  sanitizer around them.
-- `task-transcribe-vivid` is the supported follow-up lane for conversational
+  upload callers may also send `model=task-transcribe` to
+  `POST /v1/audio/transcriptions`; LiteLLM routes audio through `voice-stt`,
+  cleans the raw transcript with the same dotprompt-backed alias, and returns
+  `id` plus `output_text`. Vivid cleanup for text or audio is selected by
+  sending `prompt_variables` with `audience` and/or `tone`; multipart uploads
+  pass that field as a JSON string. LiteLLM renders the local transcribe
+  dotprompts through its generic prompt-template path and uses only a narrow
+  transcript pre/post sanitizer around them.
+- `task-transcribe` is the supported follow-up lane for conversational
   transcript manipulation. Reuse the prior Responses `id` as
   `previous_response_id` and optionally observe
   `usage.input_tokens_details.cached_tokens` to confirm reuse behavior.

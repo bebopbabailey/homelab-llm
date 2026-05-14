@@ -27,13 +27,15 @@ class TestRouterDropParams(unittest.TestCase):
             "router_settings.fallbacks must preserve fast -> deep",
         )
 
-    def test_transcribe_aliases_use_fast_and_deep_lanes(self):
+    def test_transcribe_alias_uses_single_public_fast_lane(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         aliases = {
             item.get("model_name"): item.get("litellm_params", {})
             for item in config.get("model_list", [])
             if isinstance(item, dict)
         }
+        self.assertIn("task-transcribe", aliases)
+        self.assertNotIn("task-transcribe-vivid", aliases)
         self.assertEqual(
             aliases["task-transcribe"].get("model"),
             "os.environ/LLMSTER_FAST_MODEL",
@@ -41,14 +43,6 @@ class TestRouterDropParams(unittest.TestCase):
         self.assertEqual(
             aliases["task-transcribe"].get("api_base"),
             "os.environ/LLMSTER_FAST_API_BASE",
-        )
-        self.assertEqual(
-            aliases["task-transcribe-vivid"].get("model"),
-            "os.environ/LLMSTER_DEEP_MODEL",
-        )
-        self.assertEqual(
-            aliases["task-transcribe-vivid"].get("api_base"),
-            "os.environ/LLMSTER_DEEP_API_BASE",
         )
 
     def test_voice_stt_aliases_use_orin_voice_gateway(self):
@@ -123,7 +117,7 @@ class TestRouterDropParams(unittest.TestCase):
         for params in names.values():
             self.assertEqual(
                 params.get("target_models"),
-                "deep,fast,task-transcribe,task-transcribe-vivid,task-json,task-youtube-summary",
+                "deep,fast,task-transcribe,task-json,task-youtube-summary",
             )
             self.assertEqual(params.get("responses_only"), False)
 

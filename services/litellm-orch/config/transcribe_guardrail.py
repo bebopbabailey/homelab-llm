@@ -13,11 +13,18 @@ from litellm.integrations.custom_guardrail import CustomGuardrail
 from litellm.types.guardrails import GuardrailEventHooks
 
 
-TASK_TRANSCRIBE_MODELS = {"task-transcribe", "task-transcribe-vivid"}
+TASK_TRANSCRIBE_MODEL = "task-transcribe"
+TASK_TRANSCRIBE_MODELS = {TASK_TRANSCRIBE_MODEL}
 TASK_TRANSCRIBE_AUDIO_STT_MODEL = "voice-stt"
-DEFAULT_OUTPUT_TOKENS = {
-    "task-transcribe": 4096,
-    "task-transcribe-vivid": 8192,
+TRANSCRIBE_MODE_STANDARD = "standard"
+TRANSCRIBE_MODE_VIVID = "vivid"
+PROMPT_ID_BY_MODE = {
+    TRANSCRIBE_MODE_STANDARD: "task-transcribe",
+    TRANSCRIBE_MODE_VIVID: "task-transcribe-vivid",
+}
+DEFAULT_OUTPUT_TOKENS_BY_MODE = {
+    TRANSCRIBE_MODE_STANDARD: 4096,
+    TRANSCRIBE_MODE_VIVID: 8192,
 }
 logger = logging.getLogger("transcribe_guardrail")
 
@@ -43,12 +50,6 @@ except ModuleNotFoundError:
     _PROMPT_MODULE = importlib.util.module_from_spec(_PROMPT_SPEC)
     _PROMPT_SPEC.loader.exec_module(_PROMPT_MODULE)
     _render_prompt_messages = _PROMPT_MODULE._render_prompt_messages
-
-
-PROMPT_ID_BY_MODEL = {
-    "task-transcribe": "task-transcribe",
-    "task-transcribe-vivid": "task-transcribe-vivid",
-}
 
 
 def _strip_provider_prefix(model: str) -> str:
@@ -82,6 +83,26 @@ def _coerce_positive_int(value: Any) -> int | None:
         if parsed > 0:
             return parsed
     return None
+
+
+def _select_transcribe_mode(prompt_variables: dict[str, Any]) -> str:
+    if "audience" in prompt_variables or "tone" in prompt_variables:
+        return TRANSCRIBE_MODE_VIVID
+    return TRANSCRIBE_MODE_STANDARD
+
+
+def _default_output_tokens(mode: str) -> int:
+    return DEFAULT_OUTPUT_TOKENS_BY_MODE.get(mode, DEFAULT_OUTPUT_TOKENS_BY_MODE[TRANSCRIBE_MODE_STANDARD])
+
+
+def _prompt_id_for_mode(mode: str) -> str:
+    return PROMPT_ID_BY_MODE.get(mode, PROMPT_ID_BY_MODE[TRANSCRIBE_MODE_STANDARD])
+
+
+def _ensure_vivid_prompt_variables(prompt_variables: dict[str, Any], mode: str) -> None:
+    if mode == TRANSCRIBE_MODE_VIVID:
+        prompt_variables.setdefault("audience", "")
+        prompt_variables.setdefault("tone", "")
 
 
 def _extract_user_text(messages: Any) -> str:
@@ -262,8 +283,8 @@ def _set_audio_output_text(response: Any, response_id: str, output_text: str) ->
     return response
 
 
-def _provider_config_for_alias(alias: str, data: dict[str, Any]) -> tuple[str, str, str | None]:
-    if alias == "task-transcribe-vivid":
+def _provider_config_for_mode(mode: str, data: dict[str, Any]) -> tuple[str, str, str | None]:
+    if mode == TRANSCRIBE_MODE_VIVID:
         api_base = os.getenv("LLMSTER_DEEP_API_BASE", "")
         provider_model = os.getenv("LLMSTER_DEEP_MODEL", "")
     else:
@@ -292,7 +313,8 @@ async def _post_responses(api_base: str, api_key: str | None, payload: dict[str,
 
 
 async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, Any]) -> tuple[str, str]:
-    api_base, provider_model, api_key = _provider_config_for_alias(alias, data)
+    mode = str(data.get("_transcribe_mode") or TRANSCRIBE_MODE_STANDARD)
+    api_base, provider_model, api_key = _provider_config_for_mode(mode, data)
     if not api_base:
         raise RuntimeError(f"{alias} audio cleanup requires provider api_base")
     if not provider_model:
@@ -301,13 +323,11 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
     transcript = _preprocess_transcript(transcript) if transcript else ""
     prompt_variables = _coerce_prompt_variables(data.get("_transcribe_audio_prompt_variables"))
     prompt_variables["user_message"] = transcript
-    if alias == "task-transcribe-vivid":
-        prompt_variables.setdefault("audience", "")
-        prompt_variables.setdefault("tone", "")
-    messages = _render_prompt_messages(PROMPT_ID_BY_MODEL[alias], prompt_variables)
+    _ensure_vivid_prompt_variables(prompt_variables, mode)
+    messages = _render_prompt_messages(_prompt_id_for_mode(mode), prompt_variables)
     max_output_tokens = (
         _coerce_positive_int(data.get("_transcribe_audio_max_output_tokens"))
-        or DEFAULT_OUTPUT_TOKENS[alias]
+        or _default_output_tokens(mode)
     )
     body = await _post_responses(
         api_base,
@@ -369,40 +389,51 @@ class TranscribeGuardrail(CustomGuardrail):
         if call_type in {"transcription", "atranscription"}:
             data["_transcribe_audio_cleanup_alias"] = model
             data["_transcribe_audio_original_model"] = model
-            data["_transcribe_audio_prompt_variables"] = _coerce_prompt_variables(
-                data.pop("prompt_variables", None)
-            )
+            prompt_variables = _coerce_prompt_variables(data.pop("prompt_variables", None))
+            mode = _select_transcribe_mode(prompt_variables)
+            data["_transcribe_mode"] = mode
+            data["_transcribe_audio_prompt_variables"] = prompt_variables
             requested_output_tokens = _coerce_positive_int(data.pop("max_output_tokens", None))
             if requested_output_tokens is None:
-                requested_output_tokens = DEFAULT_OUTPUT_TOKENS[model]
+                requested_output_tokens = _default_output_tokens(mode)
             data["_transcribe_audio_max_output_tokens"] = requested_output_tokens
             data["model"] = TASK_TRANSCRIBE_AUDIO_STT_MODEL
-            logger.info("transcribe audio pre_call alias=%s stt_model=%s", model, data["model"])
+            logger.info(
+                "transcribe audio pre_call alias=%s mode=%s stt_model=%s",
+                model,
+                mode,
+                data["model"],
+            )
             return data
 
         if call_type in {"responses", "aresponses"}:
             transcript = _extract_responses_input_text(data.get("input"))
-            if _coerce_positive_int(data.get("max_output_tokens")) is None:
-                data["max_output_tokens"] = DEFAULT_OUTPUT_TOKENS[model]
         else:
             transcript = _extract_user_text(data.get("messages") or [])
-            if _coerce_positive_int(data.get("max_tokens")) is None:
-                data["max_tokens"] = DEFAULT_OUTPUT_TOKENS[model]
         transcript = _preprocess_transcript(transcript) if transcript else ""
 
         prompt_variables = dict(data.get("prompt_variables") or {})
         prompt_variables["user_message"] = transcript
-        if model == "task-transcribe-vivid":
-            prompt_variables.setdefault("audience", "")
-            prompt_variables.setdefault("tone", "")
+        mode = _select_transcribe_mode(prompt_variables)
+        _ensure_vivid_prompt_variables(prompt_variables, mode)
 
-        data["prompt_id"] = PROMPT_ID_BY_MODEL[model]
+        if call_type in {"responses", "aresponses"}:
+            if _coerce_positive_int(data.get("max_output_tokens")) is None:
+                data["max_output_tokens"] = _default_output_tokens(mode)
+        else:
+            if _coerce_positive_int(data.get("max_tokens")) is None:
+                data["max_tokens"] = _default_output_tokens(mode)
+
+        data["_transcribe_text_cleanup_alias"] = TASK_TRANSCRIBE_MODEL
+        data["_transcribe_mode"] = mode
+        data["prompt_id"] = _prompt_id_for_mode(mode)
         data["prompt_variables"] = prompt_variables
         data["stream"] = False
 
         logger.info(
-            "transcribe pre_call alias=%s prompt_id=%s transcript_len=%s prompt_vars=%s",
+            "transcribe pre_call alias=%s mode=%s prompt_id=%s transcript_len=%s prompt_vars=%s",
             model,
+            mode,
             data["prompt_id"],
             len(transcript),
             sorted(prompt_variables.keys()),
@@ -416,7 +447,8 @@ class TranscribeGuardrail(CustomGuardrail):
         response: Any,
     ) -> Any:
         model = data.get("model")
-        if model not in TASK_TRANSCRIBE_MODELS:
+        alias = data.get("_transcribe_text_cleanup_alias") or model
+        if alias not in TASK_TRANSCRIBE_MODELS:
             return response
 
         body = _response_to_dict(response)
@@ -426,7 +458,8 @@ class TranscribeGuardrail(CustomGuardrail):
                 return response
             cleaned = _strip_wrappers(content)
             logger.info(
-                "transcribe post_call alias=%s content_len=%s cleaned_len=%s",
+                "transcribe post_call alias=%s route_model=%s content_len=%s cleaned_len=%s",
+                alias,
                 model,
                 len(content),
                 len(cleaned),
@@ -444,7 +477,8 @@ class TranscribeGuardrail(CustomGuardrail):
         cleaned = _strip_wrappers(content)
 
         logger.info(
-            "transcribe post_call alias=%s content_len=%s cleaned_len=%s",
+            "transcribe post_call alias=%s route_model=%s content_len=%s cleaned_len=%s",
+            alias,
             model,
             len(content),
             len(cleaned),

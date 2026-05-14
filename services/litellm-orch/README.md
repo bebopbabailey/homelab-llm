@@ -21,7 +21,8 @@ only; it does not implement inference.
 ## Backends
 - Studio `llmster` GPT service on `8126` for `fast` and `deep`
 - `task-transcribe` is a text-cleanup alias on `fast`
-- `task-transcribe-vivid` is a text-cleanup alias on `deep`
+- vivid transcript cleanup is selected on `task-transcribe` with
+  `prompt_variables.audience` / `prompt_variables.tone`
 - `task-youtube-summary` is a YouTube transcript-summary alias on `deep`
 - Voice Gateway on the Orin for STT aliases
 - SearXNG on the Mini for generic search tooling
@@ -31,21 +32,21 @@ only; it does not implement inference.
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The local canonical public human lanes remain `fast` and `deep`.
 - Public GPT-OSS traffic is Responses-first through LiteLLM for `fast`,
-  `deep`, `task-transcribe`, `task-transcribe-vivid`, `task-json`, and
-  `task-youtube-summary`.
+  `deep`, `task-transcribe`, `task-json`, and `task-youtube-summary`.
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   GPT-OSS public aliases during the current migration window.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
-- `task-transcribe` and `task-transcribe-vivid` are additional task aliases,
-  not part of the public human chat-lane trio.
-- Their prompts are rendered through the generic `prompt-pre` dotprompt path;
+- `task-transcribe` is an additional task alias, not part of the public human
+  chat-lane trio.
+- Its standard and vivid prompts are rendered through the generic `prompt-pre`
+  dotprompt path;
   the transcribe guardrail only normalizes transcript input and strips wrapper
   fields from the final response payload.
 - Direct file-upload callers may also use `POST /v1/audio/transcriptions` with
-  `model=task-transcribe` or `model=task-transcribe-vivid`; LiteLLM first routes
-  audio to `voice-stt`, then cleans the raw transcript and returns `id` plus
-  `output_text`.
+  `model=task-transcribe`; LiteLLM first routes audio to `voice-stt`, then
+  cleans the raw transcript and returns `id` plus `output_text`. Add
+  `prompt_variables.audience` / `prompt_variables.tone` for vivid cleanup.
 - `task-youtube-summary` is also an additional task alias, not part of the
   public human chat-lane trio. Its guardrail resolves one supported YouTube
   video URL on the first turn, fetches structured transcript data from the
