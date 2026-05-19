@@ -206,7 +206,7 @@ source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.loca
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":4096}' | jq .
+  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":8192}' | jq .
 
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -226,7 +226,7 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 Expected:
 - `task-transcribe` returns cleaned transcript text in the final Responses `message`
 - `task-transcribe` with `prompt_variables.audience` / `prompt_variables.tone`
-  returns cleaned vivid transcript text in the final Responses `message`
+  returns cleaned transcript text shaped subtly by that guidance
 - `task-json` returns minified canonical JSON in the final Responses `message`
 - `task-youtube-transcript` returns plain timestamped transcript text in
   `choices[0].message.content`
@@ -313,7 +313,7 @@ Expected:
 - the echoed `previous_response_id` may be an internal/raw form and should not
   be compared byte-for-byte against the public `id`
 - both responses expose `usage.input_tokens_details.cached_tokens`
-- vivid `task-transcribe` keeps stable `output_text` for Shortcut-style clients
+- guided `task-transcribe` keeps stable `output_text` for Shortcut-style clients
 
 Experimental ChatGPT/Codex alias checks:
 ```bash
@@ -413,11 +413,11 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
 ```
 
 Expected:
-- standard and vivid `task-transcribe` requests succeed through `POST /v1/chat/completions`
+- plain and guided `task-transcribe` requests succeed through `POST /v1/chat/completions`
 - outputs are plain cleaned transcript text with no wrapper label or commentary
 - outputs do not expose `reasoning`, `reasoning_content`, or `provider_specific_fields`
-- standard and vivid text requests use the public `task-transcribe` lane;
-  vivid selects the vivid dotprompt and larger default output budget
+- all text requests use the public `task-transcribe` lane and single
+  dotprompt-backed cleanup path
 - `task-transcribe` accepts optional `audience` and `tone` prompt variables
 
 ## Task JSON alias check

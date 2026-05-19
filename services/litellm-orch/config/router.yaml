@@ -45,10 +45,10 @@ model_list:
     model: os.environ/LLMSTER_FAST_MODEL
     api_base: os.environ/LLMSTER_FAST_API_BASE
     api_key: dummy
-    max_tokens: 4096
+    max_tokens: 8192
   model_info:
     mode: chat
-    max_output_tokens: 4096
+    max_output_tokens: 8192
     supports_function_calling: false
     supports_system_messages: true
 
@@ -91,6 +91,12 @@ model_list:
     api_key: os.environ/VOICE_GATEWAY_API_KEY
   model_info:
     mode: audio_transcription
+prompts:
+- prompt_id: task-transcribe
+  litellm_params:
+    prompt_id: task-transcribe
+    prompt_integration: dotprompt
+    prompt_directory: ./prompts
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:
@@ -116,15 +122,11 @@ litellm_settings:
   modify_params: true
   set_verbose: true
   callbacks: ["prometheus"]
+  global_prompt_directory: ./prompts
 guardrails:
   - guardrail_name: "transcribe-pre"
     litellm_params:
       guardrail: "transcribe_guardrail.TranscribeGuardrail"
-      mode: "pre_call"
-      default_on: true
-  - guardrail_name: "prompt-pre"
-    litellm_params:
-      guardrail: "prompt_guardrail.PromptGuardrail"
       mode: "pre_call"
       default_on: true
   - guardrail_name: "responses-contract-public-pre"

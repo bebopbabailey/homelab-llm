@@ -10,26 +10,21 @@ from uuid import uuid4
 
 import httpx
 from litellm.integrations.custom_guardrail import CustomGuardrail
+from litellm.integrations.dotprompt.dotprompt_manager import DotpromptManager
 from litellm.types.guardrails import GuardrailEventHooks
 
 
 TASK_TRANSCRIBE_MODEL = "task-transcribe"
 TASK_TRANSCRIBE_MODELS = {TASK_TRANSCRIBE_MODEL}
 TASK_TRANSCRIBE_AUDIO_STT_MODEL = "voice-stt"
-TRANSCRIBE_MODE_STANDARD = "standard"
-TRANSCRIBE_MODE_VIVID = "vivid"
-PROMPT_ID_BY_MODE = {
-    TRANSCRIBE_MODE_STANDARD: "task-transcribe",
-    TRANSCRIBE_MODE_VIVID: "task-transcribe-vivid",
-}
-DEFAULT_OUTPUT_TOKENS_BY_MODE = {
-    TRANSCRIBE_MODE_STANDARD: 4096,
-    TRANSCRIBE_MODE_VIVID: 8192,
-}
+TASK_TRANSCRIBE_PROMPT_ID = "task-transcribe"
+DEFAULT_OUTPUT_TOKENS = 8192
 logger = logging.getLogger("transcribe_guardrail")
+_PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
+_DOTPROMPT = DotpromptManager(prompt_directory=str(_PROMPT_DIR))
 
 try:
-    from config.transcribe_utils import strip_punct_outside_words, strip_wrappers
+    from config.transcribe_utils import prepare_transcript_text, strip_wrappers
 except ModuleNotFoundError:
     _UTILS_PATH = Path(__file__).with_name("transcribe_utils.py")
     _UTILS_SPEC = importlib.util.spec_from_file_location("transcribe_utils", _UTILS_PATH)
@@ -37,23 +32,23 @@ except ModuleNotFoundError:
         raise ImportError(f"Unable to load transcribe_utils from {_UTILS_PATH}")
     _UTILS_MODULE = importlib.util.module_from_spec(_UTILS_SPEC)
     _UTILS_SPEC.loader.exec_module(_UTILS_MODULE)
-    strip_punct_outside_words = _UTILS_MODULE.strip_punct_outside_words
+    prepare_transcript_text = _UTILS_MODULE.prepare_transcript_text
     strip_wrappers = _UTILS_MODULE.strip_wrappers
-
-try:
-    from config.prompt_guardrail import _render_prompt_messages
-except ModuleNotFoundError:
-    _PROMPT_PATH = Path(__file__).with_name("prompt_guardrail.py")
-    _PROMPT_SPEC = importlib.util.spec_from_file_location("prompt_guardrail", _PROMPT_PATH)
-    if _PROMPT_SPEC is None or _PROMPT_SPEC.loader is None:
-        raise ImportError(f"Unable to load prompt_guardrail from {_PROMPT_PATH}")
-    _PROMPT_MODULE = importlib.util.module_from_spec(_PROMPT_SPEC)
-    _PROMPT_SPEC.loader.exec_module(_PROMPT_MODULE)
-    _render_prompt_messages = _PROMPT_MODULE._render_prompt_messages
 
 
 def _strip_provider_prefix(model: str) -> str:
     return model.rsplit("/", 1)[-1] if "/" in model else model
+
+
+def _render_prompt_messages(prompt_id: str, prompt_variables: dict[str, Any]) -> list[dict[str, Any]]:
+    compiled = _DOTPROMPT.compile_prompt(
+        prompt_id=prompt_id,
+        prompt_variables=prompt_variables,
+        client_messages=[],
+        dynamic_callback_params={},
+    )
+    messages = compiled.get("completed_messages") or compiled.get("prompt_template") or []
+    return [dict(message) for message in messages if isinstance(message, dict)]
 
 
 def _coerce_prompt_variables(value: Any) -> dict[str, Any]:
@@ -85,24 +80,13 @@ def _coerce_positive_int(value: Any) -> int | None:
     return None
 
 
-def _select_transcribe_mode(prompt_variables: dict[str, Any]) -> str:
-    if "audience" in prompt_variables or "tone" in prompt_variables:
-        return TRANSCRIBE_MODE_VIVID
-    return TRANSCRIBE_MODE_STANDARD
-
-
-def _default_output_tokens(mode: str) -> int:
-    return DEFAULT_OUTPUT_TOKENS_BY_MODE.get(mode, DEFAULT_OUTPUT_TOKENS_BY_MODE[TRANSCRIBE_MODE_STANDARD])
-
-
-def _prompt_id_for_mode(mode: str) -> str:
-    return PROMPT_ID_BY_MODE.get(mode, PROMPT_ID_BY_MODE[TRANSCRIBE_MODE_STANDARD])
-
-
-def _ensure_vivid_prompt_variables(prompt_variables: dict[str, Any], mode: str) -> None:
-    if mode == TRANSCRIBE_MODE_VIVID:
-        prompt_variables.setdefault("audience", "")
-        prompt_variables.setdefault("tone", "")
+def _ensure_transcribe_prompt_variables(prompt_variables: dict[str, Any]) -> None:
+    for key in ("audience", "tone"):
+        value = prompt_variables.get(key)
+        if value is None:
+            prompt_variables[key] = ""
+        elif not isinstance(value, str):
+            prompt_variables[key] = str(value)
 
 
 def _extract_user_text(messages: Any) -> str:
@@ -283,13 +267,9 @@ def _set_audio_output_text(response: Any, response_id: str, output_text: str) ->
     return response
 
 
-def _provider_config_for_mode(mode: str, data: dict[str, Any]) -> tuple[str, str, str | None]:
-    if mode == TRANSCRIBE_MODE_VIVID:
-        api_base = os.getenv("LLMSTER_DEEP_API_BASE", "")
-        provider_model = os.getenv("LLMSTER_DEEP_MODEL", "")
-    else:
-        api_base = os.getenv("LLMSTER_FAST_API_BASE", "")
-        provider_model = os.getenv("LLMSTER_FAST_MODEL", "")
+def _provider_config(data: dict[str, Any]) -> tuple[str, str, str | None]:
+    api_base = os.getenv("LLMSTER_FAST_API_BASE", "")
+    provider_model = os.getenv("LLMSTER_FAST_MODEL", "")
     if not api_base:
         api_base = str(data.get("_transcribe_audio_provider_api_base") or "")
     if not provider_model:
@@ -313,8 +293,7 @@ async def _post_responses(api_base: str, api_key: str | None, payload: dict[str,
 
 
 async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, Any]) -> tuple[str, str]:
-    mode = str(data.get("_transcribe_mode") or TRANSCRIBE_MODE_STANDARD)
-    api_base, provider_model, api_key = _provider_config_for_mode(mode, data)
+    api_base, provider_model, api_key = _provider_config(data)
     if not api_base:
         raise RuntimeError(f"{alias} audio cleanup requires provider api_base")
     if not provider_model:
@@ -323,11 +302,11 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
     transcript = _preprocess_transcript(transcript) if transcript else ""
     prompt_variables = _coerce_prompt_variables(data.get("_transcribe_audio_prompt_variables"))
     prompt_variables["user_message"] = transcript
-    _ensure_vivid_prompt_variables(prompt_variables, mode)
-    messages = _render_prompt_messages(_prompt_id_for_mode(mode), prompt_variables)
+    _ensure_transcribe_prompt_variables(prompt_variables)
+    messages = _render_prompt_messages(TASK_TRANSCRIBE_PROMPT_ID, prompt_variables)
     max_output_tokens = (
         _coerce_positive_int(data.get("_transcribe_audio_max_output_tokens"))
-        or _default_output_tokens(mode)
+        or DEFAULT_OUTPUT_TOKENS
     )
     body = await _post_responses(
         api_base,
@@ -362,7 +341,7 @@ async def _clean_audio_transcript(alias: str, transcript: str, data: dict[str, A
 
 
 _strip_wrappers = strip_wrappers
-_preprocess_transcript = strip_punct_outside_words
+_preprocess_transcript = prepare_transcript_text
 
 
 class TranscribeGuardrail(CustomGuardrail):
@@ -390,18 +369,15 @@ class TranscribeGuardrail(CustomGuardrail):
             data["_transcribe_audio_cleanup_alias"] = model
             data["_transcribe_audio_original_model"] = model
             prompt_variables = _coerce_prompt_variables(data.pop("prompt_variables", None))
-            mode = _select_transcribe_mode(prompt_variables)
-            data["_transcribe_mode"] = mode
             data["_transcribe_audio_prompt_variables"] = prompt_variables
             requested_output_tokens = _coerce_positive_int(data.pop("max_output_tokens", None))
             if requested_output_tokens is None:
-                requested_output_tokens = _default_output_tokens(mode)
+                requested_output_tokens = DEFAULT_OUTPUT_TOKENS
             data["_transcribe_audio_max_output_tokens"] = requested_output_tokens
             data["model"] = TASK_TRANSCRIBE_AUDIO_STT_MODEL
             logger.info(
-                "transcribe audio pre_call alias=%s mode=%s stt_model=%s",
+                "transcribe audio pre_call alias=%s stt_model=%s",
                 model,
-                mode,
                 data["model"],
             )
             return data
@@ -412,28 +388,25 @@ class TranscribeGuardrail(CustomGuardrail):
             transcript = _extract_user_text(data.get("messages") or [])
         transcript = _preprocess_transcript(transcript) if transcript else ""
 
-        prompt_variables = dict(data.get("prompt_variables") or {})
+        prompt_variables = _coerce_prompt_variables(data.get("prompt_variables"))
         prompt_variables["user_message"] = transcript
-        mode = _select_transcribe_mode(prompt_variables)
-        _ensure_vivid_prompt_variables(prompt_variables, mode)
+        _ensure_transcribe_prompt_variables(prompt_variables)
 
         if call_type in {"responses", "aresponses"}:
             if _coerce_positive_int(data.get("max_output_tokens")) is None:
-                data["max_output_tokens"] = _default_output_tokens(mode)
+                data["max_output_tokens"] = DEFAULT_OUTPUT_TOKENS
         else:
             if _coerce_positive_int(data.get("max_tokens")) is None:
-                data["max_tokens"] = _default_output_tokens(mode)
+                data["max_tokens"] = DEFAULT_OUTPUT_TOKENS
 
         data["_transcribe_text_cleanup_alias"] = TASK_TRANSCRIBE_MODEL
-        data["_transcribe_mode"] = mode
-        data["prompt_id"] = _prompt_id_for_mode(mode)
+        data["prompt_id"] = TASK_TRANSCRIBE_PROMPT_ID
         data["prompt_variables"] = prompt_variables
         data["stream"] = False
 
         logger.info(
-            "transcribe pre_call alias=%s mode=%s prompt_id=%s transcript_len=%s prompt_vars=%s",
+            "transcribe pre_call alias=%s prompt_id=%s transcript_len=%s prompt_vars=%s",
             model,
-            mode,
             data["prompt_id"],
             len(transcript),
             sorted(prompt_variables.keys()),

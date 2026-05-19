@@ -44,6 +44,29 @@ class TestRouterDropParams(unittest.TestCase):
             aliases["task-transcribe"].get("api_base"),
             "os.environ/LLMSTER_FAST_API_BASE",
         )
+        self.assertEqual(aliases["task-transcribe"].get("max_tokens"), 8192)
+
+    def test_transcribe_prompt_uses_native_dotprompt_config(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        prompts = {
+            item.get("prompt_id"): item.get("litellm_params", {})
+            for item in config.get("prompts", [])
+            if isinstance(item, dict)
+        }
+        guardrail_names = {
+            item.get("guardrail_name")
+            for item in config.get("guardrails", [])
+            if isinstance(item, dict)
+        }
+        self.assertIn("task-transcribe", prompts)
+        self.assertNotIn("task-transcribe-vivid", prompts)
+        self.assertEqual(prompts["task-transcribe"].get("prompt_integration"), "dotprompt")
+        self.assertEqual(prompts["task-transcribe"].get("prompt_directory"), "./prompts")
+        self.assertEqual(
+            config.get("litellm_settings", {}).get("global_prompt_directory"),
+            "./prompts",
+        )
+        self.assertNotIn("prompt-pre", guardrail_names)
 
     def test_voice_stt_aliases_use_orin_voice_gateway(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())

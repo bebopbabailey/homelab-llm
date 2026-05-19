@@ -45,7 +45,8 @@ LiteLLM supports sending standard logging payloads to external endpoints via
   `async_post_call_success_hook` path to normalize strict raw Qwen tool blocks
   on `main` when the backend is semantically correct but still returns a single
   raw `<tool_call>...</tool_call>` block.
-- `config/transcribe_guardrail.py` → post-call wrapper stripping (`task-transcribe` only).
+- `config/transcribe_guardrail.py` → `task-transcribe` request shaping,
+  audio-STT cleanup routing, and post-call wrapper stripping.
 - `config/harmony_guardrail.py` → post-call normalization for GPT-OSS Harmony
   and tag-based reasoning outputs.
 

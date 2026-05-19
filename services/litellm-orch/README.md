@@ -21,8 +21,9 @@ only; it does not implement inference.
 ## Backends
 - Studio `llmster` GPT service on `8126` for `fast` and `deep`
 - `task-transcribe` is a text-cleanup alias on `fast`
-- vivid transcript cleanup is selected on `task-transcribe` with
-  `prompt_variables.audience` / `prompt_variables.tone`
+- `task-transcribe` uses one dotprompt-backed cleanup lane; optional
+  `prompt_variables.audience` / `prompt_variables.tone` subtly shape rhythm
+  and audience fit
 - `task-youtube-transcript` is a YouTube transcript acquisition alias routed to
   the Mini-local `youtube-transcript-api`
 - Voice Gateway on the Orin for STT aliases
@@ -40,14 +41,15 @@ only; it does not implement inference.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
 - `task-transcribe` is an additional task alias, not part of the public human
   chat-lane trio.
-- Its standard and vivid prompts are rendered through the generic `prompt-pre`
-  dotprompt path;
-  the transcribe guardrail only normalizes transcript input and strips wrapper
-  fields from the final response payload.
+- Its prompt is registered in LiteLLM's native dotprompt config and rendered
+  from `prompt_id` / `prompt_variables`; the transcribe guardrail preserves
+  transcript punctuation, supplies prompt variables, routes direct audio
+  uploads through STT, and strips wrapper fields from the final response
+  payload.
 - Direct file-upload callers may also use `POST /v1/audio/transcriptions` with
   `model=task-transcribe`; LiteLLM first routes audio to `voice-stt`, then
   cleans the raw transcript and returns `id` plus `output_text`. Add
-  `prompt_variables.audience` / `prompt_variables.tone` for vivid cleanup.
+  `prompt_variables.audience` / `prompt_variables.tone` for subtle shaping.
 - `task-youtube-transcript` is also an additional task alias, not part of the
   public human chat-lane trio. It routes normal Chat Completions requests to
   the localhost-only `youtube-transcript-api` service on `127.0.0.1:8014/v1`;

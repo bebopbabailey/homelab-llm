@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["strip_wrappers", "strip_punct_outside_words"]
+__all__ = ["prepare_transcript_text", "strip_wrappers"]
 
 _CODE_FENCE_RE = re.compile(r"^\s*```[a-zA-Z0-9_-]*\s*\n(.*)\n```\s*$", re.DOTALL)
 _PREAMBLE_RE = re.compile(
@@ -11,19 +11,14 @@ _PREAMBLE_RE = re.compile(
 )
 
 
-def strip_punct_outside_words(text: str) -> str:
+def prepare_transcript_text(text: str) -> str:
     if not isinstance(text, str):
         return text
 
-    masked = re.sub(r"(?<=[A-Za-z0-9])['](?=[A-Za-z0-9])", "__ASCII_APOSTROPHE__", text)
-    masked = re.sub(r"(?<=[A-Za-z0-9])[’](?=[A-Za-z0-9])", "__CURLY_APOSTROPHE__", masked)
-    masked = re.sub(r"(?<=[A-Za-z0-9])-(?=[A-Za-z0-9])", "__INTERNAL_HYPHEN__", masked)
-    masked = re.sub(r"[^\w\s]", " ", masked)
-    masked = masked.replace("__ASCII_APOSTROPHE__", "'")
-    masked = masked.replace("__CURLY_APOSTROPHE__", "’")
-    masked = masked.replace("__INTERNAL_HYPHEN__", "-")
-    masked = re.sub(r"\s+", " ", masked)
-    return masked.strip()
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    return text.strip()
 
 
 def strip_wrappers(text: str) -> str:
