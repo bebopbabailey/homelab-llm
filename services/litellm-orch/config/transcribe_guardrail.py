@@ -110,7 +110,8 @@ def _flatten_responses_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, list):
-        return "".join(_flatten_responses_text(item) for item in value)
+        parts = [_flatten_responses_text(item) for item in value]
+        return "\n\n".join(part.strip() for part in parts if part.strip())
     if isinstance(value, dict):
         if value.get("type") in {"input_text", "output_text", "text"}:
             return _flatten_responses_text(value.get("text") or value.get("value"))

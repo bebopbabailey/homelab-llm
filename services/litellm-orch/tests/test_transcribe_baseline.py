@@ -83,6 +83,56 @@ class TestTranscribeBaseline(unittest.TestCase):
         self.assertEqual(result["max_output_tokens"], 128)
         self.assertEqual(result["prompt_variables"]["user_message"], "um i i think this should probably work maybe yes")
 
+    def test_pre_call_task_transcribe_preserves_newlines_from_chat_content(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        raw = "And This is...\n\nThe 1st time, I'm really feeling crushed.\n\nAnd, uh..."
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "messages": [{"role": "user", "content": raw}],
+                    "prompt_variables": {},
+                },
+                "chat.completions",
+            )
+        )
+
+        self.assertEqual(result["prompt_variables"]["user_message"], raw)
+
+    def test_pre_call_task_transcribe_preserves_responses_content_item_breaks(self):
+        guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
+        result = asyncio.run(
+            guardrail.async_pre_call_hook(
+                None,
+                None,
+                {
+                    "model": "task-transcribe",
+                    "input": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "input_text", "text": "And This is..."},
+                                {
+                                    "type": "input_text",
+                                    "text": "The 1st time, I'm really feeling crushed.",
+                                },
+                                {"type": "input_text", "text": "And, uh..."},
+                            ],
+                        }
+                    ],
+                    "prompt_variables": {},
+                },
+                "responses",
+            )
+        )
+
+        self.assertEqual(
+            result["prompt_variables"]["user_message"],
+            "And This is...\n\nThe 1st time, I'm really feeling crushed.\n\nAnd, uh...",
+        )
+
     def test_pre_call_task_transcribe_prompt_variables_shape_single_prompt(self):
         guardrail = transcribe_guardrail.TranscribeGuardrail("transcribe-pre", "pre_call", True)
         result = asyncio.run(
