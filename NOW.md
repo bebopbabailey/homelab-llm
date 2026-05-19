@@ -1,10 +1,10 @@
 # NOW
 
 Active
-- Collapse the LiteLLM transcript cleanup surface to one public
-  `task-transcribe` lane that preserves Apple punctuation, removes disfluency,
-  and uses `prompt_variables` only as subtle audience/tone guidance.
+- Extend the Gemma/Qwen/GPT artifact-fit note with three-model ensemble
+  recommendations under 80/100/120/150 GB model-weight budgets.
 
 NEXT UP
-- Run FAST `litellm-orch` checks, then decide whether to do a Mini runtime
-  smoke and close out the linked worktree.
+- Use the ensemble note to choose a first staged model-download and runtime
+  smoke-test plan; no model registry or runtime changes are in scope for this
+  documentation update.

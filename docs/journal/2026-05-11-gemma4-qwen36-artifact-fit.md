@@ -38,6 +38,14 @@ Public artifact sources checked on 2026-05-11:
 - GGUF artifacts: Qwen3.6 27B GGUF, Gemma 4 26B-A4B GGUF, and searched
   Gemma E2B/E4B plus Qwen3.6 35B-A3B GGUF variants.
 
+Follow-up ensemble sources checked on 2026-05-19:
+- GPT-OSS 20B/120B MXFP4 release notes and MLX/GGUF package notes.
+- Gemma 4 31B MLX 4-bit/6-bit/8-bit and Gemma 4 26B-A4B MLX 4-bit/MXFP4
+  package listings.
+- Qwen3.6 27B MLX 4-bit/OptiQ/8-bit package listings.
+- Qwen3-Coder-Next official card, GGUF notes, and NVFP4 package listing.
+- Current repo hardware inventory for Studio and Orin memory boundaries.
+
 ## Findings
 
 ### Short version
@@ -178,6 +186,181 @@ Runtime posture:
 - If the GGUF path is useful but too slow, then evaluate a vLLM/NVFP4 path
   such as `RedHatAI/Qwen3-Coder-Next-NVFP4`.
 
+### GPT/Gemma/Qwen ensemble budgets
+These ensembles pick one GPT-family model, one Gemma-family model, and one
+Qwen-family model under fixed **model-weights-at-rest** budgets. The totals do
+not include KV cache, runtime memory, vision projector sidecars, speculative
+draft models, loaded tokenizer/process overhead, or batching/concurrency.
+
+The guiding split:
+- GPT slot: reasoning, structured planning, tool discipline, fallback synthesis.
+- Gemma slot: broad generalist and multimodal work, home-control-like
+  instruction following, non-code ideation, utility cleanup.
+- Qwen slot: agentic coding, repository reasoning, code exploration, tool-heavy
+  code execution, and implementation detail.
+
+The major capability inflection is `gpt-oss-20b` to `gpt-oss-120b`. After that,
+extra memory buys precision, context headroom, and operational flexibility more
+than it buys a clean step-function in model intelligence.
+
+| Budget | GPT slot | Gemma slot | Qwen slot | Est. weight total | Team read |
+| ---: | --- | --- | --- | ---: | --- |
+| 80 GB | `mlx-community/gpt-oss-20b-MXFP4-Q4` or matching GPT-OSS 20B MXFP4 GGUF | `mlx-community/gemma-4-31b-6bit` | `unsloth/Qwen3.6-27B-MLX-8bit` | about 72-78 GB | Best compact serious team: strong Qwen coding and strong Gemma generalist coverage; GPT-OSS is a small tool/reasoning fallback. |
+| 100 GB | `mlx-community/gpt-oss-120b-MXFP4-Q4` or matching GPT-OSS 120B MXFP4 GGUF | `mlx-community/gemma-4-31b-4bit` or a PLE-safe Gemma 31B 4-bit MLX | `mlx-community/Qwen3.6-27B-OptiQ-4bit` | about 95-99 GB | Best first big Studio team: the GPT-OSS 120B upgrade matters more than higher Gemma/Qwen precision. |
+| 120 GB | GPT-OSS 120B MXFP4 | Gemma 4 31B 4-bit / PLE-safe 4-bit | `unsloth/Qwen3.6-27B-MLX-8bit` | about 112-118 GB | Best balanced capability team: keep GPT-OSS 120B and spend the extra memory on higher-precision Qwen coding. |
+| 150 GB | GPT-OSS 120B MXFP4 | `mlx-community/gemma-4-31b-8bit` | `RedHatAI/Qwen3-Coder-Next-NVFP4` or another validated Qwen3-Coder-Next NVFP4 package | about 140-148 GB | Maximum-ambition team: high-precision Gemma generalist plus Qwen Coder Next for coding agents, at higher operational complexity. |
+
+#### 80 GB team
+Recommended shape:
+- GPT: GPT-OSS 20B MXFP4.
+- Gemma: Gemma 4 31B 6-bit.
+- Qwen: Qwen3.6 27B 8-bit MLX.
+
+Why this is the best 80 GB compromise:
+- GPT-OSS 120B consumes too much of the budget by itself. The 20B model keeps a
+  GPT-style reasoning/tooling voice in the team without starving Gemma/Qwen.
+- Qwen3.6 27B 8-bit is the quality anchor for code. Under this budget, spending
+  memory on Qwen precision is more useful than trying to squeeze in GPT-OSS
+  120B plus heavily reduced partners.
+- Gemma 4 31B 6-bit is the broad generalist/multimodal anchor. It gives the
+  team a different skill profile from Qwen instead of merely adding another
+  code-centric model.
+
+Best roles:
+- Agentic coding: Qwen.
+- Code planning: Qwen primary, GPT-OSS 20B as critic.
+- General multimodal: Gemma.
+- Utility tasks: Gemma for prose cleanup, Qwen for code/test summaries,
+  GPT-OSS 20B for quick structured tool calls.
+
+Warning:
+- This team is capable, but the GPT slot is intentionally weaker. Do not expect
+  GPT-OSS 20B to substitute for the 120B model on deep planning or tricky
+  reasoning.
+
+#### 100 GB team
+Recommended shape:
+- GPT: GPT-OSS 120B MXFP4.
+- Gemma: Gemma 4 31B 4-bit, ideally a PLE-safe MLX artifact.
+- Qwen: Qwen3.6 27B OptiQ 4-bit.
+
+Why this is the first serious ensemble:
+- The upgrade to GPT-OSS 120B is the biggest quality jump in these budgets.
+- Qwen3.6 27B OptiQ keeps a strong coding model in the team without paying the
+  full 8-bit footprint.
+- Gemma 31B 4-bit keeps broad general/multimodal capability under the line.
+
+Best roles:
+- Agentic coding: Qwen.
+- Code exploration/reasoning: Qwen first, GPT-OSS 120B second opinion.
+- Code planning: GPT-OSS 120B drafts the plan; Qwen checks implementation
+  specifics.
+- General and ideation: Gemma for broad/multimodal work, GPT-OSS for structured
+  reasoning-heavy ideation.
+- Fast tool use: GPT-OSS with low reasoning effort, Qwen for coding tools.
+
+Warning:
+- Gemma 4 31B 4-bit needs careful artifact selection. Quantization quality is
+  not interchangeable for Gemma 4, especially around PLE layers.
+
+#### 120 GB team
+Recommended shape:
+- GPT: GPT-OSS 120B MXFP4.
+- Gemma: Gemma 4 31B 4-bit / PLE-safe 4-bit.
+- Qwen: Qwen3.6 27B 8-bit MLX.
+
+Why this is the best all-around team:
+- It keeps the decisive GPT-OSS 120B upgrade.
+- It upgrades Qwen from memory-saving 4-bit/OptiQ to 8-bit, which is more
+  useful for coding agents than raising Gemma precision first.
+- It still leaves enough budget for a strong Gemma generalist.
+
+Best roles:
+- Agentic coding: Qwen3.6 27B 8-bit.
+- Code exploration/reasoning: Qwen primary; GPT-OSS 120B for architectural
+  critique and debugging hypotheses.
+- Code planning: GPT-OSS 120B and Qwen in pair-review mode.
+- General: Gemma 31B, especially when the task touches multimodal context,
+  home-control-like instructions, broad summarization, or small coding tasks.
+- Fast and accurate tool use: GPT-OSS 120B for general tool execution; Qwen for
+  code/tool loops.
+- Ideation: GPT-OSS 120B for structure, Gemma 31B for breadth and non-code
+  domains.
+- Utility: Gemma for transcript cleanup and summarization; Qwen for technical
+  summaries.
+
+Warning:
+- This is the point where quality gains begin to flatten. Moving from 100 GB to
+  120 GB is worthwhile because Qwen coding precision matters, but it is not as
+  transformative as the 20B-to-120B GPT jump.
+
+#### 150 GB team
+Recommended shape:
+- GPT: GPT-OSS 120B MXFP4.
+- Gemma: Gemma 4 31B 8-bit.
+- Qwen: Qwen3-Coder-Next NVFP4.
+
+Why this is the maximum-capability set:
+- GPT-OSS 120B remains the broad reasoning/tooling backbone.
+- Gemma 31B 8-bit is the best high-precision Gemma generalist/multimodal slot.
+- Qwen3-Coder-Next is the highest-ceiling coding-agent choice: Qwen describes
+  it as an 80B total / 3B active model specialized for coding agents, complex
+  tool use, execution recovery, IDE/CLI workflows, and long-context work.
+
+Best roles:
+- Agentic coding: Qwen3-Coder-Next.
+- Code exploration/reasoning: Qwen3-Coder-Next for repo traversal and edits;
+  GPT-OSS 120B for critique and alternative designs.
+- Code planning: GPT-OSS 120B first pass, Qwen3-Coder-Next feasibility check.
+- General: Gemma 31B 8-bit.
+- Fast and accurate tool use: GPT-OSS 120B for generic tool calls; Qwen Coder
+  Next for code tools if the serving stack supports its parser cleanly.
+- Ideation: GPT-OSS 120B plus Gemma 31B 8-bit.
+- Utility: Gemma 31B is high quality but overkill; use this slot only if the
+  team must stay exactly three models.
+
+Warning:
+- This is not the most boring team. Qwen3-Coder-Next has the best coding-agent
+  upside, but it introduces more runtime/parser/quantization complexity than
+  Qwen3.6 27B. If reliability matters more than ceiling, the 120 GB team is
+  probably the better daily-driver ensemble.
+
+#### Diminishing returns and precision choices
+- GPT-OSS 20B to GPT-OSS 120B is the cleanest capability jump. Prioritize it
+  once the budget reaches 100 GB.
+- Gemma 31B 4-bit to 6/8-bit may improve stability and output texture, but it
+  is less important than changing the Qwen coding slot or moving GPT-OSS to
+  120B.
+- Qwen3.6 27B 4-bit/OptiQ to 8-bit is worth considering because coding agents
+  are sensitive to small instruction, syntax, and tool-call failures.
+- Qwen3-Coder-Next is a role upgrade, not just a precision upgrade. It is most
+  appropriate when the ensemble's primary job is agentic coding and you accept
+  a more complicated serving path.
+- Weight totals are only the starting budget. For long-context coding work,
+  reserve substantial memory for KV cache. Do not plan to run these teams with
+  all three models simultaneously at full context on the same host.
+
+#### Supported prebuilt solution paths
+- Studio MLX path:
+  - Use MLX/MLX-VLM artifacts for Gemma and Qwen where available.
+  - Keep GPT-OSS 120B MXFP4 on the proven MLX/GGUF path rather than inventing a
+    new conversion.
+  - Route by role later: `coding`, `planning`, `general`, `tool-fast`,
+    `utility`.
+- Studio GGUF/LM Studio path:
+  - Good for GPT-OSS and side-by-side comparisons.
+  - Less attractive for Gemma/Qwen if a clean MLX artifact exists and the host
+    is Apple Silicon.
+- Orin/Linux path:
+  - Use GGUF/llama.cpp first for dependable smoke tests.
+  - Treat vLLM/NVFP4 as a second-phase experiment for Qwen Coder Next.
+- Gateway/orchestration path:
+  - Expose each selected model behind OpenAI-compatible endpoints.
+  - Use LiteLLM/Open WebUI/OpenCode-style aliases only after direct backend
+    quality gates pass.
+  - Keep model identity stable and route by role rather than exposing every
+    quant as a user-facing model.
+
 ## Artifact fit matrix
 
 | Hardware | Best fit | Maybe | Avoid |
@@ -303,3 +486,19 @@ Runtime posture:
   https://arxiv.org/abs/2603.00729
 - vLLM Qwen3-Next support note:
   https://vllm.ai/blog/qwen3-next
+- OpenAI GPT-OSS release:
+  https://openai.com/index/introducing-gpt-oss/
+- Hugging Face Transformers MXFP4 documentation:
+  https://huggingface.co/docs/transformers/en/quantization/mxfp4
+- MLX GPT-OSS 120B MXFP4-Q4:
+  https://huggingface.co/mlx-community/gpt-oss-120b-MXFP4-Q4
+- MLX GPT-OSS 20B MXFP4-Q4:
+  https://huggingface.co/mlx-community/gpt-oss-20b-MXFP4-Q4
+- MLX Gemma 4 31B 6-bit:
+  https://huggingface.co/mlx-community/gemma-4-31b-6bit
+- MLX Gemma 4 31B 8-bit:
+  https://huggingface.co/mlx-community/gemma-4-31b-8bit
+- Qwen3.6 27B MLX 8-bit:
+  https://huggingface.co/unsloth/Qwen3.6-27B-MLX-8bit
+- Qwen3-Coder-Next NVFP4:
+  https://huggingface.co/RedHatAI/Qwen3-Coder-Next-NVFP4
