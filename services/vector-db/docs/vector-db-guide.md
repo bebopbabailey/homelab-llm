@@ -9,7 +9,7 @@ This document covers both:
 `vector-db` is the durable retrieval substrate for long-form content in this
 repo.
 
-It is not just “the thing behind the YouTube lane.” It is the general service
+It is not just “the thing behind one document lane.” It is the general service
 that stores and retrieves:
 - chunked source passages
 - embeddings
@@ -33,7 +33,6 @@ The most important practical point is:
 So the current reality is:
 
 1. **Specialized pipelines already use it**
-- `task-youtube-summary` uses it for long-video follow-up retrieval
 - `docs-mcp` now uses it for curated document ingest and evidence search over
   Studio-local manuals
 
@@ -51,31 +50,12 @@ So the current reality is:
 
 If you want the blunt version:
 
-- **today**: use `vector-db` through `docs-mcp`, `task-youtube-summary`, or
-  direct API calls
+- **today**: use `vector-db` through `docs-mcp` or direct API calls
 - **later**: richer “just chat with my whole library” UX gets layered on top
 
 ## Concrete Current Examples
 
-### 1. YouTube follow-up retrieval
-
-Current path:
-
-```text
-YouTube URL
--> media-fetch-mcp gets transcript
--> litellm-orch indexes long transcript into vector-db
--> vector-db stores chunks + spans + response-map
--> follow-up question resolves previous_response_id
--> vector-db returns grounded transcript chunks
-```
-
-Why `vector-db` matters here:
-- the long video does not live only in provider conversation state
-- retrieval stays durable across turns and restarts
-- hits include transcript spans and chunk text
-
-### 2. `docs-mcp` over music manuals
+### 1. `docs-mcp` over music manuals
 
 Current phase-1 path:
 
@@ -99,7 +79,7 @@ Concrete handle examples:
 - library handle: `library:music-manuals`
 - document handle: `manual:music-manuals:reface-en-om-b0`
 
-### 3. Direct API retrieval
+### 2. Direct API retrieval
 
 You can also use `vector-db` directly with no MCP or LiteLLM layer in between.
 
@@ -243,8 +223,8 @@ For the current repo state:
 - use `docs-mcp` when you want a curated document-library tool boundary
 - use direct `vector-db` calls when you already have normalized chunks or want
   shell/Python-friendly retrieval without MCP
-- use `task-youtube-summary` when the source is a YouTube video and you want
-  the retrieval path hidden behind a task alias
+- use `task-youtube-transcript` when the source is a YouTube video and you only
+  need source-faithful transcript text; it does not write to `vector-db`
 
 ## Core Mental Model
 
@@ -490,7 +470,7 @@ always best.
 
 That matters in current real usage:
 - `docs-mcp` document search benefits from exact single-document routing
-- long-form YouTube follow-ups also benefit when a request resolves to one
+- long-form document workflows also benefit when a request resolves to one
   durable `document_id`
 
 ## What It Is Not
@@ -503,7 +483,8 @@ That matters in current real usage:
 - a replacement for source acquisition services
 
 Keep the responsibility split clean:
-- source acquisition: `media-fetch-mcp` or another ingestion boundary
+- source acquisition: `youtube-transcript-api`, `media-fetch-mcp`, or another
+  ingestion boundary
 - curated document ingest/search surface: `docs-mcp`
 - user-facing orchestration: LiteLLM lanes or future UI flows
 - durable retrieval: `vector-db`
@@ -518,7 +499,6 @@ life?”, the answer is:
 
 Today the normal consumer surfaces are:
 - `docs-mcp` for curated manuals/doc evidence
-- `task-youtube-summary` for YouTube transcript conversations
 - direct API calls for service-to-service workflows
 
 The broader “chat naturally with my personal libraries in one UI” experience is
@@ -587,7 +567,8 @@ vectors in place.
 Another service or helper acquires source content.
 
 Examples:
-- `media-fetch-mcp` for YouTube transcripts
+- `youtube-transcript-api` for YouTube transcripts
+- `media-fetch-mcp` for public web evidence
 - future PDF/article extractors
 
 ### 2. Normalization
@@ -606,7 +587,7 @@ The content is normalized into:
 Another service retrieves from `vector-db` and performs answer synthesis.
 
 Current main example:
-- `litellm-orch` `task-youtube-summary`
+- `docs-mcp` document ingest and search
 
 So the architecture is:
 
@@ -620,16 +601,16 @@ acquisition service
 
 ## How It Is Used Today
 
-### YouTube transcript chat
+### Service-to-service document workflows
 
-Current production-style consumer:
-- `task-youtube-summary`
+Current production-style consumers call the memory API directly or through a
+narrow tool boundary such as `docs-mcp`.
 
 Flow:
-- gets transcript via `media-fetch-mcp`
-- indexes long transcript into `vector-db`
-- writes `response_id -> document_id`
-- retrieves transcript chunks for follow-up Q&A
+- acquire source content outside `vector-db`
+- normalize it into explicit chunks and spans
+- upsert chunks into `vector-db`
+- retrieve document-scoped evidence for downstream answer synthesis
 
 ### Future publication pipelines
 
@@ -723,7 +704,7 @@ This is the best quick introspection surface for the live service.
 
 ```text
 YouTube URL
--> media-fetch-mcp
+-> youtube-transcript-api
 -> normalized transcript segments
 -> /v1/memory/upsert
 -> /v1/memory/response-map/upsert
@@ -770,7 +751,7 @@ on top of.
 
 - Retrieval quality for vague questions still needs tuning in at least one live
   consumer path.
-- The service is architecturally ready for broader document ingestion, but the
-  strongest real consumer today is still the YouTube transcript flow.
+- The service is architecturally ready for broader document ingestion, but
+  polished user-facing workflows remain layered above it.
 - `legacy` rollback still exists and should not be retired until the retrieval
   eval pack and longer runtime confidence are in better shape.

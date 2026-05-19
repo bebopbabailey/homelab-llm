@@ -239,18 +239,22 @@ Format:
 ]
 ```
 
-## youtube.transcript
+## task-youtube-transcript
 - status: active
-- transport: mcp (http via `127.0.0.1:8012/mcp`)
-- endpoint: `media-fetch` (MCP server name)
+- transport: OpenAI-compatible chat via LiteLLM
+- endpoint: `POST /v1/chat/completions`
 - input_schema:
 ```json
 {
   "type": "object",
-  "required": ["url"],
+  "required": ["model", "messages"],
   "additionalProperties": false,
   "properties": {
-    "url": { "type": "string", "format": "uri" }
+    "model": { "const": "task-youtube-transcript" },
+    "messages": {
+      "type": "array",
+      "minItems": 1
+    }
   }
 }
 ```
@@ -258,19 +262,19 @@ Format:
 ```json
 {
   "type": "object",
-  "required": ["video_id", "transcript_text", "language", "caption_type"],
-  "additionalProperties": false,
+  "required": ["choices"],
   "properties": {
-    "video_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
-    "transcript_text": { "type": "string", "minLength": 1 },
-    "language": { "type": "string", "minLength": 1 },
-    "caption_type": { "type": "string", "enum": ["manual", "generated"] }
+    "choices": { "type": "array", "minItems": 1 },
+    "transcript": { "type": "object" }
   }
 }
 ```
+- primary output: `choices[0].message.content` is plain timestamped transcript
+  text.
 - errors:
 ```json
 [
+  { "code": "invalid_request", "http_status": 400 },
   { "code": "invalid_url", "http_status": 400 },
   { "code": "unsupported_url", "http_status": 400 },
   { "code": "no_transcript", "http_status": 404 },

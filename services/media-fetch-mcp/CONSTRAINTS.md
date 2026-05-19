@@ -5,15 +5,12 @@ This service inherits global constraints from `../../CONSTRAINTS.md`.
 ## Hard constraints
 - Bindings stay localhost-only on the Mini.
 - This service is a tool backend, not an LLM gateway or summarization service.
-- `youtube.transcript` remains retrieval-only.
 - Web helpers may orchestrate search/fetch/store/retrieve, but they must not
   call a model or synthesize an answer.
-- No translation fallback in the transcript path.
 - No new LAN exposure, auth bypass, or external callback behavior.
 
 ## Allowed operations
 - Add a localhost-only Streamable HTTP MCP backend.
-- Add read-only transcript retrieval through `youtube-transcript-api`.
 - Add direct local SearXNG search and cleaned public-web fetch/extraction.
 - Add direct `vector-db` session upsert/search/delete helpers that remain scoped
   to deterministic per-conversation `research:<conversation_id>` documents.

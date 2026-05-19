@@ -68,6 +68,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
 | Media Fetch MCP | Mini | 8012 | http://127.0.0.1:8012/mcp | MCP handshake |
 | Docs MCP | Studio | 8013 | http://192.168.1.72:8013/mcp | authenticated MCP handshake |
+| YouTube Transcript API | Mini | 8014 | http://127.0.0.1:8014/v1 | /health |
 | OpenCode Web | Mini | 4096 | http://127.0.0.1:4096 | UI root (401 unauthenticated) |
 | OpenHands (Phase A, managed operator UI) | Mini | 4031 | http://127.0.0.1:4031, https://hands.tailfd1400.ts.net/ | UI root |
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
@@ -129,10 +130,12 @@ define the contract for specialized runtime-plane services such as
   is not part of the current live runtime.
 - Media Fetch MCP — HTTP MCP backend on the Mini at `127.0.0.1:8012/mcp`,
   currently localhost-only. Open WebUI is the intended first client. It now
-  exposes transcript retrieval plus reusable web-research primitives:
-  direct SearXNG search, cleaned webpage fetch/extraction, per-conversation
-  `vector-db` session tools, and helper orchestration tools that stop short of
-  answer synthesis.
+  exposes reusable web-research primitives: direct SearXNG search, cleaned
+  webpage fetch/extraction, per-conversation `vector-db` session tools, and
+  helper orchestration tools that stop short of answer synthesis.
+- YouTube Transcript API — OpenAI-compatible backend on the Mini at
+  `127.0.0.1:8014/v1`, currently localhost-only and exposed to callers through
+  LiteLLM as `task-youtube-transcript`.
 - Docs MCP — HTTP MCP backend on the Studio at `http://192.168.1.72:8013/mcp`,
   bearer-authenticated and pf-limited to Mini `192.168.1.71` plus Studio
   self-access. It exposes curated document ingest/search over `vector-db` for
@@ -152,7 +155,8 @@ define the contract for specialized runtime-plane services such as
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
 - Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
-  8010, Open Terminal MCP 8011, Media Fetch MCP 8012, CCProxy API 4010.
+  8010, Open Terminal MCP 8011, Media Fetch MCP 8012, YouTube Transcript API
+  8014, CCProxy API 4010.
   Grafana is on `127.0.0.1:3001` with tailnet-only operator access at
   `https://grafana.tailfd1400.ts.net/` via `svc:grafana`.
   OpenHands Phase A is systemd-managed on `127.0.0.1:4031` with tailnet-only

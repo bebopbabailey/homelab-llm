@@ -7,7 +7,6 @@ depending on Open WebUI's native web-search path.
 Current shape:
 - Python FastMCP service
 - Streamable HTTP on `127.0.0.1:8012`
-- media retrieval primitive: `youtube.transcript`
 - web retrieval primitives:
   - `media-fetch.web.search`
   - `media-fetch.web.fetch`
@@ -17,7 +16,6 @@ Current shape:
 
 Why this service exists separately:
 - Open WebUI requires Streamable HTTP MCP, not stdio.
-- Transcript retrieval and web retrieval are tool behavior, not model behavior.
 - The repo already had useful extraction logic in the stdio `web-fetch`
   service; this service is the HTTP/MCP boundary that can expose those
   primitives cleanly to Open WebUI and later pipelines.

@@ -1,7 +1,6 @@
 # media-fetch-mcp
 
 `media-fetch-mcp` is the localhost-only MCP retrieval boundary for:
-- YouTube transcript retrieval
 - live web search through local SearXNG
 - cleaned webpage fetch/extraction
 - per-conversation web research sessions stored in `vector-db`
@@ -13,10 +12,6 @@ elsewhere.
 ## What To Use
 
 Use these tools by intent:
-
-- `youtube.transcript`
-  - Get the full transcript for one supported YouTube video URL.
-  - Best when you already know the URL and want source-faithful text.
 
 - `media-fetch.web.search`
   - Get normalized live web candidates from local SearXNG.
@@ -68,7 +63,6 @@ Important boundaries:
 ## Tool Surface
 
 Current MCP tools:
-- `youtube.transcript`
 - `media-fetch.web.search`
 - `media-fetch.web.fetch`
 - `media-fetch.web.session.upsert`
@@ -118,33 +112,9 @@ asyncio.run(main())
 PY
 ```
 
-Expect all 8 tools to be present.
+Expect all 7 tools to be present.
 
-### 2. Transcript smoke
-
-```bash
-cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
-uv run python - <<'PY'
-import asyncio, json
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
-
-URL = "https://youtu.be/-QFHIoCo-Ko?si=EP5WGz2PLVLPWU9j"
-
-async def main():
-    async with streamable_http_client("http://127.0.0.1:8012/mcp") as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool("youtube.transcript", {"url": URL})
-            payload = json.loads(result.content[0].text)
-            print(payload["video_id"], payload["language"], payload["caption_type"])
-            print("segments", len(payload["segments"]))
-
-asyncio.run(main())
-PY
-```
-
-### 3. Search smoke
+### 2. Search smoke
 
 ```bash
 cd /home/christopherbailey/homelab-llm/services/media-fetch-mcp
@@ -169,7 +139,7 @@ asyncio.run(main())
 PY
 ```
 
-### 4. Fetch smoke
+### 3. Fetch smoke
 
 Use a stable page that actually responds cleanly.
 
@@ -194,7 +164,7 @@ asyncio.run(main())
 PY
 ```
 
-### 5. Quick-mode end-to-end smoke
+### 4. Quick-mode end-to-end smoke
 
 ```bash
 TOKEN="$(platform/ops/scripts/studio_run_utility.sh --host studio -- \
@@ -238,13 +208,11 @@ Register the MCP backend directly:
 - auth: `none`
 
 Useful first filters:
-- `youtube.transcript`
 - `media-fetch.web.fetch`
 - `media-fetch.web.quick`
 - `media-fetch.web.research`
 
 Practical OWUI prompts:
-- `Use youtube.transcript on this URL and summarize the video: <url>`
 - `Use media-fetch.web.quick to research "IANA example domain", then answer from the returned evidence.`
 - `Search for sources about <topic>, fetch the strongest ones, store them in session <id>, and answer only from retrieved chunks.`
 

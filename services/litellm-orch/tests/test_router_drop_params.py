@@ -60,6 +60,21 @@ class TestRouterDropParams(unittest.TestCase):
             self.assertEqual(params.get("api_key"), "os.environ/VOICE_GATEWAY_API_KEY")
             self.assertEqual(aliases[alias].get("model_info", {}).get("mode"), "audio_transcription")
 
+    def test_youtube_transcript_alias_uses_local_openai_backend(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        aliases = {
+            item.get("model_name"): item
+            for item in config.get("model_list", [])
+            if isinstance(item, dict)
+        }
+        self.assertIn("task-youtube-transcript", aliases)
+        self.assertNotIn("task-youtube-summary", aliases)
+        params = aliases["task-youtube-transcript"].get("litellm_params", {})
+        self.assertEqual(params.get("model"), "openai/youtube-transcript")
+        self.assertEqual(params.get("api_base"), "os.environ/YOUTUBE_TRANSCRIPT_API_BASE")
+        self.assertEqual(params.get("api_key"), "dummy")
+        self.assertEqual(aliases["task-youtube-transcript"].get("model_info", {}).get("mode"), "chat")
+
     def test_operator_only_chatgpt_alias_exists(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         model_names = {
@@ -117,7 +132,7 @@ class TestRouterDropParams(unittest.TestCase):
         for params in names.values():
             self.assertEqual(
                 params.get("target_models"),
-                "deep,fast,task-transcribe,task-json,task-youtube-summary",
+                "deep,fast,task-transcribe,task-json",
             )
             self.assertEqual(params.get("responses_only"), False)
 

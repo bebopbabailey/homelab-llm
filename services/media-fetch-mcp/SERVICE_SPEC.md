@@ -1,8 +1,8 @@
 # Service Spec: media-fetch-mcp
 
 ## Purpose
-Localhost-only MCP backend on the Mini for retrieval-style media and web tools.
-It owns reusable search/fetch/session primitives, not answer synthesis.
+Localhost-only MCP backend on the Mini for retrieval-style web tools. It owns
+reusable search/fetch/session primitives, not answer synthesis.
 
 ## Host & Runtime
 - **Host**: Mini
@@ -12,7 +12,6 @@ It owns reusable search/fetch/session primitives, not answer synthesis.
 - **Transport**: MCP Streamable HTTP
 
 ## Tool Surface
-- `youtube.transcript`
 - `media-fetch.web.search`
 - `media-fetch.web.fetch`
 - `media-fetch.web.session.upsert`
@@ -23,22 +22,8 @@ It owns reusable search/fetch/session primitives, not answer synthesis.
 
 Curated local document-library ingest/search is out of scope here and belongs to
 `services/docs-mcp`.
-
-## `youtube.transcript` contract
-- Input:
-  - `url`
-- Output:
-  - `video_id`
-  - `source_url`
-  - `transcript_text`
-  - `language`
-  - `language_code`
-  - `caption_type`
-  - `segments[]`
-    - `text`
-    - `start`
-    - `duration`
-    - `timestamp_label`
+YouTube transcript acquisition is out of scope here and belongs to
+`services/youtube-transcript-api`.
 
 ## `media-fetch.web.search` contract
 - Input:
@@ -111,19 +96,6 @@ Curated local document-library ingest/search is out of scope here and belongs to
 - Neither helper performs model inference.
 
 ## Behavior
-- Accept supported single-video YouTube watch, `youtu.be`, Shorts, and live
-  URLs.
-- Reject playlist-only, channel, search, and other non-single-video pages.
-- Preserve source caption language; no translation in v1.
-- Prefer the first manually created transcript YouTube exposes; otherwise use
-  the first generated transcript.
-- Return the full transcript always.
-- Format `transcript_text` as timestamp-prefixed lines for backward
-  compatibility.
-- `segments[]` is the canonical machine-readable payload for downstream
-  chunking/indexing.
-- Apply light normalization only: collapse whitespace and skip empty/noisy
-  segments.
 - `media-fetch.web.search` calls local SearXNG directly instead of routing via
   LiteLLM.
 - `media-fetch.web.fetch` only allows public http(s) targets and only returns
@@ -138,7 +110,6 @@ Curated local document-library ingest/search is out of scope here and belongs to
 Stable code-prefixed MCP tool errors:
 - `invalid_url`
 - `unsupported_url`
-- `no_transcript`
 - `upstream_failure`
 - `invalid_query`
 - `invalid_conversation`

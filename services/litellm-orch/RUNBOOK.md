@@ -130,7 +130,7 @@ uv run python /home/christopherbailey/homelab-llm/services/llama-cpp-server/scri
 ```
 
 Current GPT public-lane posture:
-- Responses-first for `fast`, `deep`, `task-transcribe`, `task-json`, and `task-youtube-summary`
+- Responses-first for `fast`, `deep`, `task-transcribe`, and `task-json`
 - `/v1/chat/completions` remains temporary compatibility only for those public GPT-OSS aliases
 - `fast` is now canonical on shared `8126`
 - `deep` is now live on shared `8126` under the usable-success contract
@@ -192,7 +192,8 @@ Expected:
 - `/v1/models` includes `task-transcribe`.
 - `/v1/models` does not include `task-transcribe-vivid`.
 - `/v1/models` includes `task-json`.
-- `/v1/models` includes `task-youtube-summary`.
+- `/v1/models` includes `task-youtube-transcript`.
+- `/v1/models` does not include `task-youtube-summary`.
 - `fast-research` is absent.
 - No LiteLLM config references remain for `websearch-schema`, `websearch_schema_guardrail`, or `web_answer`.
 - Current resilience baseline keeps `fast -> deep`.
@@ -217,25 +218,18 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Content-Type: application/json" \
   -d '{"model":"task-json","input":[{"role":"user","content":"call mom tomorrow, buy milk, pick up paper towels"}],"max_output_tokens":512}' | jq .
 
-curl -fsS http://127.0.0.1:4000/v1/responses \
+curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"model":"task-youtube-summary","input":[{"role":"user","content":"https://youtu.be/dQw4w9WgXcQ focus on the main claims and examples"}],"max_output_tokens":2048}' | jq .
+  -d '{"model":"task-youtube-transcript","messages":[{"role":"user","content":"https://youtu.be/dQw4w9WgXcQ"}],"max_tokens":16384}' | jq .
 ```
 Expected:
 - `task-transcribe` returns cleaned transcript text in the final Responses `message`
 - `task-transcribe` with `prompt_variables.audience` / `prompt_variables.tone`
   returns cleaned vivid transcript text in the final Responses `message`
 - `task-json` returns minified canonical JSON in the final Responses `message`
-- `task-youtube-summary` returns markdown with a compact metadata line plus a comprehensive summary in the final Responses `message`
-- `task-youtube-summary` depends on the localhost-only `media-fetch-mcp`
-  transcript service at `http://127.0.0.1:8012/mcp`; if first-turn transcript
-  acquisition fails unexpectedly, check that service before deeper LiteLLM
-  routing triage
-- long-video follow-ups are expected to resolve through the retrieval service's
-  durable `response_id -> document_id` mapping rather than raw provider state
-- `config/env.local` must include `MEMORY_API_BEARER_TOKEN=<studio token>` for
-  the write-side transcript upserts used by `task-youtube-summary`
+- `task-youtube-transcript` returns plain timestamped transcript text in
+  `choices[0].message.content`
 
 Task-transcribe audio-upload smoke:
 ```bash
@@ -320,59 +314,6 @@ Expected:
   be compared byte-for-byte against the public `id`
 - both responses expose `usage.input_tokens_details.cached_tokens`
 - vivid `task-transcribe` keeps stable `output_text` for Shortcut-style clients
-
-YouTube-summary follow-up/state smoke:
-```bash
-python3 - <<'PY'
-import json, urllib.request
-
-key = None
-for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local", encoding="utf-8"):
-    if line.startswith("LITELLM_MASTER_KEY="):
-        key = line.split("=", 1)[1].strip().strip('"').strip("'")
-        break
-
-url = "http://127.0.0.1:4000/v1/responses"
-headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-initial = {
-    "model": "task-youtube-summary",
-    "input": [{"role": "user", "content": "https://youtu.be/dQw4w9WgXcQ focus on the main claims"}],
-    "max_output_tokens": 2048,
-}
-req = urllib.request.Request(url, data=json.dumps(initial).encode(), headers=headers, method="POST")
-with urllib.request.urlopen(req, timeout=180) as resp:
-    first = json.loads(resp.read().decode())
-
-followup = {
-    "model": "task-youtube-summary",
-    "previous_response_id": first["id"],
-    "input": [{"role": "user", "content": "What examples did the speaker use?"}],
-    "max_output_tokens": 1024,
-}
-req = urllib.request.Request(url, data=json.dumps(followup).encode(), headers=headers, method="POST")
-with urllib.request.urlopen(req, timeout=120) as resp:
-    second = json.loads(resp.read().decode())
-
-print(json.dumps(
-    {
-        "first_id": first.get("id"),
-        "first_prefix": (first.get("output_text") or "")[:120],
-        "first_cached_tokens": ((first.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
-        "second_previous_response_id": second.get("previous_response_id"),
-        "second_prefix": (second.get("output_text") or "")[:120],
-    },
-    indent=2,
-))
-PY
-```
-
-Expected:
-- the initial response starts with the compact metadata line for the video
-- the follow-up accepts the prior public `id` as `previous_response_id`
-- successful follow-ups no longer depend on upstream placeholder lineage for
-  chunked runs; they should resolve through the memory API mapping layer
-- short-video runs stay transcript-grounded through the returned response `id`
-- chunked long-video runs stay synthesis-grounded because the final synthesis response becomes the public follow-up surface
 
 Experimental ChatGPT/Codex alias checks:
 ```bash

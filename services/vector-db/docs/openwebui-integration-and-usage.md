@@ -2,7 +2,7 @@
 
 This document answers two questions:
 - how Open WebUI can use Elasticsearch and `vector-db`
-- what `vector-db` is actually for in everyday life beyond YouTube transcripts
+- what `vector-db` is actually for in everyday life beyond one transcript flow
 
 ## Short Answer
 
@@ -17,7 +17,8 @@ You built a reusable retrieval and memory substrate for long-form content:
 - research and news archives
 - project knowledge
 
-The current YouTube lane is just the first serious consumer.
+The old YouTube summary lane was an early consumer, but the current transcript
+primitive no longer writes to `vector-db`.
 
 The real point of `vector-db` is:
 
@@ -76,8 +77,7 @@ Open WebUI
 -> Elasticsearch
 ```
 
-This is the current pattern for:
-- `task-youtube-summary`
+This is the current pattern for direct service-to-service document workflows.
 
 This is the better pattern when you want:
 - durable `response_id -> document_id` continuity
@@ -331,10 +331,14 @@ That is probably the best long-term shape for your homelab.
 
 Use:
 - Open WebUI
-- model: `task-youtube-summary`
+- model: `task-youtube-transcript` for transcript acquisition only
 
 Path:
-- OWUI -> LiteLLM -> `media-fetch-mcp` -> `vector-db` -> Elastic
+- OWUI -> LiteLLM -> `youtube-transcript-api`
+
+Notes:
+- this returns the source transcript only
+- it does not write transcript chunks to `vector-db`
 
 ### Scenario B: “Search my uploaded manuals and docs in OWUI”
 
@@ -363,7 +367,7 @@ The strongest answer is:
 You built a **shared retrieval substrate for long-form personal and technical
 knowledge**, not a YouTube summarizer.
 
-The YouTube lane proves the architecture:
+The reusable architecture is:
 - source acquisition separated from reasoning
 - durable retrieval instead of giant prompts
 - follow-up grounding through document identity
@@ -393,7 +397,7 @@ That gives you a sane division:
 
 ## Current Limitations
 
-- The strongest custom consumer today is still the YouTube transcript lane.
+- The strongest custom consumers are still narrow service-specific workflows.
 - Broad vague follow-up quality is still being tuned in at least one live
   retrieval-backed path.
 - There is not yet a single polished “central life knowledge app” abstraction

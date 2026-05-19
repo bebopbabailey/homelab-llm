@@ -13,14 +13,13 @@ import socket
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Iterable
-from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import urlencode, urljoin, urlparse, urlsplit, urlunsplit
 
 import httpx
 import trafilatura
 from mcp.server.fastmcp import FastMCP
 from readability import Document
 from selectolax.parser import HTMLParser
-from youtube_transcript_api import YouTubeTranscriptApi
 
 MCP_SERVER_NAME = "media-fetch"
 DEFAULT_USER_AGENT = "homelab-llm-media-fetch/1.0"
@@ -29,10 +28,7 @@ DEFAULT_SEARXNG_API_BASE = "http://127.0.0.1:8888/search"
 DEFAULT_VECTOR_DB_API_BASE = "http://192.168.1.72:55440"
 ALLOWED_MEDIA_TYPES = {"text/html", "application/xhtml+xml", "text/plain"}
 CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
-YOUTUBE_SOURCE_TYPE = "youtube"
 WEB_SOURCE_TYPE = "web_research"
-_YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
-_NOISE_RE = re.compile(r"^[\s\-–—.,:;!?()\[\]\"']*$")
 MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 URL_RE = re.compile(r"https?://[^\s)>\"]+")
 HEADING_RE = re.compile(r"^#{1,6}\s+(.+)$")
@@ -713,112 +709,6 @@ def _expires_at(ttl_seconds: int) -> str:
     return (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).isoformat()
 
 
-def _extract_video_id(url: str) -> str:
-    candidate = (url or "").strip()
-    if not candidate:
-        raise ToolContractError("invalid_url", "url is required")
-    try:
-        parsed = urlparse(candidate)
-    except ValueError as exc:
-        raise ToolContractError("invalid_url", f"invalid URL parse: {exc.__class__.__name__}") from exc
-    host = parsed.netloc.lower()
-    if not host or parsed.scheme not in {"http", "https"}:
-        raise ToolContractError("invalid_url", "only absolute http(s) YouTube URLs are allowed")
-    path_parts = [part for part in parsed.path.split("/") if part]
-    video_id: str | None = None
-    if host.endswith("youtu.be"):
-        if path_parts:
-            video_id = path_parts[0]
-    elif host.endswith("youtube.com"):
-        if path_parts[:1] == ["watch"]:
-            video_id = parse_qs(parsed.query).get("v", [None])[0]
-        elif path_parts[:1] in (["shorts"], ["live"], ["embed"]):
-            video_id = path_parts[1] if len(path_parts) > 1 else None
-        elif "v" in parse_qs(parsed.query):
-            video_id = parse_qs(parsed.query).get("v", [None])[0]
-    if not isinstance(video_id, str):
-        raise ToolContractError("unsupported_url", "expected a supported single-video YouTube URL")
-    video_id = video_id.strip()
-    if not _YOUTUBE_ID_RE.fullmatch(video_id):
-        raise ToolContractError("unsupported_url", "expected a supported single-video YouTube URL")
-    return video_id
-
-
-def _format_timestamp(seconds: float) -> str:
-    total = max(0, int(seconds))
-    hours, remainder = divmod(total, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
-    return f"{minutes:02d}:{secs:02d}"
-
-
-def _normalize_segment_payload(item: dict[str, Any]) -> dict[str, Any] | None:
-    text = _collapse_whitespace(str(item.get("text") or ""))
-    if not text or _NOISE_RE.fullmatch(text):
-        return None
-    start = float(item.get("start") or 0.0)
-    duration = float(item.get("duration") or 0.0)
-    return {
-        "text": text,
-        "start": start,
-        "duration": duration,
-        "timestamp_label": _format_timestamp(start),
-    }
-
-
-def _fetch_transcript_payload(url: str) -> dict[str, Any]:
-    video_id = _extract_video_id(url)
-    api = YouTubeTranscriptApi()
-    try:
-        transcript_list = api.list(video_id)
-    except Exception as exc:
-        message = str(exc)
-        if "No transcripts" in message or "Subtitles are disabled" in message:
-            raise ToolContractError("no_transcript", f"no usable transcript for video {video_id}") from exc
-        raise ToolContractError("upstream_failure", f"{exc.__class__.__name__}: {message}") from exc
-    transcript = None
-    caption_type = None
-    for candidate in transcript_list:
-        if not getattr(candidate, "is_generated", False):
-            transcript = candidate
-            caption_type = "manual"
-            break
-    if transcript is None:
-        for candidate in transcript_list:
-            transcript = candidate
-            caption_type = "generated" if getattr(candidate, "is_generated", False) else "manual"
-            break
-    if transcript is None:
-        raise ToolContractError("no_transcript", f"no usable transcript for video {video_id}")
-    try:
-        fetched = transcript.fetch()
-    except Exception as exc:
-        raise ToolContractError("upstream_failure", f"{exc.__class__.__name__}: {exc}") from exc
-    raw_segments = fetched.to_raw_data() if hasattr(fetched, "to_raw_data") else list(fetched)
-    segments = []
-    lines = []
-    for item in raw_segments:
-        if not isinstance(item, dict):
-            continue
-        normalized = _normalize_segment_payload(item)
-        if not normalized:
-            continue
-        segments.append(normalized)
-        lines.append(f"[{normalized['timestamp_label']}] {normalized['text']}")
-    if not segments:
-        raise ToolContractError("no_transcript", f"no non-empty transcript lines for video {video_id}")
-    return {
-        "video_id": video_id,
-        "source_url": f"https://youtu.be/{video_id}",
-        "transcript_text": "\n".join(lines),
-        "language": getattr(transcript, "language", "") or "Unknown",
-        "language_code": getattr(transcript, "language_code", "") or "",
-        "caption_type": caption_type or "unknown",
-        "segments": segments,
-    }
-
-
 def _extract_evidence_payload(fetch_result: FetchResult, include_raw_html: bool) -> dict[str, Any]:
     body_text = _decode_text(fetch_result.body_bytes, fetch_result.encoding)
     body_sha256 = hashlib.sha256(fetch_result.body_bytes).hexdigest()
@@ -1238,13 +1128,6 @@ def _summarize_fetched_sources(documents: list[dict[str, Any]]) -> list[dict[str
             }
         )
     return summaries
-
-
-@mcp.tool(name="youtube.transcript")
-def youtube_transcript(url: str) -> dict[str, Any]:
-    """Fetch the full transcript for a supported YouTube video URL."""
-
-    return _fetch_transcript_payload(url)
 
 
 @mcp.tool(name="media-fetch.web.search")

@@ -92,10 +92,9 @@ Networking note:
   Current package baseline: `litellm[proxy]==1.83.4`.
   Additional task aliases: `task-transcribe` routes standard transcript cleanup
   through `fast` and selects vivid cleanup via `prompt_variables`, while
-  `task-youtube-summary` routes to `deep` for YouTube transcript summaries
-  through `POST /v1/responses`; `POST /v1/chat/completions` remains
-  compatibility-only. They are not speech STT endpoints and no longer carry a
-  `fast` -> `deep` retry shim.
+  `task-youtube-transcript` routes to the Mini-local `youtube-transcript-api`
+  through `POST /v1/chat/completions`. They are not speech STT endpoints and no
+  longer carry a `fast` -> `deep` retry shim.
   Utility alias: `task-json` routes to the current `fast` backend through
   `POST /v1/responses` and returns canonical transcript-to-JSON output.
   Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
@@ -121,9 +120,7 @@ Networking note:
   Shortcut-style clients. Follow-up requests may reuse the public response
   `id`, but the echoed `previous_response_id` is not a stable public identity
   string. `task-transcribe` is the supported multi-turn transcript
-  manipulation lane, with vivid behavior selected by `prompt_variables`, and
-  `task-youtube-summary` uses the same direct follow-up pattern after the
-  initial summary.
+  manipulation lane, with vivid behavior selected by `prompt_variables`.
   Temporary rollout-only gateway aliases are permitted during GPT cutovers when
   they do not redefine the public alias surface; current approved example:
   no active temporary GPT rollout aliases.
@@ -159,7 +156,8 @@ Networking note:
 - Open Terminal:
   - native human-UX API container remains on `127.0.0.1:8010`
   - canonical Open Terminal MCP backend is `open-terminal-mcp.service` on `127.0.0.1:8011/mcp`
-  - transcript/media/web retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
+  - web retrieval MCP backend is `media-fetch-mcp.service` on `127.0.0.1:8012/mcp`
+  - YouTube transcript acquisition backend is `youtube-transcript-api.service` on `127.0.0.1:8014/v1`
   - curated document-library MCP backend is `docs-mcp` on `http://192.168.1.72:8013/mcp`
   - runtime is Docker under systemd from a derived image pinned to upstream `open-terminal`
   - first slice mount scope is repo-root only:

@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-19-youtube-transcript-api-runtime](2026-05-19-youtube-transcript-api-runtime.md)
 - [2026-05-11-gemma4-qwen36-artifact-fit](2026-05-11-gemma4-qwen36-artifact-fit.md)
 - [2026-05-10-gemma4-qwen36-landscape-survey](2026-05-10-gemma4-qwen36-landscape-survey.md)
 - [2026-05-10-gemma4-qwen36-artifact-fit](2026-05-10-gemma4-qwen36-artifact-fit.md)

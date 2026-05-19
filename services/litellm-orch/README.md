@@ -23,7 +23,8 @@ only; it does not implement inference.
 - `task-transcribe` is a text-cleanup alias on `fast`
 - vivid transcript cleanup is selected on `task-transcribe` with
   `prompt_variables.audience` / `prompt_variables.tone`
-- `task-youtube-summary` is a YouTube transcript-summary alias on `deep`
+- `task-youtube-transcript` is a YouTube transcript acquisition alias routed to
+  the Mini-local `youtube-transcript-api`
 - Voice Gateway on the Orin for STT aliases
 - SearXNG on the Mini for generic search tooling
 
@@ -32,7 +33,7 @@ only; it does not implement inference.
   `/home/christopherbailey/homelab-llm/docs/OPENCODE.md`.
 - The local canonical public human lanes remain `fast` and `deep`.
 - Public GPT-OSS traffic is Responses-first through LiteLLM for `fast`,
-  `deep`, `task-transcribe`, `task-json`, and `task-youtube-summary`.
+  `deep`, `task-transcribe`, and `task-json`.
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   GPT-OSS public aliases during the current migration window.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
@@ -47,12 +48,10 @@ only; it does not implement inference.
   `model=task-transcribe`; LiteLLM first routes audio to `voice-stt`, then
   cleans the raw transcript and returns `id` plus `output_text`. Add
   `prompt_variables.audience` / `prompt_variables.tone` for vivid cleanup.
-- `task-youtube-summary` is also an additional task alias, not part of the
-  public human chat-lane trio. Its guardrail resolves one supported YouTube
-  video URL on the first turn, fetches structured transcript data from the
-  localhost-only `media-fetch-mcp` service on `127.0.0.1:8012/mcp`, indexes a
-  durable transcript document through the memory API, renders an adaptive
-  summary prompt, and rewrites Responses output into stable `output_text`.
+- `task-youtube-transcript` is also an additional task alias, not part of the
+  public human chat-lane trio. It routes normal Chat Completions requests to
+  the localhost-only `youtube-transcript-api` service on `127.0.0.1:8014/v1`;
+  the assistant message content is plain timestamped transcript text.
 - Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
   upstream `output_text` is not guaranteed to be populated on every direct
   `llmster` response.
@@ -64,9 +63,6 @@ only; it does not implement inference.
   matching that public value byte-for-byte.
 - `task-json` is an additional utility alias, not part of the public human
   chat-lane trio.
-- `task-youtube-summary` follow-ups are retrieval-grounded through a durable
-  `response_id -> document_id` mapping in the memory API rather than trusting
-  provider conversation state alone.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.
@@ -85,5 +81,3 @@ only; it does not implement inference.
 - `SERVICE_SPEC.md` for endpoint/auth/runtime details
 - `RUNBOOK.md` for health checks and restart boundaries
 - `CONSTRAINTS.md` for non-negotiables
-- `docs/task-youtube-summary.md` for caller usage and operator architecture of
-  the YouTube summary lane

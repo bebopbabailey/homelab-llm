@@ -32,10 +32,6 @@ implement inference or web-search business logic.
 - `DATABASE_URL` is required in the runtime environment for DB-backed LiteLLM
   auth/key-management features such as teams, groups, service accounts, and
   `/key/generate`.
-- `MEMORY_API_BEARER_TOKEN` is required in the Mini LiteLLM runtime for
-  `task-youtube-summary` transcript upserts and response-map writes against the
-  Studio memory API. The token value must match the Studio-side file
-  `MEMORY_API_WRITE_BEARER_TOKEN_FILE`.
 - Current package baseline pins `litellm[proxy]==1.83.4`.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected
@@ -55,6 +51,8 @@ implement inference or web-search business logic.
   `VOICE_GATEWAY_API_BASE`; Speaches stays localhost-only behind that facade.
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
 - **SearXNG** on the Mini (`http://127.0.0.1:8888/search`) for the generic `searxng-search` tool.
+- **YouTube Transcript API** on the Mini (`http://127.0.0.1:8014/v1`) for the
+  `task-youtube-transcript` utility alias.
 
 ## Default Logical Models
 - `deep` -> Studio `llmster` lane `8126` (`llmster-gpt-oss-120b-mxfp4-gguf`)
@@ -70,8 +68,8 @@ implement inference or web-search business logic.
   uses the vivid transcript dotprompt and a larger default output budget
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
-- `task-youtube-summary` -> Studio `llmster` deep lane `8126`
-  (`llmster-gpt-oss-120b-mxfp4-gguf`) with the YouTube transcript-summary prompt
+- `task-youtube-transcript` -> Mini-local `youtube-transcript-api`
+  (`openai/youtube-transcript`) for source-faithful YouTube transcript retrieval
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
 
@@ -93,8 +91,7 @@ implement inference or web-search business logic.
 - The current validated upstream model for that alias is `gpt-5.3-codex`.
 - Public GPT-OSS lanes are Responses-first on the LiteLLM path.
 - `POST /v1/chat/completions` remains temporarily available as a compatibility
-  path for `fast`, `deep`, `task-transcribe`, `task-json`, and
-  `task-youtube-summary`.
+  path for `fast`, `deep`, `task-transcribe`, and `task-json`.
 - Current public `deep` contract on the live shared `8126` backend:
   - plain chat / structured simple / structured nested clean
   - auto noop strong
@@ -146,45 +143,12 @@ implement inference or web-search business logic.
   fixed strict `json_schema`, normalize malformed/provider-sloppy payloads,
   salvage unknown categories into `other`, and fall back once to the canonical
   empty payload with `other.attributes.guardrail_status="repair_failed"` if repair fails.
-- `task-youtube-summary` is a YouTube transcript-summary utility alias.
-  Its canonical initial contract is `POST /v1/responses` with native Responses
-  `input` containing one supported YouTube video URL and an optional short ask.
-  `POST /v1/chat/completions` remains compatibility-only for Open WebUI and
-  other chat-style clients.
-- `task-youtube-summary` uses a LiteLLM-owned pre-call guardrail to normalize
-  the first-turn URL, fetch source-faithful structured transcript data from the
-  localhost-only `media-fetch-mcp` service on `127.0.0.1:8012/mcp`,
-  synchronously upsert a durable transcript document through the memory API,
-  and render the adaptive summary dotprompt through the generic `prompt-pre`
-  path. `segments[]` from `media-fetch-mcp` are the canonical chunking/indexing
-  surface; LiteLLM does not reparse timestamped transcript text for that work.
-- `task-youtube-summary` emits readable markdown with a compact metadata line,
-  adaptive sections, and sparse timestamps. The first summary line includes the
-  durable document handle (`Document: youtube:<video_id>`). Successful
-  Responses payloads are rewritten into stable `output_text` while preserving
-  response `id`,
-  `previous_response_id`, and `usage`.
-- `task-youtube-summary` accepts common single-video YouTube watch, short-link,
-  Shorts, and live URLs. Playlist-only, channel, search, and other non-video
-  pages are rejected.
-- `task-youtube-summary` fails closed when YouTube does not expose a usable
-  caption track. v1 does not add ASR fallback or metadata-only summary mode.
-- `task-youtube-summary` keeps English summary/answer output as the default
-  user contract even when `media-fetch-mcp` returns a non-English transcript;
-  translation remains a summarization concern, not a transcript-service
-  concern.
-- `task-youtube-summary` supports direct follow-up Q&A on the same alias.
-  `previous_response_id` is treated as an ergonomic handle only; LiteLLM
-  resolves it into a retrieval-owned `document_id` mapping and asks the memory
-  API for document-scoped transcript chunks before follow-up synthesis.
-  Oversized transcripts are still summarized internally on `deep`, but their
-  follow-ups now ground against the indexed transcript document rather than
-  provider-side placeholder lineage.
-- Chat-completions follow-ups must not require a repeated URL. When
-  `previous_response_id` is absent, LiteLLM attempts recovery in this order:
-  explicit `document_id`, prior assistant metadata line, then prior YouTube URL
-  in chat history; otherwise it fails clearly and asks for the URL or document
-  handle.
+- `task-youtube-transcript` is a Chat Completions utility alias routed to the
+  Mini-local `youtube-transcript-api` OpenAI-compatible backend. The latest
+  user message must contain exactly one supported YouTube URL. The assistant
+  message content is plain timestamped transcript text. LiteLLM does not use a
+  custom guardrail, MCP orchestration, vector upsert, summarization, or
+  follow-up recovery for this alias.
 - GPT formatting ownership is upstream-first:
   - `fast`, `deep`, and internal worker alias `code-reasoning` keep upstream
     `llmster` / llama.cpp response formatting and tool-call structure as the
@@ -197,8 +161,7 @@ implement inference or web-search business logic.
     instead of leaving Open WebUI in a half-finished tool turn.
 - LiteLLM retains one narrow GPT request-default shim only:
   - `gpt-request-defaults` runs `pre_call` for `deep`, `fast`,
-    `code-reasoning`, `task-transcribe`, `task-json`, and
-    `task-youtube-summary`
+    `code-reasoning`, `task-transcribe`, and `task-json`
   - behavior:
     - inject `reasoning_effort=low` only when omitted on Chat Completions
     - inject `reasoning: {"effort":"low"}` only when omitted on Responses
@@ -217,8 +180,7 @@ implement inference or web-search business logic.
     error when normalization is not lossless
 - `code-reasoning` inherits the same upstream GPT normalization path as `deep`.
 - Current supported public GPT-OSS contract is Responses-first:
-  - `deep`, `fast`, `task-transcribe`, `task-json`, and
-    `task-youtube-summary` all accept `POST /v1/responses`
+  - `deep`, `fast`, `task-transcribe`, and `task-json` all accept `POST /v1/responses`
   - `POST /v1/chat/completions` remains compatibility-only during the current migration window
   - raw upstream `fast` / `deep` callers should treat the Responses `output`
     message surface as canonical text; `output_text` is advisory-only on direct

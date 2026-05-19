@@ -52,15 +52,14 @@
   not public gateway aliasing.
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects omitted reasoning
-  defaults for `fast`, `deep`, `task-transcribe`, `task-json`,
-  `task-youtube-summary`, and `code-reasoning` because the direct
+  defaults for `fast`, `deep`, `task-transcribe`, `task-json`, and
+  `code-reasoning` because the direct
   shared `8126` GPT-OSS endpoints still degrade on some omitted-effort probes.
 - Public GPT-OSS lanes are now Responses-first:
   - `fast`
   - `deep`
   - `task-transcribe`
   - `task-json`
-  - `task-youtube-summary`
 - `POST /v1/chat/completions` remains a temporary compatibility path for the
   public GPT-OSS lanes.
 - Direct raw `llmster` clients should treat the Responses `output` message
@@ -68,18 +67,13 @@
   not the upstream truth-path requirement for `fast` / `deep`.
 - LiteLLM keeps the task aliases more ergonomic by preserving `id`,
   `previous_response_id`, and `usage`, while also returning stable
-  `output_text` on `task-transcribe`, `task-json`, and
-  `task-youtube-summary`. Callers may reuse the public response `id` on the
+  `output_text` on `task-transcribe` and `task-json`. Callers may reuse the
+  public response `id` on the
   next request, but should not depend on the echoed `previous_response_id`
   string matching that public `id` verbatim.
-- Long-form `task-youtube-summary` follow-ups no longer depend on provider
-  conversation lineage alone. LiteLLM resolves the public response id through
-  the Studio memory API response-map index and retrieves document-scoped
-  transcript chunks from the Elastic-backed store on Studio.
 - The Studio memory API is Mini-facing on `http://192.168.1.72:55440`. Read and
   search routes are open to Mini through pf allowlisting; write routes use a
-  shared bearer token so transcript upserts and response-map writes stay
-  controlled.
+  shared bearer token so document upserts and response-map writes stay controlled.
 - `chatgpt-5` keeps its own adapter-backed dual-endpoint behavior.
 - `deep` cutover evidence was:
   - close `fast` observation on the current live LM Studio stack
@@ -222,19 +216,12 @@ if a param is rejected by the backend.
   extracts fixed-schema JSON from the transcript, and returns `id` plus minified
   JSON in `output_text`. It is not part of the Open WebUI `AUDIO_STT_*` speech
   path.
-- LiteLLM YouTube transcript-summary alias:
-  - `task-youtube-summary`
-- `task-youtube-summary` is a `POST /v1/responses` utility contract first.
-  `POST /v1/chat/completions` remains temporary compatibility only for
-  chat-style clients.
-- First turn: send one supported YouTube video URL plus an optional short ask.
-  The guardrail fetches captions via `youtube-transcript-api`, prefers manual
-  English captions over generated English captions, falls back to YouTube
-  translation only when needed, and returns adaptive markdown with a compact
-  metadata line and sparse timestamps.
-- Follow-up: direct callers may reuse the returned response `id` as
-  `previous_response_id`. Short-video runs remain transcript-grounded; rare
-  chunked long-video runs stay grounded in the final synthesis response.
+- LiteLLM YouTube transcript acquisition alias:
+  - `task-youtube-transcript`
+- `task-youtube-transcript` is a `POST /v1/chat/completions` utility contract.
+  Send one supported YouTube URL in the latest user message. LiteLLM routes the
+  request to the localhost-only `youtube-transcript-api` backend and returns
+  plain timestamped transcript text in `choices[0].message.content`.
 - It is not part of the Open WebUI `AUDIO_STT_*` speech path.
 - `chatgpt-5` is now backed by Mini-local experimental `ccproxy-api` on
   `127.0.0.1:4010/codex/v1`, with LiteLLM still serving as the only user-facing
@@ -517,14 +504,13 @@ Example:
   - `/v1/responses` stays denied for the worker key
 
 ## Media Fetch MCP (implemented locally)
-- Current live target path for transcript and web retrieval is the
-  localhost-only `media-fetch-mcp` backend:
+- Current live target path for web evidence retrieval is the localhost-only
+  `media-fetch-mcp` backend:
   - backend: `http://127.0.0.1:8012/mcp`
   - transport: MCP Streamable HTTP
 - Intended first client:
   - Open WebUI direct MCP registration on the Mini
 - Current tool surface:
-  - `youtube.transcript`
   - `media-fetch.web.search`
   - `media-fetch.web.fetch`
   - `media-fetch.web.session.upsert`
@@ -532,8 +518,6 @@ Example:
   - `media-fetch.web.session.delete`
   - `media-fetch.web.quick`
   - `media-fetch.web.research`
-- `youtube.transcript` accepts one supported single-video YouTube URL and
-  returns timestamped full transcript text plus structured segments.
 - `media-fetch.web.search` calls local SearXNG directly and returns normalized
   live web results.
 - `media-fetch.web.fetch` turns public webpages into cleaned evidence payloads

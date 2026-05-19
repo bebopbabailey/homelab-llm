@@ -1,0 +1,16 @@
+[Unit]
+Description=YouTube Transcript API (localhost-only OpenAI-compatible acquisition backend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/youtube-transcript-api
+EnvironmentFile=/etc/homelab-llm/youtube-transcript-api.env
+ExecStart=/home/christopherbailey/.local/bin/uv run --directory /home/christopherbailey/homelab-llm/services/youtube-transcript-api youtube-transcript-api --host ${YOUTUBE_TRANSCRIPT_API_HOST} --port ${YOUTUBE_TRANSCRIPT_API_PORT}
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
