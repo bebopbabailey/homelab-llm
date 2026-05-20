@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-19-qwen36-mlx-coding-specialist](2026-05-19-qwen36-mlx-coding-specialist.md)
 - [2026-05-19-agentic-ensemble-backend-accounting](2026-05-19-agentic-ensemble-backend-accounting.md)
 - [2026-05-19-youtube-transcript-api-runtime](2026-05-19-youtube-transcript-api-runtime.md)
 - [2026-05-11-gemma4-qwen36-artifact-fit](2026-05-11-gemma4-qwen36-artifact-fit.md)
