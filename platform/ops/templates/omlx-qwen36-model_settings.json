@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "models": {
+    "omlx-qwen36-27b-optiq-4bit": {
+      "model_type_override": "llm",
+      "max_context_window": 32768,
+      "max_tokens": 32768,
+      "enable_thinking": false,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      },
+      "forced_ct_kwargs": [
+        "enable_thinking"
+      ],
+      "display_name": "oMLX Qwen3.6 27B OptiQ 4bit",
+      "description": "Experimental Qwen3.6 agent backend primitive forced to text-only LLM mode with thinking disabled."
+    }
+  }
+}

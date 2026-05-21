@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.bebop.mlx-omni.8120</string>
+  <key>UserName</key>
+  <string>thestudio</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/thestudio</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/thestudio/homelab-llm-runtime/omlx-qwen36-agent/run_omlx_qwen36_agent.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>OMLX_MODEL_DIR</key>
+    <string>/Users/thestudio/models/omlx-agent</string>
+    <key>OMLX_BASE_PATH</key>
+    <string>/Users/thestudio/.omlx-qwen36-agent</string>
+    <key>OMLX_HOST</key>
+    <string>192.168.1.72</string>
+    <key>OMLX_PORT</key>
+    <string>8120</string>
+    <key>OMLX_MAX_PROCESS_MEMORY</key>
+    <string>75%</string>
+    <key>OMLX_MAX_CONCURRENT_REQUESTS</key>
+    <string>4</string>
+    <key>OMLX_SSD_CACHE_DIR</key>
+    <string>/Users/thestudio/.omlx-qwen36-agent/cache/shadow</string>
+    <key>OMLX_SSD_CACHE_MAX_SIZE</key>
+    <string>64GB</string>
+    <key>OMLX_HOT_CACHE_MAX_SIZE</key>
+    <string>8GB</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>StandardOutPath</key>
+  <string>/Users/thestudio/Library/Logs/omlx-qwen36-agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/thestudio/Library/Logs/omlx-qwen36-agent.err</string>
+</dict>
+</plist>

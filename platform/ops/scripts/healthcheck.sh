@@ -107,6 +107,11 @@ check_http "http://127.0.0.1:4000/v1/models" -H "Authorization: Bearer ${LITELLM
 check_http "http://127.0.0.1:4000/v1/mcp/tools" -H "Authorization: Bearer ${LITELLM_API_KEY}"
 check_http "http://127.0.0.1:8014/health"
 check_http "http://127.0.0.1:8014/v1/models"
+if [[ -f /etc/homelab-llm/omlx-agent-gateway.env ]]; then
+  check_port 4022
+  check_http "http://127.0.0.1:4022/health"
+  check_http "http://127.0.0.1:4022/v1/models"
+fi
 if [[ -f /etc/homelab-llm/ccproxy.env ]]; then
   CCPROXY_AUTH_TOKEN="$(get_env_value CCPROXY_AUTH_TOKEN /etc/homelab-llm/ccproxy.env || true)"
   if [[ -n "${CCPROXY_AUTH_TOKEN}" ]]; then

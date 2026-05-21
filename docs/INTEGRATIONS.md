@@ -50,6 +50,10 @@
 - `omlx-runtime` is not part of the current LiteLLM alias surface.
 - The current repo evidence for oMLX is direct specialized-runtime use only,
   not public gateway aliasing.
+- `omlx-agent-gateway` is a Mini-local `127.0.0.1:4022` sidecar for the
+  experimental Studio oMLX Qwen3.6 primitive. It is not a LiteLLM alias and is
+  not part of Open WebUI or OpenHands promotion. It passes streaming chat
+  completions through for coding-agent clients such as Pi.
 - Resilience baseline: `fast -> deep`.
 - GPT request-default exception: LiteLLM still injects omitted reasoning
   defaults for `fast`, `deep`, `task-transcribe`, `task-json`, and
@@ -100,6 +104,15 @@
 - It is intentionally outside the current LiteLLM routing contract.
 - It must not be documented as “the next alias” or as a generic OpenAI-style
   public backend unless a later phase proves and promotes that path.
+- Current experimental agent-backend primitive:
+  - Studio oMLX listener: `http://192.168.1.72:8120/v1`
+  - Studio launchd label: `com.bebop.mlx-omni.8120`
+  - model id: `omlx-qwen36-27b-optiq-4bit`
+  - Mini sidecar: `http://127.0.0.1:4022/v1`
+  - service boundary: `services/omlx-agent-gateway`
+  - chat surface: `/v1/chat/completions`, including `stream=true` passthrough
+  - no LiteLLM alias, OpenHands handoff, Open WebUI route, or native MCP in
+    this slice
 
 ## Local orchestration cockpit
 - `orchestration-cockpit` is the current localhost-only Mini-side LangGraph +

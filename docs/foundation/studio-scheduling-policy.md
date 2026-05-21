@@ -12,6 +12,7 @@ Only these labels are inference lane:
 - `com.bebop.mlx-lane.8100`
 - `com.bebop.mlx-lane.8101`
 - `com.bebop.mlx-lane.8102`
+- `com.bebop.mlx-omni.8120`
 - `com.bebop.llmster-gpt.8126`
 - `com.bebop.optillm-proxy`
 
@@ -86,8 +87,11 @@ uv run python platform/ops/scripts/audit_studio_scheduling.py --host studio --js
 4. Apply/check `com.bebop.llmster-gpt.8126` when the canonical GPT service
    contract changes:
    - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.llmster-gpt.8126 --json`
-5. Optional: enforce retired-label quarantine in apply mode with `--include-retired`.
-6. Run full strict audit and archive output.
+5. Apply/check `com.bebop.mlx-omni.8120` when the experimental oMLX Qwen3.6
+   primitive contract changes:
+   - `uv run python platform/ops/scripts/enforce_studio_launchd_policy.py --host studio --apply --managed-label com.bebop.mlx-omni.8120 --json`
+6. Optional: enforce retired-label quarantine in apply mode with `--include-retired`.
+7. Run full strict audit and archive output.
 
 ### Rollback
 For each changed managed label:
@@ -113,6 +117,7 @@ For quarantined unmanaged labels:
 
 Approved active/persistent inference labels:
 - `com.bebop.llmster-gpt.8126` for the shared GPT `llmster` service
+- `com.bebop.mlx-omni.8120` for the experimental oMLX Qwen3.6 primitive
 - `com.bebop.optillm-proxy` for the non-core Studio optimization proxy
 
 Approved active/persistent background data-service labels:

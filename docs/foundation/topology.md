@@ -1,8 +1,8 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama, plus the localhost-only `orchestration-cockpit` prototype when launched.
-- Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime`.
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
+- Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime` with the experimental oMLX Qwen3.6 primitive on `:8120`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
   `fast` and `deep` both routed through `8126`. Shadow ports `8123-8125` are
@@ -27,13 +27,15 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   `orchestration-cockpit` is localhost-only and inactive by default; when
   launched it uses LangGraph dev on `127.0.0.1:2024` and Agent Chat UI on
   `127.0.0.1:3030`.
+  `omlx-agent-gateway` is localhost-only on `127.0.0.1:4022` and fronts the
+  Studio oMLX Qwen3.6 primitive for framework-neutral agent backend tests.
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
 - Role: public inference host plus specialized runtime-plane host.
 - Access: `ssh studio`.
 - Sources of truth: `docs/foundation/mlx-registry.md`, `docs/foundation/studio-scheduling-policy.md`.
-- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8126/v1/models`.
+- Safe checks: `mlxctl status`, `curl http://127.0.0.1:8101/v1/models`, `curl http://127.0.0.1:8126/v1/models`, `curl http://192.168.1.72:8120/v1/models`.
   Vector-store checks: `lsof -nP -iTCP -sTCP:LISTEN | egrep ':55432|:55440'`, `curl http://127.0.0.1:55440/health`.
   Vector-store labels are background-lane managed labels:
   `com.bebop.pgvector-main`, `com.bebop.memory-api-main`,
@@ -64,6 +66,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
 | orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only |
 | CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
+| oMLX Agent Gateway (experimental, localhost-only) | Mini | 4022 | http://127.0.0.1:4022/v1 | /health, /v1/models, /v1/model/info, /v1/chat/completions |
 | Open Terminal API (human UX) | Mini | 8010 | http://127.0.0.1:8010 | /health |
 | Open Terminal MCP | Mini | 8011 | http://127.0.0.1:8011/mcp | MCP handshake |
 | Media Fetch MCP | Mini | 8012 | http://127.0.0.1:8012/mcp | MCP handshake |
@@ -81,6 +84,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Studio main memory API | Studio | 55440 | http://192.168.1.72:55440 | /health |
 | SearXNG | Mini | 8888 | http://127.0.0.1:8888 | not documented |
 | MLX inference lane (active) | Studio | 8101 | http://192.168.1.72:8101/v1 | /v1/models |
+| oMLX Qwen3.6 primitive (experimental) | Studio | 8120 | http://192.168.1.72:8120/v1 | /v1/models |
 | llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | http://192.168.1.72:8126/v1 | /v1/models |
 | AFM (planned) | Studio | 9999 | http://192.168.1.72:9999/v1 | /v1/models |
 | Ollama | Mini | 11434 | http://192.168.1.71:11434 | not documented |
@@ -92,6 +96,9 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 - Current active public inference listeners:
   - `8101`: `vllm serve` under `com.bebop.mlx-lane.8101`
   - `8126`: `llmster` GPT service under `com.bebop.llmster-gpt.8126`
+- Current experimental specialized-runtime listeners:
+  - `8120`: `omlx serve` under `com.bebop.mlx-omni.8120` for
+    `omlx-qwen36-27b-optiq-4bit`
 - Retired GPT rollback MLX slots:
   - `8100`
   - `8102`
@@ -101,7 +108,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
   - `com.bebop.elasticsearch-memory-main`
 
 Studio scheduling contract:
-- inference lane labels: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`, `com.bebop.optillm-proxy`
+- inference lane labels: `com.bebop.mlx-lane.8100`, `com.bebop.mlx-lane.8101`, `com.bebop.mlx-lane.8102`, `com.bebop.mlx-omni.8120`, `com.bebop.optillm-proxy`
 - background data-service labels: `com.bebop.elasticsearch-memory-main`, `com.bebop.memory-api-main`
 - non-inference transient automation runs with taskpolicy utility clamp
 - strict allowlist policy for owned labels (`com.bebop.*`, `com.deploy.*`)

@@ -63,6 +63,10 @@
       "lane": "inference",
       "plist_path": "/Library/LaunchDaemons/com.bebop.optillm-proxy.plist"
     },
+    "com.bebop.mlx-omni.8120": {
+      "lane": "inference",
+      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8120.plist"
+    },
     "com.bebop.pgvector-main": {
       "lane": "background",
       "plist_path": "/Library/LaunchDaemons/com.bebop.pgvector-main.plist"
@@ -99,10 +103,6 @@
     },
     "com.bebop.mlx-omni.8100": {
       "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8100.plist",
-      "action": "quarantine"
-    },
-    "com.bebop.mlx-omni.8120": {
-      "plist_path": "/Library/LaunchDaemons/com.bebop.mlx-omni.8120.plist",
       "action": "quarantine"
     },
     "com.bebop.llama-router.8100": {

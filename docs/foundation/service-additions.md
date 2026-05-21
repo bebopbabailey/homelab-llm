@@ -13,6 +13,8 @@ Current preferred usage:
 - specialized runtime services keep a narrow private contract
 - orchestration services may call a specialized runtime directly when that
   direct path is the validated contract
+- agent-backend primitives may use a localhost-only sidecar when a stable
+  framework-facing URL is useful but the runtime must stay outside LiteLLM
 
 Optimization proxies (e.g., OptiLLM) bind to localhost only. Experimental
 auth-backed translation sidecars such as `ccproxy-api` also bind to localhost
@@ -100,6 +102,15 @@ Compatibility-first service taxonomy:
    validated contract rather than adding a generic compatibility layer.
 4) If the prototype uses a third-party GUI such as Agent Chat UI, prefer
    repo-owned config/docs wrappers before vendoring the full app source.
+
+## Add a New Agent Backend Primitive
+1) Keep the sidecar localhost-only unless a later promotion phase approves
+   broader exposure.
+2) Keep the backend runtime source of truth upstream; avoid LiteLLM-style
+   fallback, guardrail, or parser-repair behavior in the primitive gateway.
+3) Prove direct backend gates before treating the sidecar as a durable daily-use
+   URL.
+4) Journal the model, runtime command, bind, cache settings, and failure modes.
 
 ## Config Sources of Truth
 - LiteLLM routing: `services/litellm-orch/config/router.yaml`.

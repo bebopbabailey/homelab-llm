@@ -1,5 +1,7 @@
 # Journal Index
 
+- [2026-05-20-pi-qwen-local-smoke](2026-05-20-pi-qwen-local-smoke.md)
+- [2026-05-20-omlx-qwen36-agent-backend-primitive](2026-05-20-omlx-qwen36-agent-backend-primitive.md)
 - [2026-05-19-qwen36-mlx-coding-specialist](2026-05-19-qwen36-mlx-coding-specialist.md)
 - [2026-05-19-agentic-ensemble-backend-accounting](2026-05-19-agentic-ensemble-backend-accounting.md)
 - [2026-05-19-youtube-transcript-api-runtime](2026-05-19-youtube-transcript-api-runtime.md)

@@ -3,6 +3,7 @@
 ## Topology (current)
 - Mac Mini: LiteLLM :4000 (LAN + localhost; tailnet optional for remote operator access), Open WebUI :3000 (LAN + tailnet),
   orchestration-cockpit prototype (localhost-only when launched: LangGraph dev :2024, Agent Chat UI :3030),
+  oMLX Agent Gateway :4022 (localhost-only experimental OpenAI-compatible sidecar for the Studio oMLX Qwen3.6 primitive),
   OpenCode Web :4096 (LAN + tailnet-reachable if network policy allows, Basic Auth at app layer),
   OpenHands Phase A :4031 (localhost + tailnet via `hands`, systemd-managed Docker service),
   Samba SMB :139/:445 (LAN-only authenticated Finder access to `mini-root` and `seagate`),
@@ -16,8 +17,9 @@
   Public LiteLLM human-chat canon is `deep` and `fast`, both on shared
   `llmster` at `8126`.
   The Studio also owns the specialized runtime plane in the repo architecture.
-  That plane is represented by `omlx-runtime`, but no repo-managed oMLX runtime
-  deployment or public route is claimed in phase 1.
+  That plane is represented by `omlx-runtime`; the current experimental oMLX
+  Qwen3.6 primitive is bound on `192.168.1.72:8120` and fronted only by the
+  Mini-local `omlx-agent-gateway` sidecar on `127.0.0.1:4022`.
   Subscription-backed `chatgpt-5` is exposed through the same Mini LiteLLM
   gateway, but now via the localhost-only experimental `ccproxy-api` sidecar.
   OptiLLM proxy :4020 remains deployed but is not part of the active gateway alias surface.
@@ -37,6 +39,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
 | Qwen-Agent proxy (experimental) | Mini | 4021 | 127.0.0.1 | http://127.0.0.1:4021 | /health, /v1/models, /v1/chat/completions | `platform/ops/systemd/qwen-agent-proxy.service`, `ss -ltnp`, direct curl |
+| oMLX Agent Gateway (experimental) | Mini | 4022 | 127.0.0.1 | http://127.0.0.1:4022/v1 | /health, /v1/models, /v1/model/info, /v1/chat/completions including streaming passthrough | `services/omlx-agent-gateway`, `platform/ops/systemd/omlx-agent-gateway.service`, direct curl |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
 | orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | 127.0.0.1 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only | `services/orchestration-cockpit/SERVICE_SPEC.md`, local `langgraph dev`, local Agent Chat UI |
 | CCProxy API (experimental) | Mini | 4010 | 127.0.0.1 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models | `/etc/systemd/system/ccproxy-api.service`, `ss -ltnp`, direct curl |
@@ -53,6 +56,7 @@
 | Docs MCP | Studio | 8013 | 192.168.1.72 (Mini + Studio self-access only) | http://192.168.1.72:8013/mcp | authenticated MCP handshake | `com.bebop.docs-mcp-main`, policy-managed launchd, bearer-authenticated MCP facade over `vector-db` |
 | SearXNG | Mini | 8888 | 127.0.0.1 | http://127.0.0.1:8888 | not documented | `/etc/systemd/system/searxng.service`, `/etc/searxng/settings.yml` |
 | MLX inference lane (active) | Studio | 8101 | 192.168.1.72 | http://192.168.1.72:8101/v1 | /v1/models | `com.bebop.mlx-lane.8101`, runtime `vllm serve`, `mlxctl status` |
+| oMLX Qwen3.6 primitive (experimental) | Studio | 8120 | 192.168.1.72 | http://192.168.1.72:8120/v1 | /v1/models | `com.bebop.mlx-omni.8120`, runtime `omlx serve`, direct curl |
 | llmster GPT service (active for `fast` + `deep`) | Studio | 8126 | 192.168.1.72 | http://192.168.1.72:8126/v1 | /v1/models | `com.bebop.llmster-gpt.8126`, runtime `llmster`, `lms ps --json` |
 | AFM (planned) | Studio | 9999 | 0.0.0.0 | http://192.168.1.72:9999/v1 | /v1/models | owner confirmation (not yet wired) |
 | Ollama | Mini | 11434 | 0.0.0.0 | http://192.168.1.71:11434 | not documented | `/etc/systemd/system/ollama.service`, `/etc/systemd/system/ollama.service.d/override.conf` |
@@ -69,6 +73,8 @@ Networking note:
 - Specialized runtime plane:
   - Studio-owned private runtime surface
   - represented in repo canon by `omlx-runtime`
+  - current experimental Qwen3.6 primitive uses Studio `8120` and Mini-local
+    `omlx-agent-gateway` `4022`
   - not part of the active public LiteLLM alias contract
 - Orchestration plane:
   - Mini-owned by default for repo-managed orchestrators
@@ -107,6 +113,9 @@ Networking note:
   `qwen-agent-proxy` sidecar and is intended only for operator validation.
   Worker-scoped `model/info` is still blocked on that shadow LiteLLM instance,
   so the lane is not yet a full OpenHands handoff path.
+  Experimental `omlx-agent-gateway` is a separate localhost-only agent backend
+  primitive for future framework tests. It does not add a LiteLLM alias, Open WebUI
+  route, or OpenHands handoff.
   Public GPT-OSS lanes are Responses-first on the LiteLLM path.
   Direct raw `llmster` Responses truth-path uses the `output` message surface
   as canonical assistant text; upstream `output_text` can still be null.

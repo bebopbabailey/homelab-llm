@@ -12,6 +12,8 @@ Current posture:
 - localhost-only experimental operator/orchestration prototypes may live under
   `services/` when they are repo-owned contract surfaces but not public
   deployments
+- localhost-only experimental agent gateways may live under `services/` when
+  they define a durable framework-facing contract but are not public routes
 - `parent_service_id` allows explicit child-service relationships such as
   `mcp-tools/web-fetch`
 - `layer-*` is taxonomy/navigation only and is not a live service-root surface

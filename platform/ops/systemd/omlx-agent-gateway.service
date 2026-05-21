@@ -1,0 +1,16 @@
+[Unit]
+Description=oMLX Agent Gateway (localhost Qwen3.6 primitive sidecar)
+After=network.target
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/omlx-agent-gateway
+EnvironmentFile=/etc/homelab-llm/omlx-agent-gateway.env
+EnvironmentFile=-/etc/homelab-llm/omlx-agent-gateway.secret.env
+ExecStart=/home/christopherbailey/homelab-llm/services/omlx-agent-gateway/scripts/run_omlx_agent_gateway.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
