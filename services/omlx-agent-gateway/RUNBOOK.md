@@ -24,8 +24,33 @@ curl -fsS http://127.0.0.1:4022/v1/models | jq .
 curl -fsS http://127.0.0.1:4022/v1/model/info | jq .
 ```
 
+## Pi Scratch Playground
+The stable human-facing scratch harness lives outside git:
+
+```bash
+python3 /home/christopherbailey/pi-qwen-trials/current/run_pi_qwen.py
+```
+
+Common request knobs:
+
+```bash
+python3 /home/christopherbailey/pi-qwen-trials/current/run_pi_qwen.py \
+  --temperature 0.1 \
+  --max-tokens 4096 \
+  --task "Fix the failing Python unittest suite."
+```
+
+Each run creates a disposable repo and artifacts under:
+
+```text
+/home/christopherbailey/pi-qwen-trials/current/runs/<timestamp>/
+```
+
+The important evidence files are `artifacts/pi-run.jsonl`,
+`artifacts/final-diff.patch`, `artifacts/final-test.log`,
+`artifacts/final-test.stderr.log`, and `artifacts/manifest.json`.
+
 ## Notes
 - Keep the Studio API key and optional gateway bearer token in the secret env.
 - The sidecar remains localhost-only; do not expose it through Tailscale, LiteLLM,
   Open WebUI, or OpenHands in this slice.
-
