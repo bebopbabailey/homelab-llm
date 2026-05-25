@@ -131,6 +131,8 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
   - not committed
   - not part of cockpit auth
   - not a LangSmith UI dependency
+- Safari access to hosted LangSmith Studio uses the LangGraph dev server
+  tunnel option, controlled by `ORCHESTRATION_COCKPIT_GRAPH_TUNNEL=true`.
 
 ## Local observability
 - Canonical static graph artifact: generated Mermaid from the compiled graph

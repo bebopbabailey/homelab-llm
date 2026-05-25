@@ -9,6 +9,7 @@ GRAPH_RUNTIME_DIR="${ORCHESTRATION_COCKPIT_GRAPH_RUNTIME_DIR:-$STATE_DIR/langgra
 ARTIFACT_DIR="${ORCHESTRATION_COCKPIT_ARTIFACT_DIR:-$STATE_DIR}"
 GRAPH_HOST="${ORCHESTRATION_COCKPIT_GRAPH_HOST:-127.0.0.1}"
 GRAPH_PORT="${ORCHESTRATION_COCKPIT_GRAPH_PORT:-2024}"
+GRAPH_TUNNEL="${ORCHESTRATION_COCKPIT_GRAPH_TUNNEL:-false}"
 RUNTIME_CONFIG_PATH="${ORCHESTRATION_COCKPIT_RUNTIME_CONFIG_PATH:-$GRAPH_RUNTIME_DIR/langgraph.json}"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-$HOME/.local/share/orchestration-cockpit/graph-venv}"
 export ORCHESTRATION_COCKPIT_ARTIFACT_DIR="$ARTIFACT_DIR"
@@ -21,9 +22,20 @@ uv run --project "$SERVICE_ROOT" --no-sync python \
   --output "$RUNTIME_CONFIG_PATH"
 cd "$GRAPH_RUNTIME_DIR"
 
-exec uv run --project "$SERVICE_ROOT" --no-sync langgraph dev \
+args=(
+  langgraph
+  dev
   --config "$RUNTIME_CONFIG_PATH" \
   --no-browser \
   --no-reload \
   --host "$GRAPH_HOST" \
   --port "$GRAPH_PORT"
+)
+
+case "$GRAPH_TUNNEL" in
+  1|true|TRUE|yes|YES|on|ON)
+    args+=(--tunnel)
+    ;;
+esac
+
+exec uv run --project "$SERVICE_ROOT" --no-sync "${args[@]}"

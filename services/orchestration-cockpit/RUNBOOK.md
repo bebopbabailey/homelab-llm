@@ -47,6 +47,8 @@ Required graph env values:
 - `OMLX_RUNTIME_MODEL=Qwen3-4B-Instruct-2507-4bit`
 - `ORCHESTRATION_COCKPIT_STATE_DIR=/home/christopherbailey/.local/state/orchestration-cockpit`
 - optional `UV_PROJECT_ENVIRONMENT=/home/christopherbailey/.local/share/orchestration-cockpit/graph-venv`
+- optional `ORCHESTRATION_COCKPIT_GRAPH_TUNNEL=true` for Safari access to
+  hosted LangSmith Studio
 
 Optional graph secret env:
 - `LANGSMITH_API_KEY=...` only if `langgraph dev` still requires it locally
@@ -84,6 +86,12 @@ dev-server prerequisite only; it is not part of cockpit auth.
 uv tool install "langgraph-cli[inmem]"
 /home/christopherbailey/homelab-llm/services/orchestration-cockpit/scripts/run_langgraph_dev.sh
 ```
+
+Safari blocks hosted Studio from calling the local plain-HTTP Agent Server. Set
+`ORCHESTRATION_COCKPIT_GRAPH_TUNNEL=true` in
+`/etc/orchestration-cockpit/graph.env`, restart
+`orchestration-cockpit-graph.service`, and use the HTTPS Studio URL printed in
+`journalctl -u orchestration-cockpit-graph.service`.
 
 Important:
 - the tracked `langgraph.json` remains the source of truth, but the wrapper
