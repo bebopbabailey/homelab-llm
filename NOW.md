@@ -1,9 +1,10 @@
 # NOW
 
 Active
-- Add a localhost-only LangGraph cockpit `/pi` route that launches the proven
-  Pi/Qwen scratch-run playground and returns artifact pointers.
+- Create an OpenTelemetry cockpit handoff for the next project chat, grounded
+  in current Mini/Studio service reality and existing Grafana/Prometheus/LiteLLM
+  observability surfaces.
 
 NEXT UP
-- Validate the cockpit path with unit tests and one local Pi/Qwen scratch smoke,
-  then decide whether the stock Agent Chat UI is good enough for daily trial use.
+- Use the handoff to plan the smallest OpenTelemetry collector + trace backend
+  slice without changing model serving or public routing.

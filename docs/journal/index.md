@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-25-opentelemetry-cockpit-handoff](2026-05-25-opentelemetry-cockpit-handoff.md)
 - [2026-05-25-orchestration-cockpit-safari-tunnel](2026-05-25-orchestration-cockpit-safari-tunnel.md)
 - [2026-05-25-qwen-pi-langgraph-control-surface](2026-05-25-qwen-pi-langgraph-control-surface.md)
 - [2026-05-25-litellm-dotprompt-startup-repair](2026-05-25-litellm-dotprompt-startup-repair.md)
