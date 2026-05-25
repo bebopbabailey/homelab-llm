@@ -96,7 +96,7 @@ prompts:
   litellm_params:
     prompt_id: task-transcribe
     prompt_integration: dotprompt
-    prompt_directory: ./prompts
+    prompt_file: ./prompts/task-transcribe.prompt
 search_tools:
 - search_tool_name: searxng-search
   litellm_params:

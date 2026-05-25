@@ -1,5 +1,6 @@
 # Journal Index
 
+- [2026-05-25-litellm-dotprompt-startup-repair](2026-05-25-litellm-dotprompt-startup-repair.md)
 - [2026-05-21-pi-qwen-stable-playground](2026-05-21-pi-qwen-stable-playground.md)
 - [2026-05-20-pi-qwen-local-smoke](2026-05-20-pi-qwen-local-smoke.md)
 - [2026-05-20-omlx-qwen36-agent-backend-primitive](2026-05-20-omlx-qwen36-agent-backend-primitive.md)

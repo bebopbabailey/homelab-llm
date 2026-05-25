@@ -61,7 +61,10 @@ class TestRouterDropParams(unittest.TestCase):
         self.assertIn("task-transcribe", prompts)
         self.assertNotIn("task-transcribe-vivid", prompts)
         self.assertEqual(prompts["task-transcribe"].get("prompt_integration"), "dotprompt")
-        self.assertEqual(prompts["task-transcribe"].get("prompt_directory"), "./prompts")
+        self.assertEqual(
+            prompts["task-transcribe"].get("prompt_file"),
+            "./prompts/task-transcribe.prompt",
+        )
         self.assertEqual(
             config.get("litellm_settings", {}).get("global_prompt_directory"),
             "./prompts",
