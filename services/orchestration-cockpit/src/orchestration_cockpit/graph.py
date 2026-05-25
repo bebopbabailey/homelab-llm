@@ -5,8 +5,10 @@ from langgraph.graph import END, START, StateGraph
 from orchestration_cockpit.nodes import (
     finalize_node,
     intake_node,
+    make_pi_invoke_node,
     make_specialized_invoke_node,
     ordinary_placeholder_node,
+    pi_prepare_node,
     route_edge,
     route_node,
     specialized_prepare_node,
@@ -21,6 +23,8 @@ def build_graph():
     builder.add_node("ordinary_placeholder", ordinary_placeholder_node)
     builder.add_node("specialized_prepare", specialized_prepare_node)
     builder.add_node("specialized_invoke", make_specialized_invoke_node())
+    builder.add_node("pi_prepare", pi_prepare_node)
+    builder.add_node("pi_invoke", make_pi_invoke_node())
     builder.add_node("finalize", finalize_node)
     builder.add_edge(START, "intake")
     builder.add_edge("intake", "route")
@@ -30,12 +34,15 @@ def build_graph():
         {
             "ordinary_placeholder": "ordinary_placeholder",
             "specialized_prepare": "specialized_prepare",
+            "pi_prepare": "pi_prepare",
             "finalize": "finalize",
         },
     )
     builder.add_edge("ordinary_placeholder", "finalize")
     builder.add_edge("specialized_prepare", "specialized_invoke")
     builder.add_edge("specialized_invoke", "finalize")
+    builder.add_edge("pi_prepare", "pi_invoke")
+    builder.add_edge("pi_invoke", "finalize")
     builder.add_edge("finalize", END)
     return builder.compile()
 

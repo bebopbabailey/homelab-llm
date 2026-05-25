@@ -1,10 +1,9 @@
 # NOW
 
 Active
-- Extend the Gemma/Qwen/GPT artifact-fit note with three-model ensemble
-  recommendations under 80/100/120/150 GB model-weight budgets.
+- Add a localhost-only LangGraph cockpit `/pi` route that launches the proven
+  Pi/Qwen scratch-run playground and returns artifact pointers.
 
 NEXT UP
-- Use the ensemble note to choose a first staged model-download and runtime
-  smoke-test plan; no model registry or runtime changes are in scope for this
-  documentation update.
+- Validate the cockpit path with unit tests and one local Pi/Qwen scratch smoke,
+  then decide whether the stock Agent Chat UI is good enough for daily trial use.

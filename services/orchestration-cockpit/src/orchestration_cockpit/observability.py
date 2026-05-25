@@ -79,6 +79,10 @@ def build_run_ledger_record(
     finished_at: str,
     latency_seconds: float | None,
 ) -> dict[str, Any]:
+    pi_result = state.get("pi_result", {})
+    pi_manifest = pi_result.get("manifest", {}) if isinstance(pi_result, Mapping) else {}
+    if not isinstance(pi_manifest, Mapping):
+        pi_manifest = {}
     return {
         "thread_id": state.get("thread_id", "local-thread"),
         "run_id": state.get("run_id", ""),
@@ -92,6 +96,11 @@ def build_run_ledger_record(
         "started_at": state.get("started_at", ""),
         "finished_at": finished_at,
         "latency_seconds": latency_seconds,
+        "pi_run_dir": pi_manifest.get("run_dir", ""),
+        "pi_artifacts": pi_manifest.get("artifacts", ""),
+        "pi_success": pi_manifest.get("success", None),
+        "pi_returncode": pi_manifest.get("pi_returncode", None),
+        "pi_final_test_returncode": pi_manifest.get("final_test_returncode", None),
     }
 
 

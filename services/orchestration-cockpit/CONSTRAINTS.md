@@ -10,17 +10,21 @@ This service inherits global constraints from `../../AGENTS.md`.
 - Do not vendor the full Agent Chat UI source unless stock UI proves insufficient.
 - Do not widen the specialized runtime contract beyond the frozen non-stream
   `/v1/chat/completions` shape already validated by `omlx-runtime`.
+- Keep Pi/Qwen cockpit runs scratch-only; do not target arbitrary local repos.
 
 ## Allowed operations
 - Service-local Python graph, routing, and tests.
 - Repo-owned UI wrapper docs and env examples only.
 - Direct calls to the existing `omlx-runtime` client from Mini-side graph code.
+- Synchronous calls to the existing Pi/Qwen scratch launcher under
+  `/home/christopherbailey/pi-qwen-trials/current`.
 
 ## Forbidden operations
 - New LAN exposure, host-binding changes, or public routing.
 - MCP additions.
 - LangGraph production deployment.
 - Interrupt/human-approval flow.
+- Custom Pi model/provider/validation selection from the cockpit route.
 
 ## Validation pointers
 - `uv run --project services/orchestration-cockpit python -m unittest discover -s services/orchestration-cockpit/tests -p 'test_*.py'`

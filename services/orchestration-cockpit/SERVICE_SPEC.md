@@ -70,10 +70,18 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
   - `adapter_request_id`
   - `specialized_payload`
   - `specialized_result`
+  - `pi_task`
+  - `pi_temperature`
+  - `pi_max_tokens`
+  - `pi_command`
+  - `pi_result`
   - `final_text`
   - `error`
 - Deterministic route syntax:
   - `/specialized <fixture-id> <freeform mission text>`
+  - `/pi <freeform scratch coding task>`
+  - `/pi --temperature <0..2> --max-tokens <256..16384> <task>` for the two
+    supported request knobs
 - Valid specialized fixture IDs:
   - `G01`
   - `G02`
@@ -86,6 +94,19 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
 - Deterministic placeholder only in this phase
 - No LiteLLM call
 - No commodity-model evaluation
+
+## Pi scratch-run path
+- Uses the existing stable Pi/Qwen playground launcher:
+  `/home/christopherbailey/pi-qwen-trials/current/run_pi_qwen.py`.
+- Requires the Mini-local oMLX Qwen sidecar at `127.0.0.1:4022`.
+- Scratch-only: the launcher creates disposable repos under
+  `/home/christopherbailey/pi-qwen-trials/current/runs/<run-id>/`.
+- The cockpit launches Pi synchronously and returns a summary plus artifact
+  paths for the manifest, transcript JSONL, final diff, and final test log.
+- The cockpit ledger stores pointers to Pi artifacts; it does not copy or
+  rewrite Pi run output.
+- Model, provider, and validation command remain fixed by the launcher in this
+  slice.
 
 ## Specialized path
 - Uses `OmlxRuntimeClient` directly.

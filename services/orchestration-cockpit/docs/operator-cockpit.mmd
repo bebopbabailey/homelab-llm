@@ -11,13 +11,18 @@ graph TD;
 	ordinary_placeholder(ordinary_placeholder)
 	specialized_prepare(specialized_prepare)
 	specialized_invoke(specialized_invoke)
+	pi_prepare(pi_prepare)
+	pi_invoke(pi_invoke)
 	finalize(finalize)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> intake;
 	intake --> route;
 	ordinary_placeholder --> finalize;
+	pi_invoke --> finalize;
+	pi_prepare --> pi_invoke;
 	route -.-> finalize;
 	route -.-> ordinary_placeholder;
+	route -.-> pi_prepare;
 	route -.-> specialized_prepare;
 	specialized_invoke --> finalize;
 	specialized_prepare --> specialized_invoke;

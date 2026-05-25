@@ -11,6 +11,10 @@ shape without changing the commodity chat surface.
   specialized branch:
   - Studio oMLX listener on `127.0.0.1:8120`
   - Mini SSH forward on `127.0.0.1:8129`
+- For Pi/Qwen scratch runs, keep the existing sidecar healthy:
+  - `omlx-agent-gateway.service`
+  - `http://127.0.0.1:4022/health`
+  - `/home/christopherbailey/pi-qwen-trials/current/run_pi_qwen.py`
 
 ## Runtime ownership
 Phase 6 defines the supported host-owned paths:
@@ -143,12 +147,18 @@ Do not enable them on boot in phase 6.
    - `/specialized S02 explain the repeated-prefix runtime path briefly`
 3. invalid specialized mission:
    - `/specialized TOOL please run tools`
+4. Pi/Qwen scratch mission:
+   - `/pi Fix the failing Python unittest suite.`
+5. Pi/Qwen scratch mission with safe knobs:
+   - `/pi --temperature 0.1 --max-tokens 4096 Fix the failing Python unittest suite.`
 
 Expected:
 - visible route message in the chat for each run
 - ordinary path returns deterministic placeholder text
 - specialized path returns a result from `omlx-runtime`
 - invalid specialized command returns out-of-scope without invoking the adapter
+- Pi/Qwen path returns success or failure plus the Pi run directory, scratch
+  repo path, manifest, transcript JSONL, final diff, and final test log paths
 
 ## Local artifacts
 Phase 6 keeps artifacts local by default:
@@ -156,6 +166,8 @@ Phase 6 keeps artifacts local by default:
   - `/home/christopherbailey/.local/state/orchestration-cockpit/run-ledger.jsonl`
 - correlated `omlx-runtime` telemetry:
   - `/home/christopherbailey/.local/state/orchestration-cockpit/omlx-runtime-telemetry.jsonl`
+- Pi/Qwen run artifacts remain in the Pi playground:
+  - `/home/christopherbailey/pi-qwen-trials/current/runs/<run-id>/`
 
 These are local service artifacts, not repo-tracked runtime outputs.
 

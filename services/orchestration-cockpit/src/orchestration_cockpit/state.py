@@ -20,5 +20,10 @@ class CockpitState(TypedDict, total=False):
     adapter_request_id: str
     specialized_payload: dict[str, Any]
     specialized_result: dict[str, Any]
+    pi_task: str
+    pi_temperature: float | None
+    pi_max_tokens: int | None
+    pi_command: list[str]
+    pi_result: dict[str, Any]
     final_text: str
     error: str

@@ -27,10 +27,13 @@ the repo a real local service boundary around:
 - Graph ID: `operator-cockpit`
 - The graph uses a deterministic command syntax:
   - `/specialized <fixture-id> ...` routes to `omlx-runtime`
+  - `/pi <task>` launches the existing Pi/Qwen scratch-run playground
   - everything else stays on the ordinary placeholder path
 - The ordinary path is deliberately non-LLM-backed in this phase.
 - The specialized path uses the existing `OmlxRuntimeClient` without semantic
   rewriting, fallback logic, or provider normalization.
+- The Pi/Qwen path is scratch-only and delegates execution/artifact ownership to
+  `/home/christopherbailey/pi-qwen-trials/current/run_pi_qwen.py`.
 
 ## Service-owned observability
 - Static visualization comes from the compiled graph itself.
@@ -39,6 +42,8 @@ the repo a real local service boundary around:
 - Runtime correlation stays local:
   - graph run ledger under `~/.local/state/orchestration-cockpit/`
   - `omlx-runtime` adapter telemetry under the same artifact root
+- Pi/Qwen artifacts stay in the Pi playground; the cockpit ledger records
+  manifest and artifact pointers only.
 - The service does not build a custom dashboard in this phase.
 
 ## Local service ownership target

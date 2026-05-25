@@ -13,11 +13,14 @@ from langgraph.graph import END, START, StateGraph
 
 from orchestration_cockpit.graph import build_graph
 from orchestration_cockpit.nodes import (
+    build_pi_command,
     build_specialized_payload,
     finalize_node,
     intake_node,
+    make_pi_invoke_node,
     make_specialized_invoke_node,
     ordinary_placeholder_node,
+    pi_prepare_node,
     route_edge,
     route_node,
     specialized_prepare_node,
@@ -29,13 +32,15 @@ from orchestration_cockpit.state import CockpitState
 TEST_CONFIG = {"configurable": {"thread_id": "test-thread"}}
 
 
-def build_test_graph(fake_runner):
+def build_test_graph(fake_runner, fake_pi_runner=None):
     builder = StateGraph(CockpitState)
     builder.add_node("intake", intake_node)
     builder.add_node("route", route_node)
     builder.add_node("ordinary_placeholder", ordinary_placeholder_node)
     builder.add_node("specialized_prepare", specialized_prepare_node)
     builder.add_node("specialized_invoke", make_specialized_invoke_node(fake_runner))
+    builder.add_node("pi_prepare", pi_prepare_node)
+    builder.add_node("pi_invoke", make_pi_invoke_node(fake_pi_runner or _fake_pi_runner))
     builder.add_node("finalize", finalize_node)
     builder.add_edge(START, "intake")
     builder.add_edge("intake", "route")
@@ -45,12 +50,15 @@ def build_test_graph(fake_runner):
         {
             "ordinary_placeholder": "ordinary_placeholder",
             "specialized_prepare": "specialized_prepare",
+            "pi_prepare": "pi_prepare",
             "finalize": "finalize",
         },
     )
     builder.add_edge("ordinary_placeholder", "finalize")
     builder.add_edge("specialized_prepare", "specialized_invoke")
     builder.add_edge("specialized_invoke", "finalize")
+    builder.add_edge("pi_prepare", "pi_invoke")
+    builder.add_edge("pi_invoke", "finalize")
     builder.add_edge("finalize", END)
     return builder.compile(checkpointer=InMemorySaver())
 
@@ -68,6 +76,18 @@ class RoutingTests(unittest.TestCase):
     def test_decide_route_ordinary(self) -> None:
         decision = decide_route("hello there")
         self.assertEqual(decision.route_decision, "ordinary-placeholder")
+
+    def test_decide_route_pi_scratch_run(self) -> None:
+        decision = decide_route("/pi --temperature 0.1 --max-tokens 2048 Fix the tests")
+        self.assertEqual(decision.route_decision, "pi-scratch-run")
+        self.assertEqual(decision.mission_mode, "pi")
+        self.assertEqual(decision.mission_text, "Fix the tests")
+        self.assertEqual(decision.pi_temperature, 0.1)
+        self.assertEqual(decision.pi_max_tokens, 2048)
+
+    def test_decide_route_pi_invalid_knob(self) -> None:
+        decision = decide_route("/pi --max-tokens 10 Fix the tests")
+        self.assertEqual(decision.route_decision, "out-of-scope")
 
 
 class GraphTests(unittest.TestCase):
@@ -172,6 +192,76 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(result["node_sequence"], ["intake", "route", "finalize"])
         self.assertFalse(Path(adapter_telemetry_path()).exists())
 
+    def test_pi_path_invokes_runner_and_records_artifact_pointers(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def fake_pi_runner(command, timeout_seconds):
+            captured["command"] = list(command)
+            captured["timeout_seconds"] = timeout_seconds
+            manifest = {
+                "run_dir": "/tmp/pi-run",
+                "scratch_repo": "/tmp/pi-run/scratch-repo",
+                "artifacts": "/tmp/pi-run/artifacts",
+                "pi_returncode": 0,
+                "final_test_returncode": 0,
+                "success": True,
+            }
+            return {
+                "returncode": 0,
+                "stdout": json.dumps(manifest),
+                "stderr": "",
+                "manifest": manifest,
+                "timed_out": False,
+            }
+
+        graph = build_test_graph(lambda payload: {"choices": []}, fake_pi_runner)
+        result = graph.invoke(
+            {"messages": [HumanMessage(content="/pi --temperature 0.1 Fix the failing Python unittest suite.")]},
+            config=TEST_CONFIG,
+        )
+
+        self.assertEqual(captured["timeout_seconds"], 900)
+        self.assertIn("--task", captured["command"])
+        self.assertIn("Fix the failing Python unittest suite.", captured["command"])
+        self.assertIn("--temperature", captured["command"])
+        contents = [message.content for message in result["messages"]]
+        self.assertIn("Route: pi-scratch-run", contents)
+        self.assertIn("Prepare: Pi scratch-run command built", contents)
+        self.assertIn("Invoke: Pi scratch run succeeded", contents)
+        self.assertIn("Pi scratch run succeeded.", contents[-1])
+        self.assertIn("Final diff: /tmp/pi-run/artifacts/final-diff.patch", contents[-1])
+        self.assertEqual(
+            result["node_sequence"],
+            ["intake", "route", "pi_prepare", "pi_invoke", "finalize"],
+        )
+        self.assertTrue(result["pi_result"]["manifest"]["success"])
+        ledger = _load_jsonl(run_ledger_path())
+        self.assertEqual(ledger[0]["route_decision"], "pi-scratch-run")
+        self.assertEqual(ledger[0]["pi_run_dir"], "/tmp/pi-run")
+        self.assertTrue(ledger[0]["pi_success"])
+
+    def test_pi_failure_summarizes_without_adapter_telemetry(self) -> None:
+        def fake_pi_runner(command, timeout_seconds):
+            return {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "sidecar health check failed",
+                "manifest": {},
+                "timed_out": False,
+            }
+
+        graph = build_test_graph(lambda payload: {"choices": []}, fake_pi_runner)
+        result = graph.invoke(
+            {"messages": [HumanMessage(content="/pi Fix the failing Python unittest suite.")]},
+            config=TEST_CONFIG,
+        )
+
+        self.assertIn("Pi scratch run failed before manifest output.", result["messages"][-1].content)
+        self.assertIn("sidecar health check failed", result["messages"][-1].content)
+        ledger = _load_jsonl(run_ledger_path())
+        self.assertEqual(ledger[0]["status"], "failed")
+        self.assertFalse(Path(adapter_telemetry_path()).exists())
+
     def test_same_thread_turns_reset_run_context_and_do_not_leak_adapter_correlation(self) -> None:
         def fake_runner(payload: Mapping[str, Any]):
             return {
@@ -216,6 +306,19 @@ class GraphTests(unittest.TestCase):
 
 
 class PayloadTests(unittest.TestCase):
+    def test_pi_command_uses_argument_list(self) -> None:
+        command = build_pi_command(
+            task="Fix tests; do not escape",
+            run_id="cockpit-run-123",
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        self.assertEqual(command[0], "python3")
+        self.assertIn("--run-id", command)
+        self.assertIn("cockpit-run-123", command)
+        self.assertIn("Fix tests; do not escape", command)
+        self.assertIn("--max-tokens", command)
+
     def test_specialized_payload_matches_frozen_contract(self) -> None:
         payload = build_specialized_payload(
             fixture_id="S02",
@@ -235,6 +338,16 @@ class PayloadTests(unittest.TestCase):
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _fake_pi_runner(command, timeout_seconds):
+    return {
+        "returncode": 2,
+        "stdout": "",
+        "stderr": "fake pi runner was not configured",
+        "manifest": {},
+        "timed_out": False,
+    }
 
 
 if __name__ == "__main__":
