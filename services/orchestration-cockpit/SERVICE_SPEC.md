@@ -109,19 +109,20 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
   slice.
 
 ## Specialized path
-- Uses `OmlxRuntimeClient` directly.
+- Uses the Mini-local `omlx-agent-gateway` OpenAI-compatible sidecar so traces
+  can correlate cockpit graph spans with gateway upstream spans.
 - Requires:
-  - `OMLX_RUNTIME_BASE_URL`
-  - `OMLX_RUNTIME_BEARER_TOKEN`
-  - `OMLX_RUNTIME_MODEL`
-- Preserves the frozen `omlx-runtime` contract:
+  - `OMLX_AGENT_GATEWAY_BASE_URL`
+  - `OMLX_AGENT_GATEWAY_MODEL_ID`
+  - optional `OMLX_AGENT_GATEWAY_AUTH_TOKEN`
+- Preserves the frozen non-stream request shape:
   - `POST /v1/chat/completions`
   - non-stream only
   - exact keys: `model`, `messages`, `temperature`, `top_p`, `max_tokens`, `stream`
   - exactly two messages: `system`, then `user`
   - plain string `content` only
 - Specialized runs must correlate one graph `run_id` to one
-  `adapter_request_id`.
+  `adapter_request_id` and one OpenTelemetry `trace_id`.
 
 ## Tooling preflight
 - Agent Chat UI itself does not require a LangSmith key for local server use.
@@ -137,9 +138,14 @@ Represent a repo-owned Mini-local cockpit service for the orchestration plane.
 ## Local observability
 - Canonical static graph artifact: generated Mermaid from the compiled graph
 - Canonical runtime artifact: small local JSONL run ledger
+- OpenTelemetry traces export to the Mini-local Alloy listener at
+  `127.0.0.1:4318` when runtime env is installed.
+- Specialized ledger rows include `trace_id`.
+- Local LLM prompt/response content may be captured in traces with the shared
+  `homelab-observability` 16 KiB attribute cap.
 - Default artifact root:
   `/home/christopherbailey/.local/state/orchestration-cockpit`
-- No cloud observability dependency is required for phase 6 success
+- No cloud observability dependency is required.
 
 ## Runtime hygiene
 - Repo-local `.env` is for manual local use only and is not the service runtime

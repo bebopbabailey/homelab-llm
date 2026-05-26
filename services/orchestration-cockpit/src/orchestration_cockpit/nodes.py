@@ -1,15 +1,23 @@
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
+import time
 from typing import Any, Callable, Mapping, Protocol, Sequence
+import urllib.error
+import urllib.request
 
+from homelab_observability import (
+    current_trace_id,
+    inject_trace_headers,
+    set_bounded_attribute,
+    set_llm_content_attributes,
+    start_as_current_span,
+)
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from omlx_runtime_client import (
-    OmlxRuntimeClient,
-    OmlxRuntimeClientError,
-    OmlxRuntimeResponse,
     append_jsonl_record,
     build_failure_record,
     build_success_record,
@@ -34,6 +42,32 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURE_SPECS_PATH = REPO_ROOT / "services" / "omlx-runtime" / "fixtures" / "phase3_fixture_specs.json"
 PI_PLAYGROUND_ROOT = Path("/home/christopherbailey/pi-qwen-trials/current")
 PI_LAUNCHER_PATH = PI_PLAYGROUND_ROOT / "run_pi_qwen.py"
+DEFAULT_AGENT_GATEWAY_BASE_URL = "http://127.0.0.1:4022/v1"
+DEFAULT_AGENT_GATEWAY_MODEL = "omlx-qwen36-27b-optiq-4bit"
+
+
+class SpecializedGatewayError(Exception):
+    def __init__(self, failure_class: str, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.failure_class = failure_class
+        self.status_code = status_code
+
+
+class SpecializedGatewayResponse:
+    def __init__(
+        self,
+        *,
+        body: Mapping[str, Any],
+        status_code: int,
+        elapsed_seconds: float,
+        request_bytes: int,
+        response_bytes: int,
+    ) -> None:
+        self.body = body
+        self.status_code = status_code
+        self.elapsed_seconds = elapsed_seconds
+        self.request_bytes = request_bytes
+        self.response_bytes = response_bytes
 
 
 class SpecializedInvoker(Protocol):
@@ -60,6 +94,7 @@ def intake_node(
         "fixture_id": "",
         "node_sequence": ["intake"],
         "adapter_request_id": "",
+        "trace_id": "",
         "specialized_payload": {},
         "specialized_result": {},
         "pi_task": "",
@@ -114,7 +149,7 @@ def specialized_prepare_node(state: CockpitState) -> dict[str, Any]:
     payload = build_specialized_payload(
         fixture_id=fixture_id,
         mission_text=decision.mission_text,
-        model=os.environ.get("OMLX_RUNTIME_MODEL", "Qwen3-4B-Instruct-2507-4bit"),
+        model=os.environ.get("OMLX_AGENT_GATEWAY_MODEL_ID", DEFAULT_AGENT_GATEWAY_MODEL),
     )
     return {
         "specialized_payload": payload,
@@ -137,59 +172,76 @@ def make_specialized_invoke_node(
                 "error": "specialized payload was not prepared",
             }
 
+        trace_id = ""
         try:
-            if invoker is not None:
-                body = dict(invoker(payload))
-                _record_adapter_success(
-                    request_id=request_id,
-                    state=state,
-                    payload=payload,
-                    body=body,
-                    response=None,
-                )
-            else:
-                response = default_specialized_client().chat_completions(payload)
-                body = response.body
-                _record_adapter_success(
-                    request_id=request_id,
-                    state=state,
-                    payload=payload,
-                    body=body,
-                    response=response,
-                )
-        except OmlxRuntimeClientError as exc:
+            with start_as_current_span(
+                "cockpit.specialized.invoke",
+                attributes={
+                    "homelab.run_id": str(state.get("run_id", "")),
+                    "homelab.adapter_request_id": request_id,
+                    "homelab.fixture_id": str(state.get("fixture_id", "")),
+                    "gen_ai.request.model": str(payload.get("model", "")),
+                },
+            ) as span:
+                set_llm_content_attributes(span, prefix="gen_ai.request", messages=payload.get("messages"))
+                trace_id = current_trace_id()
+                if invoker is not None:
+                    body = dict(invoker(payload))
+                    _record_adapter_success(
+                        request_id=request_id,
+                        state={**state, "trace_id": trace_id},
+                        payload=payload,
+                        body=body,
+                        response=None,
+                    )
+                else:
+                    response = default_specialized_gateway_response(payload, request_id=request_id)
+                    body = dict(response.body)
+                    set_bounded_attribute(span, "gen_ai.response.text", _extract_response_text(body))
+                    span.set_attribute("http.response.status_code", response.status_code)
+                    _record_adapter_success(
+                        request_id=request_id,
+                        state={**state, "trace_id": trace_id},
+                        payload=payload,
+                        body=body,
+                        response=response,
+                    )
+        except SpecializedGatewayError as exc:
             _record_adapter_failure(
                 request_id=request_id,
-                state=state,
+                state={**state, "trace_id": trace_id},
                 payload=payload,
                 failure_class=exc.failure_class,
                 error_message=str(exc),
             )
             return {
                 "adapter_request_id": request_id,
+                "trace_id": trace_id,
                 "node_sequence": node_sequence,
-                "messages": [AIMessage(content=f"Invoke: omlx-runtime request {request_id} failed")],
+                "messages": [AIMessage(content=f"Invoke: omlx-agent-gateway request {request_id} failed")],
                 "error": f"{exc.failure_class}: {exc}",
             }
         except Exception as exc:  # pragma: no cover - defensive local surfacing
             _record_adapter_failure(
                 request_id=request_id,
-                state=state,
+                state={**state, "trace_id": trace_id},
                 payload=payload,
                 failure_class="specialized_runtime_error",
                 error_message=str(exc),
             )
             return {
                 "adapter_request_id": request_id,
+                "trace_id": trace_id,
                 "node_sequence": node_sequence,
-                "messages": [AIMessage(content=f"Invoke: omlx-runtime request {request_id} failed")],
+                "messages": [AIMessage(content=f"Invoke: omlx-agent-gateway request {request_id} failed")],
                 "error": f"specialized_runtime_error: {exc}",
             }
 
         return {
             "adapter_request_id": request_id,
+            "trace_id": trace_id,
             "node_sequence": node_sequence,
-            "messages": [AIMessage(content=f"Invoke: omlx-runtime request {request_id} sent")],
+            "messages": [AIMessage(content=f"Invoke: omlx-agent-gateway request {request_id} sent")],
             "specialized_result": body,
         }
 
@@ -408,16 +460,57 @@ def load_fixture_spec(fixture_id: str) -> dict[str, Any]:
     }
 
 
-def default_specialized_client() -> OmlxRuntimeClient:
-    base_url = os.environ.get("OMLX_RUNTIME_BASE_URL", "http://127.0.0.1:8129")
-    bearer_token = os.environ.get("OMLX_RUNTIME_BEARER_TOKEN", "")
-    if not bearer_token:
-        raise RuntimeError("OMLX_RUNTIME_BEARER_TOKEN is required for specialized missions")
-    timeout_seconds = float(os.environ.get("OMLX_RUNTIME_TIMEOUT_SECONDS", "120"))
-    return OmlxRuntimeClient(
-        base_url=base_url,
-        bearer_token=bearer_token,
-        timeout_seconds=timeout_seconds,
+def default_specialized_gateway_response(
+    payload: Mapping[str, Any],
+    *,
+    request_id: str,
+) -> SpecializedGatewayResponse:
+    base_url = os.environ.get("OMLX_AGENT_GATEWAY_BASE_URL", DEFAULT_AGENT_GATEWAY_BASE_URL).rstrip("/")
+    auth_token = os.environ.get("OMLX_AGENT_GATEWAY_AUTH_TOKEN", "")
+    timeout_seconds = float(os.environ.get("OMLX_AGENT_GATEWAY_TIMEOUT_SECONDS", "180"))
+    encoded = json.dumps(dict(payload)).encode("utf-8")
+    headers = inject_trace_headers(
+        {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Request-ID": request_id,
+        }
+    )
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+    request = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=encoded,
+        headers=headers,
+        method="POST",
+    )
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            raw = response.read()
+            status_code = response.status
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        raise SpecializedGatewayError(
+            "gateway_http_error",
+            raw.decode("utf-8", errors="replace")[:500] or f"gateway returned HTTP {exc.code}",
+            status_code=exc.code,
+        ) from exc
+    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        raise SpecializedGatewayError("gateway_transport_error", str(exc)) from exc
+    elapsed = round(time.monotonic() - started, 6)
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SpecializedGatewayError("gateway_parse_error", raw[:500].decode("utf-8", errors="replace")) from exc
+    if not isinstance(parsed, Mapping):
+        raise SpecializedGatewayError("gateway_parse_error", "gateway returned non-object JSON")
+    return SpecializedGatewayResponse(
+        body=parsed,
+        status_code=status_code,
+        elapsed_seconds=elapsed,
+        request_bytes=len(encoded),
+        response_bytes=len(raw),
     )
 
 
@@ -455,6 +548,19 @@ def _summarize_specialized_result(result: Any) -> str:
                 if isinstance(content, str) and content.strip():
                     return f"Specialized runtime completed: {content.strip()}"
     return f"Specialized runtime completed with response shape: {json.dumps(result, sort_keys=True)[:400]}"
+
+
+def _extract_response_text(result: Mapping[str, Any]) -> str:
+    choices = result.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, Mapping):
+            message = first.get("message")
+            if isinstance(message, Mapping):
+                content = message.get("content")
+                if isinstance(content, str):
+                    return content
+    return ""
 
 
 def _parse_pi_manifest(stdout: str) -> dict[str, Any]:
@@ -508,7 +614,7 @@ def _record_adapter_success(
     state: CockpitState,
     payload: Mapping[str, Any],
     body: Mapping[str, Any],
-    response: OmlxRuntimeResponse | None,
+    response: SpecializedGatewayResponse | None,
 ) -> None:
     encoded_body = json.dumps(dict(body), sort_keys=True, separators=(",", ":")).encode("utf-8")
     append_jsonl_record(

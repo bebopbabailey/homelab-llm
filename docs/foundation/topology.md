@@ -1,7 +1,7 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, local Alloy/Tempo tracing, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
 - Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime` with the experimental oMLX Qwen3.6 primitive on `:8120`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
@@ -23,6 +23,8 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   operator access at `https://hands.tailfd1400.ts.net/`.
   Grafana is on `127.0.0.1:3001` locally with tailnet-only operator access at
   `https://grafana.tailfd1400.ts.net/` via `svc:grafana`.
+  Alloy receives OTLP traces on `127.0.0.1:4317/4318`; Tempo serves local
+  trace queries on `127.0.0.1:3200`.
   OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
   `orchestration-cockpit` is localhost-only and inactive by default; when
   launched it uses LangGraph dev on `127.0.0.1:2024` and Agent Chat UI on
@@ -77,6 +79,8 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
 | Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
 | Grafana | Mini | 3001 | http://127.0.0.1:3001, https://grafana.tailfd1400.ts.net/ | /api/health |
+| Alloy OTLP collector | Mini | 4317 / 4318 | OTLP on localhost | readiness on 127.0.0.1:12345 |
+| Tempo trace backend | Mini | 3200 | http://127.0.0.1:3200 | /ready |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | Voice Gateway | Orin | 18080 | http://192.168.1.93:18080/v1 | /health, /health/readiness |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |

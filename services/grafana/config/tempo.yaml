@@ -1,0 +1,32 @@
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 3200
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 9095
+
+distributor:
+  max_attribute_bytes: 16384
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 127.0.0.1:14317
+        http:
+          endpoint: 127.0.0.1:14318
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/lib/tempo/wal
+    local:
+      path: /var/lib/tempo/blocks
+
+compactor:
+  compaction:
+    block_retention: 48h
+
+overrides:
+  defaults:
+    ingestion:
+      max_attribute_bytes: 16384

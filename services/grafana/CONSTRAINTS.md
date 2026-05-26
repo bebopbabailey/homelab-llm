@@ -6,13 +6,17 @@ This service inherits global + layer constraints:
 
 ## Hard constraints
 - Keep Grafana bound to `127.0.0.1:3001`; remote operator access must proxy through tailnet-only `svc:grafana`.
+- Keep Alloy and Tempo bound to localhost-only addresses unless an explicit
+  exposure plan is approved.
 - Keep secrets (admin credentials, API keys, datasource tokens) out of git.
 - Prefer repo-managed dashboards/provisioning artifacts; avoid undocumented UI-only drift.
 - Preserve observability role; no cross-service control actions from Grafana changes.
 
 ## Allowed operations
 - Update dashboards/provisioning/docs in this service.
+- Update local Alloy/Tempo trace-stack config owned by this service.
 - Restart/check `grafana-server.service`.
+- Restart/check `alloy.service` and `tempo.service`.
 - Perform read-only health and log diagnostics.
 
 ## Forbidden operations

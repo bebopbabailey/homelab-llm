@@ -92,6 +92,7 @@ def build_run_ledger_record(
         "node_sequence": node_sequence,
         "fixture_id": state.get("fixture_id", ""),
         "adapter_request_id": state.get("adapter_request_id", ""),
+        "trace_id": state.get("trace_id", ""),
         "status": status,
         "started_at": state.get("started_at", ""),
         "finished_at": finished_at,

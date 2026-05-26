@@ -24,6 +24,18 @@ curl -fsS http://127.0.0.1:4022/v1/models | jq .
 curl -fsS http://127.0.0.1:4022/v1/model/info | jq .
 ```
 
+## OpenTelemetry
+Runtime env defaults are installed from
+`platform/ops/templates/omlx-agent-gateway.env.example`:
+```text
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=16384
+HOMELAB_OTEL_CONTENT_ATTRIBUTE_LIMIT_BYTES=16384
+```
+
+OpenTelemetry is local-only and best-effort. If Alloy/Tempo is down, gateway
+requests continue and traces resume when the local stack is healthy.
+
 ## Pi Scratch Playground
 The stable human-facing scratch harness lives outside git:
 

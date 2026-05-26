@@ -13,7 +13,7 @@ GRAPH_TUNNEL="${ORCHESTRATION_COCKPIT_GRAPH_TUNNEL:-false}"
 RUNTIME_CONFIG_PATH="${ORCHESTRATION_COCKPIT_RUNTIME_CONFIG_PATH:-$GRAPH_RUNTIME_DIR/langgraph.json}"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-$HOME/.local/share/orchestration-cockpit/graph-venv}"
 export ORCHESTRATION_COCKPIT_ARTIFACT_DIR="$ARTIFACT_DIR"
-export PYTHONPATH="${PYTHONPATH:-$SERVICE_ROOT/src:$REPO_ROOT/services/omlx-runtime/src}"
+export PYTHONPATH="${PYTHONPATH:-$SERVICE_ROOT/src:$REPO_ROOT/platform/observability-python/src:$REPO_ROOT/services/omlx-runtime/src}"
 
 mkdir -p "$GRAPH_RUNTIME_DIR" "$ARTIFACT_DIR" "$(dirname "$UV_PROJECT_ENVIRONMENT")"
 uv sync --project "$SERVICE_ROOT" --frozen

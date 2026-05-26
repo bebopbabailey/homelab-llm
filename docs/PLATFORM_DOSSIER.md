@@ -8,6 +8,7 @@
   OpenHands Phase A :4031 (localhost + tailnet via `hands`, systemd-managed Docker service),
   Samba SMB :139/:445 (LAN-only authenticated Finder access to `mini-root` and `seagate`),
   Prometheus :9090 (localhost-only), Grafana :3001 (localhost + tailnet via `grafana`),
+  Alloy OTLP :4317/:4318 (localhost-only), Tempo :3200 (localhost-only),
   OpenVINO :9000 (LAN-exposed for maintenance),
   SearXNG :8888 (localhost-only), Ollama :11434
 - Mac Studio: MLX inference host using the `mlxctl`-governed team-lane domain
@@ -48,6 +49,8 @@
 | Samba SMB | Mini | 139/445 | `127.0.0.1` + `192.168.1.71` | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth | `/etc/samba/smb.conf`, `systemctl status smbd.service nmbd.service`, `pdbedit -L` |
 | Prometheus | Mini | 9090 | 127.0.0.1 | http://127.0.0.1:9090 | /-/ready, /-/healthy | `/usr/lib/systemd/system/prometheus.service`, `/etc/default/prometheus` |
 | Grafana | Mini | 3001 | 127.0.0.1 | http://127.0.0.1:3001, https://grafana.tailfd1400.ts.net/ | /api/health | `/usr/lib/systemd/system/grafana-server.service`, `/etc/default/grafana-server`, `tailscale serve status --json` |
+| Alloy OTLP collector | Mini | 4317 / 4318 | 127.0.0.1 | OTLP gRPC / OTLP HTTP | /-/ready on `127.0.0.1:12345` | `services/grafana/config/alloy.river`, `alloy.service` |
+| Tempo trace backend | Mini | 3200 | 127.0.0.1 | http://127.0.0.1:3200 | /ready | `services/grafana/config/tempo.yaml`, `tempo.service` |
 | OpenVINO LLM | Mini | 9000 | 0.0.0.0 | http://127.0.0.1:9000 | /health | `/etc/systemd/system/ov-server.service`, `/etc/homelab-llm/ov-server.env` |
 | Voice Gateway | Orin | 18080 | private LAN IP | http://192.168.1.93:18080/v1 | /health, /health/readiness | `services/voice-gateway/SERVICE_SPEC.md`, Orin service/container runtime |
 | OptiLLM proxy | Studio | 4020 | 192.168.1.72 | http://192.168.1.72:4020/v1 | /v1/models | `services/optillm-proxy`, deployed but not part of the active LiteLLM alias surface |
@@ -139,6 +142,12 @@ Networking note:
 - Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
+- OpenTelemetry trace stack: Grafana-owned local observability slice.
+  Alloy receives OTLP on `127.0.0.1:4317/4318` and forwards to Tempo internal
+  OTLP on localhost-only ports. Tempo serves Grafana at `127.0.0.1:3200` with
+  `48h` local retention. Tier 1 instrumented services are
+  `orchestration-cockpit` and `omlx-agent-gateway`; trace export is local-only
+  and best-effort.
 - Open WebUI: systemd unit `/etc/systemd/system/open-webui.service`, env `/etc/open-webui/env`, data `/home/christopherbailey/.open-webui`.
   Working dir: `/home/christopherbailey/homelab-llm/services/open-webui` (legacy `/home/christopherbailey/open-webui` may exist).
   Canonical STT path uses env-driven `AUDIO_STT_*` values pointed at LiteLLM STT aliases only.

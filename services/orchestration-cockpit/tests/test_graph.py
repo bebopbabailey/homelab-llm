@@ -157,16 +157,18 @@ class GraphTests(unittest.TestCase):
         contents = [message.content for message in result["messages"]]
         self.assertIn("Route: specialized-runtime (fixture S02)", contents)
         self.assertIn("Prepare: specialized payload built for fixture S02", contents)
-        self.assertTrue(any(content.startswith("Invoke: omlx-runtime request adapter-") for content in contents))
+        self.assertTrue(any(content.startswith("Invoke: omlx-agent-gateway request adapter-") for content in contents))
         self.assertIn("deterministic specialized reply", contents[-1])
         self.assertEqual(
             result["node_sequence"],
             ["intake", "route", "specialized_prepare", "specialized_invoke", "finalize"],
         )
         self.assertTrue(result["adapter_request_id"].startswith("adapter-"))
+        self.assertTrue(result["trace_id"])
         ledger = _load_jsonl(run_ledger_path())
         telemetry = _load_jsonl(adapter_telemetry_path())
         self.assertEqual(ledger[0]["adapter_request_id"], result["adapter_request_id"])
+        self.assertEqual(ledger[0]["trace_id"], result["trace_id"])
         self.assertEqual(telemetry[0]["request_id"], result["adapter_request_id"])
         self.assertEqual(telemetry[0]["fixture_id"], "S02")
 

@@ -5,14 +5,17 @@
 - Keep upstream model behavior as the source of truth.
 - Do not add LiteLLM aliases, Open WebUI routes, OpenHands policy, or MCP proxying.
 - Do not store bearer tokens or Studio API keys in tracked files.
+- OpenTelemetry export failures must not fail gateway requests.
+- Keep trace export local-only unless a separate export plan is approved.
 
 ## Allowed Operations
 - Add minimal model discovery, model-info, health, and chat-completion passthrough.
 - Normalize the public sidecar model id to the Studio oMLX backend model id.
 - Surface upstream HTTP, parse, and transport failures cleanly.
+- Add request IDs, trace propagation, and local-only span metadata/content caps
+  without changing model behavior.
 
 ## Validation
 - `uv run --project services/omlx-agent-gateway pytest`
 - `curl -fsS http://127.0.0.1:4022/health`
 - `curl -fsS http://127.0.0.1:4022/v1/models`
-

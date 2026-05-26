@@ -102,11 +102,13 @@ def test_chat_passthrough_normalizes_model_and_preserves_tools():
         server.shutdown()
         server.server_close()
     assert response.status_code == 200
+    assert response.headers["x-request-id"]
     assert response.json()["model"] == "public-qwen"
     sent = json.loads(UpstreamHandler.captured_body.decode("utf-8"))
     assert sent["model"] == "omlx-qwen36-27b-optiq-4bit"
     assert sent["tools"][0]["function"]["name"] == "noop"
     assert UpstreamHandler.captured_headers["Authorization"] == "Bearer backend-key"
+    assert any(key.lower() == "traceparent" for key in UpstreamHandler.captured_headers)
 
 
 def test_chat_rejects_unknown_model():
