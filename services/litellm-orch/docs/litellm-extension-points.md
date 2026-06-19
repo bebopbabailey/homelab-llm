@@ -41,14 +41,20 @@ LiteLLM supports sending standard logging payloads to external endpoints via
 `success_callback` / `failure_callback` (Enterprise feature).
 
 ## Where we use these
-- `config/qwen_toolcall_posthook.py` → `post_call` guardrail using the
-  `async_post_call_success_hook` path to normalize strict raw Qwen tool blocks
-  on `main` when the backend is semantically correct but still returns a single
-  raw `<tool_call>...</tool_call>` block.
-- `config/transcribe_guardrail.py` → `task-transcribe` request shaping,
-  audio-STT cleanup routing, and post-call wrapper stripping.
-- `config/harmony_guardrail.py` → post-call normalization for GPT-OSS Harmony
-  and tag-based reasoning outputs.
+- `config/responses_contract_guardrail.py` → `pre_call` / `post_call`
+  Responses policy logging and deterministic task-alias normalization for
+  `task-transcribe` and `task-json`.
+- `config/llmster_toolcall_guardrail.py` → narrow `deep`, `fast`, and
+  `code-reasoning` compatibility shim for non-streaming auto-tool requests
+  where the llmster backend may leak raw tool protocol.
+- `config/gpt_request_defaults.py` → narrow GPT-OSS request-default shim that
+  injects omitted low reasoning effort for the current llmster lanes.
+- `config/task_json_guardrail.py` → text-only transcript-to-JSON request
+  shaping, schema injection, JSON normalization, and one repair attempt.
+
+Historical prompt, Harmony, Qwen post-hook, and transcribe guardrails have been
+retired from the active service tree. Reintroduce any similar behavior only
+through a fresh router change, current provider evidence, and tests.
 
 ## Keep in mind
 - Pre-call hooks can mutate requests; guardrails should enforce correctness.

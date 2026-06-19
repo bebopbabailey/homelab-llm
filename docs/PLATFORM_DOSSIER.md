@@ -1,7 +1,8 @@
 # PLATFORM_DOSSIER
 
 ## Topology (current)
-- Mac Mini: LiteLLM :4000 (LAN + localhost; tailnet optional for remote operator access), Open WebUI :3000 (LAN + tailnet),
+- Mac Mini: LiteLLM :4000 (LAN + localhost; tailnet optional for remote operator access), Transcript Cleaner :4015 (tailnet-only),
+  Open WebUI :3000 (LAN + tailnet),
   orchestration-cockpit prototype (localhost-only when launched: LangGraph dev :2024, Agent Chat UI :3030),
   oMLX Agent Gateway :4022 (localhost-only experimental OpenAI-compatible sidecar for the Studio oMLX Qwen3.6 primitive),
   OpenCode Web :4096 (LAN + tailnet-reachable if network policy allows, Basic Auth at app layer),
@@ -39,6 +40,7 @@
 | service | host | port | bind | base URL | health | evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | 0.0.0.0 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness | `/etc/systemd/system/litellm-orch.service`, `systemctl show litellm-orch.service -p ExecStart`, `ss -ltnp` |
+| Transcript Cleaner | Mini | 4015 | Mini Tailscale IPv4 | http://<mini-tailnet-name>:4015 | /health | `/etc/systemd/system/transcript-cleaner.service`, `services/litellm-orch/scripts/transcript-clean-server`, `ss -ltnp`, direct tailnet curl |
 | Qwen-Agent proxy (experimental) | Mini | 4021 | 127.0.0.1 | http://127.0.0.1:4021 | /health, /v1/models, /v1/chat/completions | `platform/ops/systemd/qwen-agent-proxy.service`, `ss -ltnp`, direct curl |
 | oMLX Agent Gateway (experimental) | Mini | 4022 | 127.0.0.1 | http://127.0.0.1:4022/v1 | /health, /v1/models, /v1/model/info, /v1/chat/completions including streaming passthrough | `services/omlx-agent-gateway`, `platform/ops/systemd/omlx-agent-gateway.service`, direct curl |
 | Open WebUI | Mini | 3000 | 0.0.0.0 | http://192.168.1.71:3000 | /health | `/etc/systemd/system/open-webui.service`, `systemctl show open-webui.service -p ExecStart`, `ss -ltnp` |
@@ -139,6 +141,13 @@ Networking note:
   GPT lanes now preserve caller streaming intent by default (no forced `stream=false`).
   The specialized runtime plane is explicitly outside this gateway contract in
   phase 1.
+- Transcript Cleaner: systemd unit `/etc/systemd/system/transcript-cleaner.service`
+  and companion FastAPI utility in `services/litellm-orch`, launched by
+  `scripts/transcript-clean-server` on the Mini Tailscale IPv4 at `:4015`. It
+  accepts pasted text or browser-read `.txt` uploads, writes jobs under
+  `/tmp/transcript-cleaner`, chunks large text, and calls local LiteLLM
+  `task-transcribe`; it has no app auth in v1 because tailnet reachability is
+  the access boundary.
 - Prometheus: systemd unit `/usr/lib/systemd/system/prometheus.service`, config `/etc/homelab-llm/prometheus/prometheus.yml`.
 - Grafana: systemd unit `/usr/lib/systemd/system/grafana-server.service`, config `/etc/homelab-llm/grafana/grafana.ini`,
   provisioning `/etc/homelab-llm/grafana/provisioning/`.
@@ -334,6 +343,8 @@ Networking note:
 - Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, CCProxy API 4010.
 - LAN-only from Mini plus Studio self-access: Docs MCP `192.168.1.72:8013/mcp`.
+- Tailnet-only direct bind: Transcript Cleaner `4015` on the Mini Tailscale
+  IPv4; no app auth in v1.
 - Local-only bind with tailnet-only operator access: Grafana 3001 at `https://grafana.tailfd1400.ts.net/`, OpenHands Phase A 4031 at `https://hands.tailfd1400.ts.net/`.
 - Local-only (Studio): Elasticsearch `127.0.0.1:9200`.
 - Mini-to-Studio LAN retrieval path: memory API `192.168.1.72:55440`, reads open

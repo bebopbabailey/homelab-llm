@@ -21,6 +21,10 @@ ResponsesContractGuardrail = responses_contract_guardrail.ResponsesContractGuard
 
 
 class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        responses_contract_guardrail._REQUEST_CONTEXTS.clear()
+        responses_contract_guardrail._REQUEST_CONTEXT_IDS_BY_MODEL.clear()
+
     async def test_non_target_model_passthrough(self):
         guardrail = ResponsesContractGuardrail(
             guardrail_name="responses-contract-pre",
@@ -63,6 +67,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["temperature"], 0.0)
         self.assertEqual(out["tools"], [{"type": "function", "name": "noop"}])
         self.assertEqual(out["tool_choice"], "auto")
+        self.assertFalse(any(key.startswith("_responses_contract") for key in out))
         self.assertEqual(captured[0]["decision"], "normalized")
         self.assertEqual(captured[0]["normalized_fields"], ["stream", "temperature"])
         self.assertEqual(captured[1]["event_type"], "policy_summary")
@@ -90,6 +95,7 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(out["stream"])
         self.assertEqual(out["temperature"], 0.0)
         self.assertEqual(out["input"], "hello")
+        self.assertFalse(any(key.startswith("_responses_contract") for key in out))
         self.assertEqual(captured[0]["decision"], "passthrough")
 
     async def test_rejects_non_responses_call_type(self):
@@ -184,6 +190,74 @@ class TestResponsesContractGuardrail(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured[0]["response_id"], "resp_123")
         self.assertEqual(captured[0]["previous_response_id"], "resp_prev")
         self.assertEqual(captured[0]["call_ids"], ["call_123"])
+
+    async def test_post_call_preserves_context_when_data_dict_is_copied(self):
+        guardrail = ResponsesContractGuardrail(
+            guardrail_name="responses-contract-pre",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        data = {
+            "model": "chatgpt-5",
+            "stream": True,
+            "input": "hello",
+        }
+        captured = []
+        with patch.object(responses_contract_guardrail, "emit_policy_event", side_effect=captured.append):
+            await guardrail.async_pre_call_hook(
+                user_api_key_dict=None,
+                cache=None,
+                data=data,
+                call_type="responses",
+            )
+            policy_request_id = captured[0]["policy_request_id"]
+            copied_data = dict(data)
+            await guardrail.async_post_call_success_hook(
+                data=copied_data,
+                user_api_key_dict=None,
+                response={"id": "resp_123"},
+            )
+
+        self.assertEqual(captured[-1]["event_type"], "policy_result")
+        self.assertEqual(captured[-1]["policy_request_id"], policy_request_id)
+        self.assertEqual(captured[-1]["call_type"], "responses")
+
+    async def test_post_call_does_not_guess_context_for_ambiguous_copied_data(self):
+        guardrail = ResponsesContractGuardrail(
+            guardrail_name="responses-contract-pre",
+            event_hook="pre_call",
+            default_on=True,
+        )
+        first = {"model": "chatgpt-5", "input": "first"}
+        second = {"model": "chatgpt-5", "input": "second"}
+        captured = []
+        with patch.object(responses_contract_guardrail, "emit_policy_event", side_effect=captured.append):
+            await guardrail.async_pre_call_hook(
+                user_api_key_dict=None,
+                cache=None,
+                data=first,
+                call_type="responses",
+            )
+            first_policy_id = captured[0]["policy_request_id"]
+            await guardrail.async_pre_call_hook(
+                user_api_key_dict=None,
+                cache=None,
+                data=second,
+                call_type="responses",
+            )
+            second_policy_id = captured[2]["policy_request_id"]
+            await guardrail.async_post_call_success_hook(
+                data=dict(first),
+                user_api_key_dict=None,
+                response={"id": "resp_ambiguous"},
+            )
+
+        self.assertEqual(captured[-1]["event_type"], "policy_result")
+        self.assertNotIn(
+            captured[-1]["policy_request_id"],
+            {first_policy_id, second_policy_id},
+        )
+        self.assertIsNone(captured[-1]["call_type"])
 
 
 class TestEmitPolicyEvent(unittest.TestCase):

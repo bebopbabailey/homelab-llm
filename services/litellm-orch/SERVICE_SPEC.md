@@ -15,7 +15,8 @@ implement inference or web-search business logic.
 ## Endpoints
 - `POST /v1/chat/completions` (OpenAI-compatible; forwards to upstream)
 - `POST /v1/responses` (OpenAI-compatible Responses API; supports LiteLLM MCP tool use)
-- `POST /v1/audio/transcriptions` (OpenAI-compatible; routes speech STT aliases)
+- `POST /v1/audio/transcriptions` (OpenAI-compatible request/JSON-text response
+  boundary; provider-specific format capabilities vary by STT alias)
 - `POST /v1/audio/speech` (OpenAI-compatible; routes speech TTS aliases)
 - `POST /v1/search/<tool_name>` (direct callers and MCP tools)
 - `GET /v1/models` (logical model names from router config)
@@ -32,7 +33,8 @@ implement inference or web-search business logic.
 - `DATABASE_URL` is required in the runtime environment for DB-backed LiteLLM
   auth/key-management features such as teams, groups, service accounts, and
   `/key/generate`.
-- Current package baseline pins `litellm[proxy]==1.83.4`.
+- Current package baseline pins `litellm[proxy,stt-nvidia-riva]==1.85.0`
+  with explicit stable NumPy and gRPC bounds for the Riva STT client path.
 - Custom guardrails are declared in `config/router.yaml` under `guardrails`.
 - Caller-requested structured outputs pass through LiteLLM when the selected
   upstream supports them. `task-json` remains the fixed-schema utility alias
@@ -40,7 +42,6 @@ implement inference or web-search business logic.
 - LiteLLM does not inject web-search schemas, repair loops, or citation rendering.
 - `drop_params=true` is part of the current runtime baseline.
 - Active router fallback baseline is `fast -> deep`.
-
 ## Backends (External Services)
 - **OpenVINO LLM server** on the Mini (`http://localhost:9000`, supports `/health`, `/v1/models`, `/v1/chat/completions`)
 - **Studio llmster GPT service** on the Studio: OpenAI-compatible shared GPT
@@ -49,6 +50,11 @@ implement inference or web-search business logic.
   non-core OptiLLM proxy on `4020` and the settled GPT-family service on `8126`.
 - **Voice Gateway** on the Orin: OpenAI-compatible LAN speech facade at the configured
   `VOICE_GATEWAY_API_BASE`; Speaches stays localhost-only behind that facade.
+- **Studio Argmax/WhisperKit ASR** on the Studio: OpenAI-compatible
+  transcription backend at the configured `ARGMAX_WHISPERKIT_API_BASE`.
+- **Orin NVIDIA Riva ASR** on the Orin: self-hosted Riva gRPC backend at the
+  configured `NVIDIA_RIVA_API_BASE`, source-restricted to Mini by the Orin
+  `homelab-riva-grpc-firewall.service`.
 - **AFM OpenAI-compatible API** on the Studio (planned; target **9999**)
 - **SearXNG** on the Mini (`http://127.0.0.1:8888/search`) for the generic `searxng-search` tool.
 - **YouTube Transcript API** on the Mini (`http://127.0.0.1:8014/v1`) for the
@@ -62,16 +68,21 @@ implement inference or web-search business logic.
 - `code-qwen-agent` -> experimental internal OpenHands shadow alias through the
   Mini-local `qwen-agent-proxy` sidecar (`qwen-agent-coder-next-shadow`)
 - `task-transcribe` -> Studio `llmster` fast lane `8126`
-  (`llmster-gpt-oss-20b-mxfp4-gguf`) with one transcript-cleanup dotprompt
-- `task-transcribe` accepts optional `prompt_variables.audience` and/or
-  `prompt_variables.tone` to subtly shape paragraph rhythm and tone fit without
-  changing the public lane
+  (`llmster-gpt-oss-20b-mxfp4-gguf`); deprecated legacy text alias pending a
+  later explicit pruning story, with no verified cleanup/output contract
 - `task-json` -> Studio `llmster` fast lane `8126`
   (`llmster-gpt-oss-20b-mxfp4-gguf`) with the transcript-to-JSON extraction prompt
 - `task-youtube-transcript` -> Mini-local `youtube-transcript-api`
   (`openai/youtube-transcript`) for source-faithful YouTube transcript retrieval
 - `voice-stt-canary` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
 - `voice-stt` -> Orin `voice-gateway` facade (`whisper-1`) for raw STT
+- `personal-asr-whisperkit` -> Studio Argmax/WhisperKit ASR
+  (`openai/large-v3-v20240930_626MB`) as the preserved personal-ASR baseline
+- `personal-asr-riva` -> Orin NVIDIA Riva ASR
+  (`nvidia_riva/conformer-en-US-asr-streaming-asr-bls-ensemble`) for the
+  clean Riva-first personal transcription contract. It returns the normal JSON
+  text shape; `prompt` is ignored, SRT requests return JSON text, and requested
+  verbose word timestamps are not exposed by the proven native route.
 
 ## Current runtime notes
 - Pushcut MCP integration is not active in the main LiteLLM runtime.
@@ -104,37 +115,20 @@ implement inference or web-search business logic.
 - Log destination: stdout/journald for now; switch to file output when ingestion pipeline is ready.
 
 ## Guardrails
-- `transcribe-guardrail` is enabled for `task-transcribe`.
-  Its pre-call path preserves transcript punctuation, sets the transcribe
-  `prompt_id`, supplies default `audience` / `tone` prompt variables, and
-  constrains the token budget enough for the lane to emit final text; its
-  post-call path strips wrappers/labels and rewrites task outputs into clean
-  transcript-only payloads.
-- `task-transcribe` is the transcript cleanup alias. Its canonical text
-  contract is `POST /v1/responses` with native Responses `input`. It also
-  accepts `POST /v1/audio/transcriptions` for direct file upload callers:
-  LiteLLM routes the audio through `voice-stt`, cleans the raw transcript
-  through the same dotprompt-backed task alias, and returns a minimal payload
-  with `id` and `output_text`. Open WebUI speech wiring should still use the
-  raw `voice-stt` alias. For audio uploads, callers send multipart
-  `prompt_variables` as a JSON string when they want `audience` / `tone`
-  shaping.
+- No `transcribe-guardrail` is active. The old transcribe-stack request
+  shaping and direct personal-ASR input checks have been removed from the
+  LiteLLM guardrail path.
+- `task-transcribe` is a deprecated legacy text alias. Its audio behavior and
+  prior cleanup/output guarantees are no longer part of the service contract;
+  direct ASR callers use `personal-asr-riva` or `personal-asr-whisperkit`.
 - The transcribe dotprompt is registered in LiteLLM's native `prompts:`
-  config and rendered through `prompt_id` / `prompt_variables`.
-- `task-transcribe` accepts optional `prompt_variables.audience` and
-  `prompt_variables.tone` for subtle paragraph rhythm, punctuation strength,
-  and audience fit. It is also the supported multi-turn
-  transcript-manipulation lane: callers may reuse the returned response `id`
-  as `previous_response_id` on later `/v1/responses` calls. The echoed
-  `previous_response_id` in gateway responses is not a stable public identity
-  surface and may differ from the public `id` string that the caller
-  originally stored.
+  config. No legacy transcribe guardrail supplies prompt variables, personal-ASR
+  request checks, or wrapper-field cleanup.
 - `task-json` is a transcript-to-JSON utility alias only.
   Its canonical contract is `POST /v1/responses` with native Responses `input`.
-  It also accepts `POST /v1/audio/transcriptions` for direct file upload
-  callers: LiteLLM routes audio through `voice-stt`, runs the raw transcript
-  through the same fixed-schema JSON extraction path, and returns a minimal
-  payload with `id` and minified JSON in `output_text`.
+  It does not accept audio uploads. Audio callers first transcribe with
+  `personal-asr-riva` or `personal-asr-whisperkit`, then submit the returned
+  text to text-mode `task-json`.
   It removes tool-calling fields and returns minified JSON with exact top-level keys
   `todo`, `grocery`, `purchase`, and `other`.
 - `task-json` uses LiteLLM-owned pre-call and post-call guardrails to inject a
@@ -183,10 +177,8 @@ implement inference or web-search business logic.
   - raw upstream `fast` / `deep` callers should treat the Responses `output`
     message surface as canonical text; `output_text` is advisory-only on direct
     `llmster`
-  - task aliases preserve response `id`, `previous_response_id`, and `usage`
-    while also returning stable `output_text` for client ergonomics; callers
-    may reuse the public `id` on follow-up input, but should not require the
-    echoed `previous_response_id` string to match that public value verbatim
+  - deterministic `stream=false` / `temperature=0.0` normalization is scoped to
+    supported task guardrail paths, not raw `fast` / `deep` lanes
   - `chatgpt-5` follows its adapter-backed dual-endpoint path rather than the local GPT request-default shim
   - `chatgpt-5` follows the Codex-backed sidecar path rather than the local GPT
     request-default shim
@@ -196,9 +188,13 @@ implement inference or web-search business logic.
   - strict structured-output guarantees are not part of the supported GPT or
     OpenHands worker contract
 - No web-search-specific pre-call or post-call guardrails are active in LiteLLM.
-- A Mini-side Prisma/schema repair was required on the current LiteLLM 1.83.4
-  deployment because the deployed Postgres schema had drifted behind the shipped
-  Prisma client. `_prisma_migrations`, `LiteLLM_ToolTable`,
+- `personal-asr-whisperkit` and `personal-asr-riva` are direct LiteLLM audio
+  transcription aliases. No legacy transcribe guardrail owns personal-ASR
+  provider behavior.
+- A Mini-side Prisma/schema repair was originally required on the LiteLLM
+  `1.83.4` deployment because the deployed Postgres schema had drifted behind
+  the shipped Prisma client. The current package baseline is `1.85.0`.
+  `_prisma_migrations`, `LiteLLM_ToolTable`,
   `LiteLLM_ConfigOverrides`, and `LiteLLM_VerificationToken.agent_id` /
   `.project_id` were restored by running LiteLLM's own startup DB setup path and
   then regenerating Prisma Client Python in the service venv.

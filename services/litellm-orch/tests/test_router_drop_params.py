@@ -1,4 +1,6 @@
 from pathlib import Path
+import importlib
+import sys
 import unittest
 
 import yaml
@@ -6,6 +8,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ROUTER_CONFIG = REPO_ROOT / "services/litellm-orch/config/router.yaml"
+CONFIG_DIR = REPO_ROOT / "services/litellm-orch/config"
 
 
 class TestRouterDropParams(unittest.TestCase):
@@ -143,7 +146,7 @@ class TestRouterDropParams(unittest.TestCase):
                 "deep,fast,code-reasoning",
             )
 
-    def test_public_responses_contract_guardrails_target_gpt_oss_aliases(self):
+    def test_public_responses_contract_guardrails_target_task_aliases_only(self):
         config = yaml.safe_load(ROUTER_CONFIG.read_text())
         guardrails = config.get("guardrails", [])
         names = {}
@@ -156,11 +159,33 @@ class TestRouterDropParams(unittest.TestCase):
             {"responses-contract-public-pre", "responses-contract-public-post"},
         )
         for params in names.values():
-            self.assertEqual(
-                params.get("target_models"),
-                "deep,fast,task-transcribe,task-json",
-            )
+            self.assertEqual(params.get("target_models"), "deep,fast,task-transcribe,task-json")
             self.assertEqual(params.get("responses_only"), False)
+
+    def test_legacy_transcribe_guardrail_is_not_wired(self):
+        config = yaml.safe_load(ROUTER_CONFIG.read_text())
+        guardrail_names = {
+            item.get("guardrail_name")
+            for item in config.get("guardrails", [])
+            if isinstance(item, dict)
+        }
+        self.assertNotIn("transcribe-pre", guardrail_names)
+        self.assertNotIn("transcribe-post", guardrail_names)
+
+    def test_router_guardrail_modules_are_importable(self):
+        sys.path.insert(0, str(CONFIG_DIR))
+        try:
+            config = yaml.safe_load(ROUTER_CONFIG.read_text())
+            for item in config.get("guardrails", []):
+                dotted = item.get("litellm_params", {}).get("guardrail", "")
+                module_name, class_name = dotted.rsplit(".", 1)
+                module = importlib.import_module(module_name)
+                self.assertTrue(hasattr(module, class_name), dotted)
+        finally:
+            try:
+                sys.path.remove(str(CONFIG_DIR))
+            except ValueError:
+                pass
 
 
 if __name__ == "__main__":

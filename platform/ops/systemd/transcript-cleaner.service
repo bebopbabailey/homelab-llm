@@ -1,0 +1,20 @@
+[Unit]
+Description=Transcript Cleaner (tailnet transcript cleanup UI)
+After=network-online.target tailscaled.service litellm-orch.service
+Wants=network-online.target tailscaled.service litellm-orch.service
+
+[Service]
+Type=simple
+User=christopherbailey
+WorkingDirectory=/home/christopherbailey/homelab-llm/services/litellm-orch
+EnvironmentFile=/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
+Environment=TRANSCRIPT_CLEAN_PORT=4015
+Environment=TRANSCRIPT_CLEAN_LITELLM_BASE_URL=http://127.0.0.1:4000/v1
+ExecStart=/home/christopherbailey/homelab-llm/services/litellm-orch/scripts/transcript-clean-server
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

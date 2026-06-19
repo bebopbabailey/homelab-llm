@@ -1,7 +1,7 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, local Alloy/Tempo tracing, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, the tailnet-only Transcript Cleaner utility, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, local Alloy/Tempo tracing, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
 - Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime` with the experimental oMLX Qwen3.6 primitive on `:8120`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
@@ -31,6 +31,8 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   `127.0.0.1:3030`.
   `omlx-agent-gateway` is localhost-only on `127.0.0.1:4022` and fronts the
   Studio oMLX Qwen3.6 primitive for framework-neutral agent backend tests.
+  Transcript Cleaner is a tailnet-only utility on the Mini Tailscale IPv4 at
+  `:4015` and calls local LiteLLM `task-transcribe`.
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
@@ -65,6 +67,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | service | host | port | base URL | health |
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
+| Transcript Cleaner | Mini | 4015 | http://<mini-tailnet-name>:4015 | /health |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
 | orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only |
 | CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
@@ -165,6 +168,8 @@ define the contract for specialized runtime-plane services such as
 - There are no active temporary GPT canary aliases in the current LiteLLM
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
+- Tailnet-only Transcript Cleaner utility: Mini Tailscale IPv4 / MagicDNS on
+  port `4015`; no app auth in v1.
 - Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, Media Fetch MCP 8012, YouTube Transcript API
   8014, CCProxy API 4010.
