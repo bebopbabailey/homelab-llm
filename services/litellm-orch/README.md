@@ -20,13 +20,16 @@ only; it does not implement inference.
 
 ## Backends
 - Studio `llmster` GPT service on `8126` for `fast` and `deep`
-- `task-transcribe` is a text-cleanup alias on `fast`
-- `task-transcribe` uses one dotprompt-backed cleanup lane; optional
-  `prompt_variables.audience` / `prompt_variables.tone` subtly shape rhythm
-  and audience fit
+- `task-transcribe` is a deprecated legacy text alias on `fast`; no verified
+  cleanup, prompt-shaping, or response-normalization contract remains after the
+  transcribe guardrail removal.
 - `task-youtube-transcript` is a YouTube transcript acquisition alias routed to
   the Mini-local `youtube-transcript-api`
 - Voice Gateway on the Orin for STT aliases
+- Studio Argmax/WhisperKit through `personal-asr-whisperkit` as the preserved
+  personal-ASR baseline
+- Orin NVIDIA Riva through `personal-asr-riva` as the clean Riva-first
+  personal-ASR contract
 - SearXNG on the Mini for generic search tooling
 
 ## OpenCode Note
@@ -41,15 +44,14 @@ only; it does not implement inference.
 - `chatgpt-5` now routes through the Mini-local `ccproxy-api` Codex sidecar.
 - `task-transcribe` is an additional task alias, not part of the public human
   chat-lane trio.
-- Its prompt is registered in LiteLLM's native dotprompt config and rendered
-  from `prompt_id` / `prompt_variables`; the transcribe guardrail preserves
-  transcript punctuation, supplies prompt variables, routes direct audio
-  uploads through STT, and strips wrapper fields from the final response
-  payload.
-- Direct file-upload callers may also use `POST /v1/audio/transcriptions` with
-  `model=task-transcribe`; LiteLLM first routes audio to `voice-stt`, then
-  cleans the raw transcript and returns `id` plus `output_text`. Add
-  `prompt_variables.audience` / `prompt_variables.tone` for subtle shaping.
+- Its prompt is registered in LiteLLM's native dotprompt config. No transcribe
+  guardrail is active; legacy prompt-variable request shaping and wrapper-field
+  cleanup are no longer preserved or verified as service behavior.
+- Direct file-upload callers use `POST /v1/audio/transcriptions` with
+  `model=personal-asr-riva` or `model=personal-asr-whisperkit`. Legacy
+  `task-transcribe` audio upload is deprecated and rejected. The remaining
+  text alias is pending explicit later pruning and is not a supported cleanup
+  pipeline.
 - `task-youtube-transcript` is also an additional task alias, not part of the
   public human chat-lane trio. It routes normal Chat Completions requests to
   the localhost-only `youtube-transcript-api` service on `127.0.0.1:8014/v1`;
@@ -57,14 +59,11 @@ only; it does not implement inference.
 - Raw `fast` / `deep` Responses should be treated as `output`-first payloads;
   upstream `output_text` is not guaranteed to be populated on every direct
   `llmster` response.
-- The task aliases keep a more ergonomic contract by returning stable
-  `output_text`, preserving response `id`, and passing through `usage` so
-  clients can chain `previous_response_id` follow-ups and observe
-  `cached_tokens`. The follow-up request may reuse the public response `id`,
-  but callers should not depend on the echoed `previous_response_id` string
-  matching that public value byte-for-byte.
 - `task-json` is an additional utility alias, not part of the public human
-  chat-lane trio.
+  chat-lane trio. It is a text-only transcript-to-JSON utility for
+  `/v1/responses` and compatibility Chat Completions calls. Audio callers
+  should first call `personal-asr-riva` or `personal-asr-whisperkit`, then
+  submit the returned text to `task-json`.
 
 ## Configuration
 - `config/router.yaml` maps logical handles to upstream endpoints.

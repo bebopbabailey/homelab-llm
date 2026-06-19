@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi==0.124.4",
+    "grpcio>=1.71,<1.82",
+    "grpcio-tools>=1.71,<1.82",
     "httpx==0.28.1",
-    "litellm[proxy]==1.83.4",
+    "litellm[proxy,stt-nvidia-riva]==1.85.0",
     "mcp==1.26.0",
+    "numpy>=1.26.0,<2.5",
     "prisma>=0.15.0",
     "prometheus-client==0.20.0",
     "pyyaml==6.0.3",

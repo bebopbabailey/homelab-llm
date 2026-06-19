@@ -1,7 +1,7 @@
 # Topology and Endpoints
 
 ## Hosts
-- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
+- Mac Mini (Ubuntu 24.04): commodity gateway/control surface for LiteLLM, the tailnet-only Transcript Cleaner utility, Open WebUI, OpenCode, OpenHands, Prometheus, Grafana, local Alloy/Tempo tracing, OpenVINO, SearXNG, Ollama, the localhost-only `omlx-agent-gateway`, plus the localhost-only `orchestration-cockpit` prototype when launched.
 - Mac Studio: public inference host for the `mlxctl`-governed team-lane domain on `:8100-:8119`, the shared `llmster` GPT listener on `:8126`, and the specialized runtime-plane host represented by `omlx-runtime` with the experimental oMLX Qwen3.6 primitive on `:8120`.
 - Mac Studio (planned): AFM OpenAI-compatible API endpoint.
 - Mac Studio: active shared `llmster` GPT service on `8126`, with public
@@ -23,12 +23,16 @@ Each host entry: role, access path, source-of-truth docs, and safe validation co
   operator access at `https://hands.tailfd1400.ts.net/`.
   Grafana is on `127.0.0.1:3001` locally with tailnet-only operator access at
   `https://grafana.tailfd1400.ts.net/` via `svc:grafana`.
+  Alloy receives OTLP traces on `127.0.0.1:4317/4318`; Tempo serves local
+  trace queries on `127.0.0.1:3200`.
   OpenCode Web is on `127.0.0.1:4096` locally, uses HTTP Basic Auth, and is exposed on the tailnet at `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
   `orchestration-cockpit` is localhost-only and inactive by default; when
   launched it uses LangGraph dev on `127.0.0.1:2024` and Agent Chat UI on
   `127.0.0.1:3030`.
   `omlx-agent-gateway` is localhost-only on `127.0.0.1:4022` and fronts the
   Studio oMLX Qwen3.6 primitive for framework-neutral agent backend tests.
+  Transcript Cleaner is a tailnet-only utility on the Mini Tailscale IPv4 at
+  `:4015` and calls local LiteLLM `task-transcribe`.
   Finder SMB is LAN-only on `127.0.0.1` + `192.168.1.71`, with authenticated shares `mini-root` and `seagate`.
 
 ### Studio (macOS)
@@ -63,6 +67,7 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | service | host | port | base URL | health |
 | --- | --- | --- | --- | --- |
 | LiteLLM proxy | Mini | 4000 | http://192.168.1.71:4000 | /health, /health/readiness, /health/liveliness |
+| Transcript Cleaner | Mini | 4015 | http://<mini-tailnet-name>:4015 | /health |
 | Open WebUI | Mini | 3000 | http://192.168.1.71:3000 | /health |
 | orchestration-cockpit (prototype, inactive by default) | Mini | 2024 / 3030 | http://127.0.0.1:2024, http://127.0.0.1:3030 | local dev only |
 | CCProxy API (experimental, localhost-only) | Mini | 4010 | http://127.0.0.1:4010/codex/v1 | /codex/v1/models |
@@ -77,6 +82,8 @@ Do not change port allocations without updating `docs/PLATFORM_DOSSIER.md`.
 | Samba SMB | Mini | 139/445 | smb://192.168.1.71/mini-root, smb://192.168.1.71/seagate | `testparm -s`, Finder auth |
 | Prometheus | Mini | 9090 | http://127.0.0.1:9090 | /-/ready, /-/healthy |
 | Grafana | Mini | 3001 | http://127.0.0.1:3001, https://grafana.tailfd1400.ts.net/ | /api/health |
+| Alloy OTLP collector | Mini | 4317 / 4318 | OTLP on localhost | readiness on 127.0.0.1:12345 |
+| Tempo trace backend | Mini | 3200 | http://127.0.0.1:3200 | /ready |
 | OpenVINO LLM | Mini | 9000 | http://127.0.0.1:9000 | /health |
 | Voice Gateway | Orin | 18080 | http://192.168.1.93:18080/v1 | /health, /health/readiness |
 | OptiLLM proxy (Studio) | Studio | 4020 | http://192.168.1.72:4020/v1 | /v1/models |
@@ -161,6 +168,8 @@ define the contract for specialized runtime-plane services such as
 - There are no active temporary GPT canary aliases in the current LiteLLM
   surface.
 - Tailnet-only OpenCode Web operator path: `https://codeagent.tailfd1400.ts.net/` via `svc:codeagent`.
+- Tailnet-only Transcript Cleaner utility: Mini Tailscale IPv4 / MagicDNS on
+  port `4015`; no app auth in v1.
 - Local-only: Prometheus 9090, SearXNG 8888, Open Terminal API
   8010, Open Terminal MCP 8011, Media Fetch MCP 8012, YouTube Transcript API
   8014, CCProxy API 4010.

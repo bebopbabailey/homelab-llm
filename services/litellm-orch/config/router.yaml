@@ -91,6 +91,23 @@ model_list:
     api_key: os.environ/VOICE_GATEWAY_API_KEY
   model_info:
     mode: audio_transcription
+
+- model_name: personal-asr-whisperkit
+  litellm_params:
+    model: openai/large-v3-v20240930_626MB
+    api_base: os.environ/ARGMAX_WHISPERKIT_API_BASE
+    api_key: dummy
+  model_info:
+    mode: audio_transcription
+
+- model_name: personal-asr-riva
+  litellm_params:
+    model: nvidia_riva/conformer-en-US-asr-streaming-asr-bls-ensemble
+    api_base: os.environ/NVIDIA_RIVA_API_BASE
+    riva_model_name: conformer-en-US-asr-streaming-asr-bls-ensemble
+    enable_automatic_punctuation: true
+  model_info:
+    mode: audio_transcription
 prompts:
 - prompt_id: task-transcribe
   litellm_params:
@@ -124,11 +141,6 @@ litellm_settings:
   callbacks: ["prometheus"]
   global_prompt_directory: ./prompts
 guardrails:
-  - guardrail_name: "transcribe-pre"
-    litellm_params:
-      guardrail: "transcribe_guardrail.TranscribeGuardrail"
-      mode: "pre_call"
-      default_on: true
   - guardrail_name: "responses-contract-public-pre"
     litellm_params:
       guardrail: "responses_contract_guardrail.ResponsesContractGuardrail"
@@ -161,11 +173,6 @@ guardrails:
       default_on: true
       target_models: "deep,fast,task-transcribe,task-json"
       responses_only: false
-  - guardrail_name: "transcribe-post"
-    litellm_params:
-      guardrail: "transcribe_guardrail.TranscribeGuardrail"
-      mode: "post_call"
-      default_on: true
   - guardrail_name: "task-json-pre"
     litellm_params:
       guardrail: "task_json_guardrail.TaskJsonGuardrail"

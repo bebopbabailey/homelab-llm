@@ -6,12 +6,27 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Any
+from typing import Any, Mapping
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from homelab_observability import (
+    current_trace_id,
+    inject_trace_headers,
+    instrument_fastapi_app,
+    set_llm_content_attributes,
+    setup_tracing,
+    start_as_current_span,
+)
+from opentelemetry.trace import SpanKind
 
 from .settings import Settings, load_settings
+
+setup_tracing(
+    service_name="omlx-agent-gateway",
+    service_version="0.1.0",
+    resource_attributes={"host.name": "mini", "homelab.plane": "gateway"},
+)
 
 
 def _error_response(message: str, *, status_code: int, error_type: str) -> JSONResponse:
@@ -72,62 +87,108 @@ def _models_payload(settings: Settings) -> dict[str, Any]:
     }
 
 
-def _upstream_headers(settings: Settings) -> dict[str, str]:
-    headers = {"Content-Type": "application/json", "Accept": "application/json", "Connection": "close"}
+def _upstream_headers(settings: Settings, *, request_id: str | None = None) -> dict[str, str]:
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Connection": "close",
+    }
+    if request_id:
+        headers["X-Request-ID"] = request_id
     if settings.backend_api_key:
         headers["Authorization"] = f"Bearer {settings.backend_api_key}"
     return headers
 
 
-def _proxy_json(settings: Settings, *, method: str, path: str, payload: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+def _proxy_json(
+    settings: Settings,
+    *,
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    request_id: str,
+) -> tuple[int, dict[str, Any]]:
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
-    request = urllib.request.Request(
-        f"{settings.backend_base_url.rstrip('/')}{path}",
-        data=body,
-        headers=_upstream_headers(settings),
-        method=method,
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=settings.timeout_seconds) as response:
-            raw = response.read()
-            status = response.status
-    except urllib.error.HTTPError as exc:
-        raw_body = exc.read().decode("utf-8", errors="replace")
+    with start_as_current_span(
+        "omlx_agent_gateway.upstream.chat",
+        kind=SpanKind.CLIENT,
+        attributes={
+            "http.request.method": method,
+            "url.full": f"{settings.backend_base_url.rstrip('/')}{path}",
+            "server.address": settings.backend_base_url,
+            "homelab.request_id": request_id,
+            "gen_ai.request.model": str(payload.get("model", "")) if isinstance(payload, Mapping) else "",
+        },
+    ) as span:
+        if isinstance(payload, Mapping):
+            set_llm_content_attributes(span, prefix="gen_ai.request", messages=payload.get("messages"))
+        request = urllib.request.Request(
+            f"{settings.backend_base_url.rstrip('/')}{path}",
+            data=body,
+            headers=inject_trace_headers(_upstream_headers(settings, request_id=request_id)),
+            method=method,
+        )
         try:
-            parsed_error = json.loads(raw_body)
-        except json.JSONDecodeError:
-            parsed_error = {"error": {"message": raw_body[:500], "type": "upstream_http_error"}}
-        return exc.code, parsed_error
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
-        return 502, {"error": {"message": f"upstream transport failed: {exc}", "type": "upstream_transport_error"}}
+            with urllib.request.urlopen(request, timeout=settings.timeout_seconds) as response:
+                raw = response.read()
+                status = response.status
+                span.set_attribute("http.response.status_code", status)
+        except urllib.error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="replace")
+            span.set_attribute("http.response.status_code", exc.code)
+            try:
+                parsed_error = json.loads(raw_body)
+            except json.JSONDecodeError:
+                parsed_error = {"error": {"message": raw_body[:500], "type": "upstream_http_error"}}
+            return exc.code, parsed_error
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            span.set_attribute("error.type", "upstream_transport_error")
+            return 502, {"error": {"message": f"upstream transport failed: {exc}", "type": "upstream_transport_error"}}
 
-    try:
-        parsed = json.loads(raw.decode("utf-8"))
-    except json.JSONDecodeError:
-        return 502, {"error": {"message": raw[:500].decode("utf-8", errors="replace"), "type": "upstream_parse_error"}}
-    if not isinstance(parsed, dict):
-        return 502, {"error": {"message": "upstream returned non-object JSON", "type": "upstream_parse_error"}}
-    return status, parsed
-
-
-def _proxy_stream(settings: Settings, *, path: str, payload: dict[str, Any]) -> JSONResponse | StreamingResponse:
-    request = urllib.request.Request(
-        f"{settings.backend_base_url.rstrip('/')}{path}",
-        data=json.dumps(payload).encode("utf-8"),
-        headers=_upstream_headers(settings),
-        method="POST",
-    )
-    try:
-        response = urllib.request.urlopen(request, timeout=settings.timeout_seconds)
-    except urllib.error.HTTPError as exc:
-        raw_body = exc.read().decode("utf-8", errors="replace")
         try:
-            parsed_error = json.loads(raw_body)
+            parsed = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError:
-            parsed_error = {"error": {"message": raw_body[:500], "type": "upstream_http_error"}}
-        return JSONResponse(status_code=exc.code, content=parsed_error)
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
-        return _error_response(f"upstream transport failed: {exc}", status_code=502, error_type="upstream_transport_error")
+            span.set_attribute("error.type", "upstream_parse_error")
+            return 502, {"error": {"message": raw[:500].decode("utf-8", errors="replace"), "type": "upstream_parse_error"}}
+        if not isinstance(parsed, dict):
+            span.set_attribute("error.type", "upstream_parse_error")
+            return 502, {"error": {"message": "upstream returned non-object JSON", "type": "upstream_parse_error"}}
+        set_llm_content_attributes(span, prefix="gen_ai.response", response=_extract_response_text(parsed))
+        return status, parsed
+
+
+def _proxy_stream(settings: Settings, *, path: str, payload: dict[str, Any], request_id: str) -> JSONResponse | StreamingResponse:
+    with start_as_current_span(
+        "omlx_agent_gateway.upstream.chat.stream",
+        kind=SpanKind.CLIENT,
+        attributes={
+            "http.request.method": "POST",
+            "url.full": f"{settings.backend_base_url.rstrip('/')}{path}",
+            "homelab.request_id": request_id,
+            "gen_ai.request.model": str(payload.get("model", "")),
+            "gen_ai.request.stream": True,
+        },
+    ) as span:
+        request = urllib.request.Request(
+            f"{settings.backend_base_url.rstrip('/')}{path}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers=inject_trace_headers(_upstream_headers(settings, request_id=request_id)),
+            method="POST",
+        )
+        try:
+            response = urllib.request.urlopen(request, timeout=settings.timeout_seconds)
+            span.set_attribute("http.response.status_code", response.status)
+        except urllib.error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="replace")
+            span.set_attribute("http.response.status_code", exc.code)
+            try:
+                parsed_error = json.loads(raw_body)
+            except json.JSONDecodeError:
+                parsed_error = {"error": {"message": raw_body[:500], "type": "upstream_http_error"}}
+            return JSONResponse(status_code=exc.code, content=parsed_error)
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            span.set_attribute("error.type", "upstream_transport_error")
+            return _error_response(f"upstream transport failed: {exc}", status_code=502, error_type="upstream_transport_error")
 
     def chunks():
         with response:
@@ -169,6 +230,27 @@ def _local_chat_response(settings: Settings, content: str) -> dict[str, Any]:
     }
 
 
+def _response_headers(request_id: str) -> dict[str, str]:
+    headers = {"X-Request-ID": request_id}
+    trace_id = current_trace_id()
+    if trace_id:
+        headers["X-Trace-ID"] = trace_id
+    return headers
+
+
+def _extract_response_text(body: Mapping[str, Any]) -> str:
+    choices = body.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, Mapping):
+            message = first.get("message")
+            if isinstance(message, Mapping):
+                content = message.get("content")
+                if isinstance(content, str):
+                    return content
+    return ""
+
+
 def create_app() -> FastAPI:
     api = FastAPI(title="oMLX Agent Gateway", version="0.1.0")
 
@@ -196,9 +278,10 @@ def create_app() -> FastAPI:
         return _model_info_payload(settings)
 
     @api.post("/v1/chat/completions")
-    async def chat_completions(request: Request, authorization: str | None = Header(default=None)) -> JSONResponse:
+    async def chat_completions(request: Request, authorization: str | None = Header(default=None)) -> Any:
         settings = load_settings()
         _require_auth(settings, authorization)
+        request_id = request.headers.get("x-request-id") or f"omlx-gw-{uuid.uuid4().hex[:12]}"
         payload = await request.json()
         if not isinstance(payload, dict):
             return _error_response("request body must be a JSON object", status_code=400, error_type="invalid_request_error")
@@ -206,15 +289,18 @@ def create_app() -> FastAPI:
         if isinstance(normalized, JSONResponse):
             return normalized
         if normalized.pop("_omlx_agent_gateway_test_response", None):
-            return JSONResponse(_local_chat_response(settings, "gateway-ok"))
+            return JSONResponse(_local_chat_response(settings, "gateway-ok"), headers=_response_headers(request_id))
         if normalized.get("stream"):
-            return _proxy_stream(settings, path="/chat/completions", payload=normalized)
-        status, body = _proxy_json(settings, method="POST", path="/chat/completions", payload=normalized)
+            response = _proxy_stream(settings, path="/chat/completions", payload=normalized, request_id=request_id)
+            response.headers.update(_response_headers(request_id))
+            return response
+        status, body = _proxy_json(settings, method="POST", path="/chat/completions", payload=normalized, request_id=request_id)
         if body.get("model") == settings.backend_model:
             body = dict(body)
             body["model"] = settings.public_model_id
-        return JSONResponse(status_code=status, content=body)
+        return JSONResponse(status_code=status, content=body, headers=_response_headers(request_id))
 
+    instrument_fastapi_app(api, excluded_urls="/health")
     return api
 
 

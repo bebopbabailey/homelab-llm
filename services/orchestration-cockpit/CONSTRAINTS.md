@@ -9,15 +9,17 @@ This service inherits global constraints from `../../AGENTS.md`.
 - Do not add LiteLLM aliasing, Open WebUI integration, or OpenHands integration.
 - Do not vendor the full Agent Chat UI source unless stock UI proves insufficient.
 - Do not widen the specialized runtime contract beyond the frozen non-stream
-  `/v1/chat/completions` shape already validated by `omlx-runtime`.
+  `/v1/chat/completions` shape already validated for the oMLX backend path.
 - Keep Pi/Qwen cockpit runs scratch-only; do not target arbitrary local repos.
+- OpenTelemetry export failures must not fail cockpit graph requests.
 
 ## Allowed operations
 - Service-local Python graph, routing, and tests.
 - Repo-owned UI wrapper docs and env examples only.
-- Direct calls to the existing `omlx-runtime` client from Mini-side graph code.
+- Gateway-backed calls to the existing Mini-local `omlx-agent-gateway` sidecar.
 - Synchronous calls to the existing Pi/Qwen scratch launcher under
   `/home/christopherbailey/pi-qwen-trials/current`.
+- Local OpenTelemetry spans and run-ledger `trace_id` correlation.
 
 ## Forbidden operations
 - New LAN exposure, host-binding changes, or public routing.

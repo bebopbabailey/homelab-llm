@@ -7,10 +7,10 @@ shape without changing the commodity chat surface.
 ## Preconditions
 - Keep all binds on localhost only.
 - Do not run on port `3000`; Open WebUI already owns that port.
-- Establish the specialized-runtime path externally before testing the
-  specialized branch:
-  - Studio oMLX listener on `127.0.0.1:8120`
-  - Mini SSH forward on `127.0.0.1:8129`
+- Keep the specialized gateway path healthy before testing the specialized branch:
+  - `omlx-agent-gateway.service`
+  - `http://127.0.0.1:4022/health`
+  - Studio oMLX listener behind the gateway
 - For Pi/Qwen scratch runs, keep the existing sidecar healthy:
   - `omlx-agent-gateway.service`
   - `http://127.0.0.1:4022/health`
@@ -42,10 +42,12 @@ sudo install -m 0644 platform/ops/templates/orchestration-cockpit.ui.env.example
 
 Required graph env values:
 - `ORCHESTRATION_COCKPIT_REPO_ROOT=/home/christopherbailey/homelab-llm`
-- `OMLX_RUNTIME_BASE_URL=http://127.0.0.1:8129`
-- `OMLX_RUNTIME_BEARER_TOKEN=...`
-- `OMLX_RUNTIME_MODEL=Qwen3-4B-Instruct-2507-4bit`
+- `OMLX_AGENT_GATEWAY_BASE_URL=http://127.0.0.1:4022/v1`
+- `OMLX_AGENT_GATEWAY_MODEL_ID=omlx-qwen36-27b-optiq-4bit`
 - `ORCHESTRATION_COCKPIT_STATE_DIR=/home/christopherbailey/.local/state/orchestration-cockpit`
+- `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318`
+- `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=16384`
+- `HOMELAB_OTEL_CONTENT_ATTRIBUTE_LIMIT_BYTES=16384`
 - optional `UV_PROJECT_ENVIRONMENT=/home/christopherbailey/.local/share/orchestration-cockpit/graph-venv`
 - optional `ORCHESTRATION_COCKPIT_GRAPH_TUNNEL=true` for Safari access to
   hosted LangSmith Studio
@@ -78,6 +80,9 @@ Verify the local service contract surfaces:
 uv run --project services/orchestration-cockpit python services/orchestration-cockpit/scripts/verify_local_runtime.py
 ```
 
+OpenTelemetry export is best-effort. If Alloy or Tempo is down, cockpit
+requests continue; traces resume after the local trace stack is healthy.
+
 ## LangGraph dev server
 If local tooling requires a LangSmith key, export it locally first. It is a
 dev-server prerequisite only; it is not part of cockpit auth.
@@ -101,6 +106,8 @@ Important:
   working directory outside the repo
 - the graph must not compile with a custom checkpointer; `langgraph dev`
   rejects that shape and manages persistence itself
+- specialized runs write `trace_id` in `run-ledger.jsonl`; the same trace is
+  queryable in Grafana Tempo when Alloy/Tempo are running
 
 ## Agent Chat UI (not vendored)
 Option 1: local scaffold in the supported durable root

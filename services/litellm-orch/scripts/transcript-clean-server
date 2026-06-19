@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+service_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${service_dir}"
+
+env_local="config/env.local"
+if [[ ! -f "${env_local}" && -f "/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local" ]]; then
+  env_local="/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local"
+fi
+
+if [[ -f "${env_local}" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${env_local}"
+  set +a
+fi
+
+host="${TRANSCRIPT_CLEAN_HOST:-}"
+if [[ -z "${host}" ]]; then
+  if ! command -v tailscale >/dev/null 2>&1; then
+    echo "TRANSCRIPT_CLEAN_HOST is unset and tailscale is not available" >&2
+    exit 1
+  fi
+  host="$(tailscale ip -4 | head -n 1)"
+fi
+if [[ -z "${host}" ]]; then
+  echo "could not detect Tailscale IPv4; set TRANSCRIPT_CLEAN_HOST explicitly" >&2
+  exit 1
+fi
+
+port="${TRANSCRIPT_CLEAN_PORT:-4015}"
+export TRANSCRIPT_CLEAN_LITELLM_BASE_URL="${TRANSCRIPT_CLEAN_LITELLM_BASE_URL:-http://127.0.0.1:4000/v1}"
+
+venv_python="${TRANSCRIPT_CLEAN_PYTHON:-${service_dir}/.venv/bin/python}"
+if [[ ! -x "${venv_python}" && -x "/home/christopherbailey/homelab-llm/services/litellm-orch/.venv/bin/python" ]]; then
+  venv_python="/home/christopherbailey/homelab-llm/services/litellm-orch/.venv/bin/python"
+fi
+if [[ ! -x "${venv_python}" ]]; then
+  echo "could not find service venv python; set TRANSCRIPT_CLEAN_PYTHON" >&2
+  exit 1
+fi
+
+echo "Starting transcript cleaner on http://${host}:${port}"
+exec "${venv_python}" -m uvicorn transcript_cleaner_app:app --host "${host}" --port "${port}"

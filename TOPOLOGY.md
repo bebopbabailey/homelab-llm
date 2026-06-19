@@ -4,6 +4,7 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 
 ## Mini (Ubuntu, always-on)
 - **LiteLLM (gateway)**: `0.0.0.0:4000` (canonical infra path `http://192.168.1.71:4000/v1`; localhost still valid)
+- **Transcript Cleaner**: Mini Tailscale IPv4 `:4015` (tailnet-only upload/paste UI for `task-transcribe`)
 - **Open WebUI**: `0.0.0.0:3000` (tailnet via Tailscale Serve)
 - **orchestration-cockpit prototype (inactive by default)**:
   LangGraph dev `127.0.0.1:2024`, Agent Chat UI `127.0.0.1:3030`
@@ -16,6 +17,8 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 - **Samba SMB**: `127.0.0.1,192.168.1.71:139/445` (LAN-only; Finder shares `mini-root` and `seagate`)
 - **Prometheus**: `127.0.0.1:9090` (localhost only)
 - **Grafana**: `127.0.0.1:3001` (localhost bind; tailnet-only operator access at `https://grafana.tailfd1400.ts.net/`)
+- **Alloy OTLP collector**: `127.0.0.1:4317/4318` (localhost-only app trace ingest)
+- **Tempo trace backend**: `127.0.0.1:3200` (localhost-only Grafana trace datasource)
 - **OpenVINO LLM**: `0.0.0.0:9000`
 - **SearXNG**: `127.0.0.1:8888` (localhost only)
 - **Ollama**: `0.0.0.0:11434` (do not modify)
@@ -50,6 +53,9 @@ This is the current runtime layout (Mini + Studio + Orin speech appliance). Upda
 
 ## Contracts
 - Clients call **LiteLLM** only (`http://192.168.1.71:4000/v1` on LAN, `http://127.0.0.1:4000/v1` on Mini, tailnet optional for remote operator access).
+- Transcript Cleaner is an exception for transcript file ingress from personal
+  tailnet devices; it calls local LiteLLM and does not expose a general model
+  API.
 - Direct backend URLs in this document are operator-only validation or
   service-to-service paths, not approved client entrypoints.
 - Open WebUI voice uses dedicated `AUDIO_STT_*` / `AUDIO_TTS_*` settings pointed at LiteLLM only.

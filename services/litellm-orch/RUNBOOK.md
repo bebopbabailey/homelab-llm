@@ -153,7 +153,6 @@ curl -fsS http://127.0.0.1:4000/v1/responses \
 ```
 Expected:
 - both responses complete with a final assistant message in `output`
-- requests are normalized to `temperature=0.0`
 - omitted reasoning defaults are injected upstream for GPT-OSS lanes
 - direct-style clients should treat `output` as the canonical text surface for
   raw `fast` / `deep`; `output_text` is not guaranteed upstream
@@ -199,19 +198,9 @@ Expected:
 - Current resilience baseline keeps `fast -> deep`.
 - `helper`, `boost*`, shadow aliases, and `metal-test-*` are absent from the active LLM alias surface.
 
-Task-alias Responses smokes:
+Supported task-alias Responses smokes:
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
-
-curl -fsS http://127.0.0.1:4000/v1/responses \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","input":[{"role":"user","content":"um i i think this should probably work maybe yes"}],"max_output_tokens":8192}' | jq .
-
-curl -fsS http://127.0.0.1:4000/v1/responses \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","input":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}],"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"max_output_tokens":8192}' | jq .
 
 curl -fsS http://127.0.0.1:4000/v1/responses \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
@@ -224,96 +213,69 @@ curl -fsS http://127.0.0.1:4000/v1/chat/completions \
   -d '{"model":"task-youtube-transcript","messages":[{"role":"user","content":"https://youtu.be/dQw4w9WgXcQ"}],"max_tokens":16384}' | jq .
 ```
 Expected:
-- `task-transcribe` returns cleaned transcript text in the final Responses `message`
-- `task-transcribe` with `prompt_variables.audience` / `prompt_variables.tone`
-  returns cleaned transcript text shaped subtly by that guidance
 - `task-json` returns minified canonical JSON in the final Responses `message`
 - `task-youtube-transcript` returns plain timestamped transcript text in
   `choices[0].message.content`
 
-Task-transcribe audio-upload smoke:
+Deprecated task audio-upload smoke:
 ```bash
 source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
-curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
+curl -sS -o /tmp/task-transcribe-audio-response.json -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -F model=task-transcribe \
-  -F file=@/path/to/audio.wav | jq .
+  -F file=@/path/to/audio.wav
 
-curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -F model=task-transcribe \
-  -F file=@/path/to/audio.wav \
-  -F 'prompt_variables={"audience":"internal notes","tone":"lightly polished"}' | jq .
-
-curl -fsS http://127.0.0.1:4000/v1/audio/transcriptions \
+curl -sS -o /tmp/task-json-audio-response.json -w "%{http_code}\n" \
+  http://127.0.0.1:4000/v1/audio/transcriptions \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
   -F model=task-json \
-  -F file=@/path/to/audio.wav | jq .
+  -F file=@/path/to/audio.wav
 ```
 Expected:
-- request routes audio through `voice-stt`
-- response body contains only `id` and `output_text`
-- `task-transcribe` `output_text` is the cleaned transcript, not the raw STT payload
-- `task-json` `output_text` is minified canonical JSON
-- `task-transcribe` passes optional `prompt_variables.audience` and
-  `prompt_variables.tone` through to the cleanup dotprompt
+- `task-transcribe` audio upload is rejected with HTTP 415 because legacy task
+  audio routing is deprecated and no transcribe guardrail mediates the request
+- `task-json` audio upload is rejected with HTTP 400
+- transcribe audio first with `personal-asr-riva` or
+  `personal-asr-whisperkit`; submit returned text to `task-json` only when
+  structured extraction is needed
 
-Task-alias follow-up/state smoke:
+Personal Riva ASR smoke:
 ```bash
-python3 - <<'PY'
-import json, urllib.request
+source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
 
-key = None
-for line in open("/home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local", encoding="utf-8"):
-    if line.startswith("LITELLM_MASTER_KEY="):
-        key = line.split("=", 1)[1].strip().strip('"').strip("'")
-        break
-
-url = "http://127.0.0.1:4000/v1/responses"
-headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-initial = {
-    "model": "task-transcribe",
-    "input": [{"role": "user", "content": "uh okay this is kind of sudden but it matters a lot actually"}],
-    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
-    "max_output_tokens": 8192,
-}
-req = urllib.request.Request(url, data=json.dumps(initial).encode(), headers=headers, method="POST")
-with urllib.request.urlopen(req, timeout=90) as resp:
-    first = json.loads(resp.read().decode())
-
-followup = {
-    "model": "task-transcribe",
-    "previous_response_id": first["id"],
-    "input": [{"role": "user", "content": "Make that a little more formal."}],
-    "prompt_variables": {"audience": "internal notes", "tone": "lightly polished"},
-    "max_output_tokens": 4096,
-}
-req = urllib.request.Request(url, data=json.dumps(followup).encode(), headers=headers, method="POST")
-with urllib.request.urlopen(req, timeout=90) as resp:
-    second = json.loads(resp.read().decode())
-
-print(json.dumps(
-    {
-        "first_id": first.get("id"),
-        "first_output_text": first.get("output_text"),
-        "first_cached_tokens": ((first.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
-        "second_previous_response_id": second.get("previous_response_id"),
-        "second_output_text": second.get("output_text"),
-        "second_cached_tokens": ((second.get("usage") or {}).get("input_tokens_details") or {}).get("cached_tokens"),
-    },
-    indent=2,
-))
-PY
+LITELLM_API_KEY="$LITELLM_MASTER_KEY" \
+ASR_SMOKE_MODEL=personal-asr-riva \
+ASR_SMOKE_AUDIO=/tmp/2086-149220-0033-riva-proof.wav \
+ASR_SMOKE_EXPECTED_TEXT="Well, I don't wish to see it any more, observed Phoebe, turning away her eyes. It is certainly very like the old portrait." \
+ASR_SMOKE_CHECK_UNAUTHORIZED_MODEL=0 \
+ASR_SMOKE_CHECK_PROMPT_REJECTION=0 \
+ASR_SMOKE_CHECK_SILENT_REJECTION=0 \
+./scripts/personal-asr-whisperkit-smoke.sh
 ```
 
 Expected:
-- the initial task response returns a stable `id`
-- the follow-up accepts the prior public `id` as input
-- the echoed `previous_response_id` may be an internal/raw form and should not
-  be compared byte-for-byte against the public `id`
-- both responses expose `usage.input_tokens_details.cached_tokens`
-- guided `task-transcribe` keeps stable `output_text` for Shortcut-style clients
+- `personal-asr-riva` succeeds through Mini/LiteLLM
+  `/v1/audio/transcriptions`
+- no-auth and invalid-key requests return HTTP 401
+- prompt and silent-WAV rejection checks are disabled for this reusable smoke
+  because the native Riva route returns HTTP 200 with prompt ignored and HTTP
+  200 with empty text for silent audio; those provider-limited semantics are
+  recorded separately and empty text is not accepted as ASR success
+- malformed audio returns provider decode failure
+
+Verify the backend restriction separately; the transcription smoke above does
+not prove firewall state or negative reachability:
+```bash
+ssh orin 'sudo systemctl is-active homelab-riva-grpc-firewall.service'
+ssh orin 'sudo iptables -S DOCKER-USER | grep "50051"'
+```
+
+Expected:
+- the firewall unit is `active`
+- TCP `50051` rules allow Mini `192.168.1.71/32` and reject other sources as
+  documented in the Story 1.2 provider evidence
 
 Experimental ChatGPT/Codex alias checks:
 ```bash
@@ -396,29 +358,6 @@ Expected:
 - LiteLLM logs show `voice-stt-canary`
 - the Orin `voice-gateway` LAN `api_base` is used directly
 - `task-transcribe` remains untouched
-
-## Transcript alias checks
-```bash
-source /home/christopherbailey/homelab-llm/services/litellm-orch/config/env.local
-
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"messages":[{"role":"user","content":"um i i think this should probably work maybe yes"}]}' | jq -r '.choices[0].message.content'
-
-curl -fsS http://127.0.0.1:4000/v1/chat/completions \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"task-transcribe","stream":false,"max_tokens":128,"prompt_variables":{"audience":"internal notes","tone":"lightly polished"},"messages":[{"role":"user","content":"uh okay this is kind of sudden but it matters a lot actually"}]}' | jq -r '.choices[0].message.content'
-```
-
-Expected:
-- plain and guided `task-transcribe` requests succeed through `POST /v1/chat/completions`
-- outputs are plain cleaned transcript text with no wrapper label or commentary
-- outputs do not expose `reasoning`, `reasoning_content`, or `provider_specific_fields`
-- all text requests use the public `task-transcribe` lane and single
-  dotprompt-backed cleanup path
-- `task-transcribe` accepts optional `audience` and `tone` prompt variables
 
 ## Task JSON alias check
 ```bash
@@ -571,7 +510,8 @@ Expected:
 - named and `required` tool modes fail closed if the adapter does not return a callable function object
 - `/v1/responses` remains unavailable on the shadow alias
 
-Current verified caveat on LiteLLM `1.83.4`:
+Historical caveat observed on LiteLLM `1.83.4`; revalidate before relying on it
+under the current `1.85.0` baseline:
 - `/v1/model/info` and `/model/info` return `403` for worker-scoped shadow keys
   on the `4001` instance.
 - LiteLLM normalizes the supplied route list to `["llm_api_routes"]`, and that
@@ -583,13 +523,13 @@ Current verified caveat on LiteLLM `1.83.4`:
 ```bash
 curl -fsS http://127.0.0.1:4000/health/readiness | jq -r '.success_callbacks[]'
 
-journalctl -u litellm-orch.service -n 200 --no-pager | rg 'GPTRequestDefaults|TranscribeGuardrail'
+journalctl -u litellm-orch.service -n 200 --no-pager | rg 'GPTRequestDefaults'
 ```
 
 Expected:
 - `/health/readiness` currently reports `sync_deployment_callback_on_success`
   and `PrometheusLogger`.
-- journald shows `GPTRequestDefaults` and `TranscribeGuardrail` loading at startup.
+- journald shows `GPTRequestDefaults` loading at startup.
 - `WebsearchSchemaGuardrail` is absent.
 
 ## Search tool checks

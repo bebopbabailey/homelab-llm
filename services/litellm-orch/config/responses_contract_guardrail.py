@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections import Counter
+from collections import Counter, defaultdict, deque
 from pathlib import Path
 from sys import stderr
 from threading import Lock
@@ -22,6 +22,7 @@ if not logger.handlers:
 _TRACE_PATH = Path("/tmp/litellm_responses_contract_guardrail.jsonl")
 _TARGET_MODELS_DEFAULT = {"chatgpt-5"}
 _REQUEST_CONTEXTS: dict[int, dict[str, Any]] = {}
+_REQUEST_CONTEXT_IDS_BY_MODEL: dict[str, deque[int]] = defaultdict(deque)
 _COUNTERS = Counter()
 _LOCK = Lock()
 
@@ -121,6 +122,53 @@ def _record_summary() -> None:
     )
 
 
+def _remember_request_context(data: dict[str, Any], context: dict[str, Any]) -> None:
+    data_id = id(data)
+    lane_alias = str(context.get("lane_alias") or "")
+    with _LOCK:
+        _REQUEST_CONTEXTS[data_id] = context
+        if lane_alias:
+            _REQUEST_CONTEXT_IDS_BY_MODEL[lane_alias].append(data_id)
+
+
+def _forget_request_context(data: dict[str, Any]) -> dict[str, Any] | None:
+    data_id = id(data)
+    lane_alias = _normalize_model_name(data.get("model"))
+    with _LOCK:
+        context = _REQUEST_CONTEXTS.pop(data_id, None)
+        if context is not None:
+            remembered_alias = str(context.get("lane_alias") or lane_alias)
+            queue = _REQUEST_CONTEXT_IDS_BY_MODEL.get(remembered_alias)
+            if queue is not None:
+                try:
+                    queue.remove(data_id)
+                except ValueError:
+                    pass
+                if not queue:
+                    _REQUEST_CONTEXT_IDS_BY_MODEL.pop(remembered_alias, None)
+            return context
+
+        queue = _REQUEST_CONTEXT_IDS_BY_MODEL.get(lane_alias)
+        if queue is None:
+            return None
+        valid_ids = [remembered_id for remembered_id in queue if remembered_id in _REQUEST_CONTEXTS]
+        if not valid_ids:
+            _REQUEST_CONTEXT_IDS_BY_MODEL.pop(lane_alias, None)
+            return None
+        if len(valid_ids) != 1:
+            return None
+        remembered_id = valid_ids[0]
+        context = _REQUEST_CONTEXTS.pop(remembered_id, None)
+        try:
+            queue.remove(remembered_id)
+        except ValueError:
+            pass
+        if not queue:
+            _REQUEST_CONTEXT_IDS_BY_MODEL.pop(lane_alias, None)
+        return context
+    return None
+
+
 class ResponsesContractGuardrail(CustomGuardrail):
     def __init__(self, guardrail_name: str, event_hook: str, default_on: bool, **kwargs):
         self.target_models = _parse_model_targets(kwargs.get("target_models"))
@@ -155,11 +203,7 @@ class ResponsesContractGuardrail(CustomGuardrail):
             "incoming_temperature": incoming_temperature,
         }
 
-        with _LOCK:
-            _REQUEST_CONTEXTS[id(data)] = context
-
-        data["_responses_contract_policy_id"] = policy_request_id
-        data["_responses_contract_call_type"] = call_type
+        _remember_request_context(data, context)
 
         if call_type not in {"responses", "aresponses"}:
             if not self.responses_only:
@@ -192,6 +236,7 @@ class ResponsesContractGuardrail(CustomGuardrail):
                 }
             )
             _record_summary()
+            _forget_request_context(data)
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -214,6 +259,7 @@ class ResponsesContractGuardrail(CustomGuardrail):
                 }
             )
             _record_summary()
+            _forget_request_context(data)
             raise HTTPException(
                 status_code=400,
                 detail=f"model {context['lane_alias']} requires native /v1/responses input",
@@ -254,18 +300,16 @@ class ResponsesContractGuardrail(CustomGuardrail):
         if not _is_target_model(data.get("model"), self.target_models):
             return response
 
-        with _LOCK:
-            context = _REQUEST_CONTEXTS.pop(id(data), None)
+        context = _forget_request_context(data)
 
         body = _response_to_dict(response)
         emit_policy_event(
             {
                 "event_type": "policy_result",
-                "policy_request_id": data.pop("_responses_contract_policy_id", None)
-                or (context or {}).get("policy_request_id")
+                "policy_request_id": (context or {}).get("policy_request_id")
                 or uuid4().hex[:12],
                 "lane_alias": (context or {}).get("lane_alias") or _normalize_model_name(data.get("model")),
-                "call_type": data.pop("_responses_contract_call_type", None) or (context or {}).get("call_type"),
+                "call_type": (context or {}).get("call_type"),
                 "result": "success",
                 "response_id": body.get("id"),
                 "previous_response_id": body.get("previous_response_id"),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from homelab_observability import setup_tracing
 from langgraph.graph import END, START, StateGraph
 
 from orchestration_cockpit.nodes import (
@@ -14,6 +15,12 @@ from orchestration_cockpit.nodes import (
     specialized_prepare_node,
 )
 from orchestration_cockpit.state import CockpitState
+
+setup_tracing(
+    service_name="orchestration-cockpit",
+    service_version="0.1.0",
+    resource_attributes={"host.name": "mini", "homelab.plane": "orchestration"},
+)
 
 
 def build_graph():

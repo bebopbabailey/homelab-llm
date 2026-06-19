@@ -24,10 +24,22 @@ oMLX Qwen3.6 agent backend primitive.
 ## Contract
 - Passes normal chat/tool requests to oMLX with only model-id normalization.
 - Passes `stream=true` chat completions through to oMLX as server-sent events.
+- Acts as an observability shim: propagates trace headers upstream, adds
+  request/trace IDs to response headers, and records server/upstream spans when
+  the local OpenTelemetry stack is available.
+- Captures bounded local LLM prompt/response content for non-stream requests;
+  streaming requests are metadata-only in this slice.
 - Does not implement broad parser repair, LiteLLM behavior, MCP proxying, or
   OpenHands-specific policy.
 - Optional local bearer auth is enabled by setting `OMLX_AGENT_GATEWAY_AUTH_TOKEN`
   in a local-only secret env file.
+
+## Observability
+- OTLP export target: `http://127.0.0.1:4318` through the shared
+  `homelab-observability` package.
+- Content cap: `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=16384` and
+  `HOMELAB_OTEL_CONTENT_ATTRIBUTE_LIMIT_BYTES=16384`.
+- Export failure must not fail gateway requests.
 
 ## Non-Goals
 - No LiteLLM alias.

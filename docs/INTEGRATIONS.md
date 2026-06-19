@@ -111,6 +111,8 @@
   - Mini sidecar: `http://127.0.0.1:4022/v1`
   - service boundary: `services/omlx-agent-gateway`
   - chat surface: `/v1/chat/completions`, including `stream=true` passthrough
+  - observability shim: propagates OpenTelemetry trace headers and records
+    local-only spans when Alloy/Tempo are running
   - no LiteLLM alias, OpenHands handoff, Open WebUI route, or native MCP in
     this slice
 
@@ -119,8 +121,9 @@
   Agent Chat UI prototype for the orchestration plane.
 - It is intentionally outside the LiteLLM alias surface and outside Open WebUI.
 - The ordinary branch is a deterministic placeholder in phase 4.
-- The specialized branch uses `OmlxRuntimeClient` directly through the validated
-  Mini `127.0.0.1:8129` -> Studio `127.0.0.1:8120` path.
+- The specialized branch uses the Mini-local `omlx-agent-gateway` at
+  `http://127.0.0.1:4022/v1` so cockpit spans correlate with gateway upstream
+  spans in local Tempo.
 - Agent Chat UI connects to the local LangGraph dev server by graph ID
   `operator-cockpit`; no public cockpit route is defined in phase 4.
 
@@ -168,6 +171,27 @@ sum(rate(litellm_output_tokens_metric_total[1m]))
 - Dashboards live in `services/grafana/dashboards/` (deployed copy under `/etc/homelab-llm/grafana/dashboards/`).
 - Prometheus runtime config: `/etc/homelab-llm/prometheus/prometheus.yml` (deployed from repo).
 - Experimental aliases (`x1`–`x4`) are not currently configured in active router config.
+- Known runtime drift from the May 2026 OTel handoff: the live Mini Prometheus
+  process was observed on `*:9090` even though the repo contract remains
+  localhost-only. The OpenTelemetry slice tracks but does not fix that drift.
+
+### OpenTelemetry + Tempo (Mini)
+- Trace stack ownership lives under `services/grafana` rather than a separate
+  service id.
+- Alloy receives application OTLP traces on localhost:
+  - gRPC: `127.0.0.1:4317`
+  - HTTP: `127.0.0.1:4318`
+- Tempo stores traces locally and serves Grafana at `http://127.0.0.1:3200`.
+- Tempo retention is `48h`; local LLM prompt/response content may be captured
+  with a 16 KiB per-attribute cap.
+- No LangSmith, cloud, or remote trace export is configured in this slice.
+- Tier 1 instrumented services:
+  - `orchestration-cockpit`
+  - `omlx-agent-gateway`
+- Tier 2 candidates: `youtube-transcript-api`, `media-fetch-mcp`, `ccproxy-api`,
+  and selected MCP/tool APIs.
+- Tier 3 candidates: LiteLLM callbacks, Open WebUI, OpenHands, OpenCode Web,
+  Docker/container telemetry, and a separate Studio collector.
 
 ### Param support probe (LiteLLM + canonical backends)
 Run this on the **Mini** to verify which optional params are accepted or ignored:

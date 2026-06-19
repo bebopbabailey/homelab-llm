@@ -18,6 +18,7 @@ class CockpitState(TypedDict, total=False):
     fixture_id: str
     node_sequence: list[str]
     adapter_request_id: str
+    trace_id: str
     specialized_payload: dict[str, Any]
     specialized_result: dict[str, Any]
     pi_task: str

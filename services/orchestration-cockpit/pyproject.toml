@@ -8,12 +8,14 @@ version = "0.1.0"
 description = "Local LangGraph operator cockpit prototype for specialized-runtime routing"
 requires-python = ">=3.11"
 dependencies = [
+  "homelab-observability",
   "langchain-core>=1.0.1,<2",
   "langgraph>=1.0.1,<2",
   "omlx-runtime-client"
 ]
 
 [tool.uv.sources]
+homelab-observability = { path = "../../platform/observability-python", editable = true }
 omlx-runtime-client = { path = "../omlx-runtime", editable = true }
 
 [tool.setuptools]
